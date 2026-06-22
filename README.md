@@ -31,9 +31,6 @@ Broad cross-tool support for `AGENTS.md` and `.agents/` removed a major adoption
 **Is the specification final?**  
 No. This is an experiment. The repository and specification may be reworked as the model is validated. Contributions to the spec are especially welcome.
 
-**Where is the implementation?**  
-Not started. Polish the specification first, then build the reference CLI.
-
 ## Core model
 
 | Concept | Role |
