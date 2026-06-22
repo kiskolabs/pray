@@ -1,14 +1,25 @@
-## Summary
+## Description
 
-What changed and why (short).
+Please include a summary of the change and the issue it resolves.
 
-## Checklist
+## Responsibility Checklist
 
-- [ ] I ran `cargo build --workspace` and `cargo test --workspace` successfully when reference implementation code changed (or noted why not).
-- [ ] I updated [SPEC.md](SPEC.md) when normative behavior changed.
-- [ ] I updated [README.md](README.md) when user-facing scope or status changed.
-- [ ] I did not commit secrets, tokens, or private agent context from production repositories.
+*By submitting this Pull Request, I confirm the following:*
 
-## Notes
+- [ ] Accuracy: I have verified that the code works as intended and have run local tests.
 
-Optional: breaking changes, specification trade-offs, follow-ups.
+- [ ] Ownership: If I used automation/AI tools, I have personally reviewed and debugged the output. I accept full responsibility for the logic.
+
+- [ ] Clarity: I have minimized cognitive load by writing clear comments and documentation.
+
+- [ ] Safety: This change does not introduce security vulnerabilities or leak context.
+
+## Type of Change
+
+- [ ] Bug fix (non-breaking change which fixes an issue)
+
+- [ ] New feature (non-breaking change which adds functionality)
+
+- [ ] Breaking change (fix or feature that would cause existing functionality to not work as expected)
+
+- [ ] Specification change ([SPEC.md](SPEC.md))

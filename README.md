@@ -48,9 +48,9 @@ Start with [SPEC.md](SPEC.md) for file formats, resolver rules, lockfile semanti
 
 ## Contributing
 
-Bug reports, specification feedback, and pull requests are welcome through the project repository.
+Bug reports and pull requests are welcome on GitHub at https://github.com/kiskolabs/agentfile.
 
-See [CONTRIBUTING.md](CONTRIBUTING.md) for development setup and checks.
+See [CONTRIBUTING.md](CONTRIBUTING.md) for the golden rule of automation, development setup, and checks.
 
 ## License
 
@@ -58,4 +58,4 @@ MIT. See [LICENSE.md](LICENSE.md).
 
 ## Security
 
-If you discover a security vulnerability, please report it responsibly. Do not open a public issue. See [SECURITY.md](SECURITY.md).
+Do **not** open a public issue for security vulnerabilities. See [SECURITY.md](SECURITY.md).

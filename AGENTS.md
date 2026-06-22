@@ -4,6 +4,23 @@ Repository for the Agentfile open specification and the **pata** reference imple
 
 Read `SPEC.md` for the normative Agentfile, agentspec, lockfile, registry, and CLI design. This file defines how to work in this repository.
 
+## Working rules
+
+- When fixing or refactoring code, add or update tests first to expose the current bug, regression path, or missing contract; then implement the fix; then run focused and broader checks; do not ship behavior changes without proving before/after via tests.
+- Test coverage must follow `spec/README.md` guidelines.
+- Prefer files around 150 lines or fewer when cohesion allows; never split coherent logic purely to satisfy line count; split only when it improves ownership, readability, and reviewability.
+- Use Rust and ecosystem features according to the versions declared in this repository.
+- Follow Rust coding conventions, principles, and best practices.
+- Do not use abbreviations or short names for variables, methods, classes, or modules unless the name is very common in the ecosystem.
+- Avoid explanatory comments; allow intent comments for non-obvious constraints, invariants, concurrency edges, or external contract requirements.
+- Code reflects user experience; readability, structure, and clarity are product qualities, not optional polish.
+- Pull request checklist: issue ticket, changelog entry with intent or reproduction steps when relevant, test coverage, quality checks done.
+- Suggest updating docs or changelog with a short summary and pull request link only when the change is significant enough to be mentioned; changelog files use `docs/changelogs/#{YYYYMMDDHHMMSS}_<title>.md`.
+- Document ideas, issues, user requests, features, bugfixes, and chores in `docs/issues/#{YYYYMMDDHHMMSS}_<title>.md`.
+- Branch names: `feature/<title>` for features, `patch/<title>` for bugfixes and chores, `trunk/<title>` for release-candidate or integration work before `main`, `plan/<title>` for exploration and ideation.
+- Validation output must list exact commands run and observed results; never claim tests pass unless they were executed and passed.
+- Ignore style-only dust unless it harms correctness, operability, maintainability, or auditability under realistic load.
+
 ## Testing
 
 When fixing or refactoring code:
@@ -35,24 +52,6 @@ Use coverage tooling declared in this repository when validating coverage claims
 
 User interface text must never mention implementation technical details.
 
-## Code structure
-
-Prefer files around 150 lines or fewer when cohesion allows. Never split coherent logic purely to satisfy line count. Split only when it improves ownership, readability, and reviewability.
-
-Use Rust and ecosystem features according to the versions declared in this repository.
-
-Follow Rust coding conventions, principles, and best practices.
-
-Do not use abbreviations or short names for variables, methods, classes, or modules unless the name is very common in the ecosystem.
-
-## Comments
-
-Avoid explanatory comments. Allow intent comments for non-obvious constraints, invariants, concurrency edges, or external contract requirements.
-
-## Product quality
-
-Code reflects user experience. Readability, structure, and clarity are product qualities, not optional polish.
-
 ## Pull requests
 
 Pull request descriptions must answer:
@@ -63,46 +62,6 @@ Pull request descriptions must answer:
 - Any relevant context
 
 For non-trivial changes, include reproduction steps or a changelog entry with intent.
-
-Pull request checklist:
-
-- Issue ticket
-- Changelog entry with intent or reproduction steps when relevant
-- Test coverage
-- Quality checks done
-
-## Documentation and changelog
-
-Suggest updating docs or changelog with a short summary and pull request link only when the change is significant enough to be mentioned.
-
-Changelog files:
-
-```
-docs/changelogs/#{YYYYMMDDHHMMSS}_<title>.md
-```
-
-Issue and idea notes:
-
-```
-docs/issues/#{YYYYMMDDHHMMSS}_<title>.md
-```
-
-## Branch naming
-
-| Kind | Pattern |
-|------|---------|
-| Feature | `feature/<title>` |
-| Bugfix or chore | `patch/<title>` |
-| Release candidate or integration before `main` | `trunk/<title>` |
-| Exploration or ideation | `plan/<title>` |
-
-## Validation output
-
-Validation output must list exact commands run and observed results. Never claim tests pass unless they were executed and passed.
-
-## Style-only changes
-
-Ignore style-only dust unless it harms correctness, operability, maintainability, or auditability under realistic load.
 
 ## Minimal implementation
 

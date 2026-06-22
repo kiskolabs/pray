@@ -1,29 +1,37 @@
-name: Specification feedback
+name: Specification Feedback
 description: Propose a change or clarification to SPEC.md.
 title: "[Spec]: "
 labels: ["spec", "triage"]
 body:
   - type: markdown
     attributes:
-      value: |
-        Specification feedback should cite the relevant section of [SPEC.md](../SPEC.md) when possible.
+      value: "Please ensure your reporting is accurate and balanced. Verify details before submitting."
   - type: textarea
     id: section
     attributes:
-      label: SPEC.md section or topic
+      label: SPEC.md Section or Topic
+      description: Cite the relevant section when possible.
       placeholder: e.g. lockfile hashing, render targets, registry protocol
     validations:
       required: true
   - type: textarea
-    id: problem
+    id: description
     attributes:
-      label: Problem or ambiguity
-      description: What is unclear, inconsistent, or missing?
+      label: Description
+      description: What is unclear, inconsistent, or missing? Be specific and avoid generalizations.
     validations:
       required: true
   - type: textarea
     id: proposal
     attributes:
-      label: Proposed wording or behavior (optional)
+      label: Proposed Wording or Behavior
+      description: Optional preferred clarification or behavior.
     validations:
       required: false
+  - type: checkboxes
+    id: automation_check
+    attributes:
+      label: Automation Safety
+      options:
+        - label: I certify that this report does not contain private keys or PII (Security Measures).
+          required: true
