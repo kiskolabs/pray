@@ -4,7 +4,7 @@
 
 Open specification for reproducible context alteration: declare shared instructions and recipes once, resolve them deterministically, render tool-specific files, and leave provenance markers showing where each piece came from.
 
-**Status:** Draft specification v0.1 — **spec-first experiment**. The open specification is the current focus. The **pata** reference CLI (**seko** mix phase, **uuta** brew phase) is designed in [SPEC.md](SPEC.md); the Rust implementation has **not started**.
+**Status:** Draft specification v0.1 — **spec-first experiment**. The open specification is the current focus. The **pata** reference CLI (**seko** mix phase, **uuta** brew phase) is designed in [SPEC.md](SPEC.md).
 
 ## Why
 
