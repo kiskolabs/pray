@@ -279,6 +279,30 @@ Semantic analogy:
 Legacy registries may execute host-language code.  
 Agentfile must parse declarations only.
 
+### RubyGems alignment
+
+Agentfile is Bundler-shaped for resolve and lock, with an additional render phase. RubyGems and Bundler are the closest reference ecosystem; the core values in section 2 extend their indicator model to context dependencies.
+
+| Agentfile | RubyGems / Bundler |
+|-----------|-------------------|
+| Agentfile | Gemfile |
+| Agentfile.lock | Gemfile.lock |
+| *.agentspec | *.gemspec |
+| *.agentpkg | `.gem` |
+| seko (resolve + lock) | resolver / `bundle lock` |
+| uuta (fetch + render) | no direct equivalent — gems install as code trees, not merged context files |
+| pata doctor | `bundle check` and sanity checks |
+| pata diff | lockfile diff plus rendered-output diff |
+
+| Core value | RubyGems / Bundler | Agentfile extension |
+|------------|-------------------|---------------------|
+| Auditable traces | lockfile pins; package name and version | section markers and origin tags inside rendered context files |
+| Temporal clarity | lockfile history; yanked gems; explicit `bundle update` | `pata diff` across lock and render; section-level blame and rollback |
+| Measurable effects | manifest → lock → install; behavior validated by tests | manifest → lock → rendered bytes → diff; agent behavior stays human-validated |
+| Security | checksums; yanked gems; optional signing; vendoring | same supply-chain baseline; packages are static declarations only — no host-language execution |
+
+Agentfile does not replace RubyGems. It applies reproducibility and audit patterns proven necessary for code dependencies to context dependencies: lock what resolved, render what landed, mark every provisioned alteration with its source.
+
 ---
 
 ## 8. Terminology
