@@ -1,0 +1,30 @@
+# Reference implementation build
+/target/
+**/*.rs.bk
+Cargo.lock
+
+# Editor and IDE artifacts
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Build artifacts
+dist/
+tmp/
+*.log
+
+# Coverage
+coverage/
+*.gcda
+*.gcno
+*.profraw
+
+# pata local state (see SPEC.md §9)
+.agentfile/cache/
+.agentfile/state.json

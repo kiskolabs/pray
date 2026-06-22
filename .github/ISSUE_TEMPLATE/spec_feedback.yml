@@ -1,0 +1,29 @@
+name: Specification feedback
+description: Propose a change or clarification to SPEC.md.
+title: "[Spec]: "
+labels: ["spec", "triage"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Specification feedback should cite the relevant section of [SPEC.md](../SPEC.md) when possible.
+  - type: textarea
+    id: section
+    attributes:
+      label: SPEC.md section or topic
+      placeholder: e.g. lockfile hashing, render targets, registry protocol
+    validations:
+      required: true
+  - type: textarea
+    id: problem
+    attributes:
+      label: Problem or ambiguity
+      description: What is unclear, inconsistent, or missing?
+    validations:
+      required: true
+  - type: textarea
+    id: proposal
+    attributes:
+      label: Proposed wording or behavior (optional)
+    validations:
+      required: false

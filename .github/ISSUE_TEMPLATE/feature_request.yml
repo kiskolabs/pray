@@ -1,0 +1,20 @@
+name: Feature request
+description: Suggest an idea for Agentfile or pata.
+title: "[Feature]: "
+labels: ["enhancement", "triage"]
+body:
+  - type: markdown
+    attributes:
+      value: Describe the problem you are solving, not only a preferred solution.
+  - type: textarea
+    id: problem
+    attributes:
+      label: Problem / use case
+    validations:
+      required: true
+  - type: textarea
+    id: proposal
+    attributes:
+      label: Proposed approach (optional)
+    validations:
+      required: false
