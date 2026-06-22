@@ -9,7 +9,7 @@ Read `SPEC.md` for the normative Agentfile, agentspec, lockfile, registry, and C
 - **Spec first.** Polish the open specification before implementing the reference CLI. Implement changes to the system tool only after the specification is stable.
 - **Problem focus.** Context alteration is permanent—it is core to inference engines. Packaging shapes (skills today, something else tomorrow) will keep changing. Agentfile targets reproducible alteration, provenance markers, and sync of shared recipes/libraries across repositories—not any one vendor workflow.
 - **What the tool must do.** Alter target files under defined contracts, leave a trace of each alteration's source, and keep shared context pinned and updatable through manifest + lockfile semantics.
-- **Experiment.** The repository and specification may be reworked as the model is validated. Prefer spec contributions and contract clarity over premature implementation.
+- **Experiment.** The repository and specification may be reworked as the model is validated. Packaging shapes will change drastically; the durable bet is indicators that make alteration visible (lockfile, provenance, diffs)—not any one vendor workflow. Prefer spec contributions and contract clarity over premature implementation.
 
 ## Working rules
 

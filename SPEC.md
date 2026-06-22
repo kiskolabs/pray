@@ -58,7 +58,7 @@ Agent context is becoming a dependency, but today it is distributed by copy-past
 | Is this an "agentic skills" platform? | No. Skills may be one artifact type a target renders. The durable problem is distributing, locking, and rendering text context with reviewable diffs and provenance—not betting on a single workflow shape. |
 | What is "context alteration"? | Automated tools assemble working context from shared libraries and local additions. Agentfile defines contracts for that assembly: resolve, lock, render, and mark provisioned sections with package origin. |
 | Why now? | Cross-tool support for AGENTS.md and `.agents/` removed a major adoption blocker. Copy-paste still does not scale. |
-| Is the spec final? | No. Draft v0.1 is an experiment; the model may be reworked as it is validated. |
+| Is the spec final? | No. Draft v0.1 is an experiment in a fast-moving space. The model may be reworked as its indicators prove—or fail—at making change visible. |
 | Implementation status? | Spec-first. Reference CLI design lives in this document. |
 
 **Implementation mantra:**
@@ -72,6 +72,25 @@ Never execute package code.
 Never hide updates.
 Keep diffs small.
 ```
+
+### Core values
+
+Context alteration is permanent—it shapes how automated tools inspect, edit, test, and reason about code. Agentfile treats observability and trust as first-class requirements, not optional polish.
+
+| Value | What it means |
+|-------|---------------|
+| Auditable traces | Every provisioned alteration carries package origin. Agentfile.lock records exact resolved state. Render output is visibly generated and bounded by stable section markers and origin tags. |
+| Temporal clarity | Lockfile and diff semantics show what changed between resolves. Version control carries when. Section markers enable surgical rollback, blame, and review without rereading entire context files. |
+| Measurable effects | Effects are measured at the dependency boundary first: manifest → lock → rendered bytes → reviewable diff. Behavioral outcomes remain human-validated; the specification does not score agent quality. |
+| Security | Context packages are supply-chain inputs: static declarations only, hash-verified, path-safe, explicitly updated. Audit trails align with integrity—implementations can prove what was installed, from where, and at which version. |
+
+These values inform lockfile fields, section markers, `pata diff` output, doctor checks, and the security model in later sections.
+
+### Experiment intent
+
+Packaging shapes, tool conventions, and workflow surfaces for agent context will keep changing drastically—skills today, something else tomorrow. This specification is an experiment in *seeing* that motion, not in freezing one workflow bet.
+
+To observe change, you need indicators. Agentfile defines them as contracts: pinned lock state, provenance markers, explicit diffs, and integrity checks. The core values above are those indicators made normative—so teams can measure what altered, when, and from where while the surrounding ecosystem shifts.
 
 ---
 
@@ -137,6 +156,10 @@ The specification prioritizes:
 - clear package ownership
 - tool-neutral package model
 - tool-specific adapters
+- auditable provenance for every provisioned alteration
+- temporal impact visible through lockfile and diff semantics
+- measurable textual effects at the manifest–lock–render boundary
+- supply-chain security for context packages
 
 The main aesthetic is:
 
