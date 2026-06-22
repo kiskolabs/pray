@@ -1,8 +1,15 @@
 # Agent context
 
-Repository for the Agentfile open specification and the **pata** reference implementation (`pata` CLI; **seko** mix phase, **uuta** brew phase).
+Repository for the Agentfile open specification and the planned **pata** reference implementation (`pata` CLI; **seko** mix phase, **uuta** brew phase).
 
 Read `SPEC.md` for the normative Agentfile, agentspec, lockfile, registry, and CLI design. This file defines how to work in this repository.
+
+## Project intent
+
+- **Spec first.** Polish the open specification before implementing the reference CLI. Implement changes to the system tool only after the specification is stable.
+- **Problem focus.** Context alteration is permanent—it is core to inference engines. Packaging shapes (skills today, something else tomorrow) will keep changing. Agentfile targets reproducible alteration, provenance markers, and sync of shared recipes/libraries across repositories—not any one vendor workflow.
+- **What the tool must do.** Alter target files under defined contracts, leave a trace of each alteration's source, and keep shared context pinned and updatable through manifest + lockfile semantics.
+- **Experiment.** The repository and specification may be reworked as the model is validated. Prefer spec contributions and contract clarity over premature implementation.
 
 ## Working rules
 

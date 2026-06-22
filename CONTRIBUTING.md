@@ -1,6 +1,6 @@
 # Contributing Guidelines
 
-Thank you for your interest in contributing to the Agentfile open specification and the **pata** reference implementation. We value learning over perfection but require rigor and responsibility.
+Thank you for your interest in contributing to the Agentfile open specification and the planned **pata** reference implementation. This repository is **spec-first**: polish the open specification before implementing the changes. We value learning over perfection but require rigor and responsibility.
 
 ## The Golden Rule of Automation
 

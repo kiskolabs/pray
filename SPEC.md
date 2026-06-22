@@ -15,7 +15,7 @@
 
 Agentfile is an open, lockfile-based dependency specification for reusable AI-agent context.
 
-It allows repositories to declare shared agent instructions, skills, templates, workflows, review rules, and tool-specific context packages in a reproducible way.
+It allows repositories to declare shared agent instructions, templates, workflows, review rules, and tool-specific context packages in a reproducible way. Targets may render skills or other tool-specific artifacts; the specification is workflow-neutral.
 
 The core model is:
 
@@ -37,7 +37,7 @@ Agentfile.lock is conceptually similar to dependency lockfile.
 
 But unlike legacy package registries, the specification must not require host-language execution. All files must be parseable as static declarations by any implementation in any language.
 
-The goal is not to create a magic agent. The goal is to distribute, lock, verify, and render agent context cleanly.
+The goal is not to create a magic agent. The goal is to distribute, lock, verify, and render agent context cleanly—with provenance for every provisioned alteration.
 
 ---
 
@@ -45,11 +45,21 @@ The goal is not to create a magic agent. The goal is to distribute, lock, verify
 
 **One-sentence definition:**
 
-Agentfile is an open, lockfile-based package specification for reusable AI-agent context, allowing repositories to declare shared instructions and skills once, resolve them reproducibly, and render small tool-specific context files with reviewable diffs.
+Agentfile is an open, lockfile-based package specification for reusable AI-agent context, allowing repositories to declare shared instructions once, resolve them reproducibly, render small tool-specific context files with reviewable diffs, and mark every provisioned section with its source.
 
 **Short pitch:**
 
-Agent context is becoming a dependency, but today it is distributed by copy-paste. Agentfile introduces a lockfile-resolver-like model for INSTRUCTIONS.md, TOOL_B.md, skills, templates, and tool-specific instruction files. Agentfile declares desired context packages, Agentfile.lock records the exact resolved versions and hashes, and pata renders small deterministic outputs for different agent tools.
+Agent context is becoming a dependency, but today it is distributed by copy-paste. There is no bundler for these text files. Agentfile introduces a lockfile-resolver-like model for AGENTS.md, `.agents/`, INSTRUCTIONS.md, TOOL_B.md, templates, and tool-specific instruction files. Agentfile declares desired context packages, Agentfile.lock records the exact resolved versions and hashes, and pata renders small deterministic outputs for different agent tools—with section markers and origin tags so every provisioned alteration has a visible source.
+
+**FAQ:**
+
+| Question | Answer |
+|----------|--------|
+| Is this an "agentic skills" platform? | No. Skills may be one artifact type a target renders. The durable problem is distributing, locking, and rendering text context with reviewable diffs and provenance—not betting on a single workflow shape. |
+| What is "context alteration"? | Automated tools assemble working context from shared libraries and local additions. Agentfile defines contracts for that assembly: resolve, lock, render, and mark provisioned sections with package origin. |
+| Why now? | Cross-tool support for AGENTS.md and `.agents/` removed a major adoption blocker. Copy-paste still does not scale. |
+| Is the spec final? | No. Draft v0.1 is an experiment; the model may be reworked as it is validated. |
+| Implementation status? | Spec-first. Reference CLI design lives in this document. |
 
 **Implementation mantra:**
 
@@ -155,6 +165,8 @@ This system is not:
 - an autonomous context writer
 - a replacement for human review
 - a package manager for executable code
+- a product built around any single agent workflow shape (for example, today's skills packaging)
+- a bet that current agent-context conventions will stay unchanged; it assumes they will evolve while context alteration remains
 
 Self-recovery means deterministic reconstruction from Agentfile.lock.
 

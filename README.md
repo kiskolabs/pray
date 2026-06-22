@@ -1,16 +1,38 @@
 # Agentfile
 
-Open, lockfile-based package specification for reusable AI-agent context.
+**A lockfile-resolver for agent context text files.**
 
-Agentfile lets repositories declare shared instructions, skills, templates, and tool-specific context packages once, resolve them reproducibly, and render small deterministic outputs for different agent tools.
+Open specification for reproducible context alteration: declare shared instructions and recipes once, resolve them deterministically, render tool-specific files, and leave provenance markers showing where each piece came from.
 
-**Status:** Draft specification v0.1. The **pata** reference CLI (**seko** mix phase, **uuta** brew phase) is in progress in this repository.
+**Status:** Draft specification v0.1 — **spec-first experiment**. The open specification is the current focus. The **pata** reference CLI (**seko** mix phase, **uuta** brew phase) is designed in [SPEC.md](SPEC.md); the Rust implementation has **not started**.
 
 ## Why
 
-Agent-oriented development relies on files such as `INSTRUCTIONS.md`, `.tool-c/rules/`, skills, and review checklists. Teams copy the same context between repositories, which leads to stale instructions, large diffs, hidden drift, and hard rollback.
+Agent tools alter context by reading files such as `AGENTS.md`, `.agents/`, instruction files, templates, and review checklists. Context alteration is core to inference; the packaging shape around it will keep changing.
 
-Agentfile treats agent context as a dependency—similar in spirit to a dependency manifest and lockfile, but without requiring host-language execution.
+There is no bundler for these text files today. Teams copy the same context between repositories, which leads to stale instructions, large diffs, hidden drift, and hard rollback.
+
+Agentfile treats agent context as a dependency—similar in spirit to a dependency manifest and lockfile, but without requiring host-language execution. It alters files under defined contracts and records the source of each alteration.
+
+## FAQ
+
+**What problem is this actually solving?**  
+Reproducible context alteration and sync of shared libraries/recipes across repositories—not a bet on any single agent workflow or packaging fad.
+
+**Is this an "agentic skills" product?**  
+No. Skills may be one artifact type a target renders, but the durable problem is distributing, locking, and rendering **text context** with reviewable diffs and clear provenance. Workflow shapes change quickly; context alteration does not.
+
+**What does the tool do?**  
+Resolve declared packages, lock exact versions and hashes, render small deterministic outputs for different agent tools, and mark provisioned sections so humans and agents know what not to edit and where shared content comes from.
+
+**Why now?**  
+Broad cross-tool support for `AGENTS.md` and `.agents/` removed a major adoption blocker. Copy-paste still does not scale.
+
+**Is the specification final?**  
+No. This is an experiment. The repository and specification may be reworked as the model is validated. Contributions to the spec are especially welcome.
+
+**Where is the implementation?**  
+Not started. Polish the specification first, then build the reference CLI.
 
 ## Core model
 
