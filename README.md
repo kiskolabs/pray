@@ -1,78 +1,110 @@
 # Prayfile
 
-**A package manager for agent context.**
+**Agent context as a dependency.**
 
-Prayfile is an open specification for reproducible agent context composition. Declare shared instructions, policies, memories, templates, and workflows once; resolve them deterministically; lock exact versions and hashes; and render tool-specific outputs with clear provenance.
+Prayfile is an open specification for reproducible agent context composition.
 
-The goal is simple: treat agent context as a dependency.
+It lets a project declare shared instructions, policies, memories, templates, review rituals, and workflows in one place; resolve them deterministically; lock exact versions and hashes; and render tool-specific outputs with visible provenance.
 
-**Status:** Draft specification v0.1 — **spec-first experiment**. The open specification is the primary focus. The **pray** reference CLI is described in `SPEC.md`.
+Not magic. Not agent theatre. Just dependency management for the text that bends agent behaviour.
+
+**Status:** Draft specification v0.1 — spec-first experiment.
+The open specification is the main object. The `pray` reference CLI is described in `SPEC.md`.
 
 ## Why
 
-Agent tools increasingly rely on files such as `AGENTS.md`, instruction libraries, prompt templates, review checklists, and other context artifacts. These files shape inference behavior, yet most teams still distribute them through copy-paste.
+Agent tools now read files like `AGENTS.md`, instruction libraries, prompt templates, checklists, memories, and local workflow notes.
 
-As context libraries grow, repositories accumulate stale instructions, hidden drift, inconsistent updates, and difficult rollbacks. Shared context becomes harder to audit and maintain.
+These files are not decoration. They shape inference. They change review behaviour. They decide what an agent notices, ignores, repeats, refuses, or breaks.
 
-Prayfile provides a reproducible way to package, version, distribute, and compose agent context.
+Most teams still move this context by copy-paste.
 
-Instead of manually copying files between repositories, teams declare context dependencies, resolve them deterministically, lock exact versions, and render reproducible outputs for supported tools.
+That works until it does not.
 
-Every rendered fragment retains provenance so both humans and agents can understand where shared content originated.
+Instructions drift. Old rules stay alive. Repositories disagree. Rollbacks become folklore. Shared context turns into soft mud: almost structured, almost auditable, almost true.
 
-## FAQ
+Prayfile treats context like a real dependency.
 
-### What problem does Prayfile solve?
+Declare it. Resolve it. Lock it. Render it. Review the diff.
 
-Reproducible composition and synchronization of shared agent context across repositories, teams, and tools.
+Every rendered fragment keeps provenance, so humans and agents can see where a piece came from instead of trusting the fog.
 
-### Is this an "agentic skills" framework?
+## What problem does it solve?
+
+Prayfile solves reproducible composition and synchronization of shared agent context across repositories, teams, and tools.
+
+The small problem is copying `AGENTS.md`.
+
+The larger problem is context drift: the slow, silent divergence of rules, policies, prompts, templates, memories, and workflow assumptions.
+
+Prayfile gives that drift a checksum.
+
+## Is this an agentic skills framework?
 
 No.
 
-Skills, prompts, templates, memories, workflows, and instruction sets may all be packaged using Prayfile, but the durable problem is packaging and distributing context itself.
+Skills, prompts, templates, memories, workflows, review policies, and instruction sets can be packaged with Prayfile, but Prayfile is not a runtime philosophy and not a skill altar.
 
-Prayfile focuses on dependency management, version locking, deterministic resolution, and provenance.
+Its durable concern is distribution.
 
-### What does the tool do?
+It focuses on dependency management, version locking, deterministic resolution, reproducible rendering, and provenance.
+
+## What does it do?
 
 Prayfile:
 
-- Resolves declared context dependencies
-- Locks exact versions and content hashes
-- Produces deterministic outputs
-- Tracks provenance of rendered content
-- Enables reviewable updates through normal version control workflows
+* resolves declared context dependencies
+* locks exact versions and content hashes
+* produces deterministic outputs
+* tracks provenance of rendered content
+* keeps updates visible through ordinary version control
+* avoids arbitrary package code execution
 
-### Why now?
+The point is not to make agents more mystical.
 
-Broad adoption of files such as `AGENTS.md` has reduced fragmentation around how agent context is discovered and consumed.
+The point is to make context less swampy.
 
-The remaining challenge is maintaining shared context across many repositories without relying on copy-paste.
+## Why now?
 
-### Does Prayfile execute package code?
+Files like `AGENTS.md` made agent context more visible and less fragmented.
+
+That was the first step.
+
+The next problem is distribution: how to keep shared context consistent across many repositories without turning every update into manual copy-paste jazz with broken syncopation.
+
+Prayfile answers that part.
+
+## Does Prayfile execute package code?
 
 No.
 
-Prayfile packages are data. Resolution and rendering are deterministic and do not require executing arbitrary package code.
+Prayfile packages are data.
 
-### Is the specification final?
+Resolution and rendering must be deterministic. Packages do not need to run arbitrary code to become useful.
+
+This is a security line, not an aesthetic preference.
+
+## Is the specification final?
 
 No.
 
-The project is experimental. Terminology, formats, and implementation details may evolve as the model is validated through real-world use.
+This is experimental.
 
-## Core Model
+Names, formats, package structure, resolver rules, rendering targets, and implementation details may change as the model is tested in real repositories.
 
-| Concept | Role |
-|----------|----------|
-| **Prayfile** | Human-authored dependency manifest |
-| **Prayfile.lock** | Machine-authored resolved state |
-| **\*.prayspec** | Package definition |
-| **\*.praypkg** | Package archive |
-| **pray** | Reference CLI |
+The specification is the instrument. The CLI is only the first bow across the string.
 
-## Design Principles
+## Core model
+
+| Concept         | Role                               |
+| --------------- | ---------------------------------- |
+| `Prayfile`      | Human-authored dependency manifest |
+| `Prayfile.lock` | Machine-authored resolved state    |
+| `*.prayspec`    | Package definition                 |
+| `*.praypkg`     | Package archive                    |
+| `pray`          | Reference CLI                      |
+
+## Design principles
 
 ```text
 Declare context.
@@ -85,40 +117,42 @@ Keep diffs small.
 Preserve provenance.
 ```
 
-## Repository Layout
+## Repository layout
 
-| Path | Purpose |
-|----------|----------|
-| `SPEC.md` | Normative specification |
-| `AGENTS.md` | Contributor and agent workflow |
-| `spec/README.md` | Test coverage guidelines |
+| Path             | Purpose                        |
+| ---------------- | ------------------------------ |
+| `SPEC.md`        | Normative specification        |
+| `AGENTS.md`      | Contributor and agent workflow |
+| `spec/README.md` | Test coverage guidelines       |
 
-## Read the Specification
+## Read the specification
 
-Start with `SPEC.md` for:
+Start with `SPEC.md`.
 
-- File formats
-- Resolver behavior
-- Lockfile semantics
-- Package structure
-- Registry design
-- Rendering targets
-- CLI commands
+It defines:
+
+* file formats
+* resolver behaviour
+* lockfile semantics
+* package structure
+* registry design
+* rendering targets
+* CLI commands
 
 ## Contributing
 
-Bug reports, design discussions, and pull requests are welcome.
+Bug reports, design critique, examples, and pull requests are welcome.
 
-Please read `CONTRIBUTING.md` before submitting changes.
+Read `CONTRIBUTING.md` before submitting changes.
 
-The specification is currently the primary area of development and feedback.
+The specification is currently the main area of development and feedback. Implementation should follow the spec, not outrun it into clever sludge.
+
+## Security
+
+Do not report security vulnerabilities through public issues.
+
+Use the responsible disclosure process described in `SECURITY.md`.
 
 ## License
 
 MIT. See `LICENSE.md`.
-
-## Security
-
-Please do not disclose security vulnerabilities through public issues.
-
-See `SECURITY.md` for responsible disclosure instructions.
