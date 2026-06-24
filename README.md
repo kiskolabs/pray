@@ -1,80 +1,124 @@
-# Agentfile
+# Prayfile
 
-**A lockfile-resolver for agent context text files.**
+**A package manager for agent context.**
 
-Open specification for reproducible context alteration: declare shared instructions and recipes once, resolve them deterministically, render tool-specific files, and leave provenance markers showing where each piece came from.
+Prayfile is an open specification for reproducible agent context composition. Declare shared instructions, policies, memories, templates, and workflows once; resolve them deterministically; lock exact versions and hashes; and render tool-specific outputs with clear provenance.
 
-**Status:** Draft specification v0.1 — **spec-first experiment**. The open specification is the current focus. The **pata** reference CLI (**seko** mix phase, **uuta** brew phase) is designed in [SPEC.md](SPEC.md).
+The goal is simple: treat agent context as a dependency.
+
+**Status:** Draft specification v0.1 — **spec-first experiment**. The open specification is the primary focus. The **pray** reference CLI is described in `SPEC.md`.
 
 ## Why
 
-Agent tools alter context by reading files such as `AGENTS.md`, `.agents/`, instruction files, templates, and review checklists. Context alteration is core to inference; the packaging shape around it will keep changing.
+Agent tools increasingly rely on files such as `AGENTS.md`, instruction libraries, prompt templates, review checklists, and other context artifacts. These files shape inference behavior, yet most teams still distribute them through copy-paste.
 
-There is no bundler for these text files today. Teams copy the same context between repositories, which leads to stale instructions, large diffs, hidden drift, and hard rollback.
+As context libraries grow, repositories accumulate stale instructions, hidden drift, inconsistent updates, and difficult rollbacks. Shared context becomes harder to audit and maintain.
 
-Agentfile treats agent context as a dependency—similar in spirit to a dependency manifest and lockfile, but without requiring host-language execution. It alters files under defined contracts and records the source of each alteration.
+Prayfile provides a reproducible way to package, version, distribute, and compose agent context.
+
+Instead of manually copying files between repositories, teams declare context dependencies, resolve them deterministically, lock exact versions, and render reproducible outputs for supported tools.
+
+Every rendered fragment retains provenance so both humans and agents can understand where shared content originated.
 
 ## FAQ
 
-**What problem is this actually solving?**  
-Reproducible context alteration and sync of shared libraries/recipes across repositories—not a bet on any single agent workflow or packaging fad.
+### What problem does Prayfile solve?
 
-**Is this an "agentic skills" product?**  
-No. Skills may be one artifact type a target renders, but the durable problem is distributing, locking, and rendering **text context** with reviewable diffs and clear provenance. Workflow shapes change quickly; context alteration does not.
+Reproducible composition and synchronization of shared agent context across repositories, teams, and tools.
 
-**What does the tool do?**  
-Resolve declared packages, lock exact versions and hashes, render small deterministic outputs for different agent tools, and mark provisioned sections so humans and agents know what not to edit and where shared content comes from.
+### Is this an "agentic skills" framework?
 
-**Why now?**  
-Broad cross-tool support for `AGENTS.md` and `.agents/` removed a major adoption blocker. Copy-paste still does not scale.
+No.
 
-**Is the specification final?**  
-No. This is an experiment. The repository and specification may be reworked as the model is validated. Contributions to the spec are especially welcome.
+Skills, prompts, templates, memories, workflows, and instruction sets may all be packaged using Prayfile, but the durable problem is packaging and distributing context itself.
 
-## Core model
+Prayfile focuses on dependency management, version locking, deterministic resolution, and provenance.
+
+### What does the tool do?
+
+Prayfile:
+
+- Resolves declared context dependencies
+- Locks exact versions and content hashes
+- Produces deterministic outputs
+- Tracks provenance of rendered content
+- Enables reviewable updates through normal version control workflows
+
+### Why now?
+
+Broad adoption of files such as `AGENTS.md` has reduced fragmentation around how agent context is discovered and consumed.
+
+The remaining challenge is maintaining shared context across many repositories without relying on copy-paste.
+
+### Does Prayfile execute package code?
+
+No.
+
+Prayfile packages are data. Resolution and rendering are deterministic and do not require executing arbitrary package code.
+
+### Is the specification final?
+
+No.
+
+The project is experimental. Terminology, formats, and implementation details may evolve as the model is validated through real-world use.
+
+## Core Model
 
 | Concept | Role |
-|---------|------|
-| **Agentfile** | Human-authored dependency manifest |
-| **Agentfile.lock** | Machine-authored exact resolved state |
-| **\*.agentspec** | Package definition file |
-| **\*.agentpkg** | Built package archive |
-| **pata** | Reference CLI |
-| **seko** | Mix phase — resolve dependencies and merge exports |
-| **uuta** | Brew phase — fetch, verify, and render context |
+|----------|----------|
+| **Prayfile** | Human-authored dependency manifest |
+| **Prayfile.lock** | Machine-authored resolved state |
+| **\*.prayspec** | Package definition |
+| **\*.praypkg** | Package archive |
+| **pray** | Reference CLI |
 
-```
-Parse data.
+## Design Principles
+
+```text
+Declare context.
 Resolve deterministically.
 Lock exactly.
-Render minimally.
+Render reproducibly.
 Never execute package code.
 Never hide updates.
 Keep diffs small.
+Preserve provenance.
 ```
 
-## Repository layout
+## Repository Layout
 
 | Path | Purpose |
-|------|---------|
-| [SPEC.md](SPEC.md) | Normative open specification |
-| [AGENTS.md](AGENTS.md) | Contributor and agent workflow for this repo |
-| [spec/README.md](spec/README.md) | Test coverage guidelines |
+|----------|----------|
+| `SPEC.md` | Normative specification |
+| `AGENTS.md` | Contributor and agent workflow |
+| `spec/README.md` | Test coverage guidelines |
 
-## Read the specification
+## Read the Specification
 
-Start with [SPEC.md](SPEC.md) for file formats, resolver rules, lockfile semantics, registry design, rendering targets, and CLI commands.
+Start with `SPEC.md` for:
+
+- File formats
+- Resolver behavior
+- Lockfile semantics
+- Package structure
+- Registry design
+- Rendering targets
+- CLI commands
 
 ## Contributing
 
-Bug reports and pull requests are welcome on GitHub at https://github.com/kiskolabs/agentfile.
+Bug reports, design discussions, and pull requests are welcome.
 
-See [CONTRIBUTING.md](CONTRIBUTING.md) for the golden rule of automation, development setup, and checks.
+Please read `CONTRIBUTING.md` before submitting changes.
+
+The specification is currently the primary area of development and feedback.
 
 ## License
 
-MIT. See [LICENSE.md](LICENSE.md).
+MIT. See `LICENSE.md`.
 
 ## Security
 
-Do **not** open a public issue for security vulnerabilities. See [SECURITY.md](SECURITY.md).
+Please do not disclose security vulnerabilities through public issues.
+
+See `SECURITY.md` for responsible disclosure instructions.
