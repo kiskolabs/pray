@@ -1,4 +1,4 @@
-# Prayfile
+# pray & Prayfile
 
 **A package manager for the language placed before inference.**
 
