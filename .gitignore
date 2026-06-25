@@ -25,6 +25,6 @@ coverage/
 *.gcno
 *.profraw
 
-# pata local state (see SPEC.md §9)
-.agentfile/cache/
-.agentfile/state.json
+# pray local state (see SPEC.md §9)
+.pray/cache/
+.pray/state.json

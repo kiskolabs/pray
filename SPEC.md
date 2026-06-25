@@ -1,11 +1,9 @@
-# Agentfile Open Specification
+# Prayfile Open Specification
 
 **Status:** Draft v0.1  
-**Primary file names:** Agentfile, Agentfile.lock, *.agentspec, *.agentpkg  
-**Reference CLI name:** pata  
-**Mix phase name:** seko  
-**Brew phase name:** uuta  
-**Project name:** pata  
+**Primary file names:** Prayfile, Prayfile.lock, *.prayspec, *.praypkg  
+**Reference CLI name:** pray  
+**Project name:** pray  
 **Reference implementation target:** systems language  
 **Specification goal:** language-independent, platform-independent, implementation-independent
 
@@ -13,31 +11,30 @@
 
 ## 1. Summary
 
-Agentfile is an open, lockfile-based dependency specification for reusable AI-agent context.
+Prayfile is an open specification for reproducible inference input composition.
 
-It allows repositories to declare shared agent instructions, templates, workflows, review rules, and tool-specific context packages in a reproducible way. Targets may render skills or other tool-specific artifacts; the specification is workflow-neutral.
+It lets projects declare shared instructions, policies, memories, templates, review checklists, formatting rules, and workflows in one place; resolve them deterministically; lock exact versions and hashes; preserve original source fragments; and render tool-specific outputs with compact provenance markers.
 
 The core model is:
 
 | Concept | Role |
 |---------|------|
-| Agentfile | human-authored dependency manifest |
-| Agentfile.lock | machine-authored exact resolved state |
-| *.agentspec | package definition file |
-| *.agentpkg | built package archive |
-| pata | reference CLI and project name |
-| seko | mix phase — resolve dependencies and merge exports |
-| uuta | brew phase — fetch, verify, and render context |
+| Prayfile | human-authored input dependency manifest |
+| Prayfile.lock | machine-authored resolved state |
+| *.prayspec | package definition |
+| *.praypkg | package archive |
+| distribution point | registry-like source for packages, metadata, checksums, signatures, feedback, and docs |
+| pray | reference CLI |
 
-Agentfile is conceptually similar to dependency manifest.
+Prayfile is conceptually similar to dependency manifest.
 
-Agentfile.lock is conceptually similar to dependency lockfile.
+Prayfile.lock is conceptually similar to dependency lockfile.
 
-*.agentspec is conceptually similar to *.packagespec.
+*.prayspec is conceptually similar to *.packagespec.
 
 But unlike legacy package registries, the specification must not require host-language execution. All files must be parseable as static declarations by any implementation in any language.
 
-The goal is not to create a magic agent. The goal is to distribute, lock, verify, and render agent context cleanly—with provenance for every provisioned alteration.
+The goal is not to create a magic agent. The goal is to distribute, lock, verify, and render inference input cleanly—with compact pray markers that cite `Prayfile.lock`.
 
 ---
 
@@ -45,71 +42,83 @@ The goal is not to create a magic agent. The goal is to distribute, lock, verify
 
 **One-sentence definition:**
 
-Agentfile is an open, lockfile-based package specification for reusable AI-agent context, allowing repositories to declare shared instructions once, resolve them reproducibly, render small tool-specific context files with reviewable diffs, and mark every provisioned section with its source.
+Prayfile is an open specification for reproducible inference input composition.
 
 **Short pitch:**
 
-Agent context is becoming a dependency, but today it is distributed by copy-paste. There is no bundler for these text files. Agentfile introduces a lockfile-resolver-like model for AGENTS.md, `.agents/`, INSTRUCTIONS.md, TOOL_B.md, templates, and tool-specific instruction files. Agentfile declares desired context packages, Agentfile.lock records the exact resolved versions and hashes, and pata renders small deterministic outputs for different agent tools—with section markers and origin tags so every provisioned alteration has a visible source.
+Modern inference engines rely on surrounding input files such as `AGENTS.md`, `CLAUDE.md`, instruction libraries, prompt templates, review checklists, memories, formatting rules, and workflow notes. These files are often distributed manually through copy-paste. Prayfile lets projects declare shared input dependencies, resolve them deterministically, lock exact versions and content hashes, preserve original source fragments, and render tool-specific outputs with compact provenance markers.
 
 **FAQ:**
 
 | Question | Answer |
 |----------|--------|
-| Is this an "agentic skills" platform? | No. Skills may be one artifact type a target renders. The durable problem is distributing, locking, and rendering text context with reviewable diffs and provenance—not betting on a single workflow shape. |
-| What is "context alteration"? | Automated tools assemble working context from shared libraries and local additions. Agentfile defines contracts for that assembly: resolve, lock, render, and mark provisioned sections with package origin. |
-| Why now? | Cross-tool support for AGENTS.md and `.agents/` removed a major adoption blocker. Copy-paste still does not scale. |
-| Is the spec final? | No. Draft v0.1 is an experiment in a fast-moving space. The model may be reworked as its indicators prove—or fail—at making change visible. |
-| Implementation status? | Spec-first. Reference CLI design lives in this document. |
+| Is this a prompt framework? | No. The durable problem is packaging and distributing the material placed before inference—not prompt design itself. |
+| What is input drift? | The gradual divergence of instructions, policies, templates, memories, formatting rules, and workflow assumptions between projects. |
+| Why now? | Cross-tool support for `AGENTS.md`, `CLAUDE.md`, and similar files removed a major adoption blocker. Copy-paste still does not scale. |
+| Is the spec final? | No. Draft v0.1 is an experiment. Terminology, formats, and behaviour may evolve as the model is validated. |
+| Implementation status? | Spec-first. Reference CLI design lives in this document and `README.md`. |
 
-**Implementation mantra:**
+**Design principles:**
 
-```
-Parse data.
+```text
+Declare input.
 Resolve deterministically.
 Lock exactly.
-Render minimally.
+Verify by checksum.
+Sign packages.
+Harden publishing.
+Collect signed feedback.
+Cache original fragments.
+Render reproducibly.
+Cite compactly.
+Format safely.
+Plan before applying.
+Detect drift.
+Serve without extra machinery.
 Never execute package code.
 Never hide updates.
 Keep diffs small.
+Preserve provenance.
+Support rollback.
+Respect silence.
+Avoid bundled binary assets.
 ```
 
 ### Core values
 
-Context alteration is permanent—it shapes how automated tools inspect, edit, test, and reason about code. Agentfile treats observability and trust as first-class requirements, not optional polish.
+Inference input is operational—it shapes what models notice, ignore, repeat, refuse, prioritize, imitate, format, or treat as important. Prayfile treats observability and trust as first-class requirements, not optional polish.
 
 | Value | What it means |
 |-------|---------------|
-| Auditable traces | Every provisioned alteration carries package origin. Agentfile.lock records exact resolved state. Render output is visibly generated and bounded by stable section markers and origin tags. |
-| Temporal clarity | Lockfile and diff semantics show what changed between resolves. Version control carries when. Section markers enable surgical rollback, blame, and review without rereading entire context files. |
-| Measurable effects | Effects are measured at the dependency boundary first: manifest → lock → rendered bytes → reviewable diff. Behavioral outcomes remain human-validated; the specification does not score agent quality. |
-| Security | Context packages are supply-chain inputs: static declarations only, hash-verified, path-safe, explicitly updated. Audit trails align with integrity—implementations can prove what was installed, from where, and at which version. |
+| Auditable traces | Every managed rendered span carries a compact pray marker. `Prayfile.lock` records exact resolved state, source checksums, silenced fragments, and provenance metadata. |
+| Temporal clarity | Lockfile and drift semantics show what changed between resolves. Version control carries when. Pray markers enable surgical rollback, blame, and review without rereading entire target files. |
+| Measurable effects | Effects are measured at the dependency boundary first: manifest → lock → rendered bytes → reviewable diff. Inference behaviour remains human-validated; the specification does not score model quality. |
+| Security | Input packages are supply-chain inputs: static declarations only, hash-verified, path-safe, explicitly updated, optionally signed. Audit trails align with integrity—implementations can prove what was installed, from where, and at which version. |
 
-These values inform lockfile fields, section markers, `pata diff` output, doctor checks, and the security model in later sections.
+These values inform lockfile fields, pray markers, `pray drift` output, `pray verify` checks, and the security model in later sections.
 
 ### Experiment intent
 
-Packaging shapes, tool conventions, and workflow surfaces for agent context will keep changing drastically—skills today, something else tomorrow. This specification is an experiment in *seeing* that motion, not in freezing one workflow bet.
+Packaging shapes, tool conventions, and workflow surfaces for inference input will keep changing drastically—skills today, something else tomorrow. This specification is an experiment in *seeing* that motion, not in freezing one workflow bet.
 
-To observe change, you need indicators. Agentfile defines them as contracts: pinned lock state, provenance markers, explicit diffs, and integrity checks. The core values above are those indicators made normative—so teams can measure what altered, when, and from where while the surrounding ecosystem shifts.
+To observe change, you need indicators. Prayfile defines them as contracts: pinned lock state, pray markers, explicit diffs, integrity checks, and signed feedback. The core values above are those indicators made normative—so teams can measure what altered, when, and from where while the surrounding ecosystem shifts.
 
 ---
 
 ## 3. Problem
 
-Agent-oriented development now commonly uses files and folders such as:
+Inference-oriented development now commonly uses files and folders such as:
 
-- INSTRUCTIONS.md
-- TOOL_B.md
-- .agents/
-- .tool-b/skills/
-- .tool-c/rules/
-- .tool-d/
-- .tool-e/
-- prompts/
-- review-checklists/
-- security-guides/
-- testing-guides/
-- workflow templates
+- AGENTS.md
+- CLAUDE.md
+- `.github/copilot-instructions.md`
+- `.agents/`
+- instruction libraries
+- prompt templates
+- review checklists
+- memories
+- formatting rules
+- workflow notes
 
 Teams copy the same context between repositories.
 
@@ -124,11 +133,11 @@ This causes:
 - hard rollback
 - hard audit
 - conflicting rules
-- different output for different agent tools
-- accidental private-context leakage
-- giant INSTRUCTIONS.md / TOOL_B.md files
+- different output for different inference tools
+- accidental private-input leakage
+- giant merged instruction files
 
-Agent context is not just documentation. It affects how automated tools inspect, edit, test, and reason about code.
+Inference input is not passive documentation. It affects what models notice, ignore, repeat, refuse, prioritize, imitate, format, or treat as important.
 
 Therefore it should be treated as a dependency.
 
@@ -156,7 +165,7 @@ The specification prioritizes:
 - clear package ownership
 - tool-neutral package model
 - tool-specific adapters
-- auditable provenance for every provisioned alteration
+- auditable provenance for every managed rendered span
 - temporal impact visible through lockfile and diff semantics
 - measurable textual effects at the manifest–lock–render boundary
 - supply-chain security for context packages
@@ -189,11 +198,11 @@ This system is not:
 - a replacement for human review
 - a package manager for executable code
 - a product built around any single agent workflow shape (for example, today's skills packaging)
-- a bet that current agent-context conventions will stay unchanged; it assumes they will evolve while context alteration remains
+- a bet that current inference-input conventions will stay unchanged; it assumes they will evolve while reproducible composition remains
 
-Self-recovery means deterministic reconstruction from Agentfile.lock.
+Self-recovery means deterministic reconstruction from Prayfile.lock.
 
-Self-update means explicit `pata update`.
+Self-update means explicit `pray update`.
 
 It must not mean hidden mutation.
 
@@ -205,113 +214,111 @@ Recommended names:
 
 | Concept | Name |
 |---------|------|
-| Spec / manifest | Agentfile |
-| Lockfile | Agentfile.lock |
-| Package spec | *.agentspec |
-| Package archive | *.agentpkg |
-| CLI | pata |
-| Mix / resolve phase | seko |
-| Brew / render phase | uuta |
-| Project / implementation | pata |
-| Implementation crate/package | pata or pata-agentfile |
-| Registry concept | Agentfile Registry |
+| Spec / manifest | Prayfile |
+| Lockfile | Prayfile.lock |
+| Package spec | *.prayspec |
+| Package archive | *.praypkg |
+| Distribution point | registry-like source for packages, metadata, checksums, signatures, feedback, and docs |
+| CLI | pray |
+| Project / implementation | pray |
+| Implementation crate/package | pray |
 
-Etymology (ASCII-friendly):
+**Prayfile** and **Prayfile.lock** are the manifest and lockfile names.
 
-**pata** (*pot*, *cauldron*) — the CLI and project name. Everything mixes and brews in the pot.
-
-**seko** (from *sekoitus*, *mixture*; verb *sekoittaa*, to mix) — the mix phase: parse Agentfile, resolve versions, merge exports, write Agentfile.lock.
-
-**uuta** (from *uuttaa*, to brew or extract) — the brew phase: fetch packages, verify hashes, render target files.
-
-Typical pipeline: **seko** then **uuta**. `pata install` runs both.
-
-**seko** and **uuta** are internal phase and module names only. They are not CLI commands or aliases.
-
-**Agentfile** and **Agentfile.lock** stay as the manifest and lockfile names.
+The reference CLI is **pray**. See `README.md` for project positioning and name rationale.
 
 Example command usage:
 
 ```
-pata init
-pata add sample/webapp "~> 2.1"
-pata install
-pata update
-pata doctor
-pata render
-pata pack
-pata publish
+pray init
+pray add sample/webapp "~> 2.1"
+pray install
+pray update
+pray plan
+pray apply
+pray render
+pray format
+pray verify
+pray drift
+pray package
+pray publish
+pray confess
+pray serve
+pray vendor
+pray clean
 ```
+
+Implementations may split resolve and render internally. Those phase names are not CLI commands or aliases.
 
 Semantic analogy:
 
-| Agentfile concept | Analogy |
+| Prayfile concept | Analogy |
 |-------------------|---------|
-| Agentfile | recipe |
-| Agentfile.lock | exact brew record |
-| agent package | ingredient / volume |
+| Prayfile | recipe |
+| Prayfile.lock | exact brew record |
+| package | ingredient / volume |
 | export | portion |
-| registry | pantry |
-| install | seko + uuta |
-| update | seko (re-mix) |
-| render | uuta (brew output) |
-| doctor | taste test |
+| distribution point | pantry |
+| install | resolve + render |
+| update | re-resolve |
+| render | materialize |
+| verify | taste test |
 | vendor | jar on the shelf |
 
 ---
 
 ## 7. Ecosystem analogy
 
-| Reference package ecosystem | Agentfile ecosystem |
+| Reference package ecosystem | Prayfile ecosystem |
 |----------------|---------------------|
-| dependency manifest | Agentfile |
-| dependency lockfile | Agentfile.lock |
-| *.packagespec | *.agentspec |
-| .legacy-archive | .agentpkg |
-| resolver install | pata install |
-| resolver update | pata update |
-| package build | pata pack |
-| package publish | pata publish |
-| legacy package registry | Agentfile registry / static index |
+| dependency manifest | Prayfile |
+| dependency lockfile | Prayfile.lock |
+| *.packagespec | *.prayspec |
+| .legacy-archive | .praypkg |
+| resolver install | pray install |
+| resolver update | pray update |
+| package build | pray package |
+| package publish | pray publish |
+| legacy package registry | distribution point / static index |
 
 **Important difference:**
 
 Legacy registries may execute host-language code.  
-Agentfile must parse declarations only.
+Prayfile must parse declarations only.
 
 ### RubyGems alignment
 
-Agentfile is Bundler-shaped for resolve and lock, with an additional render phase. RubyGems and Bundler are the closest reference ecosystem; the core values in section 2 extend their indicator model to context dependencies.
+Prayfile is Bundler-shaped for resolve and lock, with an additional render phase. RubyGems and Bundler are the closest reference ecosystem; the core values in section 2 extend their indicator model to inference-input dependencies.
 
-| Agentfile | RubyGems / Bundler |
+| Prayfile | RubyGems / Bundler |
 |-----------|-------------------|
-| Agentfile | Gemfile |
-| Agentfile.lock | Gemfile.lock |
-| *.agentspec | *.gemspec |
-| *.agentpkg | `.gem` |
-| seko (resolve + lock) | resolver / `bundle lock` |
-| uuta (fetch + render) | no direct equivalent — gems install as code trees, not merged context files |
-| pata doctor | `bundle check` and sanity checks |
-| pata diff | lockfile diff plus rendered-output diff |
+| Prayfile | Gemfile |
+| Prayfile.lock | Gemfile.lock |
+| *.prayspec | *.gemspec |
+| *.praypkg | `.gem` |
+| resolve (lock) | resolver / `bundle lock` |
+| render (fetch + materialize) | no direct equivalent — gems install as code trees, not merged context files |
+| pray verify | `bundle check` and sanity checks |
+| pray drift | lockfile diff plus rendered-output diff |
 
-| Core value | RubyGems / Bundler | Agentfile extension |
+| Core value | RubyGems / Bundler | Prayfile extension |
 |------------|-------------------|---------------------|
-| Auditable traces | lockfile pins; package name and version | section markers and origin tags inside rendered context files |
-| Temporal clarity | lockfile history; yanked gems; explicit `bundle update` | `pata diff` across lock and render; section-level blame and rollback |
-| Measurable effects | manifest → lock → install; behavior validated by tests | manifest → lock → rendered bytes → diff; agent behavior stays human-validated |
+| Auditable traces | lockfile pins; package name and version | compact pray markers inside rendered target files |
+| Temporal clarity | lockfile history; yanked gems; explicit `bundle update` | `pray drift` across lock and render; marker-level blame and rollback |
+| Measurable effects | manifest → lock → install; behavior validated by tests | manifest → lock → rendered bytes → diff; inference behaviour stays human-validated |
 | Security | checksums; yanked gems; optional signing; vendoring | same supply-chain baseline; packages are static declarations only — no host-language execution |
 
-Agentfile does not replace RubyGems. It applies reproducibility and audit patterns proven necessary for code dependencies to context dependencies: lock what resolved, render what landed, mark every provisioned alteration with its source.
+Prayfile does not replace RubyGems. It applies reproducibility and audit patterns proven necessary for code dependencies to inference-input dependencies: lock what resolved, render what landed, cite managed spans compactly in target files.
 
 ---
 
 ## 8. Terminology
 
-**Agentfile** — Human-authored dependency manifest.
+**Prayfile** — Human-authored dependency manifest.
 
-**Agentfile.lock** — Machine-authored exact resolved state.
+**Prayfile.lock** — Machine-authored exact resolved state.
 
-**agentspec** — Package definition file.
+**prayspec** — Package definition file.
 
 **agent package** — Versioned bundle of agent-context content.
 
@@ -327,7 +334,7 @@ Examples: `tool_a`, `tool_b`, `tool_c`, `tool_d`, `tool_e`, `generic`
 
 **render** — Process of creating actual target files from locked package state.
 
-**managed file** — Generated file owned by Pata.
+**managed file** — Generated file owned by pray.
 
 **local file** — Human-owned project file included or appended into rendered output.
 
@@ -344,33 +351,25 @@ Examples: registry, static index, git, local path, tarball, OCI artifact, file s
 Recommended project layout:
 
 ```
-Agentfile
-Agentfile.lock
-agent/
-  local/
-    project.md
-    testing.md
-    security.md
-    skills/              # optional human/agent-owned skills
-INSTRUCTIONS.md               # generated if tool A target enabled
-TOOL_B.md               # generated if tool B target enabled
-.agents/skills/         # generated if target uses skills
-.tool-b/skills/         # generated if target uses skills
-.tool-c/rules/          # generated if tool C target enabled
-.agentfile/
-  cache/                # ignored
-  state.json            # ignored
-  vendor/               # optional, committed only in vendor mode
+Prayfile
+Prayfile.lock
+AGENTS.md
+CLAUDE.md
+.github/copilot-instructions.md
+
+.pray/cache/                # ignored by default
+.pray/vendor/               # optional, committed only in hermetic/offline mode
+
+agent/local/                # optional human-owned overrides
 ```
 
 Recommended `.gitignore`:
 
 ```
-.agentfile/cache/
-.agentfile/state.json
+.pray/cache/
 ```
 
-Depending on repository policy, generated target files may be committed or ignored.
+Depending on repository policy, rendered target files may be committed or ignored. Rendered files are usually committed because current inference tools commonly read repository-visible files, not `Prayfile` directly.
 
 ---
 
@@ -378,33 +377,32 @@ Depending on repository policy, generated target files may be committed or ignor
 
 **Recommended default for most repositories:**
 
-- commit Agentfile
-- commit Agentfile.lock
-- commit generated INSTRUCTIONS.md / TOOL_B.md if tools require repository-local files
-- commit generated skills if tools require repository-local skills
+- commit Prayfile
+- commit Prayfile.lock
+- commit rendered target files such as `AGENTS.md` and `CLAUDE.md` when tools require repository-local files
 - ignore cache
 - ignore state
 
 **Recommended for local personal context:**
 
-- commit Agentfile
-- optionally commit Agentfile.lock
+- commit Prayfile
+- optionally commit Prayfile.lock
 - ignore generated local tool output
 - ignore cache
 - ignore state
 
 **Recommended for offline / archival workflows:**
 
-- commit Agentfile
-- commit Agentfile.lock
-- commit `.agentfile/vendor`
+- commit Prayfile
+- commit Prayfile.lock
+- commit `.pray/vendor`
 - commit generated files if target tools need them
 
 ---
 
-## 11. Agentfile design
+## 11. Prayfile design
 
-Agentfile is a declarative declarative manifest DSL.
+Prayfile is a declarative declarative manifest DSL.
 
 It must be:
 
@@ -420,7 +418,7 @@ It must not be executable host language.
 Allowed style:
 
 ```manifest
-agentfile "1"
+prayfile "1"
 source "default", "https://agents.example.com"
 target :tool_a do
   output "INSTRUCTIONS.md"
@@ -460,13 +458,13 @@ The parser must reject:
 
 ## 12. Canonical manifest model
 
-Every valid Agentfile compiles to a canonical language-neutral model.
+Every valid Prayfile compiles to a canonical language-neutral model.
 
 Example:
 
 ```json
 {
-  "agentfile_version": "1",
+  "prayfile_version": "1",
   "sources": [
     {
       "name": "default",
@@ -509,10 +507,10 @@ Whitespace-only changes should not affect lockfile resolution.
 
 ---
 
-## 13. Minimal Agentfile example
+## 13. Minimal Prayfile example
 
 ```manifest
-agentfile "1"
+prayfile "1"
 source "default", "https://agents.example.com"
 target :tool_a do
   output "INSTRUCTIONS.md"
@@ -534,10 +532,10 @@ render mode: :managed,
 
 ---
 
-## 14. Larger Agentfile example
+## 14. Larger Prayfile example
 
 ```manifest
-agentfile "1"
+prayfile "1"
 source "default", "https://agents.example.com"
 source "sample", "git+ssh://git@example.com/agent-context/index.git"
 target :tool_a do
@@ -585,14 +583,14 @@ render mode: :managed,
 
 ---
 
-## 15. Agentfile statements
+## 15. Prayfile statements
 
-### agentfile
+### prayfile
 
 Declares spec version.
 
 ```
-agentfile "1"
+prayfile "1"
 ```
 
 Required.
@@ -767,7 +765,7 @@ Recommended package layout:
 
 ```
 sample-webapp/
-  sample-webapp.agentspec
+  sample-webapp.prayspec
   README.md
   LICENSE
   CHANGELOG.md
@@ -790,15 +788,15 @@ sample-webapp/
     tool_c.toml
 ```
 
-Required: `*.agentspec`
+Required: `*.prayspec`
 
 Optional: `README.md`, `LICENSE`, `CHANGELOG.md`, `exports/`, `skills/`, `templates/`, `adapters/`, `assets/`
 
 ---
 
-## 20. agentspec design
+## 20. prayspec design
 
-`*.agentspec` is the package definition file. It is inspired by legacy `.packagespec`. It is declarative but not executable host language.
+`*.prayspec` is the package definition file. It is inspired by legacy `.packagespec`. It is declarative but not executable host language.
 
 Example:
 
@@ -813,7 +811,7 @@ Package::Specification.new do |spec|
   spec.homepage = "https://example.com/sample/webapp"
   spec.source_code_uri = "https://vcs.example.com/sample-org/agent-packages/tree/main/sample-webapp"
   spec.changelog_uri = "https://vcs.example.com/sample-org/agent-packages/blob/main/sample-webapp/CHANGELOG.md"
-  spec.agentfile_version = ">= 0.1"
+  spec.pray_version = ">= 0.1"
   spec.files = [
     "README.md",
     "LICENSE",
@@ -861,15 +859,15 @@ Package::Specification.new do |spec|
   }
   spec.add_dependency "sample/base", "~> 1.4"
   spec.metadata = {
-    "agentfile.target.tool_a" => "true",
-    "agentfile.target.tool_b" => "true"
+    "prayfile.target.tool_a" => "true",
+    "prayfile.target.tool_b" => "true"
   }
 end
 ```
 
 ---
 
-## 21. agentspec allowed grammar
+## 21. prayspec allowed grammar
 
 Allowed:
 
@@ -889,7 +887,7 @@ Allowed methods:
 
 ```
 name= version= summary= description= authors= maintainers= license=
-homepage= source_code_uri= changelog_uri= agentfile_version= files=
+homepage= source_code_uri= changelog_uri= prayfile_version= files=
 exports= skills= templates= adapters= targets= metadata=
 add_dependency add_optional_dependency
 ```
@@ -910,9 +908,9 @@ All files must be explicitly listed in `spec.files`. This reduces hidden package
 
 ---
 
-## 22. agentspec canonical model
+## 22. prayspec canonical model
 
-Every `*.agentspec` compiles to a canonical package model:
+Every `*.prayspec` compiles to a canonical package model:
 
 ```json
 {
@@ -920,7 +918,7 @@ Every `*.agentspec` compiles to a canonical package model:
   "version": "2.1.5",
   "summary": "web applications, testing, data layer, and live UI agent context",
   "license": "MIT",
-  "agentfile_version": ">= 0.1",
+  "prayfile_version": ">= 0.1",
   "files": [
     "README.md",
     "LICENSE",
@@ -1007,13 +1005,13 @@ Forbidden during install/render:
 - environment-variable interpolation
 - dynamic file discovery
 
-Packages may contain executable-looking files only as inert assets. Agentfile must not execute them.
+Packages may contain executable-looking files only as inert assets. Prayfile must not execute them.
 
 ---
 
 ## 26. Package archive
 
-Built package file: `sample-webapp-2.1.5.agentpkg`
+Built package file: `sample-webapp-2.1.5.praypkg`
 
 Recommended internal format: `tar.zst`
 
@@ -1045,7 +1043,7 @@ Rules:
 - file order is lexicographic
 - symlinks forbidden in v1
 - device files forbidden
-- only files listed in agentspec included
+- only files listed in prayspec included
 
 Pseudo-algorithm:
 
@@ -1063,7 +1061,7 @@ for each entry:
 tree_hash = sha256(all_appended_bytes)
 ```
 
-Agentfile.lock records this hash.
+Prayfile.lock records this hash.
 
 ---
 
@@ -1084,7 +1082,7 @@ Direct package sources:
 ```
 agent "sample/base", git: "git+ssh://git@example.com/base.git", tag: "v1.4.3"
 agent "local/base", path: "../base"
-agent "public/base", tarball: "https://example.com/base-1.4.3.agentpkg"
+agent "public/base", tarball: "https://example.com/base-1.4.3.praypkg"
 agent "public/base", oci: "registry.example.com/agents/base:1.4.3"
 ```
 
@@ -1100,14 +1098,14 @@ Recommended layout:
 /v1/index.json
 /v1/packages/sample/base.json
 /v1/packages/sample/webapp.json
-/v1/artifacts/sample/base/1.4.3/sample-base-1.4.3.agentpkg
+/v1/artifacts/sample/base/1.4.3/sample-base-1.4.3.praypkg
 ```
 
 index.json:
 
 ```json
 {
-  "spec": "agentfile-registry-1",
+  "spec": "prayfile-distribution-1",
   "packages": [
     "sample/base",
     "sample/webapp"
@@ -1123,7 +1121,7 @@ Package metadata:
   "versions": [
     {
       "version": "1.4.3",
-      "artifact": "v1/artifacts/sample/base/1.4.3/sample-base-1.4.3.agentpkg",
+      "artifact": "v1/artifacts/sample/base/1.4.3/sample-base-1.4.3.praypkg",
       "artifact_hash": "sha256:...",
       "tree_hash": "sha256:...",
       "yanked": false,
@@ -1150,22 +1148,22 @@ To reduce churn and privacy leakage, project lockfiles should not copy unnecessa
 
 ## 31. Lockfile
 
-Agentfile.lock is machine-authored.
+Prayfile.lock is machine-authored.
 
 Recommended format: TOML.
 
 Reasons: readable, stable, small diffs, easy to parse, good for sorted package tables
 
-Users should not edit Agentfile.lock by hand.
+Users should not edit Prayfile.lock by hand.
 
 ---
 
 ## 32. Lockfile example
 
 ```toml
-agentfile_lock = "1"
+prayfile_lock = "1"
 spec = "0.1"
-generated_by = "pata 0.1.0"
+generated_by = "pray 0.1.0"
 manifest_hash = "sha256:..."
 
 [[source]]
@@ -1184,7 +1182,7 @@ version = "1.4.3"
 source = "sample"
 tree_hash = "sha256:..."
 artifact_hash = "sha256:..."
-artifact = "v1/artifacts/sample/base/1.4.3/sample-base-1.4.3.agentpkg"
+artifact = "v1/artifacts/sample/base/1.4.3/sample-base-1.4.3.praypkg"
 exports = [
   "working-agreements",
   "testing-basics",
@@ -1197,7 +1195,7 @@ version = "2.1.5"
 source = "sample"
 tree_hash = "sha256:..."
 artifact_hash = "sha256:..."
-artifact = "v1/artifacts/sample/webapp/2.1.5/sample-webapp-2.1.5.agentpkg"
+artifact = "v1/artifacts/sample/webapp/2.1.5/sample-webapp-2.1.5.praypkg"
 dependencies = [
   "sample/base",
 ]
@@ -1248,7 +1246,7 @@ It should not record every generated file hash by default. Strict audit mode may
 
 ## 34. Manifest hash
 
-`manifest_hash` is a normalized hash of Agentfile.
+`manifest_hash` is a normalized hash of Prayfile.
 
 Normalization process:
 
@@ -1267,9 +1265,9 @@ Comment-only changes should not change `manifest_hash`.
 
 ## 35. Resolver behavior
 
-**Resolver input:** Agentfile, existing Agentfile.lock if present, available sources, target list from manifest, package metadata, cache
+**Resolver input:** Prayfile, existing Prayfile.lock if present, available sources, target list from manifest, package metadata, cache
 
-**Resolver output:** resolved package graph, selected versions, selected exports, source identities, artifact hashes, tree hashes, target render plan, Agentfile.lock
+**Resolver output:** resolved package graph, selected versions, selected exports, source identities, artifact hashes, tree hashes, target render plan, Prayfile.lock
 
 Resolution rules:
 
@@ -1291,7 +1289,7 @@ Resolution rules:
 
 ## 36. Install behavior
 
-### pata install
+### pray install
 
 Default behavior:
 
@@ -1302,21 +1300,21 @@ Default behavior:
 - verify packages
 - render target files
 
-### pata install --locked
+### pray install --locked
 
-- require existing Agentfile.lock
+- require existing Prayfile.lock
 - fail if lockfile needs update
 - fetch and verify packages
 - render only from locked state
 
-### pata install --frozen
+### pray install --frozen
 
 - same as `--locked`
 - fail if generated files are stale
-- fail if doctor checks fail
+- fail if verify checks fail
 - intended for CI
 
-### pata install --offline
+### pray install --offline
 
 - use cache or vendor directory only
 - no network access
@@ -1327,8 +1325,8 @@ Default behavior:
 ## 37. Update behavior
 
 ```
-pata update
-pata update sample/webapp
+pray update
+pray update sample/webapp
 ```
 
 Updates all packages within manifest constraints, or selected package and only dependencies required by that update.
@@ -1340,7 +1338,7 @@ Update summary should show: package name, old version, new version, source, expo
 Major updates should require explicit intent:
 
 ```
-pata update sample/webapp --major
+pray update sample/webapp --major
 ```
 
 ---
@@ -1348,14 +1346,14 @@ pata update sample/webapp --major
 ## 38. Remove behavior
 
 ```
-pata remove sample/webapp
+pray remove sample/webapp
 ```
 
 Expected behavior:
 
-- remove package declaration from Agentfile
+- remove package declaration from Prayfile
 - re-resolve dependency graph
-- update Agentfile.lock
+- update Prayfile.lock
 - remove generated sections/files no longer needed
 - preserve local files
 - show diff
@@ -1364,7 +1362,7 @@ Expected behavior:
 
 ## 39. Render behavior
 
-**Render input:** Agentfile.lock, resolved package contents, local files, target adapters, render policy
+**Render input:** Prayfile.lock, resolved package contents, local files, target adapters, render policy
 
 **Render output:** INSTRUCTIONS.md, TOOL_B.md, skill directories, command directories, rule files, target-specific files
 
@@ -1374,31 +1372,74 @@ Render must be deterministic. Same inputs must produce byte-identical outputs.
 
 ## 40. Generated file header
 
-Generated files should include a compact header:
+Rendered target files may include the ignore marker near the beginning of the file:
 
-```html
-<!--
-Generated by Pata from Agentfile.
-Edit Agentfile or agent/local/*.md, not this file.
--->
+```md
+<!-- pray:0 ignore-comments -->
 ```
 
-Generated files should not include: timestamps, hostnames, absolute paths, random IDs, full package graph unless requested
+This marker declares that `pray` comments are render markers and should not be interpreted as instruction content.
+
+The marker is advisory for inference behaviour and binding for Prayfile tooling.
+
+Generated files should not include: timestamps, hostnames, absolute paths, random IDs, or full package graphs unless requested.
 
 ---
 
-## 41. Section markers
+## 41. Pray markers
 
-Generated root files should use stable section markers:
+Rendered target files should not duplicate the dependency graph, package list, source URLs, source hashes, or provenance records already stored in `Prayfile.lock`.
 
-```html
-<!-- pata:begin package="sample/base" export="testing-basics" -->
-## Testing basics
-Run focused tests before broad suites.
-<!-- pata:end package="sample/base" export="testing-basics" -->
+Rendered files use compact citation markers, not provenance blocks.
+
+A marker is an opaque reference into `Prayfile.lock`. It identifies a managed rendered span but does not explain it.
+
+Markdown targets use this canonical marker form:
+
+```md
+<!-- pray:p7f3k9m2 -->
+
+...rendered content...
+
+<!-- pray:p7f3k9m2 -->
 ```
 
-Benefits: smaller diffs, easier doctor checks, easier partial regeneration, easier human review, clear source attribution
+The same marker appears exactly twice for one managed block.
+
+The first occurrence opens the block.
+
+The second occurrence closes the block.
+
+Nested pray blocks are invalid.
+
+Unmatched markers are invalid.
+
+A marker ID must be opaque. It must not encode package names, topic names, versions, hashes, source paths, or semantic labels.
+
+Marker IDs must use only lowercase ASCII letters and digits.
+
+Marker IDs should be 8–16 characters.
+
+Marker comments must appear on their own lines.
+
+The purpose of a marker is region identity, drift detection, and lockfile lookup.
+
+Rendered output cites.
+Lockfile explains.
+Cache preserves.
+
+Prayfile tooling must ignore pray comments when computing semantic content hashes.
+
+Prayfile tooling may also compute exact file hashes that include marker bytes.
+
+Therefore, implementations may track both:
+
+```text
+semantic hash  = rendered content without pray markers
+file hash      = exact target file bytes including pray markers
+```
+
+Benefits: smaller diffs, easier verify checks, easier partial regeneration, easier human review, drift detection without duplicating provenance in target files
 
 ---
 
@@ -1423,9 +1464,9 @@ The renderer should:
 - normalize line endings only when configured
 - avoid blank-line noise
 
-Preferred output model: small root files, separate skills, separate templates, stable section markers
+Preferred output model: small root files, separate skills, separate templates, stable pray markers
 
-Avoid: giant concatenated INSTRUCTIONS.md, giant duplicated TOOL_B.md, generated walls of generic advice
+Avoid: giant concatenated instruction files, giant duplicated target files, generated walls of generic advice
 
 ---
 
@@ -1439,8 +1480,8 @@ local "agent/local/project.md", position: :after
 
 Rules:
 
-- never overwritten by pata on disk
-- content is re-embedded into rendered root files on each uuta run
+- never overwritten by pray on disk
+- content is re-embedded into rendered root files on each render run
 - agents edit local source files, not the embed copy inside INSTRUCTIONS.md
 - missing local files are errors unless optional
 - paths must stay inside repository unless explicitly allowed
@@ -1454,7 +1495,7 @@ Optional local file:
 local "agent/local/private.md", optional: true
 ```
 
-Local file hashes may be stored in `.agentfile/state.json`, not Agentfile.lock.
+Local file hashes may be stored in `.pray/state.json`, not Prayfile.lock.
 
 ---
 
@@ -1462,10 +1503,10 @@ Local file hashes may be stored in `.agentfile/state.json`, not Agentfile.lock.
 
 | Mode | Behavior |
 |------|----------|
-| managed | Generated files are owned by Pata. Manual edits are overwritten after warning or error depending on policy. Recommended for repositories. |
-| check | No files are written. Used by `pata render --check`. |
+| managed | Generated files are owned by pray. Manual edits are overwritten after warning or error depending on policy. Recommended for repositories. |
+| check | No files are written. Used by `pray render --check`. |
 | local | Generated files are placed into local tool directories. Useful for personal context. |
-| vendor | Packages are copied into `.agentfile/vendor`. Useful for offline and archival workflows. |
+| vendor | Packages are copied into `.pray/vendor`. Useful for offline and archival workflows. |
 
 ---
 
@@ -1526,7 +1567,7 @@ directory = ".tool-b/skills"
 skill_file = "SKILL.md"
 ```
 
-Built-in adapters should exist for common targets. Packages may also provide adapters. Project Agentfile may override output paths.
+Built-in adapters should exist for common targets. Packages may also provide adapters. Project Prayfile may override output paths.
 
 ---
 
@@ -1538,8 +1579,8 @@ Recommended root file shape:
 
 ```markdown
 <!--
-Generated by Pata from Agentfile.
-Edit Agentfile or agent/local/*.md, not this file.
+
+Edit Prayfile or agent/local/*.md, not this file.
 -->
 # Agent context
 ## Project-local instructions
@@ -1555,34 +1596,39 @@ Do not dump every skill body into root files if target supports skills.
 
 ---
 
-## 48. Example generated INSTRUCTIONS.md
+## 48. Example generated AGENTS.md
 
 ```markdown
-<!--
-Generated context. Do not edit this file.
-Project-specific rules: agent/local/
-Shared rules: changed via repository recipe, not here.
--->
+<!-- pray:0 ignore-comments -->
+
 # Agent context
 
-Do not edit provisioned sections or provisioned skills.
+Do not edit managed blocks or managed skills.
 Add or change project-specific instructions in `agent/local/` only.
-To change shared guidance, ask a human to update the repository recipe and reinstall.
+To change shared guidance, ask a human to update `Prayfile` and run `pray`.
 
-<!-- pata:begin local path="agent/local/project.md" -->
+<!-- pray:l3m8n2p4 -->
+
 ## Project-local instructions
 This repository uses a web stack, test framework, UI library, and relational database.
-<!-- pata:end local path="agent/local/project.md" -->
+
+<!-- pray:l3m8n2p4 -->
 
 ## Shared instructions
-<!-- pata:begin package="sample/base" export="testing-basics" -->
+
+<!-- pray:p7f3k9m2 -->
+
 ### Testing basics
 Prefer focused tests near the changed code before broad suites.
-<!-- pata:end package="sample/base" export="testing-basics" -->
-<!-- pata:begin package="sample/webapp" export="webapp-review" -->
+
+<!-- pray:p7f3k9m2 -->
+
+<!-- pray:q8g4h1j6 -->
+
 ### Web application review
 Check migrations, callbacks, authorization boundaries, background jobs, and data consistency.
-<!-- pata:end package="sample/webapp" export="webapp-review" -->
+
+<!-- pray:q8g4h1j6 -->
 
 ## Available skills
 - code-review
@@ -1613,35 +1659,36 @@ Use when a task changes application code, data models, migrations, jobs, service
 
 ## 50. CLI command set
 
-Minimum v1 commands:
+Example command set:
+
+```sh
+pray init
+pray add kiskolabs/rails-review
+pray install
+pray update
+pray plan
+pray apply
+pray render
+pray format
+pray verify
+pray drift
+pray package
+pray publish
+pray confess
+pray serve
+pray vendor
+pray clean
+```
+
+Additional useful commands:
 
 ```
-pata init
-pata add
-pata remove
-pata install
-pata update
-pata render
-pata diff
-pata doctor
-pata tree
-pata verify
-pata pack
-pata publish
-```
-
-Useful later commands:
-
-```
-pata list
-pata outdated
-pata explain
-pata cache clean
-pata vendor
-pata export
-pata normalize
-pata format
-pata manifest
+pray remove
+pray tree
+pray list
+pray outdated
+pray explain
+pray manifest
 ```
 
 ---
@@ -1650,33 +1697,39 @@ pata manifest
 
 | Command | Behavior |
 |---------|----------|
-| init | Creates minimal Agentfile. Optional: `pata init --targets tool_a,tool_b` |
+| init | Creates minimal Prayfile. Optional: `pray init --targets tool_a,tool_b` |
 | add | Adds a package declaration. |
 | remove | Removes a package declaration and re-renders. |
-| install | Installs according to Agentfile and Agentfile.lock. |
+| install | Installs according to Prayfile and Prayfile.lock. |
 | update | Updates resolved versions. |
+| plan | Computes changes to lockfile, cache, and rendered target files. |
+| apply | Materializes planned changes. |
 | render | Regenerates or verifies target files. |
-| diff | Shows what would change. |
-| doctor | Validates repository state. |
-| verify | Verifies hashes and signatures. |
+| format | Normalizes pray markers in target files. |
+| verify | Validates lockfile integrity, checksums, signatures, cache, and target consistency. |
+| drift | Checks whether managed blocks differ from lockfile and renderer output. |
+| package | Builds `.praypkg`. |
+| publish | Packages, signs, and uploads to a distribution point. |
+| confess | Signs and submits acceptance or rejection feedback. |
+| serve | Runs a local or self-hosted distribution point. |
+| vendor | Copies packages into `.pray/vendor`. |
+| clean | Removes cache and other local ephemeral state. |
 | tree | Shows dependency graph. |
-| pack | Builds .agentpkg. |
-| publish | Publishes package to registry or static index. |
 
 ---
 
-## 52. Doctor checks
+## 52. Verify checks
 
-`pata doctor` should detect:
+`pray verify` should detect:
 
-- missing Agentfile.lock
+- missing Prayfile.lock
 - lockfile incompatible with manifest
 - package hash mismatch
 - missing package source
 - missing local files
 - stale generated files
-- manual edits inside `pata:begin` / `pata:end` provisioned blocks
-- manual edits inside provisioned skill directories
+- manual edits inside managed pray-marker blocks
+- manual edits inside managed skill directories
 - content outside allowed marker regions in managed root files
 - duplicate sections
 - duplicate skill names
@@ -1690,15 +1743,15 @@ pata manifest
 - line ending inconsistency
 - unknown DSL statement
 
-Strict mode: `pata doctor --strict` turns warnings into errors.
+Strict mode: `pray verify --strict` turns warnings into errors.
 
 ---
 
 ## 53. Diff behavior
 
-`pata diff` required sections: Lockfile changes, Package changes, Rendered file changes, Removed files, Added files, Warnings
+`pray drift` required sections: Lockfile changes, Package changes, Rendered file changes, Removed files, Added files, Warnings
 
-Semantic diff: `pata diff --semantic`
+Semantic diff: `pray drift --semantic`
 
 Example output:
 
@@ -1720,9 +1773,9 @@ Rendered files:
 Recommended CI:
 
 ```
-pata install --frozen
-pata doctor --strict
-pata render --check
+pray install --frozen
+pray verify --strict
+pray render --check
 ```
 
 CI must fail when:
@@ -1740,15 +1793,15 @@ CI must fail when:
 
 ## 55. Cache layout
 
-Default cache location: `$AGENTFILE_HOME/cache`
+Default cache location: `$PRAY_HOME/cache`
 
-If `AGENTFILE_HOME` is unset:
+If `PRAY_HOME` is unset:
 
 | Platform | Path |
 |----------|------|
-| Unix-like | `~/.cache/agentfile` |
-| Alternate desktop layout A | `~/Library/Caches/agentfile` |
-| Alternate desktop layout B | `%LOCALAPPDATA%\agentfile\cache` |
+| Unix-like | `~/.cache/pray` |
+| Alternate desktop layout A | `~/Library/Caches/pray` |
+| Alternate desktop layout B | `%LOCALAPPDATA%\pray\cache` |
 
 Recommended cache structure:
 
@@ -1770,7 +1823,7 @@ Cache must be safely deletable.
 
 ## 56. State file
 
-`.agentfile/state.json` is local and ignored.
+`.pray/state.json` is local and ignored.
 
 May contain: last render hashes, manual edit detection data, cache hints, local file hashes, tool discovery result
 
@@ -1780,7 +1833,7 @@ It must not be required for reproducible install. Deleting it must be safe.
 
 ## 57. Vendor mode
 
-Vendor mode copies package contents into `.agentfile/vendor/`.
+Vendor mode copies package contents into `.pray/vendor/`.
 
 Used for: offline work, archival, regulated environments, private distribution without registry availability
 
@@ -1868,14 +1921,14 @@ Implementations may detect installed tools, but discovery must not affect lockfi
 Good:
 
 ```
-pata doctor
+pray verify
 # warns: tool_a target configured but tool A not found
 ```
 
 Bad:
 
 ```
-pata install
+pray install
 # silently changes lockfile because tool B is installed locally
 ```
 
@@ -1887,7 +1940,7 @@ Resolution must be manifest-driven, not machine-driven.
 
 Formatting is not the product.
 
-Still, a formatter may exist: `pata format`
+Still, a formatter may exist: `pray format`
 
 Rules:
 
@@ -1895,7 +1948,7 @@ Rules:
 - do not reorder packages unless requested
 - use stable indentation
 - prefer one package declaration per dependency
-- avoid rewriting whole Agentfile for add/remove
+- avoid rewriting whole Prayfile for add/remove
 - append new packages at logical location
 - make lockfile canonical
 
@@ -1905,13 +1958,13 @@ Less churn is more important than stylistic perfection.
 
 ## 64. Global config
 
-Optional user config: `~/.config/agentfile/config.toml`
+Optional user config: `~/.config/pray/config.toml`
 
 May contain:
 
 ```toml
 [cache]
-directory = "~/.cache/agentfile"
+directory = "~/.cache/pray"
 
 [network]
 offline = false
@@ -1920,7 +1973,7 @@ offline = false
 url = "https://agents.example.com"
 ```
 
-Global config must not inject packages into a repository. The repository dependency graph must come from Agentfile.
+Global config must not inject packages into a repository. The repository dependency graph must come from Prayfile.
 
 ---
 
@@ -1929,11 +1982,11 @@ Global config must not inject packages into a repository. The repository depende
 Allowed implementation variables:
 
 ```
-AGENTFILE_HOME
-AGENTFILE_CACHE
-AGENTFILE_CONFIG
-AGENTFILE_NO_COLOR
-AGENTFILE_OFFLINE
+PRAY_HOME
+PRAY_CACHE
+PRAY_CONFIG
+PRAY_NO_COLOR
+PRAY_OFFLINE
 ```
 
 They may affect local behavior. They must not silently change package resolution.
@@ -1947,7 +2000,7 @@ Errors must be precise.
 Good:
 
 ```
-Agentfile:14: package "sample/webapp" requests export "testing2", but available exports are: "testing", "data-layer", "webapp-review".
+Prayfile:14: package "sample/webapp" requests export "testing2", but available exports are: "testing", "data-layer", "webapp-review".
 ```
 
 Bad:
@@ -1956,7 +2009,7 @@ Bad:
 Resolution failed.
 ```
 
-Error categories: `parse_error`, `manifest_error`, `resolution_error`, `fetch_error`, `integrity_error`, `render_error`, `doctor_error`, `target_error`
+Error categories: `parse_error`, `manifest_error`, `resolution_error`, `fetch_error`, `integrity_error`, `render_error`, `verify_error`, `target_error`
 
 Suggested exit codes:
 
@@ -1968,7 +2021,7 @@ Suggested exit codes:
 | 3 | resolution error |
 | 4 | integrity error |
 | 5 | render/check failed |
-| 6 | doctor failed |
+| 6 | verify failed |
 | 7 | network/fetch error |
 | 8 | unsupported feature |
 
@@ -2004,7 +2057,7 @@ Package manifest may declare:
 spec.changelog_uri = "https://example.com/sample/webapp/CHANGELOG.md"
 ```
 
-`pata update` should display changelog entries when available.
+`pray update` should display changelog entries when available.
 
 ---
 
@@ -2039,7 +2092,7 @@ Repository authors should:
 
 - keep project-local instructions short
 - put reusable instructions into packages
-- commit Agentfile.lock
+- commit Prayfile.lock
 - review generated diffs
 - use frozen CI mode
 - update packages intentionally
@@ -2057,7 +2110,7 @@ Private context should be handled through: private registry, local path packages
 
 Do not put secrets, credentials, personal facts, private business data, or private customer data into public packages.
 
-Do not put secrets into Agentfile.lock.
+Do not put secrets into Prayfile.lock.
 
 ---
 
@@ -2065,11 +2118,11 @@ Do not put secrets into Agentfile.lock.
 
 | Level | Capability | Required commands |
 |-------|------------|-------------------|
-| 0: Parser | Can parse Agentfile and *.agentspec | `pata manifest` |
-| 1: Installer | Can resolve local/path/tarball packages and produce lockfile | `pata install`, `pata verify` |
-| 2: Renderer | Can render at least one target | `pata render`, `pata render --check` |
-| 3: Package manager | Supports registry, Git, update, diff, doctor | `pata update`, `pata diff`, `pata doctor` |
-| 4: Publisher | Can pack and publish packages to static registry | `pata pack`, `pata publish` |
+| 0: Parser | Can parse Prayfile and *.prayspec | `pray manifest` |
+| 1: Installer | Can resolve local/path/tarball packages and produce lockfile | `pray install`, `pray verify` |
+| 2: Renderer | Can render at least one target | `pray render`, `pray render --check` |
+| 3: Package manager | Supports distribution point, Git, update, drift, verify | `pray update`, `pray drift`, `pray verify` |
+| 4: Publisher | Can pack and publish packages to static registry | `pray package`, `pray publish` |
 
 The reference implementation should target Level 3 first.
 
@@ -2082,16 +2135,16 @@ The open specification should include conformance fixtures:
 ```
 fixtures/
   parser/
-  agentspec/
+  prayspec/
   resolver/
   lockfile/
   render/
-  doctor/
+  verify/
   registry/
   packages/
 ```
 
-Each fixture should contain: input Agentfile, input agentspec files, package sources, expected canonical manifest, expected Agentfile.lock, expected rendered files, expected diagnostics
+Each fixture should contain: input Prayfile, input prayspec files, package sources, expected canonical manifest, expected Prayfile.lock, expected rendered files, expected diagnostics
 
 This allows independent implementations.
 
@@ -2101,9 +2154,9 @@ This allows independent implementations.
 
 Reference implementation should support:
 
-- Agentfile parser
-- agentspec parser
-- Agentfile.lock reader/writer
+- Prayfile parser
+- prayspec parser
+- Prayfile.lock reader/writer
 - registry source
 - git source
 - path source
@@ -2116,14 +2169,13 @@ Reference implementation should support:
 - tool_b target
 - managed rendering
 - local append files
-- section markers
+- pray markers
 - install
 - update
 - render
-- diff
-- doctor
+- drift
 - verify
-- pack
+- package
 - static publish
 - frozen CI mode
 - offline cache mode
@@ -2147,45 +2199,45 @@ Do not implement in v1:
 Crate/module split:
 
 ```
-pata-cli
-pata-core
-pata-parser
-pata-seko
-pata-lock
-pata-uuta
-pata-package
-pata-registry
-pata-doctor
+pray-cli
+pray-core
+pray-parser
+pray-resolve
+pray-lock
+pray-render
+pray-package
+pray-distribution
+pray-verify
 ```
 
 Internal layers:
 
 ```
-CLI (pata)
+CLI (pray)
   parses commands
 Core
-  orchestrates seko and uuta
+  orchestrates resolve and render
 Parser
-  Agentfile DSL
-  agentspec DSL
+  Prayfile DSL
+  prayspec DSL
 Model
   canonical manifest
   package spec
   lockfile model
   render plan
-Seko
+Resolve
   semver resolution
   sources
   dependency graph
   lockfile writes
-Uuta
+Render
   fetch registry / git / path / tarball
   verify artifact hash
   verify tree hash
   optional signatures
   target adapters
   generated files
-  section markers
+  pray markers
   churn-minimal writing
 Doctor
   drift checks
@@ -2218,7 +2270,7 @@ Parser choice: Start with a strict hand-written parser or parser combinator libr
 Suggested repository:
 
 ```
-agentfile-spec/
+prayfile-spec/
   README.md
   SPEC.md
   CHANGELOG.md
@@ -2235,27 +2287,27 @@ agentfile-spec/
     private-registry/
   fixtures/
     parser/
-    agentspec/
+    prayspec/
     resolver/
     render/
-    doctor/
+    verify/
   rfcs/
-    0001-agentfile.md
-    0002-agentspec.md
+    0001-prayfile.md
+    0002-prayspec.md
     0003-registry.md
 ```
 
 Suggested implementation repo:
 
 ```
-pata/
+pray/
   crates/
-    pata-cli/
-    pata-core/
-    pata-parser/
-    pata-seko/
-    pata-uuta/
-    pata-package/
+    pray-cli/
+    pray-core/
+    pray-parser/
+    pray-resolve/
+    pray-render/
+    pray-package/
   tests/
   README.md
 ```
@@ -2266,24 +2318,24 @@ pata/
 
 Milestone 1 should produce:
 
-- parse Agentfile
-- parse agentspec
+- parse Prayfile
+- parse prayspec
 - load local path package
 - resolve exact version
-- write Agentfile.lock
+- write Prayfile.lock
 - render INSTRUCTIONS.md
-- doctor check generated file
+- verify check generated file
 
 No registry yet.
 
 Example demo:
 
 ```
-pata init --targets tool_a
-pata add local/base --path ../agent-packages/base
-pata install
+pray init --targets tool_a
+pray add local/base --path ../agent-packages/base
+pray install
 cat INSTRUCTIONS.md
-pata doctor
+pray verify
 ```
 
 ---
@@ -2293,7 +2345,7 @@ pata doctor
 Milestone 2:
 
 - package build
-- .agentpkg archive
+- .praypkg archive
 - tree hash
 - tarball source
 - static registry source
@@ -2322,84 +2374,75 @@ Milestone 3:
 
 ## 80. Ownership and agent contract
 
-The hardest part of Agentfile is keeping **provisioned** context stable and read-only for agents while **local** additions remain editable and safe from overwrite.
+The hardest part of Prayfile is keeping **managed** rendered output stable and read-only for agents while **local** additions remain editable and safe from overwrite.
 
-The model is not “one big INSTRUCTIONS.md everyone edits.” It is three zones with different owners.
+The model is not “one big `AGENTS.md` everyone edits.” It is three zones with different owners.
 
 ### Three zones
 
-| Zone | Source | Who edits | What pata does |
+| Zone | Source | Who edits | What pray does |
 |------|--------|-----------|----------------|
-| **Recipe** | Agentfile, packages, Agentfile.lock | Humans via `pata add`, `pata remove`, `pata update` | **seko** resolves and locks |
-| **Local** | `agent/local/**` | Humans and agents | Reads on render; **never writes** |
-| **Provisioned** | Generated root files, package skills, package rules | Nobody directly | **uuta** fully regenerates from lock + recipes + local inputs |
+| **Recipe** | Prayfile, packages, Prayfile.lock | Humans via `pray add`, `pray remove`, `pray update` | resolves and locks |
+| **Local** | `agent/local/**` | Humans and agents | reads on render; **never writes** |
+| **Managed** | Generated target files, package skills, package rules | Nobody directly | fully regenerates from lock + recipe + local inputs |
 
-**Potions** (package exports and skills) live only in the provisioned zone. They are pinned by recipe and hash. Agents consume them; they do not rebrew them.
+Package exports and skills live only in the managed zone. They are pinned by recipe and hash. Agents consume them; they do not rewrite them.
 
-**Local mixes** live only under `agent/local/`. They are not locked, not hashed in Agentfile.lock, and are re-embedded into rendered output on every `pata render`.
+Local overrides live only under `agent/local/`. They are not locked, not hashed in `Prayfile.lock`, and are re-embedded into rendered output on every `pray render`.
 
 ### Golden rules
 
-1. Agents must **not** edit provisioned files or provisioned sections.
-2. Agents **may** edit `agent/local/**` when project-specific context must change.
-3. Humans change shared potions by editing **Agentfile** and running **pata**, not by patching INSTRUCTIONS.md.
-4. Render reconstructs provisioned output from inputs. There is no three-way merge in v1.
+1. Agents must **not** edit managed files, managed blocks, or managed skill directories.
+2. Agents **may** edit `agent/local/**` when project-specific input must change.
+3. Humans change shared packages by editing **Prayfile** and running **pray**, not by patching rendered target files.
+4. Render reconstructs managed output from inputs. There is no three-way merge in v1.
 
 ### Render composition
 
 Root files are assembled in a fixed order:
 
 ```
-agent preamble          # short contract (generated)
-local embeds            # copied from agent/local/*.md
-provisioned sections    # one block per package export
-skills index            # names only; bodies live in skill dirs
+preamble              # short contract (generated)
+local embeds          # copied from agent/local/*.md
+managed blocks        # one block per package export
+skills index          # names only; bodies live in skill dirs
 ```
 
-Local embeds use stable markers:
+Managed blocks use opaque pray markers from section 41:
 
-```html
-<!-- pata:begin local path="agent/local/project.md" -->
-...content copied from file...
-<!-- pata:end local path="agent/local/project.md" -->
+```md
+<!-- pray:p7f3k9m2 -->
+
+...rendered content...
+
+<!-- pray:p7f3k9m2 -->
 ```
 
-Provisioned exports keep section markers from section 41:
+On render, pray replaces each managed block from locked package content and re-embeds local files into their managed spans. Anything outside allowed marker regions is a **verify error**.
 
-```html
-<!-- pata:begin package="sample/base" export="testing-basics" -->
-...
-<!-- pata:end -->
-```
+### Target preamble
 
-On render, pata replaces the entire local embed from the current file bytes and replaces each provisioned block from locked package content. Anything outside these markers is a **doctor error**.
-
-### Agent preamble
-
-Every generated root file starts with a short, user-facing contract. It must not mention implementation details.
+Every generated root file may start with a short, user-facing contract. It must not mention implementation details.
 
 Recommended shape:
 
 ```markdown
-<!--
-Generated context. Do not edit this file.
-Project-specific rules: agent/local/
-Shared rules: changed via repository recipe, not here.
--->
+<!-- pray:0 ignore-comments -->
+
 # Agent context
 
-Do not edit provisioned sections or provisioned skills.
+Do not edit managed blocks or managed skills.
 Add or change project-specific instructions in `agent/local/` only.
-To change shared guidance, ask a human to update the repository recipe and reinstall.
+To change shared guidance, ask a human to update `Prayfile` and run `pray`.
 ```
 
-The HTML comment is for tools. The visible lines are for the agent.
+The ignore marker is for tooling. The visible lines are for the agent.
 
 ### Skills ownership
 
 Package skills install under the target skills directory, for example `.agents/skills/`.
 
-Each provisioned skill directory must carry origin metadata, either in `SKILL.md` front matter or a small `.pata-origin.toml`:
+Each managed skill directory must carry origin metadata, either in `SKILL.md` front matter or a small `.pray-origin.toml`:
 
 ```toml
 package = "sample/webapp"
@@ -2408,109 +2451,110 @@ version = "2.1.5"
 tree_hash = "sha256:..."
 ```
 
-Optional local skills live under `agent/local/skills/` and copy to `.agents/skills/local/<name>/`. They are not origin-tagged as packages. Name collisions between local and provisioned skills are **conflicts** unless policy says otherwise.
+Optional local skills live under `agent/local/skills/` and copy to `.agents/skills/local/<name>/`. They are not origin-tagged as packages. Name collisions between local and managed skills are **conflicts** unless policy says otherwise.
 
-Agents must not edit provisioned skill directories. They may edit `agent/local/skills/`.
+Agents must not edit managed skill directories. They may edit `agent/local/skills/`.
 
 ### Idempotency
 
-**Definition:** same inputs must yield the same provisioned bytes.
+**Definition:** same inputs must yield the same managed bytes.
 
-Inputs to **uuta**:
+Inputs to render:
 
-- Agentfile.lock
+- Prayfile.lock
 - resolved package trees (verified by tree hash)
 - `agent/local/**` contents
-- render policy from Agentfile
+- render policy from Prayfile
 - target adapter
 
 Guarantees:
 
 | Command | Idempotent when |
 |---------|-----------------|
-| `pata install` | lock and inputs unchanged → no writes (optional optimization) |
-| `pata render` | always reconstructs provisioned zones from inputs |
-| `pata install --frozen` | fails instead of mutating when output would change |
-| uuta phase (internal) | same lock + same local files + same packages → byte-identical provisioned output |
+| `pray install` | lock and inputs unchanged → no writes (optional optimization) |
+| `pray render` | always reconstructs managed zones from inputs |
+| `pray install --frozen` | fails instead of mutating when output would change |
+| render phase (internal) | same lock + same local files + same packages → byte-identical managed output |
 
-Local file edits change only local embeds and the root file hash. They do not require **seko** unless Agentfile changed.
+Local file edits change only local embeds and the root file hash. They do not require resolve unless Prayfile changed.
 
 Package updates change only blocks and skills owned by affected packages.
 
 ### Update behavior
 
 ```
-pata update sample/webapp
+pray update sample/webapp
 ```
 
-1. **seko** selects new version within constraints and updates Agentfile.lock.
-2. **uuta** replaces every root section where `package="sample/webapp"`.
-3. **uuta** replaces skill directories whose origin package is `sample/webapp`.
+1. resolve selects new version within constraints and updates Prayfile.lock.
+2. render replaces every managed block mapped to `sample/webapp` in `Prayfile.lock`.
+3. render replaces skill directories whose origin package is `sample/webapp`.
 4. Local embeds and `agent/local/**` are re-read but not modified on disk.
-5. `pata diff` shows recipe, lock, section, skill, and render changes.
+5. `pray drift` shows recipe, lock, managed-block, skill, and render changes.
 
-Section markers make updates surgical in diffs even though render is logically full reconstruction.
+Pray markers make updates surgical in diffs even though render is logically full reconstruction.
 
 ### Remove behavior
 
 ```
-pata remove sample/webapp
+pray remove sample/webapp
 ```
 
-1. Remove declaration from Agentfile.
-2. **seko** recomputes lock without that package.
-3. **uuta** deletes all root sections tagged `package="sample/webapp"`.
-4. **uuta** deletes provisioned skills tagged with that package origin.
+1. Remove declaration from Prayfile.
+2. resolve recomputes lock without that package.
+3. render deletes all managed blocks mapped to `sample/webapp`.
+4. render deletes managed skills tagged with that package origin.
 5. `agent/local/**` is preserved.
-6. Orphan markers or origin tags after remove are **doctor errors**.
+6. Orphan pray markers after remove are **verify errors**.
 
-### Doctor enforcement
+### Verify enforcement
 
-`pata doctor` is the guardrail when agents or humans edit the wrong zone.
+`pray verify` is the guardrail when agents or humans edit the wrong zone.
 
 Must detect:
 
-- manual edits inside `pata:begin package=...` / `pata:end` blocks
-- manual edits inside provisioned skill directories
+- manual edits inside managed pray-marker blocks
+- manual edits inside managed skill directories
 - content outside any allowed marker region in managed root files
 - stale render relative to lock and local inputs
-- missing local files referenced by Agentfile
-- duplicate skill names across local and provisioned paths
+- missing local files referenced by Prayfile
+- duplicate skill names across local and managed paths
+- invalid, nested, or unmatched pray markers
 
-Strict mode turns all of these into errors. CI uses `pata install --frozen` and `pata doctor --strict`.
+Strict mode turns all of these into errors. CI uses `pray install --frozen` and `pray verify --strict`.
 
 ### Why this works
 
-Agents are untrusted editors. Treat provisioned context like compiled output:
+Agents are untrusted editors. Treat managed rendered output like compiled output:
 
 ```
-Agentfile + packages  →  seko  →  lock
-lock + local + packages  →  uuta  →  INSTRUCTIONS.md + skills
+Prayfile + packages  →  resolve  →  lock
+lock + local + packages  →  render  →  AGENTS.md + skills
 ```
 
-If an agent rewrites a potion in INSTRUCTIONS.md, the next `pata render` or CI frozen check fails. The fix is not merge logic. The fix is regenerate and move custom text into `agent/local/`.
+If an agent rewrites a managed block in `AGENTS.md`, the next `pray render` or CI frozen check fails. The fix is not merge logic. The fix is regenerate and move custom text into `agent/local/`.
 
-That keeps distributed potions stable, local mixes editable, and the system idempotent.
+That keeps shared packages stable, local overrides editable, and the system idempotent.
 
 ---
 
 ## 81. Final principle
 
-This system should not try to make agents smarter by adding more magic.
+This system should not try to make inference smarter by adding more magic.
 
-It should make agent context boring enough to trust.
+It should make inference input boring enough to trust.
 
 The valuable thing is not another prompt folder.
 
 The valuable thing is:
 
 ```
-declared context
-locked context
-verified context
-minimal rendered context
-reviewable context updates
-recoverable context state
+declared input
+locked input
+verified input
+rendered input with compact citations
+recoverable source fragments
+explicit silence
 ```
 
-That is the whole point of Agentfile, Agentfile.lock, *.agentspec, and pata.
+That is the whole point of Prayfile, Prayfile.lock, *.prayspec, and pray.

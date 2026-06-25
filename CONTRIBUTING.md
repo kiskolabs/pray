@@ -1,6 +1,6 @@
 # Contributing Guidelines
 
-Thank you for your interest in contributing to the Agentfile open specification and the planned **pata** reference implementation. This repository is **spec-first**: polish the open specification before implementing the changes. We value learning over perfection but require rigor and responsibility.
+Thank you for your interest in contributing to the pray open specification and the planned **pray** reference CLI. This repository is **spec-first**: polish the open specification before implementing the changes. We value learning over perfection but require rigor and responsibility.
 
 ## The Golden Rule of Automation
 
@@ -16,6 +16,7 @@ We welcome the use of AI and automation tools to reduce toil, but you must stric
 
 | Change | Where |
 |--------|-------|
+| Project overview and naming rationale | [README.md](README.md) |
 | Normative specification | [SPEC.md](SPEC.md) |
 | Repository workflow for humans and agents | [AGENTS.md](AGENTS.md) |
 | Test coverage expectations | [spec/README.md](spec/README.md) |

@@ -7,9 +7,9 @@ Guidelines for tests in this repository.
 Test executable logic and user-facing behavior:
 
 - parser acceptance and rejection of valid and invalid input
-- canonical model output from Agentfile and agentspec
+- canonical model output from Prayfile and prayspec
 - resolver decisions, lockfile writes, and hash verification
-- render output and doctor checks
+- render output, verify checks, and drift detection
 - CLI exit codes and error messages for failure paths
 
 ## What not to test

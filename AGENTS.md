@@ -1,15 +1,15 @@
 # Agent context
 
-Repository for the Agentfile open specification and the planned **pata** reference implementation (`pata` CLI; **seko** mix phase, **uuta** brew phase).
+Repository for the pray open specification and the planned **pray** reference CLI.
 
-Read `SPEC.md` for the normative Agentfile, agentspec, lockfile, registry, and CLI design. This file defines how to work in this repository.
+Read `README.md` for project positioning and `SPEC.md` for the normative Prayfile, prayspec, lockfile, distribution point, and CLI design. This file defines how to work in this repository.
 
 ## Project intent
 
 - **Spec first.** Polish the open specification before implementing the reference CLI. Implement changes to the system tool only after the specification is stable.
-- **Problem focus.** Context alteration is permanent—it is core to inference engines. Packaging shapes (skills today, something else tomorrow) will keep changing. Agentfile targets reproducible alteration, provenance markers, and sync of shared recipes/libraries across repositories—not any one vendor workflow.
-- **What the tool must do.** Alter target files under defined contracts, leave a trace of each alteration's source, and keep shared context pinned and updatable through manifest + lockfile semantics.
-- **Experiment.** The repository and specification may be reworked as the model is validated. Packaging shapes will change drastically; the durable bet is indicators that make alteration visible (lockfile, provenance, diffs)—not any one vendor workflow. Prefer spec contributions and contract clarity over premature implementation.
+- **Problem focus.** Inference input is operational—it shapes what models notice, ignore, and prioritize. Packaging shapes (skills today, something else tomorrow) will keep changing. Prayfile targets reproducible composition, provenance markers, and sync of shared input libraries across repositories—not any one vendor workflow.
+- **What the tool must do.** Resolve declared input dependencies, lock exact versions and hashes, render tool-specific files under defined contracts, cite managed blocks with compact pray markers into `Prayfile.lock`, and keep shared input pinned and updatable through manifest + lockfile semantics.
+- **Experiment.** The repository and specification may be reworked as the model is validated. Packaging shapes will change drastically; the durable bet is indicators that make alteration visible (lockfile, provenance, drift, diffs)—not any one vendor workflow. Prefer spec contributions and contract clarity over premature implementation.
 
 ## Working rules
 
@@ -47,7 +47,7 @@ Trivial one-liners need no new test.
 
 ## Rust checks
 
-For the **pata** reference implementation, run from the workspace root:
+For the **pray** reference implementation, run from the workspace root:
 
 - `cargo test` for the full suite
 - `cargo test -p <crate>` for a focused crate

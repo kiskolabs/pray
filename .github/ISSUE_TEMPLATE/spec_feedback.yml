@@ -11,7 +11,7 @@ body:
     attributes:
       label: SPEC.md Section or Topic
       description: Cite the relevant section when possible.
-      placeholder: e.g. lockfile hashing, render targets, registry protocol
+      placeholder: e.g. lockfile hashing, render targets, distribution point API
     validations:
       required: true
   - type: textarea

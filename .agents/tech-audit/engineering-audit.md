@@ -10,11 +10,12 @@ Map findings to stages when relevant:
 request ingress → app logic → cache → database → queue → worker → external API → response path
 ```
 
-For Agentfile / pata, typical stages include:
+For Prayfile / pray, typical stages include:
 
-- **seko** — parse, resolve semver, merge exports, write lockfile
-- **uuta** — fetch, verify hashes, render targets
-- **doctor** — drift, stale files, conflicts
+- **resolve** — parse, resolve semver, merge exports, write lockfile
+- **render** — fetch, verify hashes, materialize targets
+- **verify** — lockfile integrity, cache validity, render consistency
+- **drift** — managed blocks differ from lockfile and renderer output
 - **CLI egress** — exit codes, diagnostics
 
 ## Dimensions
