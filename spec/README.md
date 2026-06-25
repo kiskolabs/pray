@@ -9,7 +9,8 @@ Test executable logic and user-facing behavior:
 - parser acceptance and rejection of valid and invalid input
 - canonical model output from Prayfile and prayspec
 - resolver decisions, lockfile writes, and hash verification
-- render output, verify checks, and drift detection
+- managed span ideal checksum and line position checks
+- verify and drift detection (custom implementation, removed prayers, orphan markers)
 - CLI exit codes and error messages for failure paths
 
 ## What not to test

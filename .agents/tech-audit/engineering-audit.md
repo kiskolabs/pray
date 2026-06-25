@@ -14,8 +14,8 @@ For Prayfile / pray, typical stages include:
 
 - **resolve** — parse, resolve semver, merge exports, write lockfile
 - **render** — fetch, verify hashes, materialize targets
-- **verify** — lockfile integrity, cache validity, render consistency
-- **drift** — managed blocks differ from lockfile and renderer output
+- **verify** — read-only managed span checksum and line position checks; package and cache integrity
+- **drift** — custom implementation, removed prayers, position drift, renderer drift, orphan markers
 - **CLI egress** — exit codes, diagnostics
 
 ## Dimensions

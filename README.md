@@ -413,7 +413,17 @@ HTML and CSS are enough.
 
 ## How does Prayfile keep input consistent?
 
-`Prayfile.lock` records the exact resolved dependency graph, selected versions, source references, content hashes, silenced fragments, render targets, renderer versions, formatting options, signature metadata, distribution point metadata, confession references, and provenance metadata.
+`Prayfile.lock` records the exact resolved dependency graph, selected versions, source references, content hashes, silenced fragments, render targets, renderer versions, formatting options, signature metadata, distribution point metadata, confession references, provenance metadata, and **managed span records**.
+
+Each managed span (a **prayer** rendered between pray markers) has a lockfile entry that stores:
+
+* marker ID
+* target file path
+* **ideal checksum** — semantic hash of the expected managed body (content between markers, excluding pray comment lines)
+* **line positions** — opening and closing marker line numbers in the target file
+* provenance — package, export, source fragment checksum, silenced flag, and related metadata
+
+The lockfile is the authoritative record of what should appear in each managed span and where it should live.
 
 This allows projects to verify that rendered files still match the resolved state.
 
@@ -421,7 +431,9 @@ A local compressed cache may store the original source fragments used during res
 
 In short:
 
-* the lockfile verifies what was resolved
+* the lockfile verifies what was resolved and where each prayer should appear
+* ideal checksums detect custom edits to managed content
+* line positions detect marker movement and missing spans
 * the cache preserves what was resolved
 * signatures verify who published or approved the package
 * confessions record signed acceptance or rejection feedback
@@ -550,19 +562,65 @@ Canonical Markdown form:
 
 Invalid forms include inline markers, markers with special characters, markers with whitespace inside the ID, unmatched markers, and manually nested managed blocks.
 
-## Planning and applying
+## Planning, verifying, applying, and drift
 
-Prayfile should support a plan/apply workflow.
+Prayfile separates **detection** from **materialization**.
 
-`pray plan` computes the changes that would happen to resolved packages, lockfile entries, cache contents, and rendered target files.
+### `pray plan`
 
-`pray apply` materializes the planned changes.
+Computes the changes that would happen to resolved packages, lockfile entries, cache contents, and rendered target files.
 
-`pray render` may be used as a non-interactive rendering command for CI and automation.
+### `pray apply`
 
-`pray verify` checks lockfile integrity, package checksums, package signatures, cache validity, render hashes, confession references, and target file consistency.
+Materializes the planned changes.
 
-`pray drift` checks whether managed blocks in rendered files differ from the lockfile and renderer output.
+After render, `pray apply` **refreshes** `Prayfile.lock`:
+
+* updates ideal checksums for each managed span
+* updates opening and closing marker line positions
+* adds, updates, or removes managed span records when prayers are introduced, re-rendered, or silenced
+
+`apply` is the only normal command that should rewrite managed span checksums and line positions after intentional materialization.
+
+### `pray verify`
+
+Read-only consistency check against the current lockfile and on-disk target files.
+
+For every managed span record, `pray verify` locates the marker pair in the target file and checks:
+
+* the span exists (both opening and closing markers are present)
+* the managed body checksum matches the lockfile **ideal checksum**
+* the marker **line positions** match the lockfile positions
+
+`pray verify` reports mismatches. It does **not** modify `Prayfile.lock` or target files.
+
+Position-only changes are still reported: if the ideal checksum still matches but marker lines moved, verify reports **position drift**.
+
+Content changes are reported when the ideal checksum does not match: the on-disk prayer body differs from the locked ideal even though markers may still be present. This catches custom implementation edits inside a managed span.
+
+Missing spans are reported when a lockfile record exists but the marker pair is absent — the prayer was removed from the target file.
+
+### `pray drift`
+
+Drift detection is a superset of verify.
+
+`pray drift` reports everything `pray verify` reports, plus drift against the **current renderer output**:
+
+* **custom implementation** — markers remain, but the managed body no longer matches the locked ideal checksum (hand-edited replacement text)
+* **removed prayer** — lockfile still records a managed span, but the marker pair is gone from the target file
+* **position drift** — content checksum still matches the ideal, but marker line positions changed
+* **renderer drift** — on-disk file matches the lock, but a fresh render from current packages and `Prayfile` would produce different ideal checksums or different prayers
+* **orphan marker** — a pray marker pair exists in a target file with no matching lockfile managed span record
+
+`pray drift` is for review and CI. It does not refresh the lockfile.
+
+To accept intentional changes after plan review, run `pray apply`.
+
+### `pray render`
+
+May be used as a non-interactive rendering command for CI and automation. Rendering alone does not replace the plan/apply lock refresh contract unless the invocation is explicitly documented as also updating managed span records (for example `pray apply` or `pray install` after resolve).
+
+### Other commands
 
 `pray publish` packages, signs, and uploads a package to a distribution point.
 
@@ -665,6 +723,48 @@ The specification is about packaging, resolving, locking, caching, rendering, fo
 
 Quality remains a human and project-level concern.
 
+## Ruby and Rails integration (planned)
+
+Prayfile is language-independent, but Ruby and Rails are a natural first host for runtime prayer support.
+
+A planned Ruby gem would let web applications that incorporate inference load and compose prayers at runtime — without reimplementing resolve, lock, or render inside the app process.
+
+### Split of responsibility
+
+| Layer | Owner | Role |
+|-------|-------|------|
+| `pray` CLI | reference implementation | resolve, lock, render, verify, drift, publish, serve |
+| Ruby gem | planned host integration | read lock/cache, assemble inference input, optional Rails hooks |
+| Rails app | application | declare `Prayfile`, commit lock + rendered targets, call inference with composed input |
+
+The gem would not replace `pray`. Development and CI still run `pray plan`, `pray apply`, `pray verify`, and `pray drift`. The gem consumes the artifacts they produce.
+
+### What the gem could provide
+
+* load managed spans from `Prayfile.lock` (ideal checksums, provenance, silenced fragments)
+* resolve prayer bodies from `.pray/cache`, vendored `.praypkg`, or distribution points
+* assemble inference-facing text for a named target (for example `AGENTS.md`, a custom `:rails` target, or an in-memory buffer)
+* expose the same drift semantics as the CLI: custom implementation, removed prayers, position drift, orphan markers
+* Rails integration: initializers, request/job-scoped context builders, generators, and rake tasks that delegate to `pray` where shelling out is appropriate
+
+### Typical Rails workflow
+
+```text
+Prayfile + Prayfile.lock   committed in the app repo
+AGENTS.md / CLAUDE.md      committed rendered targets (today's tool compatibility)
+.pray/cache/               ignored locally; populated by pray install
+
+CI:  pray verify --strict && pray drift
+App: Prayer::Context.for(:inference).to_s  # example API; not normative yet
+```
+
+### Design constraints
+
+* prayers remain data — no arbitrary package code execution in the gem either
+* lockfile managed span records remain authoritative for verify/drift
+* the gem should not fork marker or checksum rules; it implements the same contracts as `README.md` and `SPEC.md`
+* gem name and API are not finalized; `prayer`, `prayfile`, and `prayers` are candidates
+
 ## Is the specification final?
 
 No.
@@ -678,7 +778,9 @@ The specification is currently the main area of development.
 | Concept                | Role                                                                                   |
 | ---------------------- | -------------------------------------------------------------------------------------- |
 | `Prayfile`             | Human-authored input dependency manifest                                               |
-| `Prayfile.lock`        | Machine-authored resolved state                                                        |
+| `Prayfile.lock`        | Machine-authored resolved state, including ideal checksums and marker line positions per managed span |
+| managed span           | Lockfile record for one prayer between pray markers in a target file                                 |
+| ideal checksum         | Semantic hash of expected managed span body stored in `Prayfile.lock`                                |
 | `*.prayspec`           | Package definition                                                                     |
 | `*.praypkg`            | Package archive                                                                        |
 | distribution point     | Registry-like source for packages, metadata, checksums, signatures, feedback, and docs |
@@ -745,8 +847,9 @@ Start with `SPEC.md` for:
 * rendering targets
 * render marker rules
 * formatting behaviour
+* managed span records (ideal checksums and line positions)
 * plan/apply behaviour
-* drift detection
+* verify and drift detection
 * CLI commands
 
 ## Contributing

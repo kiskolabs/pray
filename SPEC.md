@@ -90,7 +90,7 @@ Inference input is operational—it shapes what models notice, ignore, repeat, r
 
 | Value | What it means |
 |-------|---------------|
-| Auditable traces | Every managed rendered span carries a compact pray marker. `Prayfile.lock` records exact resolved state, source checksums, silenced fragments, and provenance metadata. |
+| Auditable traces | Every managed rendered span carries a compact pray marker. `Prayfile.lock` records exact resolved state, ideal checksums, marker line positions, source checksums, silenced fragments, and provenance metadata. |
 | Temporal clarity | Lockfile and drift semantics show what changed between resolves. Version control carries when. Pray markers enable surgical rollback, blame, and review without rereading entire target files. |
 | Measurable effects | Effects are measured at the dependency boundary first: manifest → lock → rendered bytes → reviewable diff. Inference behaviour remains human-validated; the specification does not score model quality. |
 | Security | Input packages are supply-chain inputs: static declarations only, hash-verified, path-safe, explicitly updated, optionally signed. Audit trails align with integrity—implementations can prove what was installed, from where, and at which version. |
@@ -309,6 +309,8 @@ Prayfile is Bundler-shaped for resolve and lock, with an additional render phase
 | Security | checksums; yanked gems; optional signing; vendoring | same supply-chain baseline; packages are static declarations only — no host-language execution |
 
 Prayfile does not replace RubyGems. It applies reproducibility and audit patterns proven necessary for code dependencies to inference-input dependencies: lock what resolved, render what landed, cite managed spans compactly in target files.
+
+A planned Ruby gem may provide runtime prayer loading and assembly for Rails and other Ruby web applications. The gem consumes `Prayfile.lock` and cache artifacts produced by `pray`; it does not replace the CLI resolve/render pipeline. See `README.md` — Ruby and Rails integration (planned).
 
 ---
 
@@ -1209,19 +1211,111 @@ exports = [
 [[target]]
 name = "tool_a"
 outputs = [
-  "INSTRUCTIONS.md",
+  "AGENTS.md",
   ".agents/skills",
 ]
-render_hash = "sha256:..."
+
+[[managed_span]]
+id = "p7f3k9m2"
+target = "AGENTS.md"
+open_line = 14
+close_line = 20
+ideal_checksum = "sha256:abc123..."
+package = "sample/base"
+export = "testing-basics"
+source_checksum = "sha256:def456..."
+silenced = false
+
+[[managed_span]]
+id = "q8g4h1j6"
+target = "AGENTS.md"
+open_line = 24
+close_line = 30
+ideal_checksum = "sha256:789abc..."
+package = "sample/webapp"
+export = "webapp-review"
+source_checksum = "sha256:012def..."
+silenced = false
 
 [[target]]
 name = "tool_b"
 outputs = [
-  "TOOL_B.md",
+  "CLAUDE.md",
   ".tool-b/skills",
 ]
-render_hash = "sha256:..."
 ```
+
+---
+
+## 32.1 Managed span records
+
+Each managed span (a **prayer** between pray markers) must have a lockfile record.
+
+Required fields:
+
+| Field | Meaning |
+|-------|---------|
+| `id` | Opaque pray marker ID |
+| `target` | Target file path |
+| `open_line` | Line number of opening marker |
+| `close_line` | Line number of closing marker |
+| `ideal_checksum` | Semantic hash of managed body between markers |
+| provenance | Package, export, source fragment checksum, silenced flag |
+
+`ideal_checksum` is computed from the managed body only:
+
+* exclude opening and closing pray marker comment lines
+* normalize line endings according to target policy
+* apply the same semantic hashing rules as `README.md` (pray comments ignored for semantic hash)
+
+`open_line` and `close_line` are 1-based line numbers in the target file after materialization.
+
+Managed span records are updated by `pray apply`, `pray install`, and other materialization commands that explicitly refresh render state. They are not updated by read-only commands.
+
+---
+
+## 32.2 Verify and drift contract
+
+### `pray verify`
+
+Read-only. Compare on-disk target files to managed span records.
+
+For each lockfile managed span:
+
+1. locate the marker pair by `id` in `target`
+2. fail if either marker is missing (**removed prayer**)
+3. compute semantic checksum of the managed body
+4. compare body checksum to `ideal_checksum` (**custom implementation** when different)
+5. compare current marker line numbers to `open_line` / `close_line` (**position drift** when checksum matches but lines differ)
+
+`pray verify` reports mismatches. It must not modify `Prayfile.lock` or target files.
+
+Also checks lockfile integrity, package checksums, signatures, cache validity, and confession references.
+
+### `pray apply`
+
+Materializes planned changes, then **refreshes** managed span records:
+
+* rewrite target files when needed
+* recompute `ideal_checksum` for each managed span
+* recompute `open_line` and `close_line`
+* add, update, or remove managed span records
+
+### `pray drift`
+
+Superset of verify. Reports:
+
+| Drift kind | Meaning |
+|------------|---------|
+| `custom_implementation` | Marker pair exists, but body checksum ≠ `ideal_checksum` |
+| `removed_prayer` | Lockfile record exists, marker pair missing from target |
+| `position_drift` | Body checksum matches `ideal_checksum`, but marker lines moved |
+| `renderer_drift` | On-disk file matches lock, but fresh render from current inputs would change ideals |
+| `orphan_marker` | Marker pair in target file has no lockfile managed span record |
+
+`pray drift` does not refresh the lockfile.
+
+---
 
 ---
 
@@ -1238,9 +1332,11 @@ Stable ordering:
 - targets sorted by name
 - arrays sorted unless order is semantic
 
-The lockfile should record: manifest hash, resolved package versions, source identity, artifact hashes, tree hashes, selected exports, dependency graph, target render hashes
+The lockfile should record: manifest hash, resolved package versions, source identity, artifact hashes, tree hashes, selected exports, dependency graph, and **managed span records** (ideal checksums and marker line positions per prayer).
 
-It should not record every generated file hash by default. Strict audit mode may optionally record per-file hashes.
+Per-target `render_hash` may summarize an entire output file. Managed span records are the authoritative per-prayer contract for verify and drift.
+
+It should not duplicate full generated file content. Strict audit mode may optionally record per-file hashes in addition to managed span records.
 
 ---
 
@@ -1423,6 +1519,8 @@ Marker IDs should be 8–16 characters.
 Marker comments must appear on their own lines.
 
 The purpose of a marker is region identity, drift detection, and lockfile lookup.
+
+Each marker ID maps to a managed span record in `Prayfile.lock` storing the ideal checksum and opening/closing line positions for that prayer.
 
 Rendered output cites.
 Lockfile explains.
@@ -1703,11 +1801,11 @@ pray manifest
 | install | Installs according to Prayfile and Prayfile.lock. |
 | update | Updates resolved versions. |
 | plan | Computes changes to lockfile, cache, and rendered target files. |
-| apply | Materializes planned changes. |
-| render | Regenerates or verifies target files. |
+| apply | Materializes planned changes and refreshes managed span ideal checksums and line positions. |
+| render | Regenerates or verifies target files. Does not replace apply for lock refresh unless documented. |
 | format | Normalizes pray markers in target files. |
-| verify | Validates lockfile integrity, checksums, signatures, cache, and target consistency. |
-| drift | Checks whether managed blocks differ from lockfile and renderer output. |
+| verify | Read-only check: managed span checksums, line positions, package integrity, cache, signatures. |
+| drift | Reports custom implementation, removed prayers, position drift, renderer drift, and orphan markers. |
 | package | Builds `.praypkg`. |
 | publish | Packages, signs, and uploads to a distribution point. |
 | confess | Signs and submits acceptance or rejection feedback. |
@@ -1720,51 +1818,73 @@ pray manifest
 
 ## 52. Verify checks
 
-`pray verify` should detect:
+`pray verify` is read-only. It must not modify `Prayfile.lock` or target files.
+
+### Managed span checks
+
+For each `[[managed_span]]` record:
+
+- opening and closing markers with `id` exist in `target`
+- managed body semantic checksum equals `ideal_checksum`
+- current `open_line` and `close_line` equal lockfile line positions
+- report **removed prayer** when lock record exists but marker pair is absent
+- report **custom implementation** when markers exist but body checksum ≠ `ideal_checksum`
+- report **position drift** when body checksum matches `ideal_checksum` but line positions differ
+
+### Repository checks
+
+`pray verify` should also detect:
 
 - missing Prayfile.lock
 - lockfile incompatible with manifest
 - package hash mismatch
 - missing package source
 - missing local files
-- stale generated files
-- manual edits inside managed pray-marker blocks
-- manual edits inside managed skill directories
-- content outside allowed marker regions in managed root files
-- duplicate sections
+- orphan pray marker pairs with no lockfile managed span record
+- manual edits outside allowed marker regions in managed root files
 - duplicate skill names
 - unsupported target
-- root file too large
-- context bloat warning
 - unresolved package source
 - path traversal attempt
-- generated files not listed in render plan
 - vendored package mismatch
-- line ending inconsistency
-- unknown DSL statement
 
 Strict mode: `pray verify --strict` turns warnings into errors.
 
 ---
 
-## 53. Diff behavior
+## 53. Drift behavior
 
-`pray drift` required sections: Lockfile changes, Package changes, Rendered file changes, Removed files, Added files, Warnings
+`pray drift` includes all `pray verify` managed span checks and adds renderer comparison.
+
+Required drift kinds:
+
+| Kind | Detection |
+|------|-----------|
+| `custom_implementation` | Marker pair present; body checksum ≠ `ideal_checksum` |
+| `removed_prayer` | Lock record present; marker pair absent |
+| `position_drift` | Body checksum = `ideal_checksum`; marker lines moved |
+| `renderer_drift` | On-disk state matches lock; fresh render would change ideals or spans |
+| `orphan_marker` | Marker pair present; no lock managed span record |
+
+Required report sections: Lockfile changes, Package changes, Managed span changes, Rendered file changes, Removed prayers, Orphan markers, Warnings
 
 Semantic diff: `pray drift --semantic`
 
 Example output:
 
 ```
-sample/webapp 2.1.4 -> 2.1.5
-Changed exports:
-  testing
-    + added focused system spec guidance
-    - removed obsolete browser driver note
-Rendered files:
-  INSTRUCTIONS.md
-  .agents/skills/code-review/SKILL.md
+managed_span q8g4h1j6 AGENTS.md
+  kind: custom_implementation
+  ideal_checksum: sha256:789abc...
+  actual_checksum: sha256:111222...
+managed_span p7f3k9m2 AGENTS.md
+  kind: removed_prayer
+  expected lines: 14-20
+renderer_drift
+  sample/webapp 2.1.4 -> 2.1.5 would change 2 managed spans
 ```
+
+`pray drift` must not refresh the lockfile. Run `pray apply` to accept intentional materialization and refresh managed span records.
 
 ---
 
@@ -1775,7 +1895,7 @@ Recommended CI:
 ```
 pray install --frozen
 pray verify --strict
-pray render --check
+pray drift
 ```
 
 CI must fail when:
@@ -1783,8 +1903,9 @@ CI must fail when:
 - lockfile is missing
 - lockfile needs update
 - package hash mismatch exists
-- generated files are stale
-- generated files were manually edited
+- managed span checksum or line position mismatch exists
+- removed prayer or orphan marker detected
+- custom implementation detected inside a managed span
 - target output exceeds hard limit
 - package source unavailable and not vendored
 - package is yanked and strict mode forbids it
@@ -2509,11 +2630,14 @@ pray remove sample/webapp
 
 ### Verify enforcement
 
-`pray verify` is the guardrail when agents or humans edit the wrong zone.
+`pray verify` is read-only. `pray drift` extends it with renderer comparison.
 
 Must detect:
 
-- manual edits inside managed pray-marker blocks
+- **custom implementation** — managed body checksum ≠ lockfile `ideal_checksum`
+- **removed prayer** — lockfile managed span exists; marker pair missing
+- **position drift** — body checksum matches `ideal_checksum`; marker lines moved
+- **orphan marker** — marker pair exists; no lock managed span record
 - manual edits inside managed skill directories
 - content outside any allowed marker region in managed root files
 - stale render relative to lock and local inputs
@@ -2521,7 +2645,9 @@ Must detect:
 - duplicate skill names across local and managed paths
 - invalid, nested, or unmatched pray markers
 
-Strict mode turns all of these into errors. CI uses `pray install --frozen` and `pray verify --strict`.
+Strict mode turns all of these into errors. CI uses `pray install --frozen`, `pray verify --strict`, and `pray drift`.
+
+To refresh ideal checksums and line positions after intentional changes, run `pray apply`.
 
 ### Why this works
 
