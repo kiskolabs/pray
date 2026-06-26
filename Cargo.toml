@@ -1,0 +1,7 @@
+[workspace]
+members = [
+  "crates/pray-core",
+  "crates/pray-cli",
+]
+resolver = "2"
+

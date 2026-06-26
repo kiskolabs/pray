@@ -1,0 +1,1152 @@
+use pray_core::hashing::normalize_line_endings;
+use pray_core::lockfile::{read_lockfile, write_lockfile, Lockfile};
+use pray_core::manifest::parse_manifest;
+use pray_core::render::{render_project, write_rendered_targets};
+use pray_core::resolve::resolve_project;
+use pray_core::verify::{drift_project, format_verification_report, verify_project};
+use pray_core::{PrayError, PrayResult};
+use std::env;
+use std::fs;
+use std::io::Write;
+use std::path::{Path, PathBuf};
+
+fn main() {
+    let code = match run(env::args().skip(1).collect()) {
+        Ok(()) => 0,
+        Err(error) => {
+            eprintln!("{error}");
+            error.exit_code()
+        }
+    };
+    std::process::exit(code);
+}
+
+fn run(arguments: Vec<String>) -> PrayResult<()> {
+    let command = parse_command(arguments)?;
+    match command {
+        Command::Manifest => manifest_command(),
+        Command::Init { targets } => init_command(targets),
+        Command::Add {
+            name,
+            constraint,
+            path,
+        } => add_command(name, constraint, path),
+        Command::Remove { name } => remove_command(name),
+        Command::Update { package, major } => update_command(package, major),
+        Command::Install {
+            locked,
+            frozen,
+            offline,
+        } => install_command(locked, frozen, offline),
+        Command::Plan => plan_command(),
+        Command::Apply => apply_command(),
+        Command::Render { check } => render_command(check),
+        Command::Verify { strict } => verify_command(strict),
+        Command::Drift { semantic } => drift_command(semantic),
+        Command::Format => format_command(),
+        Command::Package => package_command(),
+        Command::Vendor => vendor_command(),
+        Command::Clean => clean_command(),
+        Command::Tree => tree_command(),
+    }
+}
+
+enum Command {
+    Manifest,
+    Init {
+        targets: Vec<String>,
+    },
+    Install {
+        locked: bool,
+        frozen: bool,
+        offline: bool,
+    },
+    Add {
+        name: String,
+        constraint: Option<String>,
+        path: Option<String>,
+    },
+    Remove {
+        name: String,
+    },
+    Update {
+        package: Option<String>,
+        major: bool,
+    },
+    Render {
+        check: bool,
+    },
+    Plan,
+    Apply,
+    Verify {
+        strict: bool,
+    },
+    Drift {
+        semantic: bool,
+    },
+    Format,
+    Package,
+    Vendor,
+    Clean,
+    Tree,
+}
+
+fn parse_command(arguments: Vec<String>) -> PrayResult<Command> {
+    let check = arguments.iter().any(|argument| argument == "--check");
+    let strict = arguments.iter().any(|argument| argument == "--strict");
+    let semantic = arguments.iter().any(|argument| argument == "--semantic");
+    let mut iter = arguments.into_iter();
+    let command = iter.next().unwrap_or_else(|| "help".to_string());
+    match command.as_str() {
+        "manifest" => Ok(Command::Manifest),
+        "init" => {
+            let mut targets = Vec::new();
+            while let Some(argument) = iter.next() {
+                if argument == "--targets" {
+                    if let Some(value) = iter.next() {
+                        targets = value
+                            .split(',')
+                            .map(|entry| entry.trim().to_string())
+                            .filter(|entry| !entry.is_empty())
+                            .collect();
+                    }
+                }
+            }
+            Ok(Command::Init { targets })
+        }
+        "install" => {
+            let mut locked = false;
+            let mut frozen = false;
+            let mut offline = false;
+            for argument in iter {
+                match argument.as_str() {
+                    "--locked" => locked = true,
+                    "--frozen" => {
+                        locked = true;
+                        frozen = true;
+                    }
+                    "--offline" => offline = true,
+                    other if other.starts_with("--") => {
+                        return Err(PrayError::Unsupported(format!(
+                            "unknown install flag: {other}"
+                        )))
+                    }
+                    other => {
+                        return Err(PrayError::Unsupported(format!(
+                            "unexpected install argument: {other}"
+                        )))
+                    }
+                }
+            }
+            Ok(Command::Install {
+                locked,
+                frozen,
+                offline,
+            })
+        }
+        "add" => parse_add_command(iter),
+        "remove" => parse_remove_command(iter),
+        "update" => parse_update_command(iter),
+        "render" => Ok(Command::Render { check }),
+        "plan" => Ok(Command::Plan),
+        "apply" => Ok(Command::Apply),
+        "verify" => Ok(Command::Verify { strict }),
+        "drift" => Ok(Command::Drift { semantic }),
+        "format" => Ok(Command::Format),
+        "package" => Ok(Command::Package),
+        "vendor" => Ok(Command::Vendor),
+        "clean" => Ok(Command::Clean),
+        "tree" => Ok(Command::Tree),
+        "help" | "-h" | "--help" => {
+            print_help();
+            std::process::exit(0);
+        }
+        other => Err(PrayError::Unsupported(format!("unknown command: {other}"))),
+    }
+}
+
+fn manifest_command() -> PrayResult<()> {
+    let manifest = load_manifest()?;
+    let json = serde_json::to_string_pretty(&manifest.canonicalized())
+        .map_err(|error| PrayError::Manifest(error.to_string()))?;
+    println!("{json}");
+    Ok(())
+}
+
+fn init_command(targets: Vec<String>) -> PrayResult<()> {
+    let manifest_path = manifest_path();
+    if manifest_path.exists() {
+        return Err(PrayError::Manifest("Prayfile already exists".to_string()));
+    }
+    let mut text = String::new();
+    text.push_str("prayfile \"1\"\n");
+    for target in if targets.is_empty() {
+        vec!["tool_a".to_string()]
+    } else {
+        targets
+    } {
+        text.push_str(&format!(
+            "target :{} do\n  output \"{}.md\"\nend\n",
+            target,
+            default_output_for_target(&target)
+        ));
+    }
+    fs::write(manifest_path, text)?;
+    Ok(())
+}
+
+fn add_command(name: String, constraint: Option<String>, path: Option<String>) -> PrayResult<()> {
+    let manifest_path = manifest_path();
+    let manifest_text = fs::read_to_string(&manifest_path)?;
+    let manifest = parse_manifest(&manifest_text)?;
+    if manifest.packages.iter().any(|package| package.name == name) {
+        return Err(PrayError::Manifest(format!(
+            "package {name} already exists"
+        )));
+    }
+
+    let declaration = if let Some(path) = path {
+        if let Some(constraint) = constraint {
+            format!("agent \"{name}\", \"{constraint}\", path: \"{path}\"")
+        } else {
+            format!("agent \"{name}\", path: \"{path}\"")
+        }
+    } else if let Some(constraint) = constraint {
+        format!("agent \"{name}\", \"{constraint}\"")
+    } else {
+        format!("agent \"{name}\"")
+    };
+
+    fs::write(
+        manifest_path,
+        insert_manifest_statement(&manifest_text, &declaration),
+    )?;
+    Ok(())
+}
+
+fn remove_command(name: String) -> PrayResult<()> {
+    let manifest_path = manifest_path();
+    let manifest_text = fs::read_to_string(&manifest_path)?;
+    let manifest = parse_manifest(&manifest_text)?;
+    if !manifest.packages.iter().any(|package| package.name == name) {
+        return Err(PrayError::Manifest(format!("package {name} not found")));
+    }
+
+    fs::write(
+        manifest_path,
+        remove_manifest_statement(&manifest_text, &name),
+    )?;
+    install_command(false, false, false)
+}
+
+fn update_command(package: Option<String>, major: bool) -> PrayResult<()> {
+    if major && package.is_none() {
+        return Err(PrayError::Unsupported(
+            "major updates require a package name".to_string(),
+        ));
+    }
+
+    let project = resolve_project(&manifest_path())?;
+    if let Some(package_name) = &package {
+        if !project
+            .manifest
+            .packages
+            .iter()
+            .any(|declaration| declaration.name == *package_name)
+        {
+            return Err(PrayError::Manifest(format!(
+                "package {package_name} not found"
+            )));
+        }
+    }
+
+    let previous_lockfile = read_lockfile(&lockfile_path()).ok();
+    install_command(false, false, false)?;
+    let updated_lockfile = read_lockfile(&lockfile_path())?;
+    let merged_lockfile = if let (Some(previous_lockfile), Some(package_name)) =
+        (previous_lockfile.as_ref(), package.as_deref())
+    {
+        merge_selected_package_update(previous_lockfile, &updated_lockfile, package_name)
+    } else {
+        updated_lockfile
+    };
+    if package.is_some() {
+        write_lockfile(&lockfile_path(), &merged_lockfile)?;
+    }
+    print_update_summary(
+        previous_lockfile.as_ref(),
+        &merged_lockfile,
+        package.as_deref(),
+        &project,
+    );
+    Ok(())
+}
+
+fn insert_manifest_statement(text: &str, statement: &str) -> String {
+    let mut lines: Vec<String> = text.lines().map(|line| line.to_string()).collect();
+    let insertion_index = lines
+        .iter()
+        .position(|line| {
+            let trimmed = line.trim_start();
+            trimmed.starts_with("local ") || trimmed.starts_with("render ")
+        })
+        .unwrap_or(lines.len());
+    lines.insert(insertion_index, statement.to_string());
+    let mut output = lines.join("\n");
+    if !output.ends_with('\n') {
+        output.push('\n');
+    }
+    output
+}
+
+fn remove_manifest_statement(text: &str, name: &str) -> String {
+    let mut lines: Vec<String> = text.lines().map(|line| line.to_string()).collect();
+    let package_prefix = format!("agent \"{name}\"");
+    if let Some(index) = lines.iter().position(|line| {
+        let trimmed = line.trim_start();
+        trimmed.starts_with(&package_prefix) || trimmed.starts_with(&format!("agent '{name}'"))
+    }) {
+        lines.remove(index);
+        if index < lines.len() && lines[index].trim().is_empty() {
+            lines.remove(index);
+        } else if index > 0 && lines[index - 1].trim().is_empty() {
+            lines.remove(index - 1);
+        }
+    }
+    let mut output = lines.join("\n");
+    if !output.ends_with('\n') {
+        output.push('\n');
+    }
+    output
+}
+
+fn parse_add_command(mut arguments: std::vec::IntoIter<String>) -> PrayResult<Command> {
+    let mut name = None;
+    let mut constraint = None;
+    let mut path = None;
+    while let Some(argument) = arguments.next() {
+        match argument.as_str() {
+            "--path" => {
+                let Some(value) = arguments.next() else {
+                    return Err(PrayError::Unsupported(
+                        "add requires a path after --path".to_string(),
+                    ));
+                };
+                path = Some(value);
+            }
+            other if other.starts_with("--") => {
+                return Err(PrayError::Unsupported(format!("unknown add flag: {other}")))
+            }
+            other => {
+                if name.is_none() {
+                    name = Some(other.to_string());
+                } else if constraint.is_none() {
+                    constraint = Some(other.to_string());
+                } else {
+                    return Err(PrayError::Unsupported(format!(
+                        "unexpected add argument: {other}"
+                    )));
+                }
+            }
+        }
+    }
+    let name =
+        name.ok_or_else(|| PrayError::Unsupported("add requires a package name".to_string()))?;
+    Ok(Command::Add {
+        name,
+        constraint,
+        path,
+    })
+}
+
+fn parse_remove_command(arguments: std::vec::IntoIter<String>) -> PrayResult<Command> {
+    let mut name = None;
+    for argument in arguments {
+        match argument.as_str() {
+            other if other.starts_with("--") => {
+                return Err(PrayError::Unsupported(format!(
+                    "unknown remove flag: {other}"
+                )))
+            }
+            other => {
+                if name.is_none() {
+                    name = Some(other.to_string());
+                } else {
+                    return Err(PrayError::Unsupported(format!(
+                        "unexpected remove argument: {other}"
+                    )));
+                }
+            }
+        }
+    }
+    let name =
+        name.ok_or_else(|| PrayError::Unsupported("remove requires a package name".to_string()))?;
+    Ok(Command::Remove { name })
+}
+
+fn parse_update_command(arguments: std::vec::IntoIter<String>) -> PrayResult<Command> {
+    let mut package = None;
+    let mut major = false;
+    for argument in arguments {
+        match argument.as_str() {
+            "--major" => major = true,
+            other if other.starts_with("--") => {
+                return Err(PrayError::Unsupported(format!(
+                    "unknown update flag: {other}"
+                )))
+            }
+            other => {
+                if package.is_none() {
+                    package = Some(other.to_string());
+                } else {
+                    return Err(PrayError::Unsupported(format!(
+                        "unexpected update argument: {other}"
+                    )));
+                }
+            }
+        }
+    }
+    Ok(Command::Update { package, major })
+}
+
+fn install_command(locked: bool, frozen: bool, offline: bool) -> PrayResult<()> {
+    let project = resolve_project(&manifest_path())?;
+    if offline {
+        ensure_offline_ready(&project)?;
+    }
+    let rendered = render_project(&project)?;
+    let lockfile_path = lockfile_path();
+    if locked {
+        let lockfile = ensure_existing_lockfile(&lockfile_path)?;
+        ensure_lockfile_current(&project, &rendered, &lockfile)?;
+        if frozen {
+            ensure_rendered_outputs_current(&project, &rendered)?;
+            return Ok(());
+        }
+        write_rendered_targets(&project, &rendered)?;
+        return Ok(());
+    }
+
+    let lockfile = build_lockfile(&project, &rendered)?;
+    write_lockfile_if_changed(&lockfile_path, &lockfile)?;
+    write_rendered_targets(&project, &rendered)?;
+    Ok(())
+}
+
+fn plan_command() -> PrayResult<()> {
+    let project = resolve_project(&manifest_path())?;
+    let rendered = render_project(&project)?;
+    let lockfile = build_lockfile(&project, &rendered)?;
+    let mut lines = Vec::new();
+
+    match read_lockfile(&lockfile_path()) {
+        Ok(existing) if existing.canonicalized() == lockfile.canonicalized() => {
+            lines.push("Prayfile.lock unchanged".to_string());
+        }
+        Ok(_) => lines.push("Prayfile.lock would be updated".to_string()),
+        Err(_) => lines.push("Prayfile.lock would be created".to_string()),
+    }
+
+    for target in &rendered {
+        let path = project.project_root.join(&target.path);
+        let status = match fs::read_to_string(&path) {
+            Ok(existing) if existing == target.content => "unchanged",
+            Ok(_) => "would be updated",
+            Err(_) => "would be written",
+        };
+        lines.push(format!("{} {status}", target.path.display()));
+    }
+
+    println!("{}", lines.join("\n"));
+    Ok(())
+}
+
+fn apply_command() -> PrayResult<()> {
+    install_command(false, false, false)
+}
+
+fn clean_command() -> PrayResult<()> {
+    remove_path_if_exists(Path::new(".pray/cache"))?;
+    remove_path_if_exists(Path::new(".pray/vendor"))?;
+    remove_path_if_exists(Path::new(".pray/state.json"))?;
+    Ok(())
+}
+
+fn tree_command() -> PrayResult<()> {
+    let project = resolve_project(&manifest_path())?;
+    let package_map: std::collections::BTreeMap<String, &pray_core::resolve::ResolvedPackage> =
+        project
+            .packages
+            .iter()
+            .map(|package| (package.declaration.name.clone(), package))
+            .collect();
+    let mut lines = vec!["Dependency tree".to_string()];
+    for package in &project.packages {
+        let mut ancestry = std::collections::BTreeSet::new();
+        render_tree_node(package, &package_map, 0, &mut ancestry, &mut lines);
+    }
+    println!("{}", lines.join("\n"));
+    Ok(())
+}
+
+fn format_command() -> PrayResult<()> {
+    let lockfile = read_lockfile(&lockfile_path())?;
+    for target in &lockfile.target {
+        for output in &target.outputs {
+            let path = Path::new(output);
+            let original = fs::read_to_string(path)?;
+            let formatted = format_marker_comments(&normalize_line_endings(&original));
+            if formatted != original {
+                fs::write(path, formatted)?;
+            }
+        }
+    }
+    Ok(())
+}
+
+fn package_command() -> PrayResult<()> {
+    let project = resolve_project(&manifest_path())?;
+    for package in &project.packages {
+        let output_path = package_archive_path(&package.declaration.name, &package.spec.version);
+        write_package_archive(package, &output_path)?;
+    }
+    Ok(())
+}
+
+fn vendor_command() -> PrayResult<()> {
+    let project = resolve_project(&manifest_path())?;
+    for package in &project.packages {
+        let output_directory =
+            vendor_package_path(&package.declaration.name, &package.spec.version);
+        materialize_package_directory(package, &output_directory)?;
+    }
+    Ok(())
+}
+
+fn materialize_package_directory(
+    package: &pray_core::resolve::ResolvedPackage,
+    output_directory: &Path,
+) -> PrayResult<()> {
+    if output_directory.exists() {
+        remove_path_if_exists(output_directory)?;
+    }
+    fs::create_dir_all(output_directory)?;
+    let metadata = serde_json::json!({
+        "name": package.declaration.name,
+        "version": package.spec.version,
+        "tree_hash": package.tree_hash,
+        "artifact_hash": package.artifact_hash,
+        "exports": package.spec.exports.keys().cloned().collect::<Vec<_>>(),
+        "files": package.spec.files,
+        "dependencies": package
+            .spec
+            .dependencies
+            .iter()
+            .map(|dependency| serde_json::json!({
+                "name": dependency.name,
+                "constraint": dependency.constraint,
+                "optional": dependency.optional,
+            }))
+            .collect::<Vec<_>>(),
+    });
+    fs::write(
+        output_directory.join("metadata.json"),
+        serde_json::to_string_pretty(&metadata)
+            .map_err(|error| PrayError::Manifest(error.to_string()))?,
+    )?;
+
+    for file in &package.spec.files {
+        copy_package_file(&package.root, output_directory, file)?;
+    }
+    Ok(())
+}
+
+fn write_package_archive(
+    package: &pray_core::resolve::ResolvedPackage,
+    output_path: &Path,
+) -> PrayResult<()> {
+    if output_path.exists() {
+        remove_path_if_exists(output_path)?;
+    }
+    if let Some(parent) = output_path.parent() {
+        fs::create_dir_all(parent)?;
+    }
+
+    let metadata = package_metadata(package)?;
+    let mut tar_bytes = Vec::new();
+    {
+        let mut archive = tar::Builder::new(&mut tar_bytes);
+        append_archive_file(
+            &mut archive,
+            Path::new("metadata.json"),
+            metadata.as_bytes(),
+        )?;
+        for file in &package.spec.files {
+            let content = read_package_file_bytes(&package.root, file)?;
+            append_archive_file(&mut archive, Path::new(file), &content)?;
+        }
+        archive.finish()?;
+    }
+
+    let mut output_file = fs::File::create(output_path)?;
+    zstd::stream::copy_encode(&tar_bytes[..], &mut output_file, 0)?;
+    output_file.flush()?;
+    Ok(())
+}
+
+fn package_metadata(package: &pray_core::resolve::ResolvedPackage) -> PrayResult<String> {
+    serde_json::to_string_pretty(&serde_json::json!({
+        "name": package.declaration.name,
+        "version": package.spec.version,
+        "tree_hash": package.tree_hash,
+        "artifact_hash": package.artifact_hash,
+        "exports": package.spec.exports.keys().cloned().collect::<Vec<_>>(),
+        "files": package.spec.files,
+        "dependencies": package
+            .spec
+            .dependencies
+            .iter()
+            .map(|dependency| serde_json::json!({
+                "name": dependency.name,
+                "constraint": dependency.constraint,
+                "optional": dependency.optional,
+            }))
+            .collect::<Vec<_>>(),
+    }))
+    .map_err(|error| PrayError::Manifest(error.to_string()))
+}
+
+fn append_archive_file(
+    archive: &mut tar::Builder<&mut Vec<u8>>,
+    path: &Path,
+    contents: &[u8],
+) -> PrayResult<()> {
+    let mut header = tar::Header::new_gnu();
+    header.set_size(contents.len() as u64);
+    header.set_mode(0o644);
+    header.set_mtime(0);
+    header.set_uid(0);
+    header.set_gid(0);
+    header.set_cksum();
+    archive.append_data(&mut header, path, contents)?;
+    Ok(())
+}
+
+fn read_package_file_bytes(source_root: &Path, relative_path: &str) -> PrayResult<Vec<u8>> {
+    let relative = Path::new(relative_path);
+    validate_package_relative_path(relative)?;
+    let source = source_root.join(relative);
+    if !source.exists() {
+        return Err(PrayError::Integrity(format!(
+            "package file missing: {}",
+            relative_path
+        )));
+    }
+    if source.is_dir() {
+        return Err(PrayError::Integrity(format!(
+            "package file is a directory: {}",
+            relative_path
+        )));
+    }
+    Ok(fs::read(source)?)
+}
+
+fn render_command(check_only: bool) -> PrayResult<()> {
+    let project = resolve_project(&manifest_path())?;
+    let rendered = render_project(&project)?;
+    if check_only {
+        ensure_rendered_outputs_current(&project, &rendered)?;
+        return Ok(());
+    }
+    let lockfile = build_lockfile(&project, &rendered)?;
+    write_lockfile(&lockfile_path(), &lockfile)?;
+    write_rendered_targets(&project, &rendered)?;
+    Ok(())
+}
+
+fn verify_command(strict: bool) -> PrayResult<()> {
+    let project = resolve_project(&manifest_path())?;
+    let lockfile = read_lockfile(&lockfile_path())?;
+    let report = verify_project(&project, &lockfile, strict)?;
+    if !report.is_clean() {
+        eprintln!("{}", format_verification_report(&report));
+    }
+    Ok(())
+}
+
+fn drift_command(semantic: bool) -> PrayResult<()> {
+    let project = resolve_project(&manifest_path())?;
+    let lockfile = read_lockfile(&lockfile_path())?;
+    if semantic {
+        drift_semantic_command(&project, &lockfile)
+    } else {
+        drift_project(&project, &lockfile)?;
+        Ok(())
+    }
+}
+
+fn drift_semantic_command(
+    project: &pray_core::resolve::ResolvedProject,
+    lockfile: &Lockfile,
+) -> PrayResult<()> {
+    let lock_versions: std::collections::BTreeMap<&str, (&str, usize)> = lockfile
+        .package
+        .iter()
+        .map(|package| {
+            let managed_span_count = lockfile
+                .managed_span
+                .iter()
+                .filter(|span| span.package == package.name)
+                .count();
+            (
+                package.name.as_str(),
+                (package.version.as_str(), managed_span_count),
+            )
+        })
+        .collect();
+
+    let mut lines = Vec::new();
+    for package in &project.packages {
+        let Some((locked_version, managed_span_count)) =
+            lock_versions.get(package.declaration.name.as_str())
+        else {
+            continue;
+        };
+        if *locked_version != package.spec.version {
+            lines.push(format!(
+                "{} {} -> {} would change {} managed spans",
+                package.declaration.name, locked_version, package.spec.version, managed_span_count,
+            ));
+        }
+    }
+
+    if lines.is_empty() {
+        return Ok(());
+    }
+
+    let mut report = String::from("Semantic diff");
+    for line in lines {
+        report.push('\n');
+        report.push_str(&line);
+    }
+    Err(PrayError::Verify(report))
+}
+
+fn build_lockfile(
+    project: &pray_core::resolve::ResolvedProject,
+    rendered: &[pray_core::render::RenderedTarget],
+) -> PrayResult<Lockfile> {
+    Ok(pray_core::lockfile::build_lockfile(
+        project.lockfile_hash()?,
+        &project.manifest.sources,
+        &project.manifest.targets,
+        rendered,
+        &project.packages,
+    ))
+}
+
+fn load_manifest() -> PrayResult<pray_core::manifest::Manifest> {
+    let text = fs::read_to_string(manifest_path())?;
+    parse_manifest(&text)
+}
+
+fn manifest_path() -> PathBuf {
+    PathBuf::from("Prayfile")
+}
+
+fn lockfile_path() -> PathBuf {
+    PathBuf::from("Prayfile.lock")
+}
+
+fn default_output_for_target(target: &str) -> String {
+    match target {
+        "tool_a" => "INSTRUCTIONS".to_string(),
+        "tool_b" => "TOOL_B".to_string(),
+        other => other.to_uppercase(),
+    }
+}
+
+fn ensure_existing_lockfile(path: &Path) -> PrayResult<Lockfile> {
+    if !path.exists() {
+        return Err(PrayError::Verify("missing Prayfile.lock".to_string()));
+    }
+    read_lockfile(path)
+}
+
+fn ensure_lockfile_current(
+    project: &pray_core::resolve::ResolvedProject,
+    rendered: &[pray_core::render::RenderedTarget],
+    existing: &Lockfile,
+) -> PrayResult<()> {
+    let current = build_lockfile(project, rendered)?;
+    if current.canonicalized() != existing.canonicalized() {
+        return Err(PrayError::Verify("lockfile needs update".to_string()));
+    }
+    Ok(())
+}
+
+fn ensure_rendered_outputs_current(
+    project: &pray_core::resolve::ResolvedProject,
+    rendered: &[pray_core::render::RenderedTarget],
+) -> PrayResult<()> {
+    for target in rendered {
+        let path = project.project_root.join(&target.path);
+        let on_disk = fs::read_to_string(&path).map_err(PrayError::from)?;
+        if on_disk != target.content {
+            return Err(PrayError::Render(format!("{} is stale", path.display())));
+        }
+    }
+    Ok(())
+}
+
+fn write_lockfile_if_changed(path: &Path, lockfile: &Lockfile) -> PrayResult<()> {
+    if path.exists() {
+        if let Ok(existing) = read_lockfile(path) {
+            if existing.canonicalized() == lockfile.canonicalized() {
+                return Ok(());
+            }
+        }
+    }
+    write_lockfile(path, lockfile)
+}
+
+fn ensure_offline_ready(project: &pray_core::resolve::ResolvedProject) -> PrayResult<()> {
+    for declaration in &project.manifest.packages {
+        if declaration.path.is_some() {
+            continue;
+        }
+        if let Some(source_name) = &declaration.source {
+            let source = project
+                .manifest
+                .sources
+                .iter()
+                .find(|candidate| candidate.name == *source_name)
+                .ok_or_else(|| PrayError::Resolution(format!("unknown source: {source_name}")))?;
+            if source.kind == "path" {
+                continue;
+            }
+        }
+        return Err(PrayError::Unsupported(
+            "offline mode requires explicit local path packages".to_string(),
+        ));
+    }
+    Ok(())
+}
+
+fn remove_path_if_exists(path: &Path) -> PrayResult<()> {
+    match fs::symlink_metadata(path) {
+        Ok(metadata) if metadata.is_dir() => {
+            fs::remove_dir_all(path)?;
+            Ok(())
+        }
+        Ok(_) => {
+            fs::remove_file(path)?;
+            Ok(())
+        }
+        Err(error) if error.kind() == std::io::ErrorKind::NotFound => Ok(()),
+        Err(error) => Err(error.into()),
+    }
+}
+
+fn package_archive_path(name: &str, version: &str) -> PathBuf {
+    PathBuf::from(format!("{}-{}.praypkg", name.replace('/', "-"), version))
+}
+
+fn vendor_package_path(name: &str, version: &str) -> PathBuf {
+    PathBuf::from(".pray/vendor")
+        .join(name.replace('/', "-"))
+        .join(version)
+}
+
+fn copy_package_file(
+    source_root: &Path,
+    archive_root: &Path,
+    relative_path: &str,
+) -> PrayResult<()> {
+    let relative = Path::new(relative_path);
+    validate_package_relative_path(relative)?;
+    let source = source_root.join(relative);
+    if !source.exists() {
+        return Err(PrayError::Integrity(format!(
+            "package file missing: {}",
+            relative_path
+        )));
+    }
+    if source.is_dir() {
+        return Err(PrayError::Integrity(format!(
+            "package file is a directory: {}",
+            relative_path
+        )));
+    }
+    let destination = archive_root.join(relative);
+    if let Some(parent) = destination.parent() {
+        fs::create_dir_all(parent)?;
+    }
+    fs::copy(source, destination)?;
+    Ok(())
+}
+
+fn validate_package_relative_path(path: &Path) -> PrayResult<()> {
+    if path.is_absolute() {
+        return Err(PrayError::Integrity(format!(
+            "package file path must be relative: {}",
+            path.display()
+        )));
+    }
+    for component in path.components() {
+        if matches!(component, std::path::Component::ParentDir) {
+            return Err(PrayError::Integrity(format!(
+                "package file path may not traverse upward: {}",
+                path.display()
+            )));
+        }
+    }
+    Ok(())
+}
+
+fn merge_selected_package_update(
+    previous: &Lockfile,
+    updated: &Lockfile,
+    selected_package: &str,
+) -> Lockfile {
+    let mut merged = updated.clone();
+    for package in &mut merged.package {
+        if package.name == selected_package {
+            continue;
+        }
+        if let Some(previous_package) = previous
+            .package
+            .iter()
+            .find(|locked_package| locked_package.name == package.name)
+        {
+            *package = previous_package.clone();
+        }
+    }
+    merged
+}
+
+fn print_update_summary(
+    previous: Option<&Lockfile>,
+    updated: &Lockfile,
+    selected_package: Option<&str>,
+    project: &pray_core::resolve::ResolvedProject,
+) {
+    let previous_versions: std::collections::BTreeMap<&str, &str> = previous
+        .into_iter()
+        .flat_map(|lockfile| lockfile.package.iter())
+        .map(|package| (package.name.as_str(), package.version.as_str()))
+        .collect();
+    let package_sources: std::collections::BTreeMap<&str, String> = project
+        .packages
+        .iter()
+        .map(|package| {
+            (
+                package.declaration.name.as_str(),
+                package_source_label(&package.declaration),
+            )
+        })
+        .collect();
+    let package_targets: std::collections::BTreeMap<&str, Vec<String>> = project
+        .packages
+        .iter()
+        .map(|package| {
+            (
+                package.declaration.name.as_str(),
+                package_target_names(package, project),
+            )
+        })
+        .collect();
+    let target_outputs: std::collections::BTreeMap<&str, Vec<String>> = project
+        .manifest
+        .targets
+        .iter()
+        .map(|target| (target.name.as_str(), target.outputs.clone()))
+        .collect();
+
+    let mut lines = Vec::new();
+    for package in &updated.package {
+        if let Some(selected_package) = selected_package {
+            if package.name != selected_package {
+                continue;
+            }
+        }
+        let Some(previous_version) = previous_versions.get(package.name.as_str()) else {
+            lines.push(format!(
+                "Updated package {} (new) -> {}",
+                package.name, package.version
+            ));
+            continue;
+        };
+        if *previous_version == package.version {
+            continue;
+        }
+
+        let source = package_sources
+            .get(package.name.as_str())
+            .cloned()
+            .unwrap_or_else(|| "unknown".to_string());
+        let exports = updated
+            .package
+            .iter()
+            .find(|locked_package| locked_package.name == package.name)
+            .map(|locked_package| locked_package.exports.clone())
+            .unwrap_or_default();
+        let targets = package_targets
+            .get(package.name.as_str())
+            .cloned()
+            .unwrap_or_default();
+        let rendered_files: Vec<String> = targets
+            .iter()
+            .flat_map(|target_name| {
+                target_outputs
+                    .get(target_name.as_str())
+                    .into_iter()
+                    .flatten()
+            })
+            .cloned()
+            .collect();
+
+        lines.push(format!(
+            "Updated package {} {} -> {}",
+            package.name, previous_version, package.version
+        ));
+        lines.push(format!("  source: {source}"));
+        lines.push(format!("  exports affected: {}", join_or_none(&exports)));
+        lines.push(format!("  targets affected: {}", join_or_none(&targets)));
+        lines.push(format!(
+            "  rendered files affected: {}",
+            join_or_none(&rendered_files)
+        ));
+        lines.push("  warnings: none".to_string());
+    }
+
+    if lines.is_empty() {
+        return;
+    }
+
+    println!("Update summary");
+    for line in lines {
+        println!("{line}");
+    }
+}
+
+fn package_source_label(declaration: &pray_core::manifest::ManifestPackage) -> String {
+    if let Some(path) = &declaration.path {
+        return format!("path:{path}");
+    }
+    if let Some(source) = &declaration.source {
+        return format!("source:{source}");
+    }
+    "default".to_string()
+}
+
+fn package_target_names(
+    package: &pray_core::resolve::ResolvedPackage,
+    project: &pray_core::resolve::ResolvedProject,
+) -> Vec<String> {
+    if !package.declaration.targets.is_empty() {
+        return package.declaration.targets.clone();
+    }
+    project
+        .manifest
+        .targets
+        .iter()
+        .map(|target| target.name.clone())
+        .collect()
+}
+
+fn join_or_none(values: &[String]) -> String {
+    if values.is_empty() {
+        return "none".to_string();
+    }
+    values.join(", ")
+}
+
+fn format_marker_comments(text: &str) -> String {
+    let lines: Vec<String> = text
+        .split('\n')
+        .map(|line| match canonical_marker_line(line) {
+            Some(marker) => marker,
+            None => line.to_string(),
+        })
+        .collect();
+    let mut output = lines.join("\n");
+    if !output.ends_with('\n') {
+        output.push('\n');
+    }
+    output
+}
+
+fn canonical_marker_line(line: &str) -> Option<String> {
+    let trimmed = line.trim();
+    let remainder = trimmed.strip_prefix("<!--")?.trim_start();
+    let remainder = remainder.strip_prefix("pray:")?;
+    let content = remainder.strip_suffix("-->")?.trim();
+    if content == "0 ignore-comments" {
+        return Some("<!-- pray:0 ignore-comments -->".to_string());
+    }
+    if content
+        .chars()
+        .all(|character| character.is_ascii_lowercase() || character.is_ascii_digit())
+    {
+        return Some(format!("<!-- pray:{content} -->"));
+    }
+    None
+}
+
+fn render_tree_node(
+    package: &pray_core::resolve::ResolvedPackage,
+    package_map: &std::collections::BTreeMap<String, &pray_core::resolve::ResolvedPackage>,
+    depth: usize,
+    ancestry: &mut std::collections::BTreeSet<String>,
+    lines: &mut Vec<String>,
+) {
+    let indent = "  ".repeat(depth);
+    lines.push(format!(
+        "{indent}{} {}",
+        package.declaration.name, package.spec.version
+    ));
+    if !ancestry.insert(package.declaration.name.clone()) {
+        return;
+    }
+
+    for dependency in &package.spec.dependencies {
+        if let Some(resolved) = package_map.get(&dependency.name) {
+            if ancestry.contains(&resolved.declaration.name) {
+                lines.push(format!(
+                    "{}  {} {} (cycle)",
+                    indent, resolved.declaration.name, resolved.spec.version
+                ));
+            } else {
+                render_tree_node(resolved, package_map, depth + 1, ancestry, lines);
+            }
+        } else {
+            lines.push(format!(
+                "{}  {} {} (unresolved)",
+                indent, dependency.name, dependency.constraint
+            ));
+        }
+    }
+
+    ancestry.remove(&package.declaration.name);
+}
+
+fn print_help() {
+    println!("pray <command>");
+    println!("  manifest");
+    println!("  init [--targets tool_a,tool_b]");
+    println!("  add <name> [constraint] [--path PATH]");
+    println!("  remove <name>");
+    println!("  update [package] [--major]");
+    println!("  install [--locked|--frozen|--offline]");
+    println!("  render [--check]");
+    println!("  plan");
+    println!("  apply");
+    println!("  verify [--strict]");
+    println!("  drift [--semantic]");
+    println!("  format");
+    println!("  package");
+    println!("  vendor");
+    println!("  clean");
+    println!("  tree");
+}

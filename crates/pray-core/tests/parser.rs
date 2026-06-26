@@ -1,0 +1,72 @@
+use pray_core::manifest::parse_manifest;
+use pray_core::package_spec::parse_package_spec;
+
+#[test]
+fn parses_minimal_manifest_example() {
+    let manifest = parse_manifest(
+        r#"
+prayfile "1"
+source "default", "https://agents.example.com"
+target :tool_a do
+  output "INSTRUCTIONS.md"
+  skills ".agents/skills"
+end
+agent "sample/base", "~> 1.4",
+  exports: ["testing-basics", "security-basics"]
+local "agent/local/project.md"
+render mode: :managed,
+  conflict: :fail,
+  churn: :minimal
+"#,
+    )
+    .expect("manifest parses");
+
+    assert_eq!(manifest.prayfile_version, "1");
+    assert_eq!(manifest.sources[0].name, "default");
+    assert_eq!(manifest.targets[0].name, "tool_a");
+    assert_eq!(
+        manifest.targets[0].outputs,
+        vec!["INSTRUCTIONS.md".to_string()]
+    );
+    assert_eq!(manifest.packages[0].name, "sample/base");
+    assert_eq!(manifest.local[0].path, "agent/local/project.md");
+    assert_eq!(manifest.render.mode, "managed");
+}
+
+#[test]
+fn parses_minimal_package_spec_example() {
+    let package = parse_package_spec(
+        r#"
+Package::Specification.new do |spec|
+  spec.name = "sample/base"
+  spec.version = "1.4.3"
+  spec.summary = "shared guidance"
+  spec.files = ["README.md", "exports/testing-basics.md"]
+  spec.exports = {
+    "testing-basics" => {
+      type: "fragment",
+      path: "exports/testing-basics.md",
+      summary: "Testing guidance"
+    }
+  }
+  spec.add_dependency "sample/common", "~> 1.0"
+end
+"#,
+    )
+    .expect("package spec parses");
+
+    assert_eq!(package.name, "sample/base");
+    assert_eq!(package.version, "1.4.3");
+    assert_eq!(
+        package.files,
+        vec![
+            "README.md".to_string(),
+            "exports/testing-basics.md".to_string()
+        ]
+    );
+    assert_eq!(
+        package.exports["testing-basics"].path,
+        "exports/testing-basics.md"
+    );
+    assert_eq!(package.dependencies[0].name, "sample/common");
+}
