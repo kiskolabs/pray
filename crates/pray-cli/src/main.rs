@@ -1155,9 +1155,13 @@ async fn sync_package_from_peer(
     metadata: pray_transport::PackageMetadata,
     package_versions_by_name: &mut BTreeMap<String, BTreeMap<String, RegistryPackageVersion>>,
 ) -> PrayResult<()> {
+    if !package_versions_by_name.contains_key(&metadata.name) {
+        let existing_versions = load_local_package_versions(root, &metadata.name)?;
+        package_versions_by_name.insert(metadata.name.clone(), existing_versions);
+    }
     let package_versions = package_versions_by_name
-        .entry(metadata.name.clone())
-        .or_insert_with(|| load_local_package_versions(root, &metadata.name).unwrap_or_default());
+        .get_mut(&metadata.name)
+        .expect("package versions should be initialized");
 
     for version in metadata.versions {
         let local_version = sync_package_version_from_transport(&version)?;
