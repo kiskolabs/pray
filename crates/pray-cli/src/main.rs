@@ -875,18 +875,18 @@ fn confess_command(
 }
 
 fn current_signer() -> String {
+    let session_root = workspace_root();
+    if let Some(email) = current_signer_from_session(&session_root) {
+        return email;
+    }
+
     if let Ok(token) = std::env::var("PRAY_SESSION_TOKEN") {
         let auth_root = std::env::var("PRAY_AUTH_ROOT")
             .map(PathBuf::from)
-            .unwrap_or_else(|_| {
-                manifest_path()
-                    .parent()
-                    .map(Path::to_path_buf)
-                    .unwrap_or_else(|| PathBuf::from("."))
-            });
+            .unwrap_or_else(|_| session_root.clone());
         if let Ok(store) = RegistryAuthStore::open(&auth_root) {
-            if let Ok(Some(email)) = store.email_for_session(&token) {
-                return email;
+            if let Ok(Some(session)) = store.resolve_session(&token) {
+                return session.email;
             }
         }
     }
@@ -988,23 +988,26 @@ fn login_command(
 ) -> PrayResult<()> {
     let session_root = workspace_root();
     let session = if let Some(passkey_key) = passkey_key {
-        login_with_passkey(
-            &server,
-            credential_id.as_deref().unwrap_or_default(),
-            &passkey_key,
-            &session_root,
-        )?
+        let credential_id = credential_id.ok_or_else(|| {
+            PrayError::Unsupported("passkey login requires --credential-id".to_string())
+        })?;
+        login_with_passkey(&server, &credential_id, &passkey_key, &session_root)?
     } else if ssh_agent {
-        login_with_ssh_agent(
-            &server,
-            public_key.as_deref().unwrap_or_else(|| Path::new("")),
-            &session_root,
-        )?
+        let public_key = public_key.ok_or_else(|| {
+            PrayError::Unsupported("ssh-agent login requires --public-key".to_string())
+        })?;
+        login_with_ssh_agent(&server, &public_key, &session_root)?
     } else {
         return Err(PrayError::Unsupported(
             "login requires an authentication mode".to_string(),
         ));
     };
+    if session.email != email {
+        return Err(PrayError::Resolution(format!(
+            "login completed for {} but {} was requested",
+            session.email, email
+        )));
+    }
     println!("logged in as {} via {}", session.email, session.kind);
     Ok(())
 }
@@ -1378,6 +1381,13 @@ fn build_lockfile(
 fn load_manifest() -> PrayResult<pray_core::manifest::Manifest> {
     let text = fs::read_to_string(manifest_path())?;
     parse_manifest(&text)
+}
+
+fn workspace_root() -> PathBuf {
+    manifest_path()
+        .parent()
+        .map(Path::to_path_buf)
+        .unwrap_or_else(|| PathBuf::from("."))
 }
 
 fn manifest_path() -> PathBuf {
@@ -1822,6 +1832,7 @@ fn print_help() {
     println!("  format");
     println!("  package");
     println!("  publish --root PATH");
+    println!("  login --server URL --email EMAIL [--credential-id ID --passkey-key PATH | --public-key PATH --ssh-agent]");
     println!("  serve [--root PATH] [--host HOST] [--port PORT]");
     println!(
         "  confess <package> [--version VERSION] [--accepted|--rejected] [--note NOTE] [--url URL]"

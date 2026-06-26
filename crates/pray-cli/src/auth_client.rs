@@ -2,9 +2,8 @@ use base64::{engine::general_purpose::STANDARD, Engine as _};
 use ed25519_dalek::{Signer, SigningKey};
 use pray_core::auth::{
     AuthPasskeyChallengeRequest, AuthPasskeyChallengeResponse, AuthPasskeyLoginRequest,
-    AuthPasskeyLoginResponse, AuthSessionResponse, AuthSshKeyChallengeRequest,
-    AuthSshKeyChallengeResponse, AuthSshKeyLoginRequest, AuthSshKeyLoginResponse,
-    RegistryAuthStore,
+    AuthPasskeyLoginResponse, AuthSshKeyChallengeRequest, AuthSshKeyChallengeResponse,
+    AuthSshKeyLoginRequest, AuthSshKeyLoginResponse,
 };
 use pray_core::{PrayError, PrayResult};
 use serde::{Deserialize, Serialize};
@@ -25,6 +24,7 @@ pub fn session_file_path(root: &Path) -> PathBuf {
     root.join(".pray/session.json")
 }
 
+#[allow(dead_code)]
 pub fn load_session_email(root: &Path) -> PrayResult<Option<String>> {
     let path = session_file_path(root);
     let Ok(text) = fs::read_to_string(&path) else {
@@ -122,6 +122,7 @@ pub fn current_signer(root: &Path) -> Option<String> {
     None
 }
 
+#[allow(dead_code)]
 pub fn resolve_session_token(root: &Path) -> PrayResult<Option<String>> {
     let path = session_file_path(root);
     let Ok(text) = fs::read_to_string(&path) else {
@@ -214,11 +215,14 @@ fn ssh_agent_sign(public_key: &str, message: &[u8]) -> PrayResult<String> {
     let agent_socket = std::env::var("SSH_AUTH_SOCK")
         .map_err(|_| PrayError::Unsupported("SSH_AUTH_SOCK is not set".to_string()))?;
     let mut stream = std::os::unix::net::UnixStream::connect(agent_socket)?;
-    let public_key_blob = parse_ssh_public_key_blob(public_key)?;
+    let (_, raw_key_bytes) = parse_ssh_ed25519_public_key(public_key)?;
+    let mut public_key_blob = Vec::new();
+    write_ssh_string(&mut public_key_blob, b"ssh-ed25519");
+    write_ssh_string(&mut public_key_blob, &raw_key_bytes);
     let mut payload = Vec::new();
     write_ssh_string(&mut payload, &public_key_blob);
     write_ssh_string(&mut payload, message);
-    write_u32(&mut payload, 0);
+    write_u32(&mut payload, 0)?;
     write_ssh_message(&mut stream, 13, &payload)?;
     let (message_type, response) = read_ssh_message(&mut stream)?;
     if message_type != 14 {
@@ -230,24 +234,42 @@ fn ssh_agent_sign(public_key: &str, message: &[u8]) -> PrayResult<String> {
     parse_ssh_signature_blob(signature_blob)
 }
 
-fn parse_ssh_public_key_blob(public_key: &str) -> PrayResult<Vec<u8>> {
+fn parse_ssh_ed25519_public_key(public_key: &str) -> PrayResult<(String, [u8; 32])> {
     let mut fields = public_key.split_whitespace();
     let algorithm = fields.next().ok_or_else(|| {
         PrayError::Unsupported("public key must include an algorithm".to_string())
     })?;
-    let value = fields
+    if algorithm != "ssh-ed25519" {
+        return Err(PrayError::Unsupported(format!(
+            "unsupported public key algorithm: {algorithm}"
+        )));
+    }
+    let key_value = fields
         .next()
         .ok_or_else(|| PrayError::Unsupported("public key must include key bytes".to_string()))?;
-    let raw_key = STANDARD
-        .decode(value.as_bytes())
+    let blob = STANDARD
+        .decode(key_value.as_bytes())
         .map_err(|error| PrayError::Parse {
             kind: "public key",
             message: error.to_string(),
         })?;
-    let mut blob = Vec::new();
-    write_ssh_string(&mut blob, algorithm.as_bytes());
-    write_ssh_string(&mut blob, &raw_key);
-    Ok(blob)
+    let mut cursor = blob.as_slice();
+    let blob_algorithm = read_ssh_string(&mut cursor)?;
+    if blob_algorithm != b"ssh-ed25519" {
+        return Err(PrayError::Parse {
+            kind: "public key",
+            message: "ed25519 public key blob must start with ssh-ed25519".to_string(),
+        });
+    }
+    let key_bytes = read_ssh_string(&mut cursor)?;
+    let key_bytes: [u8; 32] = key_bytes
+        .as_slice()
+        .try_into()
+        .map_err(|_| PrayError::Parse {
+            kind: "public key",
+            message: "ed25519 public key must be 32 bytes".to_string(),
+        })?;
+    Ok((format!("ssh-ed25519 {key_value}"), key_bytes))
 }
 
 fn parse_ssh_signature_blob(signature_blob: Vec<u8>) -> PrayResult<String> {

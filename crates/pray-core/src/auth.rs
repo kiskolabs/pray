@@ -148,10 +148,7 @@ pub struct RegistryAuthStore {
 
 #[derive(Debug, Clone)]
 struct StoredChallenge {
-    challenge_id: String,
-    email: String,
     challenge: String,
-    kind: String,
 }
 
 impl RegistryAuthStore {
@@ -308,13 +305,14 @@ impl RegistryAuthStore {
     ) -> PrayResult<AuthSshKeyChallengeResponse> {
         validate_public_key(public_key)?;
         let connection = self.connection()?;
-        let fingerprint = ssh_key_fingerprint(public_key);
+        let (public_key, _) = parse_ssh_ed25519_public_key(public_key)?;
+        let fingerprint = ssh_key_fingerprint(&public_key);
         let email: String = connection.query_row(
             "SELECT email FROM ssh_keys WHERE fingerprint = ?1",
             rusqlite::params![fingerprint],
             |row| row.get(0),
         )?;
-        let challenge = generate_auth_challenge("ssh_key", public_key)?;
+        let challenge = generate_auth_challenge("ssh_key", &public_key)?;
         let challenge_id = generate_challenge_id(&email, &fingerprint, "ssh_key", &challenge)?;
         store_challenge(&connection, &challenge_id, &email, &challenge, "ssh_key")?;
         Ok(AuthSshKeyChallengeResponse {
@@ -333,25 +331,22 @@ impl RegistryAuthStore {
         validate_public_key(public_key)?;
         validate_identifier(challenge_id, "challenge id")?;
         validate_signature(signature)?;
-        let fingerprint = ssh_key_fingerprint(public_key);
         let connection = self.connection()?;
+        let (public_key, _) = parse_ssh_ed25519_public_key(public_key)?;
+        let fingerprint = ssh_key_fingerprint(&public_key);
         let email: String = connection.query_row(
             "SELECT email FROM ssh_keys WHERE fingerprint = ?1",
             rusqlite::params![fingerprint],
             |row| row.get(0),
         )?;
         let challenge = load_challenge(&connection, challenge_id, &email, "ssh_key")?;
-        verify_signature(public_key, challenge.challenge.as_bytes(), signature)?;
+        verify_signature(&public_key, challenge.challenge.as_bytes(), signature)?;
         mark_challenge_used(&connection, challenge_id)?;
         let session = self.issue_session(&email, AuthSessionKind::SshKey)?;
         Ok(AuthSshKeyLoginResponse {
             email,
             token: session.token,
         })
-    }
-
-    pub fn email_for_session(&self, token: &str) -> PrayResult<Option<String>> {
-        Ok(self.resolve_session(token)?.map(|session| session.email))
     }
 
     pub fn issue_session(
@@ -482,7 +477,8 @@ impl RegistryAuthStore {
         validate_public_key(public_key)?;
         let connection = self.connection()?;
         ensure_user_can_authenticate(&connection, email)?;
-        let fingerprint = ssh_key_fingerprint(public_key);
+        let (public_key, _) = parse_ssh_ed25519_public_key(public_key)?;
+        let fingerprint = ssh_key_fingerprint(&public_key);
         let timestamp = current_unix_timestamp()?;
         connection.execute(
             "INSERT INTO ssh_keys (fingerprint, email, public_key, label, created_at, last_used_at)
@@ -499,8 +495,9 @@ impl RegistryAuthStore {
 
     pub fn login_with_ssh_key(&self, public_key: &str) -> PrayResult<AuthSshKeyLoginResponse> {
         validate_public_key(public_key)?;
-        let fingerprint = ssh_key_fingerprint(public_key);
         let connection = self.connection()?;
+        let (public_key, _) = parse_ssh_ed25519_public_key(public_key)?;
+        let fingerprint = ssh_key_fingerprint(&public_key);
         let email: Option<String> = connection
             .query_row(
                 "SELECT email FROM ssh_keys WHERE fingerprint = ?1",
@@ -522,10 +519,6 @@ impl RegistryAuthStore {
             email,
             token: session.token,
         })
-    }
-
-    pub fn email_for_session(&self, token: &str) -> PrayResult<Option<String>> {
-        Ok(self.resolve_session(token)?.map(|session| session.email))
     }
 
     fn initialize(&self) -> PrayResult<()> {
@@ -713,16 +706,9 @@ fn load_challenge(
 ) -> PrayResult<StoredChallenge> {
     let challenge: Option<StoredChallenge> = connection
         .query_row(
-            "SELECT challenge_id, email, challenge, kind FROM auth_challenges WHERE challenge_id = ?1 AND email = ?2 AND kind = ?3 AND used_at IS NULL",
+            "SELECT challenge FROM auth_challenges WHERE challenge_id = ?1 AND email = ?2 AND kind = ?3 AND used_at IS NULL",
             rusqlite::params![challenge_id, email, kind],
-            |row| {
-                Ok(StoredChallenge {
-                    challenge_id: row.get(0)?,
-                    email: row.get(1)?,
-                    challenge: row.get(2)?,
-                    kind: row.get(3)?,
-                })
-            },
+            |row| Ok(StoredChallenge { challenge: row.get(0)? }),
         )
         .optional()?;
     challenge.ok_or_else(|| PrayError::Resolution(format!("challenge not found for {email}")))
@@ -756,7 +742,11 @@ fn validate_signature(signature: &str) -> PrayResult<()> {
 }
 
 fn verify_signature(public_key: &str, message: &[u8], signature: &str) -> PrayResult<()> {
-    let verifying_key = parse_ssh_ed25519_public_key(public_key)?;
+    let (_, key_bytes) = parse_ssh_ed25519_public_key(public_key)?;
+    let verifying_key = VerifyingKey::from_bytes(&key_bytes).map_err(|error| PrayError::Parse {
+        kind: "public key",
+        message: error.to_string(),
+    })?;
     let signature_bytes =
         STANDARD
             .decode(signature.as_bytes())
@@ -771,12 +761,12 @@ fn verify_signature(public_key: &str, message: &[u8], signature: &str) -> PrayRe
         .map_err(|error| PrayError::Verify(error.to_string()))
 }
 
-fn parse_ssh_ed25519_public_key(public_key: &str) -> PrayResult<VerifyingKey> {
+fn parse_ssh_ed25519_public_key(public_key: &str) -> PrayResult<(String, [u8; 32])> {
     let mut fields = public_key.split_whitespace();
     let algorithm = fields.next().ok_or_else(|| {
         PrayError::Unsupported("public key must include an algorithm".to_string())
     })?;
-    if algorithm != "ssh-ed25519" && algorithm != "ed25519" {
+    if algorithm != "ssh-ed25519" {
         return Err(PrayError::Unsupported(format!(
             "unsupported public key algorithm: {algorithm}"
         )));
@@ -784,12 +774,21 @@ fn parse_ssh_ed25519_public_key(public_key: &str) -> PrayResult<VerifyingKey> {
     let key_value = fields
         .next()
         .ok_or_else(|| PrayError::Unsupported("public key must include key bytes".to_string()))?;
-    let key_bytes = STANDARD
+    let blob = STANDARD
         .decode(key_value.as_bytes())
         .map_err(|error| PrayError::Parse {
             kind: "public key",
             message: error.to_string(),
         })?;
+    let mut cursor = blob.as_slice();
+    let blob_algorithm = read_ssh_string(&mut cursor)?;
+    if blob_algorithm != b"ssh-ed25519" {
+        return Err(PrayError::Parse {
+            kind: "public key",
+            message: "ed25519 public key blob must start with ssh-ed25519".to_string(),
+        });
+    }
+    let key_bytes = read_ssh_string(&mut cursor)?;
     let key_bytes: [u8; 32] = key_bytes
         .as_slice()
         .try_into()
@@ -797,10 +796,30 @@ fn parse_ssh_ed25519_public_key(public_key: &str) -> PrayResult<VerifyingKey> {
             kind: "public key",
             message: "ed25519 public key must be 32 bytes".to_string(),
         })?;
-    VerifyingKey::from_bytes(&key_bytes).map_err(|error| PrayError::Parse {
-        kind: "public key",
-        message: error.to_string(),
-    })
+    Ok((format!("ssh-ed25519 {key_value}"), key_bytes))
+}
+
+fn read_ssh_string(cursor: &mut &[u8]) -> PrayResult<Vec<u8>> {
+    let length = read_u32_from_slice(cursor)? as usize;
+    if cursor.len() < length {
+        return Err(PrayError::Resolution(
+            "truncated ssh public key blob".to_string(),
+        ));
+    }
+    let (value, rest) = cursor.split_at(length);
+    *cursor = rest;
+    Ok(value.to_vec())
+}
+
+fn read_u32_from_slice(cursor: &mut &[u8]) -> PrayResult<u32> {
+    if cursor.len() < 4 {
+        return Err(PrayError::Resolution("truncated ssh field".to_string()));
+    }
+    let (length_bytes, rest) = cursor.split_at(4);
+    *cursor = rest;
+    Ok(u32::from_be_bytes(
+        length_bytes.try_into().expect("length bytes"),
+    ))
 }
 
 fn generate_verification_code(email: &str, timestamp: u64) -> String {

@@ -409,7 +409,11 @@ fn auth_ssh_key_login_response(root: &Path, body: &[u8]) -> PrayResult<Response>
             message: error.to_string(),
         })?;
     let store = RegistryAuthStore::open(root)?;
-    let response: AuthSshKeyLoginResponse = store.login_with_ssh_key(&request.public_key)?;
+    let response: AuthSshKeyLoginResponse = store.respond_ssh_key_challenge(
+        &request.public_key,
+        &request.challenge_id,
+        &request.signature,
+    )?;
     let body =
         serde_json::to_vec(&response).map_err(|error| PrayError::Manifest(error.to_string()))?;
     Ok(Response {

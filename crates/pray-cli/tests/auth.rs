@@ -1,3 +1,7 @@
+use base64::{engine::general_purpose::STANDARD, Engine as _};
+use ed25519_dalek::{Signer, SigningKey};
+use pray_core::auth::RegistryAuthStore;
+use pray_core::trust::EmailConfirmationPolicy;
 use std::fs;
 use std::io::{Read, Write};
 use std::net::{TcpListener, TcpStream};
@@ -47,14 +51,16 @@ fn exercises_registration_session_passkey_and_ssh_key_over_http() {
     wait_for_server(port);
 
     let base_url = format!("http://127.0.0.1:{port}");
+    let signing_key = signing_key_from_seed(7);
+    let public_key = ssh_public_key_text(&signing_key);
 
-    let register = fetch_http_post(
-        &format!("{base_url}/v1/auth/register"),
-        r#"{"email":"alice@example.com"}"#,
-    );
-    assert_eq!(register.status, 201);
-    assert!(register.body.contains("\"verified\":false"));
-    let code = extract_json_string(&register.body, "verification_code");
+    let store = RegistryAuthStore::open(&registry_root).expect("open auth store");
+    let register = store
+        .register_email("alice@example.com", EmailConfirmationPolicy::Required)
+        .expect("register");
+    assert!(!register.verified);
+    let code = register.verification_code.expect("verification code");
+    assert_eq!(code.len(), 6);
 
     let verify = fetch_http_post(
         &format!("{base_url}/v1/auth/verify"),
@@ -76,16 +82,34 @@ fn exercises_registration_session_passkey_and_ssh_key_over_http() {
     assert_eq!(extract_json_string(&session.body, "kind"), "email");
     assert!(session_token.starts_with("sha256:"));
 
-    let passkey_enroll = fetch_http_post(
-        &format!("{base_url}/v1/auth/passkeys/enroll"),
-        r#"{"email":"alice@example.com","credential_id":"credential-1","public_key":"ed25519-public-key","label":"laptop passkey"}"#,
-    );
-    assert_eq!(passkey_enroll.status, 201);
-    assert!(extract_json_bool(&passkey_enroll.body, "enrolled"));
+    let passkey_enroll = store
+        .enroll_passkey(
+            "alice@example.com",
+            "credential-1",
+            &public_key,
+            Some("laptop passkey"),
+        )
+        .expect("passkey enrollment");
+    assert!(passkey_enroll.enrolled);
 
+    let passkey_challenge = fetch_http_post(
+        &format!("{base_url}/v1/auth/passkeys/challenge"),
+        r#"{"credential_id":"credential-1"}"#,
+    );
+    assert_eq!(passkey_challenge.status, 200);
+    let passkey_challenge_id = extract_json_string(&passkey_challenge.body, "challenge_id");
+    let passkey_challenge_value = extract_json_string(&passkey_challenge.body, "challenge");
+    let passkey_signature = STANDARD.encode(
+        signing_key
+            .sign(passkey_challenge_value.as_bytes())
+            .to_bytes(),
+    );
     let passkey_login = fetch_http_post(
         &format!("{base_url}/v1/auth/passkeys/login"),
-        r#"{"credential_id":"credential-1"}"#,
+        &format!(
+            r#"{{"credential_id":"credential-1","challenge_id":"{}","signature":"{}"}}"#,
+            passkey_challenge_id, passkey_signature
+        ),
     );
     assert_eq!(passkey_login.status, 200);
     assert_eq!(
@@ -94,16 +118,26 @@ fn exercises_registration_session_passkey_and_ssh_key_over_http() {
     );
     assert!(extract_json_string(&passkey_login.body, "token").starts_with("sha256:"));
 
-    let ssh_enroll = fetch_http_post(
-        &format!("{base_url}/v1/auth/ssh-keys/enroll"),
-        r#"{"email":"alice@example.com","public_key":"ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIexample","label":"workstation"}"#,
-    );
-    assert_eq!(ssh_enroll.status, 201);
-    assert!(extract_json_bool(&ssh_enroll.body, "enrolled"));
+    let ssh_enroll = store
+        .enroll_ssh_key("alice@example.com", &public_key, Some("workstation"))
+        .expect("ssh enrollment");
+    assert!(ssh_enroll.enrolled);
 
+    let ssh_challenge = fetch_http_post(
+        &format!("{base_url}/v1/auth/ssh-keys/challenge"),
+        &format!(r#"{{"public_key":"{}"}}"#, public_key),
+    );
+    assert_eq!(ssh_challenge.status, 200);
+    let ssh_challenge_id = extract_json_string(&ssh_challenge.body, "challenge_id");
+    let ssh_challenge_value = extract_json_string(&ssh_challenge.body, "challenge");
+    let ssh_signature =
+        STANDARD.encode(signing_key.sign(ssh_challenge_value.as_bytes()).to_bytes());
     let ssh_login = fetch_http_post(
         &format!("{base_url}/v1/auth/ssh-keys/login"),
-        r#"{"public_key":"ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIexample"}"#,
+        &format!(
+            r#"{{"public_key":"{}","challenge_id":"{}","signature":"{}"}}"#,
+            public_key, ssh_challenge_id, ssh_signature
+        ),
     );
     assert_eq!(ssh_login.status, 200);
     assert_eq!(
@@ -160,12 +194,20 @@ fn extract_json_string(text: &str, key: &str) -> String {
         .to_string()
 }
 
-fn extract_json_bool(text: &str, key: &str) -> bool {
-    let value: serde_json::Value = serde_json::from_str(text).expect("json body");
-    value
-        .get(key)
-        .and_then(serde_json::Value::as_bool)
-        .expect("json bool")
+fn ssh_public_key_text(signing_key: &SigningKey) -> String {
+    let mut blob = Vec::new();
+    write_ssh_string(&mut blob, b"ssh-ed25519");
+    write_ssh_string(&mut blob, &signing_key.verifying_key().to_bytes());
+    format!("ssh-ed25519 {}", STANDARD.encode(blob))
+}
+
+fn write_ssh_string(buffer: &mut Vec<u8>, bytes: &[u8]) {
+    buffer.extend_from_slice(&(bytes.len() as u32).to_be_bytes());
+    buffer.extend_from_slice(bytes);
+}
+
+fn signing_key_from_seed(seed: u8) -> SigningKey {
+    SigningKey::from_bytes(&[seed; 32])
 }
 
 fn temporary_directory(prefix: &str) -> std::path::PathBuf {
