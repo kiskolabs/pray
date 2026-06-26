@@ -1,3 +1,5 @@
+use pray_core::auth::{AuthSessionKind, RegistryAuthStore};
+use pray_core::trust::EmailConfirmationPolicy;
 use serde_json::Value;
 use std::collections::BTreeMap;
 use std::fs;
@@ -566,6 +568,17 @@ fn publish_serve_install_and_confess_end_to_end_with_web_surface() {
         String::from_utf8_lossy(&add.stderr)
     );
 
+    let auth_store = RegistryAuthStore::open(&source_repo).expect("open auth store");
+    auth_store
+        .register_email(
+            "sample-agent-packages@example.com",
+            EmailConfirmationPolicy::Disabled,
+        )
+        .expect("register publisher");
+    let session = auth_store
+        .issue_session("sample-agent-packages@example.com", AuthSessionKind::Email)
+        .expect("issue publisher session");
+
     let publish = Command::new(env!("CARGO_BIN_EXE_pray"))
         .args([
             "publish",
@@ -573,7 +586,8 @@ fn publish_serve_install_and_confess_end_to_end_with_web_surface() {
             registry_root.to_str().expect("registry path"),
         ])
         .current_dir(&source_repo)
-        .env("PRAY_SIGNER", "sample-agent-packages-2026")
+        .env("PRAY_SESSION_TOKEN", &session.token)
+        .env("PRAY_AUTH_ROOT", &source_repo)
         .output()
         .expect("run publish");
     assert!(
@@ -607,7 +621,7 @@ fn publish_serve_install_and_confess_end_to_end_with_web_surface() {
         .get("signer")
         .and_then(Value::as_str)
         .expect("signer");
-    assert_eq!(signer, "sample-agent-packages-2026");
+    assert_eq!(signer, "sample-agent-packages@example.com");
     assert!(signature.starts_with("sha256:"));
     assert!(registry_root.join(artifact_path).is_file());
 
