@@ -52,3 +52,9 @@ impl From<io::Error> for PrayError {
         Self::Io(error)
     }
 }
+
+impl From<rusqlite::Error> for PrayError {
+    fn from(error: rusqlite::Error) -> Self {
+        Self::Resolution(error.to_string())
+    }
+}

@@ -1,5 +1,6 @@
 mod server;
 
+use pray_core::auth::RegistryAuthStore;
 use pray_core::hashing::{normalize_line_endings, sha256_prefixed};
 use pray_core::lockfile::{read_lockfile, write_lockfile, Lockfile};
 use pray_core::manifest::parse_manifest;
@@ -755,6 +756,22 @@ fn confess_command(
 }
 
 fn current_signer() -> String {
+    if let Ok(token) = std::env::var("PRAY_SESSION_TOKEN") {
+        let auth_root = std::env::var("PRAY_AUTH_ROOT")
+            .map(PathBuf::from)
+            .unwrap_or_else(|_| {
+                manifest_path()
+                    .parent()
+                    .map(Path::to_path_buf)
+                    .unwrap_or_else(|| PathBuf::from("."))
+            });
+        if let Ok(store) = RegistryAuthStore::open(&auth_root) {
+            if let Ok(Some(email)) = store.email_for_session(&token) {
+                return email;
+            }
+        }
+    }
+
     std::env::var("PRAY_SIGNER")
         .or_else(|_| std::env::var("USER"))
         .or_else(|_| std::env::var("USERNAME"))
