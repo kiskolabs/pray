@@ -6,9 +6,17 @@ use pray_core::auth::{
     AuthSshKeyEnrollmentRequest, AuthSshKeyEnrollmentResponse, AuthSshKeyLoginRequest,
     AuthSshKeyLoginResponse, AuthVerificationRequest, AuthVerificationResponse, RegistryAuthStore,
 };
-use pray_core::registry::{ConfessionSubmission, RegistryIndex, RegistryPackageMetadata};
+use pray_core::registry::{
+    ConfessionSubmission, RegistryIndex, RegistryPackageMetadata, RegistryPackageVersion,
+};
 use pray_core::trust::read_registry_trust_settings;
 use pray_core::{PrayError, PrayResult};
+use pray_transport::{
+    FederationInfo, IndexResponse, OriginInfo, PackageMetadata as TransportPackageMetadata,
+    PackageSummary, PackageVersion, PeerInfo, PublisherInfo, ServerInfo, SignatureInfo,
+    SyncEndpoints,
+};
+use std::collections::BTreeSet;
 use std::fs;
 use std::io::{BufRead, BufReader, Read, Write};
 use std::net::{TcpListener, TcpStream};
@@ -77,6 +85,12 @@ fn handle_connection(root: PathBuf, mut stream: TcpStream) -> PrayResult<()> {
 
     let response = match (method, strip_query(path)) {
         ("GET", "/") => html_root_response(&root)?,
+        ("GET", "/.well-known/pray-federation.json") => federation_discovery_response(&root)?,
+        ("GET", "/v1/sync/index") => federation_index_response(&root, path)?,
+        ("GET", path) if path.starts_with("/v1/sync/package/") => {
+            federation_package_response(&root, path)?
+        }
+        ("POST", "/v1/sync/push") => federation_push_response(&root, &body)?,
         ("GET", path) if path.starts_with("/packages/") => html_package_response(&root, path)?,
         ("GET", path) => static_file_response(&root, path)?,
         ("POST", "/v1/confessions") => confession_response(&root, &body)?,
@@ -131,6 +145,403 @@ fn html_root_response(root: &Path) -> PrayResult<Response> {
         content_type: "text/html; charset=utf-8".to_string(),
         body: body.into_bytes(),
     })
+}
+
+fn federation_discovery_response(root: &Path) -> PrayResult<Response> {
+    let discovery = FederationInfo {
+        spec: "pray-federation-v1".to_string(),
+        server: ServerInfo {
+            name: "pray".to_string(),
+            version: env!("CARGO_PKG_VERSION").to_string(),
+            capabilities: vec!["static_registry".to_string(), "federation".to_string()],
+        },
+        sync: SyncEndpoints {
+            index_url: "/v1/sync/index".to_string(),
+            package_url: "/v1/sync/package/{name}".to_string(),
+            artifact_url: "/v1/artifacts/{package}/{version}/{artifact}".to_string(),
+            since_param: "since".to_string(),
+        },
+        peers: read_known_peers(root)?,
+    };
+    Ok(Response {
+        status: 200,
+        content_type: "application/json".to_string(),
+        body: serde_json::to_vec_pretty(&discovery)
+            .map_err(|error| PrayError::Manifest(error.to_string()))?,
+    })
+}
+
+fn federation_index_response(root: &Path, request_path: &str) -> PrayResult<Response> {
+    let since = query_parameter(request_path, "since").and_then(|value| value.parse::<u64>().ok());
+    let index = read_registry_index(root)?;
+    let mut packages = Vec::new();
+    let mut sync_version = 0u64;
+
+    for package_name in index.packages {
+        let Ok(metadata) = read_registry_package_metadata(root, &package_name) else {
+            continue;
+        };
+        let updated_at = latest_publish_timestamp(&metadata)
+            .map(|timestamp| timestamp.to_string())
+            .unwrap_or_else(|| "0".to_string());
+        let updated_at_value = updated_at.parse::<u64>().unwrap_or(0);
+        sync_version = sync_version.max(updated_at_value);
+        if since.is_some_and(|since| updated_at_value <= since) {
+            continue;
+        }
+        packages.push(PackageSummary {
+            name: package_name.clone(),
+            updated_at,
+            url: format!("/v1/sync/package/{package_name}"),
+        });
+    }
+
+    let body = IndexResponse {
+        spec: "prayfile-distribution-1".to_string(),
+        sync_version: sync_version as i64,
+        packages,
+    };
+
+    Ok(Response {
+        status: 200,
+        content_type: "application/json".to_string(),
+        body: serde_json::to_vec_pretty(&body)
+            .map_err(|error| PrayError::Manifest(error.to_string()))?,
+    })
+}
+
+fn federation_package_response(root: &Path, path: &str) -> PrayResult<Response> {
+    let package_name = path.trim_start_matches("/v1/sync/package/");
+    let metadata = read_registry_package_metadata(root, package_name)?;
+    let body = transport_package_metadata(&metadata);
+    Ok(Response {
+        status: 200,
+        content_type: "application/json".to_string(),
+        body: serde_json::to_vec_pretty(&body)
+            .map_err(|error| PrayError::Manifest(error.to_string()))?,
+    })
+}
+
+fn federation_push_response(root: &Path, body: &[u8]) -> PrayResult<Response> {
+    let incoming: TransportPackageMetadata =
+        serde_json::from_slice(body).map_err(|error| PrayError::Parse {
+            kind: "federation package metadata",
+            message: error.to_string(),
+        })?;
+    let registry_metadata = registry_package_metadata_from_transport(&incoming)?;
+    let merged_metadata = merge_registry_package_metadata(root, registry_metadata)?;
+    let metadata_path = registry_metadata_path(root, &merged_metadata.name);
+    write_registry_package_metadata(&metadata_path, &merged_metadata)?;
+    update_registry_index_with_package(root, &merged_metadata.name)?;
+    Ok(Response {
+        status: 201,
+        content_type: "application/json".to_string(),
+        body: serde_json::to_vec_pretty(&serde_json::json!({
+            "status": "ok",
+            "package": merged_metadata.name,
+        }))
+        .map_err(|error| PrayError::Manifest(error.to_string()))?,
+    })
+}
+
+fn read_registry_package_metadata(
+    root: &Path,
+    package_name: &str,
+) -> PrayResult<RegistryPackageMetadata> {
+    let metadata_path = registry_metadata_path(root, package_name);
+    let metadata_text = fs::read_to_string(&metadata_path).map_err(|error| {
+        if error.kind() == std::io::ErrorKind::NotFound {
+            PrayError::Resolution(format!("package metadata not found: {}", package_name))
+        } else {
+            PrayError::from(error)
+        }
+    })?;
+    let metadata: RegistryPackageMetadata =
+        serde_json::from_str(&metadata_text).map_err(|error| PrayError::Parse {
+            kind: "registry metadata",
+            message: error.to_string(),
+        })?;
+    if metadata.name != package_name {
+        return Err(PrayError::Resolution(format!(
+            "registry metadata name mismatch: expected {}, found {}",
+            package_name, metadata.name
+        )));
+    }
+    Ok(metadata)
+}
+
+fn write_registry_package_metadata(
+    path: &Path,
+    metadata: &RegistryPackageMetadata,
+) -> PrayResult<()> {
+    if let Some(parent) = path.parent() {
+        fs::create_dir_all(parent)?;
+    }
+    fs::write(
+        path,
+        serde_json::to_string_pretty(metadata)
+            .map_err(|error| PrayError::Manifest(error.to_string()))?,
+    )?;
+    Ok(())
+}
+
+fn registry_metadata_path(root: &Path, package_name: &str) -> PathBuf {
+    root.join("v1/packages")
+        .join(package_name)
+        .with_extension("json")
+}
+
+fn read_known_peers(root: &Path) -> PrayResult<Vec<PeerInfo>> {
+    let path = root.join("v1/peers.json");
+    let text = match fs::read_to_string(&path) {
+        Ok(text) => text,
+        Err(error) if error.kind() == std::io::ErrorKind::NotFound => return Ok(Vec::new()),
+        Err(error) => return Err(error.into()),
+    };
+    let peers: Vec<PeerInfo> = serde_json::from_str(&text).map_err(|error| PrayError::Parse {
+        kind: "peer list",
+        message: error.to_string(),
+    })?;
+    for peer in &peers {
+        if peer.name.trim().is_empty() || peer.url.trim().is_empty() {
+            return Err(PrayError::Resolution(
+                "peer list contains an entry with an empty name or url".to_string(),
+            ));
+        }
+    }
+    Ok(peers)
+}
+
+fn latest_publish_timestamp(metadata: &RegistryPackageMetadata) -> Option<u64> {
+    metadata
+        .versions
+        .iter()
+        .filter_map(|version| version.published_at.as_deref())
+        .filter_map(|published_at| published_at.parse::<u64>().ok())
+        .max()
+}
+
+fn transport_package_metadata(metadata: &RegistryPackageMetadata) -> TransportPackageMetadata {
+    let versions = metadata
+        .versions
+        .iter()
+        .map(transport_package_version)
+        .collect();
+    TransportPackageMetadata {
+        name: metadata.name.clone(),
+        versions,
+        updated_at: latest_publish_timestamp(metadata)
+            .map(|timestamp| timestamp.to_string())
+            .unwrap_or_else(|| "0".to_string()),
+    }
+}
+
+fn transport_package_version(version: &RegistryPackageVersion) -> PackageVersion {
+    let published_at = version
+        .published_at
+        .clone()
+        .unwrap_or_else(|| "0".to_string());
+    let publisher = version.signer.as_ref().map(|signer| PublisherInfo {
+        id: signer.clone(),
+        key_fingerprint: signer.clone(),
+    });
+    let signature = version.signature.as_ref().map(|signature| SignatureInfo {
+        algorithm: "sha256".to_string(),
+        signature: signature.clone(),
+        public_key: version.signer.clone().unwrap_or_default(),
+    });
+    let origin = version
+        .published_at
+        .as_ref()
+        .map(|published_at| OriginInfo {
+            server: "local".to_string(),
+            first_seen: published_at.clone(),
+        });
+    PackageVersion {
+        version: version.version.clone(),
+        artifact: version.artifact.clone(),
+        artifact_hash: version.artifact_hash.clone().unwrap_or_default(),
+        tree_hash: version.tree_hash.clone().unwrap_or_default(),
+        yanked: version.yanked,
+        targets: version.targets.clone(),
+        exports: version.exports.clone(),
+        published_at,
+        publisher,
+        signature,
+        origin,
+    }
+}
+
+fn registry_package_metadata_from_transport(
+    metadata: &TransportPackageMetadata,
+) -> PrayResult<RegistryPackageMetadata> {
+    if metadata.name.trim().is_empty() {
+        return Err(PrayError::Resolution(
+            "federation package metadata missing package name".to_string(),
+        ));
+    }
+
+    let mut seen_versions = BTreeSet::new();
+    let mut versions = Vec::new();
+    for version in &metadata.versions {
+        let registry_version = registry_package_version_from_transport(version)?;
+        if !seen_versions.insert(registry_version.version.clone()) {
+            return Err(PrayError::Resolution(format!(
+                "duplicate package version in federation payload: {} {}",
+                metadata.name, registry_version.version
+            )));
+        }
+        versions.push(registry_version);
+    }
+
+    Ok(RegistryPackageMetadata {
+        name: metadata.name.clone(),
+        versions,
+    })
+}
+
+fn registry_package_version_from_transport(
+    version: &PackageVersion,
+) -> PrayResult<RegistryPackageVersion> {
+    if version.version.trim().is_empty() {
+        return Err(PrayError::Resolution(
+            "federation package version missing version string".to_string(),
+        ));
+    }
+    if version.artifact.trim().is_empty() {
+        return Err(PrayError::Resolution(format!(
+            "federation package version {} missing artifact path",
+            version.version
+        )));
+    }
+
+    let signer = version
+        .publisher
+        .as_ref()
+        .map(|publisher| publisher.id.clone())
+        .or_else(|| {
+            version
+                .signature
+                .as_ref()
+                .map(|signature| signature.public_key.clone())
+        })
+        .filter(|signer| !signer.trim().is_empty());
+    let signature = version
+        .signature
+        .as_ref()
+        .map(|signature| signature.signature.clone())
+        .filter(|signature| !signature.trim().is_empty());
+    let published_at = if version.published_at.trim().is_empty() {
+        None
+    } else {
+        Some(version.published_at.clone())
+    };
+
+    Ok(RegistryPackageVersion {
+        version: version.version.clone(),
+        artifact: version.artifact.clone(),
+        artifact_hash: empty_string_to_none(&version.artifact_hash),
+        tree_hash: empty_string_to_none(&version.tree_hash),
+        yanked: version.yanked,
+        targets: version.targets.clone(),
+        exports: version.exports.clone(),
+        signer,
+        published_at,
+        signature,
+    })
+}
+
+fn merge_registry_package_metadata(
+    root: &Path,
+    incoming: RegistryPackageMetadata,
+) -> PrayResult<RegistryPackageMetadata> {
+    let mut current = read_or_create_registry_package_metadata(root, &incoming.name)?;
+    for incoming_version in incoming.versions {
+        match current
+            .versions
+            .iter()
+            .position(|version| version.version == incoming_version.version)
+        {
+            Some(index) if current.versions[index] != incoming_version => {
+                return Err(PrayError::Resolution(format!(
+                    "conflicting package version received for {} {}",
+                    incoming.name, incoming_version.version
+                )));
+            }
+            Some(_) => {}
+            None => current.versions.push(incoming_version),
+        }
+    }
+    Ok(current)
+}
+
+fn read_or_create_registry_package_metadata(
+    root: &Path,
+    package_name: &str,
+) -> PrayResult<RegistryPackageMetadata> {
+    match read_registry_package_metadata(root, package_name) {
+        Ok(metadata) => Ok(metadata),
+        Err(PrayError::Resolution(message))
+            if message.starts_with("package metadata not found") =>
+        {
+            Ok(RegistryPackageMetadata {
+                name: package_name.to_string(),
+                versions: Vec::new(),
+            })
+        }
+        Err(error) => Err(error),
+    }
+}
+
+fn update_registry_index_with_package(root: &Path, package_name: &str) -> PrayResult<()> {
+    let mut index = read_or_create_registry_index(root)?;
+    if index.spec.trim().is_empty() {
+        index.spec = "prayfile-distribution-1".to_string();
+    }
+    if !index
+        .packages
+        .iter()
+        .any(|existing| existing == package_name)
+    {
+        index.packages.push(package_name.to_string());
+    }
+    write_registry_index(root, &index)
+}
+
+fn read_or_create_registry_index(root: &Path) -> PrayResult<RegistryIndex> {
+    let index_path = root.join("v1/index.json");
+    match fs::read_to_string(&index_path) {
+        Ok(index_text) => serde_json::from_str(&index_text).map_err(|error| PrayError::Parse {
+            kind: "registry index",
+            message: error.to_string(),
+        }),
+        Err(error) if error.kind() == std::io::ErrorKind::NotFound => Ok(RegistryIndex {
+            spec: "prayfile-distribution-1".to_string(),
+            packages: Vec::new(),
+        }),
+        Err(error) => Err(error.into()),
+    }
+}
+
+fn write_registry_index(root: &Path, index: &RegistryIndex) -> PrayResult<()> {
+    let path = root.join("v1/index.json");
+    if let Some(parent) = path.parent() {
+        fs::create_dir_all(parent)?;
+    }
+    fs::write(
+        path,
+        serde_json::to_string_pretty(index)
+            .map_err(|error| PrayError::Manifest(error.to_string()))?,
+    )?;
+    Ok(())
+}
+
+fn empty_string_to_none(value: &str) -> Option<String> {
+    if value.trim().is_empty() {
+        None
+    } else {
+        Some(value.to_string())
+    }
 }
 
 fn html_package_response(root: &Path, path: &str) -> PrayResult<Response> {
@@ -523,6 +934,17 @@ fn reason_phrase(status: u16) -> &'static str {
 
 fn strip_query(path: &str) -> &str {
     path.split_once('?').map(|(path, _)| path).unwrap_or(path)
+}
+
+fn query_parameter(path: &str, name: &str) -> Option<String> {
+    let query = path.split_once('?')?.1;
+    for pair in query.split('&') {
+        let (key, value) = pair.split_once('=').unwrap_or((pair, ""));
+        if key == name {
+            return Some(value.to_string());
+        }
+    }
+    None
 }
 
 fn sanitize_request_path(path: &str) -> PrayResult<PathBuf> {

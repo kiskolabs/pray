@@ -250,6 +250,170 @@ fn format_normalizes_pray_markers_and_line_endings() {
 }
 
 #[test]
+fn federation_endpoints_expose_discovery_and_sync_metadata() {
+    let registry_root = temporary_directory("pray-federation-http");
+    fs::create_dir_all(registry_root.join("v1/packages/sample")).expect("registry directories");
+    fs::write(
+        registry_root.join("v1/index.json"),
+        r#"{
+            "spec": "prayfile-distribution-1",
+            "packages": ["sample/base"]
+        }"#,
+    )
+    .expect("write index");
+    fs::write(
+        registry_root.join("v1/peers.json"),
+        r#"[
+            {
+                "name": "seed-one",
+                "url": "https://seed-one.example",
+                "public": true
+            }
+        ]"#,
+    )
+    .expect("write peers");
+    fs::write(
+        registry_root.join("v1/packages/sample/base.json"),
+        r#"{
+            "name": "sample/base",
+            "versions": [
+                {
+                    "version": "1.0.0",
+                    "artifact": "v1/artifacts/sample/base/1.0.0/sample-base-1.0.0.praypkg",
+                    "artifact_hash": "sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+                    "tree_hash": "sha256:bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+                    "yanked": false,
+                    "targets": ["tool_a"],
+                    "exports": ["basics"],
+                    "published_at": "1711111111",
+                    "signer": "publisher-a",
+                    "signature": "sha256:cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc"
+                }
+            ]
+        }"#,
+    )
+    .expect("write package metadata");
+
+    let port = find_free_port();
+    let mut server = Command::new(env!("CARGO_BIN_EXE_pray"))
+        .args([
+            "serve",
+            "--root",
+            registry_root.to_str().expect("registry path"),
+            "--host",
+            "127.0.0.1",
+            "--port",
+            &port.to_string(),
+        ])
+        .stdout(Stdio::null())
+        .stderr(Stdio::null())
+        .spawn()
+        .expect("spawn server");
+    wait_for_server(port);
+
+    let base_url = format!("http://127.0.0.1:{port}");
+
+    let discovery = fetch_http_get(&format!("{base_url}/.well-known/pray-federation.json"));
+    assert_eq!(discovery.status, 200);
+    let discovery_json: Value = serde_json::from_str(&discovery.body).expect("discovery json");
+    assert_eq!(discovery_json["spec"], "pray-federation-v1");
+    assert_eq!(discovery_json["server"]["name"], "pray");
+    assert!(discovery_json["server"]["capabilities"]
+        .as_array()
+        .expect("capabilities")
+        .iter()
+        .any(|value| value.as_str() == Some("federation")));
+    assert_eq!(discovery_json["peers"].as_array().expect("peers").len(), 1);
+
+    let index = fetch_http_get(&format!("{base_url}/v1/sync/index"));
+    assert_eq!(index.status, 200);
+    let index_json: Value = serde_json::from_str(&index.body).expect("index json");
+    assert_eq!(index_json["spec"], "prayfile-distribution-1");
+    assert_eq!(
+        index_json["packages"].as_array().expect("packages").len(),
+        1
+    );
+    assert_eq!(index_json["packages"][0]["name"], "sample/base");
+    assert_eq!(index_json["packages"][0]["updated_at"], "1711111111");
+
+    let filtered_index = fetch_http_get(&format!("{base_url}/v1/sync/index?since=1711111111"));
+    assert_eq!(filtered_index.status, 200);
+    let filtered_json: Value =
+        serde_json::from_str(&filtered_index.body).expect("filtered index json");
+    assert_eq!(
+        filtered_json["packages"]
+            .as_array()
+            .expect("filtered packages")
+            .len(),
+        0
+    );
+
+    let package = fetch_http_get(&format!("{base_url}/v1/sync/package/sample/base"));
+    assert_eq!(package.status, 200);
+    let package_json: Value = serde_json::from_str(&package.body).expect("package json");
+    assert_eq!(package_json["name"], "sample/base");
+    assert_eq!(package_json["versions"][0]["published_at"], "1711111111");
+    assert_eq!(
+        package_json["versions"][0]["publisher"]["id"],
+        "publisher-a"
+    );
+
+    let pushed = fetch_http_post(
+        &format!("{base_url}/v1/sync/push"),
+        r#"{
+            "name": "sample/extra",
+            "versions": [
+                {
+                    "version": "2.0.0",
+                    "artifact": "v1/artifacts/sample/extra/2.0.0/sample-extra-2.0.0.praypkg",
+                    "artifact_hash": "sha256:dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd",
+                    "tree_hash": "sha256:eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee",
+                    "yanked": false,
+                    "targets": ["tool_a"],
+                    "exports": ["extra"],
+                    "published_at": "1712222222",
+                    "publisher": {
+                        "id": "publisher-b",
+                        "key_fingerprint": "publisher-b"
+                    },
+                    "signature": {
+                        "algorithm": "sha256",
+                        "signature": "sha256:ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff",
+                        "public_key": "publisher-b"
+                    },
+                    "origin": {
+                        "server": "peer-one",
+                        "first_seen": "1712222222"
+                    }
+                }
+            ]
+        }"#,
+    );
+    assert_eq!(pushed.status, 201);
+
+    let pushed_metadata_text =
+        fs::read_to_string(registry_root.join("v1/packages/sample/extra.json"))
+            .expect("pushed package metadata");
+    let pushed_metadata: Value =
+        serde_json::from_str(&pushed_metadata_text).expect("pushed metadata json");
+    assert_eq!(pushed_metadata["name"], "sample/extra");
+    assert_eq!(pushed_metadata["versions"][0]["signer"], "publisher-b");
+
+    let updated_index_text =
+        fs::read_to_string(registry_root.join("v1/index.json")).expect("updated index");
+    let updated_index: Value =
+        serde_json::from_str(&updated_index_text).expect("updated index json");
+    assert!(updated_index["packages"]
+        .as_array()
+        .expect("updated packages")
+        .iter()
+        .any(|value| value.as_str() == Some("sample/extra")));
+
+    let _ = server.kill();
+    let _ = server.wait();
+}
+
+#[test]
 fn package_builds_a_tar_zst_archive_from_package_contents() {
     let repo = temporary_directory("pray-package");
     create_add_fixture(&repo);
@@ -1467,6 +1631,52 @@ fn read_package_archive(path: &Path) -> BTreeMap<String, String> {
         entries.insert(path, content);
     }
     entries
+}
+
+fn fetch_http_get(url: &str) -> HttpResponse {
+    fetch_http_request("GET", url, None)
+}
+
+fn fetch_http_post(url: &str, body: &str) -> HttpResponse {
+    fetch_http_request("POST", url, Some(body))
+}
+
+struct HttpResponse {
+    status: u16,
+    body: String,
+}
+
+fn fetch_http_request(method: &str, url: &str, body: Option<&str>) -> HttpResponse {
+    let url = url.strip_prefix("http://").expect("http url");
+    let (host_port, path) = url.split_once('/').unwrap_or((url, ""));
+    let (host, port) = host_port.split_once(':').expect("host and port");
+    let mut stream =
+        TcpStream::connect((host, port.parse::<u16>().expect("port"))).expect("connect");
+    let request_path = format!("/{}", path);
+    let body = body.unwrap_or("");
+    let content_length = body.len();
+    write!(
+        stream,
+        "{} {} HTTP/1.1\r\nHost: {}\r\nContent-Type: application/json\r\nContent-Length: {}\r\nConnection: close\r\n\r\n{}",
+        method,
+        request_path,
+        host_port,
+        content_length,
+        body
+    )
+    .expect("write request");
+    let mut response = String::new();
+    stream.read_to_string(&mut response).expect("read response");
+    let mut sections = response.splitn(2, "\r\n\r\n");
+    let header = sections.next().unwrap_or_default();
+    let body = sections.next().unwrap_or_default().to_string();
+    let status = header
+        .lines()
+        .next()
+        .and_then(|line| line.split_whitespace().nth(1))
+        .and_then(|status| status.parse::<u16>().ok())
+        .expect("status code");
+    HttpResponse { status, body }
 }
 
 fn run_pray(repo: &Path, arguments: &[&str]) -> std::process::Output {

@@ -237,32 +237,16 @@ pub trait TransportAdapter: Send + Sync {
     async fn fetch_discovery(&self, peer: &PeerConfig) -> Result<FederationInfo>;
 
     /// Fetch index from peer (optionally since a timestamp)
-    async fn fetch_index(
-        &self,
-        peer: &PeerConfig,
-        since: Option<i64>,
-    ) -> Result<IndexResponse>;
+    async fn fetch_index(&self, peer: &PeerConfig, since: Option<i64>) -> Result<IndexResponse>;
 
     /// Fetch package metadata from peer
-    async fn fetch_package(
-        &self,
-        peer: &PeerConfig,
-        name: &str,
-    ) -> Result<PackageMetadata>;
+    async fn fetch_package(&self, peer: &PeerConfig, name: &str) -> Result<PackageMetadata>;
 
     /// Fetch artifact from peer
-    async fn fetch_artifact(
-        &self,
-        peer: &PeerConfig,
-        artifact: &ArtifactRef,
-    ) -> Result<Vec<u8>>;
+    async fn fetch_artifact(&self, peer: &PeerConfig, artifact: &ArtifactRef) -> Result<Vec<u8>>;
 
     /// Send metadata to peer (for push-capable transports)
-    async fn push_package(
-        &self,
-        peer: &PeerConfig,
-        metadata: &PackageMetadata,
-    ) -> Result<()> {
+    async fn push_package(&self, peer: &PeerConfig, metadata: &PackageMetadata) -> Result<()> {
         let _ = (peer, metadata);
         Err(TransportError::NotCapable(
             "Push not supported by this transport".to_string(),
@@ -274,4 +258,30 @@ pub trait TransportAdapter: Send + Sync {
 pub trait TransportAdapterFactory: Send + Sync {
     fn name(&self) -> &str;
     fn create(&self, config: &PeerConfig) -> Result<Box<dyn TransportAdapter>>;
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn sync_direction_reports_expected_capabilities() {
+        assert!(SyncDirection::Pull.needs_pull());
+        assert!(!SyncDirection::Pull.needs_push());
+        assert!(SyncDirection::Push.needs_push());
+        assert!(!SyncDirection::Push.needs_pull());
+        assert!(SyncDirection::Bidirectional.needs_pull());
+        assert!(SyncDirection::Bidirectional.needs_push());
+    }
+
+    #[test]
+    fn trust_level_serializes_and_formats_as_expected() {
+        let trust = TrustLevel::MetadataOnly;
+        let encoded = serde_json::to_string(&trust).expect("should serialize");
+        let decoded: TrustLevel = serde_json::from_str(&encoded).expect("should deserialize");
+
+        assert_eq!(encoded, "\"metadata_only\"");
+        assert_eq!(decoded, TrustLevel::MetadataOnly);
+        assert_eq!(trust.to_string(), "metadata_only");
+    }
 }

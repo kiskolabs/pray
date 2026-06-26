@@ -4,36 +4,21 @@ version = "0.1.0"
 edition = "2021"
 
 [dependencies]
-# Core dependencies
+async-trait = "0.1"
+anyhow = "1"
+chrono = { version = "0.4", features = ["serde"] }
+hex = "0.4"
+reqwest = { version = "0.12", features = ["json"] }
 serde = { version = "1", features = ["derive"] }
 serde_json = "1"
-tokio = { version = "1", features = ["full"] }
-async-trait = "0.1"
-
-# HTTP transport
-reqwest = { version = "0.12", features = ["json"] }
-
-# P2P/BitTorrent transport
-# Using librqbit - a modern Rust BitTorrent library
-librqbit = { version = "7", optional = true }
-
-# DHT for package discovery
-mainline = { version = "2", optional = true }
-
-# Error handling
-thiserror = "1"
-anyhow = "1"
-
-# Hashing
 sha2 = "0.10"
-
-# Time
-chrono = { version = "0.4", features = ["serde"] }
+thiserror = "1"
+tokio = { version = "1", features = ["full"] }
 
 [features]
 default = ["http"]
 http = []
-p2p = ["librqbit", "mainline"]
+p2p = []
 filesystem = []
 all = ["http", "p2p", "filesystem"]
 
