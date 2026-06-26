@@ -257,6 +257,8 @@ Prayfile should also support direct sources such as local paths, git repositorie
 
 Prayfile should also leave room for peer-to-peer distribution transport: torrent-style seeding and collective-network discovery through a DHT, inspired by systems like BitTorrent, Freenet, and GNUnet. That transport should preserve the same hash verification, signature checking, and provenance guarantees as static hosting.
 
+Distribution points may also form federated networks through server-to-server (S2S) synchronization. Servers can establish explicit peer relationships and sync package metadata and artifacts, similar to FIDONet-style store-and-forward networks. Federation allows distribution points to mirror packages, share availability across the network, and maintain eventual consistency while preserving signatures and provenance. Clients remain unaware of federation and simply query a single server.
+
 ## Publishing and signatures
 
 Publishing changes the shared material placed before inference, so publishing must be treated as a high-trust operation.

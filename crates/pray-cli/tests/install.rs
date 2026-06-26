@@ -1,6 +1,6 @@
 use base64::{engine::general_purpose::STANDARD, Engine as _};
 use ed25519_dalek::{Signer, SigningKey};
-use pray_core::auth::{AuthSessionKind, RegistryAuthStore};
+use pray_core::auth::RegistryAuthStore;
 use pray_core::trust::EmailConfirmationPolicy;
 use serde_json::Value;
 use std::collections::BTreeMap;
@@ -9,7 +9,7 @@ use std::io::{Read, Write};
 use std::net::TcpStream;
 use std::os::unix::net::{UnixListener, UnixStream};
 use std::path::{Path, PathBuf};
-use std::process::{Command, Stdio};
+use std::process::{Child, Command, Stdio};
 use std::sync::atomic::{AtomicUsize, Ordering};
 use std::thread;
 use std::thread::sleep;
@@ -554,10 +554,50 @@ fn publish_serve_install_and_confess_end_to_end_with_web_surface() {
     let workspace = temporary_directory("pray-publish-e2e");
     let source_repo = workspace.join("source");
     let registry_root = workspace.join("registry");
+    let registry_root_mirror = workspace.join("registry-mirror");
     let client_a = workspace.join("client-a");
     let client_b = workspace.join("client-b");
     fs::create_dir_all(&source_repo).expect("source workspace");
     fs::create_dir_all(&registry_root).expect("registry workspace");
+    fs::create_dir_all(&registry_root_mirror).expect("registry mirror workspace");
+    fs::create_dir_all(registry_root.join("v1")).expect("registry v1 workspace");
+    fs::write(
+        registry_root.join("v1/index.json"),
+        r#"{
+            "spec": "prayfile-distribution-1",
+            "packages": []
+        }"#,
+    )
+    .expect("write registry index");
+    fs::write(
+        registry_root.join("v1/trust.json"),
+        r#"{
+            "email_confirmation": "required",
+            "passkeys_enabled": true,
+            "ssh_keys_enabled": true,
+            "ssh_agent_signing_enabled": true
+        }"#,
+    )
+    .expect("write trust settings");
+    fs::create_dir_all(registry_root_mirror.join("v1")).expect("registry mirror v1 workspace");
+    fs::write(
+        registry_root_mirror.join("v1/index.json"),
+        r#"{
+            "spec": "prayfile-distribution-1",
+            "packages": []
+        }"#,
+    )
+    .expect("write mirror index");
+    fs::write(
+        registry_root_mirror.join("v1/trust.json"),
+        r#"{
+            "email_confirmation": "required",
+            "passkeys_enabled": true,
+            "ssh_keys_enabled": true,
+            "ssh_agent_signing_enabled": true
+        }"#,
+    )
+    .expect("write mirror trust settings");
     fs::create_dir_all(&client_a).expect("client A workspace");
     fs::create_dir_all(&client_b).expect("client B workspace");
 
@@ -655,7 +695,7 @@ fn publish_serve_install_and_confess_end_to_end_with_web_surface() {
         &client_a_private_key_path,
     );
 
-    let ssh_agent_socket = workspace.join("ssh-agent.sock");
+    let ssh_agent_socket = PathBuf::from("/tmp/pray-ssh-agent.sock");
     let ssh_agent_handle = spawn_mock_ssh_agent(&ssh_agent_socket, client_b_key);
     run_pray_login_ssh_agent(
         &client_b,
@@ -672,6 +712,8 @@ fn publish_serve_install_and_confess_end_to_end_with_web_surface() {
             "publish",
             "--root",
             registry_root.to_str().expect("registry path"),
+            "--root",
+            registry_root_mirror.to_str().expect("registry mirror path"),
         ],
     );
     assert!(
@@ -684,6 +726,11 @@ fn publish_serve_install_and_confess_end_to_end_with_web_surface() {
         fs::read_to_string(registry_root.join("v1/index.json")).expect("registry index");
     assert!(index_text.contains("prayfile-distribution-1"));
     assert!(index_text.contains("sample/base"));
+
+    let mirror_index_text = fs::read_to_string(registry_root_mirror.join("v1/index.json"))
+        .expect("registry mirror index");
+    assert!(mirror_index_text.contains("prayfile-distribution-1"));
+    assert!(mirror_index_text.contains("sample/base"));
 
     let metadata_text = fs::read_to_string(registry_root.join("v1/packages/sample/base.json"))
         .expect("package metadata");
@@ -708,6 +755,7 @@ fn publish_serve_install_and_confess_end_to_end_with_web_surface() {
     assert_eq!(signer, publisher_email);
     assert!(signature.starts_with("sha256:"));
     assert!(registry_root.join(artifact_path).is_file());
+    assert!(registry_root_mirror.join(artifact_path).is_file());
 
     let ruby_script =
         PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("tests/support/distribution_point_smoke.rb");
@@ -734,6 +782,91 @@ fn publish_serve_install_and_confess_end_to_end_with_web_surface() {
     );
     let stdout = String::from_utf8_lossy(&smoke.stdout);
     assert!(stdout.contains("distribution point smoke test passed"));
+}
+
+#[test]
+fn login_supports_multiple_auth_origins() {
+    let workspace = temporary_directory("pray-login-multi-origin");
+    let client_repo = workspace.join("client");
+    let auth_root_a = workspace.join("auth-a");
+    let auth_root_b = workspace.join("auth-b");
+    fs::create_dir_all(&client_repo).expect("client workspace");
+    fs::create_dir_all(&auth_root_a).expect("auth root A workspace");
+    fs::create_dir_all(&auth_root_b).expect("auth root B workspace");
+    write_auth_registry_fixture(&auth_root_a);
+    write_auth_registry_fixture(&auth_root_b);
+
+    let auth_store_a = RegistryAuthStore::open(&auth_root_a).expect("open auth store A");
+    let auth_store_b = RegistryAuthStore::open(&auth_root_b).expect("open auth store B");
+    let login_email = "multi-origin@example.com";
+    let signing_key = signing_key_from_seed(21);
+    let public_key = ssh_public_key_text(&signing_key);
+
+    verify_email_registration(&auth_store_a, login_email);
+    verify_email_registration(&auth_store_b, login_email);
+    auth_store_a
+        .enroll_passkey(
+            login_email,
+            "multi-origin-passkey",
+            &public_key,
+            Some("auth origin A"),
+        )
+        .expect("enroll passkey on auth origin A");
+    auth_store_b
+        .enroll_passkey(
+            login_email,
+            "multi-origin-passkey",
+            &public_key,
+            Some("auth origin B"),
+        )
+        .expect("enroll passkey on auth origin B");
+
+    let port_a = find_free_port();
+    let port_b = find_free_port();
+    let mut server_a = spawn_server(&auth_root_a, port_a);
+    let mut server_b = spawn_server(&auth_root_b, port_b);
+    wait_for_server(port_a);
+    wait_for_server(port_b);
+
+    let server_url_a = format!("http://127.0.0.1:{port_a}");
+    let server_url_b = format!("http://127.0.0.1:{port_b}");
+    let private_key_path =
+        write_private_key_file(&client_repo, "multi-origin-passkey.bin", &signing_key);
+
+    let login = Command::new(env!("CARGO_BIN_EXE_pray"))
+        .args([
+            "login",
+            "--server",
+            &server_url_a,
+            "--server",
+            &server_url_b,
+            "--email",
+            login_email,
+            "--credential-id",
+            "multi-origin-passkey",
+            "--passkey-key",
+            private_key_path.to_str().expect("private key path"),
+        ])
+        .current_dir(&client_repo)
+        .output()
+        .expect("run multi-origin login");
+    assert!(
+        login.status.success(),
+        "multi-origin login failed: {}",
+        String::from_utf8_lossy(&login.stderr)
+    );
+
+    let session_text =
+        fs::read_to_string(client_repo.join(".pray/session.json")).expect("session file");
+    let session_json: Value = serde_json::from_str(&session_text).expect("session json");
+    let server_urls = session_server_urls(&session_json);
+    assert!(server_urls.contains(&server_url_a));
+    assert!(server_urls.contains(&server_url_b));
+
+    let _ = server_a.kill();
+    let _ = server_a.wait();
+    let _ = server_b.kill();
+    let _ = server_b.wait();
 }
 
 #[test]
@@ -887,7 +1020,8 @@ fn spawn_mock_ssh_agent(socket_path: &Path, signing_key: SigningKey) -> thread::
     let listener = UnixListener::bind(socket_path).expect("bind mock ssh agent");
     thread::spawn(move || {
         let (mut stream, _) = listener.accept().expect("accept ssh agent connection");
-        let (message_type, payload) = read_ssh_message(&mut stream).expect("read ssh agent request");
+        let (message_type, payload) =
+            read_ssh_message(&mut stream).expect("read ssh agent request");
         assert_eq!(message_type, 13);
         let mut cursor = payload.as_slice();
         let _public_key_blob = read_ssh_string(&mut cursor).expect("read public key blob");
@@ -914,6 +1048,65 @@ fn verify_email_registration(store: &RegistryAuthStore, email: &str) {
     store
         .verify_email(email, verification_code)
         .expect("verify email");
+}
+
+fn write_auth_registry_fixture(root: &Path) {
+    fs::create_dir_all(root.join("v1")).expect("auth root directories");
+    fs::write(
+        root.join("v1/index.json"),
+        r#"{
+            "spec": "prayfile-distribution-1",
+            "packages": []
+        }"#,
+    )
+    .expect("write auth index");
+    fs::write(
+        root.join("v1/trust.json"),
+        r#"{
+            "email_confirmation": "required",
+            "passkeys_enabled": true,
+            "ssh_keys_enabled": true,
+            "ssh_agent_signing_enabled": true
+        }"#,
+    )
+    .expect("write auth trust settings");
+}
+
+fn session_server_urls(session_json: &Value) -> Vec<String> {
+    if let Some(sessions) = session_json.get("sessions").and_then(Value::as_array) {
+        return sessions
+            .iter()
+            .filter_map(|session| {
+                session
+                    .get("server_url")
+                    .and_then(Value::as_str)
+                    .map(ToString::to_string)
+            })
+            .collect();
+    }
+
+    session_json
+        .get("server_url")
+        .and_then(Value::as_str)
+        .map(|server_url| vec![server_url.to_string()])
+        .unwrap_or_default()
+}
+
+fn spawn_server(root: &Path, port: u16) -> Child {
+    Command::new(env!("CARGO_BIN_EXE_pray"))
+        .args([
+            "serve",
+            "--root",
+            root.to_str().expect("registry path"),
+            "--host",
+            "127.0.0.1",
+            "--port",
+            &port.to_string(),
+        ])
+        .stdout(Stdio::null())
+        .stderr(Stdio::null())
+        .spawn()
+        .expect("spawn server")
 }
 
 fn write_registry_client_fixture(repo: &Path, server_url: &str) {
@@ -945,6 +1138,10 @@ fn write_public_key_file(repo: &Path, filename: &str, public_key: &str) -> PathB
     let path = repo.join(filename);
     fs::write(&path, format!("{public_key}\n")).expect("write public key file");
     path
+}
+
+fn signing_key_from_seed(seed: u8) -> SigningKey {
+    SigningKey::from_bytes(&[seed; 32])
 }
 
 fn ssh_public_key_text(signing_key: &SigningKey) -> String {
@@ -981,7 +1178,9 @@ fn read_u32(cursor: &mut &[u8]) -> std::io::Result<u32> {
     }
     let (length_bytes, rest) = cursor.split_at(4);
     *cursor = rest;
-    Ok(u32::from_be_bytes(length_bytes.try_into().expect("length bytes")))
+    Ok(u32::from_be_bytes(
+        length_bytes.try_into().expect("length bytes"),
+    ))
 }
 
 fn read_ssh_message(stream: &mut UnixStream) -> std::io::Result<(u8, Vec<u8>)> {
@@ -994,7 +1193,11 @@ fn read_ssh_message(stream: &mut UnixStream) -> std::io::Result<(u8, Vec<u8>)> {
     Ok((message_type, buffer[1..].to_vec()))
 }
 
-fn write_ssh_message(stream: &mut UnixStream, message_type: u8, payload: &[u8]) -> std::io::Result<()> {
+fn write_ssh_message(
+    stream: &mut UnixStream,
+    message_type: u8,
+    payload: &[u8],
+) -> std::io::Result<()> {
     let mut buffer = Vec::new();
     buffer.push(message_type);
     buffer.extend_from_slice(payload);
@@ -1012,7 +1215,6 @@ fn write_u32_to_stream(stream: &mut UnixStream, value: u32) -> std::io::Result<(
     stream.write_all(&value.to_be_bytes())
 }
 
-fn write_registry_client_fixture(repo: &Path, server_url: &str) {
 fn find_free_port() -> u16 {
     let listener = std::net::TcpListener::bind("127.0.0.1:0").expect("reserve port");
     let port = listener.local_addr().expect("local addr").port();

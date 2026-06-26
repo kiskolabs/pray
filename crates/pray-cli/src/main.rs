@@ -13,7 +13,7 @@ use pray_core::registry::{
     RegistryPackageMetadata, RegistryPackageVersion,
 };
 use pray_core::render::{render_project, write_rendered_targets};
-use pray_core::resolve::resolve_project;
+use pray_core::resolve::{resolve_project, ResolvedProject};
 use pray_core::verify::{drift_project, format_verification_report, verify_project};
 use pray_core::{PrayError, PrayResult};
 use std::env;
@@ -57,16 +57,16 @@ fn run(arguments: Vec<String>) -> PrayResult<()> {
         Command::Drift { semantic } => drift_command(semantic),
         Command::Format => format_command(),
         Command::Package => package_command(),
-        Command::Publish { root } => publish_command(root),
+        Command::Publish { roots } => publish_command(roots),
         Command::Login {
-            server,
+            servers,
             email,
             credential_id,
             passkey_key,
             public_key,
             ssh_agent,
         } => login_command(
-            server,
+            servers,
             email,
             credential_id,
             passkey_key,
@@ -124,10 +124,10 @@ enum Command {
     Format,
     Package,
     Publish {
-        root: PathBuf,
+        roots: Vec<PathBuf>,
     },
     Login {
-        server: String,
+        servers: Vec<String>,
         email: String,
         credential_id: Option<String>,
         passkey_key: Option<PathBuf>,
@@ -475,7 +475,7 @@ fn parse_update_command(arguments: std::vec::IntoIter<String>) -> PrayResult<Com
 }
 
 fn parse_publish_command(mut arguments: std::vec::IntoIter<String>) -> PrayResult<Command> {
-    let mut root = None;
+    let mut roots = Vec::new();
     while let Some(argument) = arguments.next() {
         match argument.as_str() {
             "--root" => {
@@ -484,7 +484,7 @@ fn parse_publish_command(mut arguments: std::vec::IntoIter<String>) -> PrayResul
                         "publish requires a path after --root".to_string(),
                     ));
                 };
-                root = Some(PathBuf::from(value));
+                roots.push(PathBuf::from(value));
             }
             other if other.starts_with("--") => {
                 return Err(PrayError::Unsupported(format!(
@@ -498,13 +498,16 @@ fn parse_publish_command(mut arguments: std::vec::IntoIter<String>) -> PrayResul
             }
         }
     }
-    let root =
-        root.ok_or_else(|| PrayError::Unsupported("publish requires --root PATH".to_string()))?;
-    Ok(Command::Publish { root })
+    if roots.is_empty() {
+        return Err(PrayError::Unsupported(
+            "publish requires at least one --root PATH".to_string(),
+        ));
+    }
+    Ok(Command::Publish { roots })
 }
 
 fn parse_login_command(mut arguments: std::vec::IntoIter<String>) -> PrayResult<Command> {
-    let mut server = None;
+    let mut servers = Vec::new();
     let mut email = None;
     let mut credential_id = None;
     let mut passkey_key = None;
@@ -518,7 +521,7 @@ fn parse_login_command(mut arguments: std::vec::IntoIter<String>) -> PrayResult<
                         "login requires a URL after --server".to_string(),
                     ));
                 };
-                server = Some(value);
+                servers.push(value);
             }
             "--email" => {
                 let Some(value) = arguments.next() else {
@@ -565,8 +568,11 @@ fn parse_login_command(mut arguments: std::vec::IntoIter<String>) -> PrayResult<
             }
         }
     }
-    let server =
-        server.ok_or_else(|| PrayError::Unsupported("login requires --server URL".to_string()))?;
+    if servers.is_empty() {
+        return Err(PrayError::Unsupported(
+            "login requires at least one --server URL".to_string(),
+        ));
+    }
     let email = email
         .ok_or_else(|| PrayError::Unsupported("login requires --email ADDRESS".to_string()))?;
     if passkey_key.is_some() == ssh_agent || (passkey_key.is_none() && public_key.is_none()) {
@@ -585,7 +591,7 @@ fn parse_login_command(mut arguments: std::vec::IntoIter<String>) -> PrayResult<
         ));
     }
     Ok(Command::Login {
-        server,
+        servers,
         email,
         credential_id,
         passkey_key,
@@ -928,11 +934,23 @@ fn package_command() -> PrayResult<()> {
     Ok(())
 }
 
-fn publish_command(root: PathBuf) -> PrayResult<()> {
+fn publish_command(roots: Vec<PathBuf>) -> PrayResult<()> {
     let project = resolve_project(&manifest_path())?;
     let signer = current_signer();
     let published_at = current_timestamp()?;
-    let mut registry_index = load_registry_index(&root)?;
+    for root in roots {
+        publish_to_root(&project, &signer, &published_at, &root)?;
+    }
+    Ok(())
+}
+
+fn publish_to_root(
+    project: &ResolvedProject,
+    signer: &str,
+    published_at: &str,
+    root: &Path,
+) -> PrayResult<()> {
+    let mut registry_index = load_registry_index(root)?;
     let mut package_names = registry_index
         .packages
         .iter()
@@ -949,10 +967,10 @@ fn publish_command(root: PathBuf) -> PrayResult<()> {
         }
         fs::write(&artifact_output_path, &archive_bytes)?;
 
-        let metadata_path = registry_metadata_path(&root, &package.declaration.name);
+        let metadata_path = registry_metadata_path(root, &package.declaration.name);
         let mut metadata =
             load_registry_package_metadata(&metadata_path, &package.declaration.name)?;
-        let signature = registry_artifact_signature(&archive_bytes, &package.tree_hash, &signer);
+        let signature = registry_artifact_signature(&archive_bytes, &package.tree_hash, signer);
         let version_entry = RegistryPackageVersion {
             version: package.spec.version.clone(),
             artifact: artifact_path,
@@ -961,8 +979,8 @@ fn publish_command(root: PathBuf) -> PrayResult<()> {
             yanked: false,
             targets: package.spec.targets.clone(),
             exports: package.spec.exports.keys().cloned().collect(),
-            signer: Some(signer.clone()),
-            published_at: Some(published_at.clone()),
+            signer: Some(signer.to_string()),
+            published_at: Some(published_at.to_string()),
             signature: Some(signature),
         };
         metadata
@@ -974,12 +992,12 @@ fn publish_command(root: PathBuf) -> PrayResult<()> {
     }
 
     registry_index.packages = package_names.into_iter().collect();
-    write_registry_index(&root, &registry_index)?;
+    write_registry_index(root, &registry_index)?;
     Ok(())
 }
 
 fn login_command(
-    server: String,
+    servers: Vec<String>,
     email: String,
     credential_id: Option<String>,
     passkey_key: Option<PathBuf>,
@@ -987,28 +1005,33 @@ fn login_command(
     ssh_agent: bool,
 ) -> PrayResult<()> {
     let session_root = workspace_root();
-    let session = if let Some(passkey_key) = passkey_key {
-        let credential_id = credential_id.ok_or_else(|| {
-            PrayError::Unsupported("passkey login requires --credential-id".to_string())
-        })?;
-        login_with_passkey(&server, &credential_id, &passkey_key, &session_root)?
-    } else if ssh_agent {
-        let public_key = public_key.ok_or_else(|| {
-            PrayError::Unsupported("ssh-agent login requires --public-key".to_string())
-        })?;
-        login_with_ssh_agent(&server, &public_key, &session_root)?
-    } else {
-        return Err(PrayError::Unsupported(
-            "login requires an authentication mode".to_string(),
-        ));
-    };
-    if session.email != email {
-        return Err(PrayError::Resolution(format!(
-            "login completed for {} but {} was requested",
-            session.email, email
-        )));
+    for server in servers {
+        let session = if let Some(passkey_key) = &passkey_key {
+            let credential_id = credential_id.as_ref().ok_or_else(|| {
+                PrayError::Unsupported("passkey login requires --credential-id".to_string())
+            })?;
+            login_with_passkey(&server, credential_id, passkey_key, &session_root)?
+        } else if ssh_agent {
+            let public_key = public_key.as_ref().ok_or_else(|| {
+                PrayError::Unsupported("ssh-agent login requires --public-key".to_string())
+            })?;
+            login_with_ssh_agent(&server, public_key, &session_root)?
+        } else {
+            return Err(PrayError::Unsupported(
+                "login requires an authentication mode".to_string(),
+            ));
+        };
+        if session.email != email {
+            return Err(PrayError::Resolution(format!(
+                "login completed for {} but {} was requested",
+                session.email, email
+            )));
+        }
+        println!(
+            "logged in as {} via {} on {}",
+            session.email, session.kind, server
+        );
     }
-    println!("logged in as {} via {}", session.email, session.kind);
     Ok(())
 }
 

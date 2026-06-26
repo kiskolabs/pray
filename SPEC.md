@@ -1146,6 +1146,46 @@ Peer-to-peer transport must preserve the same package identity, artifact hash ve
 
 P2P transport is optional. A conforming implementation must still work with local, private, and static registry sources without it.
 
+### 29.2 Server-to-server federation
+
+The specification should allow distribution points to form federated networks through explicit server-to-server (S2S) synchronization.
+
+A conforming implementation may support a federation protocol inspired by FIDONet, NNTP, and ActivityPub where:
+
+- Servers establish explicit peer relationships through configuration
+- Servers sync package metadata and artifacts from trusted peers
+- Sync operates on a pull, push, or bidirectional model
+- Each server validates packages before accepting them
+- Consistency is eventual through periodic synchronization
+- Provenance is tracked (origin server, sync path, timestamps)
+
+Federation protocol requirements:
+
+- Discovery endpoint at `/.well-known/pray-federation.json` exposing server capabilities and sync URLs
+- Index sync endpoint returning changed packages since a timestamp
+- Package metadata sync endpoint with federation-specific fields (origin, publisher, signature)
+- Standard artifact URLs for package file retrieval
+- Hash verification and signature validation before acceptance
+- Conflict detection for same version with different hashes
+
+Trust levels:
+
+- `full`: Accept metadata and artifacts, mirror packages locally
+- `metadata_only`: Accept metadata but fetch artifacts from origin
+- `disabled`: Peer listed but sync paused
+
+Sync directions:
+
+- `pull`: Server fetches updates from peer
+- `push`: Server sends updates to peer
+- `bidirectional`: Both pull and push
+
+Servers may optionally publish their known peer list to enable discovery of the federation topology.
+
+Federation is optional. A conforming implementation must work without federation support.
+
+Clients remain unaware of federation. A client queries a single distribution point, which may serve from local mirror, proxy to a peer, or return metadata with origin URLs.
+
 ---
 
 ## 30. Registry metadata fields

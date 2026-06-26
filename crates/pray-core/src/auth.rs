@@ -842,6 +842,7 @@ fn ssh_key_fingerprint(public_key: &str) -> String {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use ed25519_dalek::SigningKey;
 
     fn temporary_directory(prefix: &str) -> PathBuf {
         let unique = format!(
@@ -914,10 +915,10 @@ mod tests {
         assert_eq!(session.kind, AuthSessionKind::Email);
         assert_eq!(
             store
-                .email_for_session(&session.token)
+                .resolve_session(&session.token)
                 .expect("resolve session")
-                .as_deref(),
-            Some("carol@example.com")
+                .map(|session| session.email),
+            Some("carol@example.com".to_string())
         );
     }
 
@@ -926,6 +927,9 @@ mod tests {
         let root = temporary_directory("pray-auth-keys");
         let store = RegistryAuthStore::open(&root).expect("open store");
 
+        let signing_key = signing_key_from_seed(17);
+        let public_key = ssh_public_key_text(&signing_key);
+
         store
             .register_email("dave@example.com", EmailConfirmationPolicy::Optional)
             .expect("register");
@@ -933,7 +937,7 @@ mod tests {
             .enroll_passkey(
                 "dave@example.com",
                 "credential-1",
-                "ed25519-public-key",
+                &public_key,
                 Some("laptop passkey"),
             )
             .expect("passkey enrollment");
@@ -944,16 +948,26 @@ mod tests {
         assert_eq!(passkey_login.email, "dave@example.com");
 
         let ssh_key = store
-            .enroll_ssh_key(
-                "dave@example.com",
-                "ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIexample",
-                Some("workstation"),
-            )
+            .enroll_ssh_key("dave@example.com", &public_key, Some("workstation"))
             .expect("ssh enrollment");
         assert!(ssh_key.enrolled);
-        let ssh_login = store
-            .login_with_ssh_key("ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIexample")
-            .expect("ssh login");
+        let ssh_login = store.login_with_ssh_key(&public_key).expect("ssh login");
         assert_eq!(ssh_login.email, "dave@example.com");
+    }
+
+    fn ssh_public_key_text(signing_key: &SigningKey) -> String {
+        let mut blob = Vec::new();
+        write_ssh_string(&mut blob, b"ssh-ed25519");
+        write_ssh_string(&mut blob, &signing_key.verifying_key().to_bytes());
+        format!("ssh-ed25519 {}", STANDARD.encode(blob))
+    }
+
+    fn write_ssh_string(buffer: &mut Vec<u8>, bytes: &[u8]) {
+        buffer.extend_from_slice(&(bytes.len() as u32).to_be_bytes());
+        buffer.extend_from_slice(bytes);
+    }
+
+    fn signing_key_from_seed(seed: u8) -> SigningKey {
+        SigningKey::from_bytes(&[seed; 32])
     }
 }

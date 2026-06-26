@@ -20,6 +20,13 @@ pub struct SessionFile {
     pub kind: String,
 }
 
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(untagged)]
+enum SessionDocument {
+    Single(SessionFile),
+    Multiple { sessions: Vec<SessionFile> },
+}
+
 pub fn session_file_path(root: &Path) -> PathBuf {
     root.join(".pray/session.json")
 }
@@ -27,13 +34,9 @@ pub fn session_file_path(root: &Path) -> PathBuf {
 #[allow(dead_code)]
 pub fn load_session_email(root: &Path) -> PrayResult<Option<String>> {
     let path = session_file_path(root);
-    let Ok(text) = fs::read_to_string(&path) else {
+    let Some(session) = load_latest_session(&path)? else {
         return Ok(None);
     };
-    let session: SessionFile = serde_json::from_str(&text).map_err(|error| PrayError::Parse {
-        kind: "session file",
-        message: error.to_string(),
-    })?;
     Ok(Some(session.email))
 }
 
@@ -114,8 +117,7 @@ pub fn login_with_ssh_agent(
 
 pub fn current_signer(root: &Path) -> Option<String> {
     let session_path = session_file_path(root);
-    let text = fs::read_to_string(session_path).ok()?;
-    let session: SessionFile = serde_json::from_str(&text).ok()?;
+    let session = load_latest_session(&session_path).ok().flatten()?;
     if !session.email.trim().is_empty() {
         return Some(session.email);
     }
@@ -125,13 +127,9 @@ pub fn current_signer(root: &Path) -> Option<String> {
 #[allow(dead_code)]
 pub fn resolve_session_token(root: &Path) -> PrayResult<Option<String>> {
     let path = session_file_path(root);
-    let Ok(text) = fs::read_to_string(&path) else {
+    let Some(session) = load_latest_session(&path)? else {
         return Ok(None);
     };
-    let session: SessionFile = serde_json::from_str(&text).map_err(|error| PrayError::Parse {
-        kind: "session file",
-        message: error.to_string(),
-    })?;
     Ok(Some(session.token))
 }
 
@@ -140,12 +138,52 @@ fn persist_session(root: &Path, session: SessionFile) -> PrayResult<SessionFile>
     if let Some(parent) = path.parent() {
         fs::create_dir_all(parent)?;
     }
+    let mut sessions = load_sessions(&path)?.unwrap_or_default();
+    if let Some(existing) = sessions
+        .iter_mut()
+        .find(|existing| existing.server_url == session.server_url)
+    {
+        *existing = session.clone();
+    } else {
+        sessions.push(session.clone());
+    }
+    let document = if sessions.len() == 1 {
+        SessionDocument::Single(sessions.remove(0))
+    } else {
+        SessionDocument::Multiple { sessions }
+    };
     fs::write(
         &path,
-        serde_json::to_string_pretty(&session)
+        serde_json::to_string_pretty(&document)
             .map_err(|error| PrayError::Manifest(error.to_string()))?,
     )?;
     Ok(session)
+}
+
+fn load_latest_session(path: &Path) -> PrayResult<Option<SessionFile>> {
+    let Some(sessions) = load_sessions(path)? else {
+        return Ok(None);
+    };
+    Ok(sessions
+        .into_iter()
+        .rev()
+        .find(|session| !session.email.trim().is_empty()))
+}
+
+fn load_sessions(path: &Path) -> PrayResult<Option<Vec<SessionFile>>> {
+    let Ok(text) = fs::read_to_string(path) else {
+        return Ok(None);
+    };
+    let document: SessionDocument =
+        serde_json::from_str(&text).map_err(|error| PrayError::Parse {
+            kind: "session file",
+            message: error.to_string(),
+        })?;
+    let sessions = match document {
+        SessionDocument::Single(session) => vec![session],
+        SessionDocument::Multiple { sessions } => sessions,
+    };
+    Ok(Some(sessions))
 }
 
 fn post_json<Request, Response>(url: &str, body: &Request) -> PrayResult<Response>
