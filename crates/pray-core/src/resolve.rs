@@ -1,5 +1,6 @@
 use crate::manifest::{Manifest, ManifestPackage, ManifestSource};
 use crate::package_spec::{parse_package_spec, PackageSpec};
+use crate::registry::resolve_registry_package_root;
 use crate::{PrayError, PrayResult};
 use semver::{Version, VersionReq};
 use std::collections::{BTreeMap, BTreeSet};
@@ -128,6 +129,9 @@ fn resolve_package_root(
         if source.kind == "path" {
             let slug = declaration.name.replace('/', "-");
             return Ok(project_root.join(&source.url).join(slug));
+        }
+        if source.kind == "registry" || source.kind == "static index" {
+            return resolve_registry_package_root(project_root, &source.url, declaration);
         }
         return Err(PrayError::Unsupported(format!(
             "source kind {} not implemented yet",

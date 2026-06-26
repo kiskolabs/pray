@@ -1,8 +1,10 @@
+use serde_json::Value;
 use std::collections::BTreeMap;
 use std::fs;
 use std::io::Read;
+use std::net::TcpStream;
 use std::path::{Path, PathBuf};
-use std::process::Command;
+use std::process::{Command, Stdio};
 use std::sync::atomic::{AtomicUsize, Ordering};
 use std::thread::sleep;
 use std::time::{Duration, SystemTime, UNIX_EPOCH};
@@ -348,7 +350,7 @@ end
     );
     let stdout = String::from_utf8_lossy(&update.stdout);
     assert!(stdout.contains("sample/base 1.4.3 -> 1.4.4"));
-    assert!(!stdout.contains("sample/common"));
+    assert!(!stdout.contains("dependent packages affected"));
 
     let lockfile = fs::read_to_string(repo.join("Prayfile.lock")).expect("lockfile exists");
     assert!(lockfile.contains("sample/base"));
@@ -356,6 +358,51 @@ end
     assert!(lockfile.contains("sample/common"));
     assert!(lockfile.contains("1.0.0"));
     assert!(!lockfile.contains("1.1.0"));
+}
+
+#[test]
+fn update_reports_dependent_packages_affected() {
+    let repo = temporary_directory("pray-update-dependent");
+    create_tree_fixture(&repo);
+    assert!(run_pray(&repo, &["install"]).status.success());
+
+    fs::write(
+        repo.join("packages/common/sample-common.prayspec"),
+        r#"
+Package::Specification.new do |spec|
+  spec.name = "sample/common"
+  spec.version = "1.1.0"
+  spec.summary = "common guidance"
+  spec.files = ["README.md", "exports/common-basics.md"]
+  spec.exports = {
+    "common-basics" => {
+      type: "fragment",
+      path: "exports/common-basics.md",
+      summary: "Common guidance"
+    }
+  }
+end
+"#,
+    )
+    .expect("rewrite common prayspec");
+
+    let update = run_pray(&repo, &["update", "sample/common"]);
+    assert!(
+        update.status.success(),
+        "update failed: {}",
+        String::from_utf8_lossy(&update.stderr)
+    );
+    let stdout = String::from_utf8_lossy(&update.stdout);
+    assert!(stdout.contains("sample/common 1.0.0 -> 1.1.0"));
+    assert!(stdout.contains("dependent packages affected: sample/base"));
+    assert!(stdout.contains("\"updated_packages\""));
+    assert!(stdout.contains("\"dependent_packages_affected\""));
+
+    let lockfile = fs::read_to_string(repo.join("Prayfile.lock")).expect("lockfile exists");
+    assert!(lockfile.contains("sample/common"));
+    assert!(lockfile.contains("1.1.0"));
+    assert!(lockfile.contains("sample/base"));
+    assert!(lockfile.contains("1.4.3"));
 }
 
 #[test]
@@ -497,6 +544,87 @@ fn install_offline_rejects_derived_package_paths() {
 }
 
 #[test]
+fn serve_install_and_confess_end_to_end_with_web_surface() {
+    let workspace = temporary_directory("pray-serve-e2e");
+    let source_repo = workspace.join("source");
+    let registry_root = workspace.join("registry");
+    let client_a = workspace.join("client-a");
+    let client_b = workspace.join("client-b");
+    fs::create_dir_all(&source_repo).expect("source workspace");
+    fs::create_dir_all(&registry_root).expect("registry workspace");
+    fs::create_dir_all(&client_a).expect("client A workspace");
+    fs::create_dir_all(&client_b).expect("client B workspace");
+
+    create_add_fixture(&source_repo);
+    let add = run_pray(
+        &source_repo,
+        &["add", "sample/base", "--path", "packages/base"],
+    );
+    assert!(
+        add.status.success(),
+        "add failed: {}",
+        String::from_utf8_lossy(&add.stderr)
+    );
+    let package = run_pray(&source_repo, &["package"]);
+    assert!(
+        package.status.success(),
+        "package failed: {}",
+        String::from_utf8_lossy(&package.stderr)
+    );
+
+    let archive = source_repo.join("sample-base-1.4.3.praypkg");
+    let archive_entries = read_package_archive(&archive);
+    create_registry_fixture(&registry_root, &archive, &archive_entries, "tool_a");
+
+    let port = find_free_port();
+    let mut server = Command::new(env!("CARGO_BIN_EXE_pray"))
+        .args([
+            "serve",
+            "--root",
+            registry_root.to_str().expect("registry path"),
+            "--host",
+            "127.0.0.1",
+            "--port",
+            &port.to_string(),
+        ])
+        .stdout(Stdio::null())
+        .stderr(Stdio::null())
+        .spawn()
+        .expect("spawn server");
+    wait_for_server(port);
+
+    let server_url = format!("http://127.0.0.1:{port}");
+    write_registry_client_fixture(&client_a, &server_url);
+    write_registry_client_fixture(&client_b, &server_url);
+
+    let ruby_script =
+        PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("tests/support/distribution_point_smoke.rb");
+    let smoke = Command::new("ruby")
+        .arg(ruby_script)
+        .arg("--pray-bin")
+        .arg(env!("CARGO_BIN_EXE_pray"))
+        .arg("--server-url")
+        .arg(&server_url)
+        .arg("--client")
+        .arg(&client_a)
+        .arg("--client")
+        .arg(&client_b)
+        .output()
+        .expect("run ruby smoke test");
+
+    let _ = server.kill();
+    let _ = server.wait();
+
+    assert!(
+        smoke.status.success(),
+        "ruby smoke test failed: {}",
+        String::from_utf8_lossy(&smoke.stderr)
+    );
+    let stdout = String::from_utf8_lossy(&smoke.stdout);
+    assert!(stdout.contains("distribution point smoke test passed"));
+}
+
+#[test]
 fn drift_reports_renderer_changes_in_sections() {
     let repo = temporary_directory("pray-drift-renderer");
     create_fixture(&repo);
@@ -580,6 +708,122 @@ end
     let stderr = String::from_utf8_lossy(&semantic.stderr);
     assert!(stderr.contains("Semantic diff"));
     assert!(stderr.contains("sample/base 1.4.3 -> 1.4.4 would change 2 managed spans"));
+}
+
+fn create_registry_fixture(
+    registry_root: &Path,
+    archive: &Path,
+    archive_entries: &BTreeMap<String, String>,
+    target: &str,
+) {
+    let metadata_text = archive_entries
+        .get("metadata.json")
+        .expect("package metadata in archive");
+    let metadata: Value = serde_json::from_str(metadata_text).expect("archive metadata json");
+    let package_name = metadata
+        .get("name")
+        .and_then(Value::as_str)
+        .expect("package name")
+        .to_string();
+    let version = metadata
+        .get("version")
+        .and_then(Value::as_str)
+        .expect("package version")
+        .to_string();
+    let tree_hash = metadata
+        .get("tree_hash")
+        .and_then(Value::as_str)
+        .expect("tree hash")
+        .to_string();
+    let artifact_hash = metadata
+        .get("artifact_hash")
+        .and_then(Value::as_str)
+        .expect("artifact hash")
+        .to_string();
+    let exports = metadata
+        .get("exports")
+        .and_then(Value::as_array)
+        .expect("exports array")
+        .iter()
+        .map(|value| value.as_str().expect("export string").to_string())
+        .collect::<Vec<_>>();
+    let artifact_path = registry_artifact_path(&package_name, &version);
+    let package_metadata = serde_json::json!({
+        "name": package_name,
+        "versions": [
+            {
+                "version": version,
+                "artifact": artifact_path,
+                "artifact_hash": artifact_hash,
+                "tree_hash": tree_hash,
+                "yanked": false,
+                "targets": [target],
+                "exports": exports,
+            }
+        ]
+    });
+
+    let artifact_destination = registry_root.join(&artifact_path);
+    if let Some(parent) = artifact_destination.parent() {
+        fs::create_dir_all(parent).expect("artifact directories");
+    }
+    fs::copy(archive, &artifact_destination).expect("copy package archive");
+    fs::create_dir_all(registry_root.join("v1/packages/sample")).expect("package metadata dirs");
+    fs::write(
+        registry_root.join("v1/index.json"),
+        serde_json::to_string_pretty(&serde_json::json!({
+            "spec": "prayfile-distribution-1",
+            "packages": ["sample/base"],
+        }))
+        .expect("index json"),
+    )
+    .expect("write registry index");
+    fs::write(
+        registry_root.join("v1/packages/sample/base.json"),
+        serde_json::to_string_pretty(&package_metadata).expect("package metadata json"),
+    )
+    .expect("write package metadata");
+}
+
+fn write_registry_client_fixture(repo: &Path, server_url: &str) {
+    fs::create_dir_all(repo).expect("client repo");
+    fs::write(
+        repo.join("Prayfile"),
+        format!(
+            r#"
+prayfile "1"
+source "default", "{server_url}"
+target :tool_a do
+  output "INSTRUCTIONS.md"
+end
+agent "sample/base", "~> 1.4", source: "default"
+render mode: :managed, conflict: :fail, churn: :minimal
+"#,
+        ),
+    )
+    .expect("write client Prayfile");
+}
+
+fn registry_artifact_path(package_name: &str, version: &str) -> String {
+    let artifact_name = format!("{}-{}.praypkg", package_name.replace('/', "-"), version);
+    format!("v1/artifacts/{package_name}/{version}/{artifact_name}")
+}
+
+fn find_free_port() -> u16 {
+    let listener = std::net::TcpListener::bind("127.0.0.1:0").expect("reserve port");
+    let port = listener.local_addr().expect("local addr").port();
+    drop(listener);
+    port
+}
+
+fn wait_for_server(port: u16) {
+    for _ in 0..50 {
+        if TcpStream::connect(("127.0.0.1", port)).is_ok() {
+            return;
+        }
+        sleep(Duration::from_millis(100));
+    }
+    panic!("server did not start on port {port}");
 }
 
 fn create_fixture(repo: &Path) {

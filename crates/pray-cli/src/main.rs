@@ -1,6 +1,9 @@
-use pray_core::hashing::normalize_line_endings;
+mod server;
+
+use pray_core::hashing::{normalize_line_endings, sha256_prefixed};
 use pray_core::lockfile::{read_lockfile, write_lockfile, Lockfile};
 use pray_core::manifest::parse_manifest;
+use pray_core::registry::{submit_confession, ConfessionSubmission};
 use pray_core::render::{render_project, write_rendered_targets};
 use pray_core::resolve::resolve_project;
 use pray_core::verify::{drift_project, format_verification_report, verify_project};
@@ -9,6 +12,7 @@ use std::env;
 use std::fs;
 use std::io::Write;
 use std::path::{Path, PathBuf};
+use std::time::{SystemTime, UNIX_EPOCH};
 
 fn main() {
     let code = match run(env::args().skip(1).collect()) {
@@ -45,6 +49,15 @@ fn run(arguments: Vec<String>) -> PrayResult<()> {
         Command::Drift { semantic } => drift_command(semantic),
         Command::Format => format_command(),
         Command::Package => package_command(),
+        Command::Serve { root, host, port } => serve_command(root, host, port),
+        Command::Confess {
+            package,
+            version,
+            accepted,
+            rejected,
+            note,
+            url,
+        } => confess_command(package, version, accepted, rejected, note, url),
         Command::Vendor => vendor_command(),
         Command::Clean => clean_command(),
         Command::Tree => tree_command(),
@@ -86,6 +99,19 @@ enum Command {
     },
     Format,
     Package,
+    Serve {
+        root: PathBuf,
+        host: String,
+        port: u16,
+    },
+    Confess {
+        package: String,
+        version: Option<String>,
+        accepted: bool,
+        rejected: bool,
+        note: Option<String>,
+        url: Option<String>,
+    },
     Vendor,
     Clean,
     Tree,
@@ -154,6 +180,8 @@ fn parse_command(arguments: Vec<String>) -> PrayResult<Command> {
         "drift" => Ok(Command::Drift { semantic }),
         "format" => Ok(Command::Format),
         "package" => Ok(Command::Package),
+        "serve" => parse_serve_command(iter),
+        "confess" => parse_confess_command(iter),
         "vendor" => Ok(Command::Vendor),
         "clean" => Ok(Command::Clean),
         "tree" => Ok(Command::Tree),
@@ -278,7 +306,7 @@ fn update_command(package: Option<String>, major: bool) -> PrayResult<()> {
         &merged_lockfile,
         package.as_deref(),
         &project,
-    );
+    )?;
     Ok(())
 }
 
@@ -409,6 +437,121 @@ fn parse_update_command(arguments: std::vec::IntoIter<String>) -> PrayResult<Com
     Ok(Command::Update { package, major })
 }
 
+fn parse_serve_command(mut arguments: std::vec::IntoIter<String>) -> PrayResult<Command> {
+    let mut root = PathBuf::from(".");
+    let mut host = "127.0.0.1".to_string();
+    let mut port = 7429u16;
+    while let Some(argument) = arguments.next() {
+        match argument.as_str() {
+            "--root" => {
+                let Some(value) = arguments.next() else {
+                    return Err(PrayError::Unsupported(
+                        "serve requires a path after --root".to_string(),
+                    ));
+                };
+                root = PathBuf::from(value);
+            }
+            "--host" => {
+                let Some(value) = arguments.next() else {
+                    return Err(PrayError::Unsupported(
+                        "serve requires a host after --host".to_string(),
+                    ));
+                };
+                host = value;
+            }
+            "--port" => {
+                let Some(value) = arguments.next() else {
+                    return Err(PrayError::Unsupported(
+                        "serve requires a port after --port".to_string(),
+                    ));
+                };
+                port = value
+                    .parse::<u16>()
+                    .map_err(|error| PrayError::Unsupported(error.to_string()))?;
+            }
+            other if other.starts_with("--") => {
+                return Err(PrayError::Unsupported(format!(
+                    "unknown serve flag: {other}"
+                )))
+            }
+            other => {
+                return Err(PrayError::Unsupported(format!(
+                    "unexpected serve argument: {other}"
+                )))
+            }
+        }
+    }
+    Ok(Command::Serve { root, host, port })
+}
+
+fn parse_confess_command(mut arguments: std::vec::IntoIter<String>) -> PrayResult<Command> {
+    let mut package = None;
+    let mut version = None;
+    let mut accepted = false;
+    let mut rejected = false;
+    let mut note = None;
+    let mut url = None;
+    while let Some(argument) = arguments.next() {
+        match argument.as_str() {
+            "--version" => {
+                let Some(value) = arguments.next() else {
+                    return Err(PrayError::Unsupported(
+                        "confess requires a version after --version".to_string(),
+                    ));
+                };
+                version = Some(value);
+            }
+            "--note" => {
+                let Some(value) = arguments.next() else {
+                    return Err(PrayError::Unsupported(
+                        "confess requires a note after --note".to_string(),
+                    ));
+                };
+                note = Some(value);
+            }
+            "--url" => {
+                let Some(value) = arguments.next() else {
+                    return Err(PrayError::Unsupported(
+                        "confess requires a URL after --url".to_string(),
+                    ));
+                };
+                url = Some(value);
+            }
+            "--accepted" => accepted = true,
+            "--rejected" => rejected = true,
+            other if other.starts_with("--") => {
+                return Err(PrayError::Unsupported(format!(
+                    "unknown confess flag: {other}"
+                )))
+            }
+            other => {
+                if package.is_none() {
+                    package = Some(other.to_string());
+                } else {
+                    return Err(PrayError::Unsupported(format!(
+                        "unexpected confess argument: {other}"
+                    )));
+                }
+            }
+        }
+    }
+    let package = package
+        .ok_or_else(|| PrayError::Unsupported("confess requires a package name".to_string()))?;
+    if accepted == rejected {
+        return Err(PrayError::Unsupported(
+            "confess requires exactly one of --accepted or --rejected".to_string(),
+        ));
+    }
+    Ok(Command::Confess {
+        package,
+        version,
+        accepted,
+        rejected,
+        note,
+        url,
+    })
+}
+
 fn install_command(locked: bool, frozen: bool, offline: bool) -> PrayResult<()> {
     let project = resolve_project(&manifest_path())?;
     if offline {
@@ -489,6 +632,97 @@ fn tree_command() -> PrayResult<()> {
     Ok(())
 }
 
+fn serve_command(root: PathBuf, host: String, port: u16) -> PrayResult<()> {
+    server::run_server(root, host, port)
+}
+
+fn confess_command(
+    package: String,
+    version: Option<String>,
+    accepted: bool,
+    rejected: bool,
+    note: Option<String>,
+    url: Option<String>,
+) -> PrayResult<()> {
+    if accepted == rejected {
+        return Err(PrayError::Unsupported(
+            "confess requires exactly one of --accepted or --rejected".to_string(),
+        ));
+    }
+
+    let project = resolve_project(&manifest_path())?;
+    let package_resolution = project
+        .packages
+        .iter()
+        .find(|resolved_package| resolved_package.declaration.name == package)
+        .ok_or_else(|| PrayError::Resolution(format!("package {package} not found")))?;
+
+    let resolved_version = version.unwrap_or_else(|| package_resolution.spec.version.clone());
+    if resolved_version != package_resolution.spec.version {
+        return Err(PrayError::Resolution(format!(
+            "package {package} version {} does not match resolved version {}",
+            resolved_version, package_resolution.spec.version
+        )));
+    }
+
+    let source_name = package_resolution
+        .declaration
+        .source
+        .as_ref()
+        .ok_or_else(|| PrayError::Resolution(format!("package {package} is missing a source")))?;
+    let source_url = if let Some(url) = url {
+        url
+    } else {
+        project
+            .manifest
+            .sources
+            .iter()
+            .find(|source| source.name == *source_name)
+            .map(|source| source.url.clone())
+            .ok_or_else(|| PrayError::Resolution(format!("unknown source: {source_name}")))?
+    };
+
+    let lockfile = read_lockfile(&lockfile_path()).ok();
+    let lockfile_reference = lockfile
+        .as_ref()
+        .and_then(|lockfile| lockfile.file_hash().ok());
+    let timestamp = SystemTime::now()
+        .duration_since(UNIX_EPOCH)
+        .map_err(|error| PrayError::Resolution(error.to_string()))?
+        .as_secs()
+        .to_string();
+    let mut confession = ConfessionSubmission {
+        package: package.clone(),
+        version: resolved_version,
+        status: if accepted {
+            "accepted".to_string()
+        } else {
+            "rejected".to_string()
+        },
+        note,
+        lockfile: lockfile_reference,
+        distribution_point: Some(source_url.clone()),
+        signer: Some(current_signer()),
+        timestamp: Some(timestamp),
+        signature: None,
+    };
+    let signature_payload =
+        serde_json::to_vec(&confession).map_err(|error| PrayError::Manifest(error.to_string()))?;
+    confession.signature = Some(sha256_prefixed(&signature_payload));
+    submit_confession(&source_url, &confession)?;
+    println!(
+        "Confession submitted for {} {}",
+        confession.package, confession.version
+    );
+    Ok(())
+}
+
+fn current_signer() -> String {
+    std::env::var("USER")
+        .or_else(|_| std::env::var("USERNAME"))
+        .unwrap_or_else(|_| "unknown".to_string())
+}
+
 fn format_command() -> PrayResult<()> {
     let lockfile = read_lockfile(&lockfile_path())?;
     for target in &lockfile.target {
@@ -554,6 +788,7 @@ fn materialize_package_directory(
         serde_json::to_string_pretty(&metadata)
             .map_err(|error| PrayError::Manifest(error.to_string()))?,
     )?;
+    copy_prayspec_file(&package.root, output_directory)?;
 
     for file in &package.spec.files {
         copy_package_file(&package.root, output_directory, file)?;
@@ -581,6 +816,12 @@ fn write_package_archive(
             Path::new("metadata.json"),
             metadata.as_bytes(),
         )?;
+        let prayspec_path = find_prayspec_file(&package.root)?;
+        let prayspec_name = prayspec_path
+            .file_name()
+            .ok_or_else(|| PrayError::Integrity("missing prayspec filename".to_string()))?;
+        let prayspec_bytes = fs::read(&prayspec_path)?;
+        append_archive_file(&mut archive, Path::new(prayspec_name), &prayspec_bytes)?;
         for file in &package.spec.files {
             let content = read_package_file_bytes(&package.root, file)?;
             append_archive_file(&mut archive, Path::new(file), &content)?;
@@ -649,6 +890,38 @@ fn read_package_file_bytes(source_root: &Path, relative_path: &str) -> PrayResul
         )));
     }
     Ok(fs::read(source)?)
+}
+
+fn find_prayspec_file(root: &Path) -> PrayResult<PathBuf> {
+    let mut prayspec_files = Vec::new();
+    for entry in fs::read_dir(root)? {
+        let entry = entry?;
+        let path = entry.path();
+        if path.extension().and_then(|value| value.to_str()) == Some("prayspec") {
+            prayspec_files.push(path);
+        }
+    }
+    match prayspec_files.len() {
+        1 => Ok(prayspec_files.remove(0)),
+        0 => Err(PrayError::Integrity(format!(
+            "no prayspec file found in {:?}",
+            root
+        ))),
+        _ => Err(PrayError::Integrity(format!(
+            "multiple prayspec files found in {:?}",
+            root
+        ))),
+    }
+}
+
+fn copy_prayspec_file(source_root: &Path, archive_root: &Path) -> PrayResult<()> {
+    let prayspec_path = find_prayspec_file(source_root)?;
+    let prayspec_name = prayspec_path
+        .file_name()
+        .ok_or_else(|| PrayError::Integrity("missing prayspec filename".to_string()))?;
+    let destination = archive_root.join(prayspec_name);
+    fs::copy(prayspec_path, destination)?;
+    Ok(())
 }
 
 fn render_command(check_only: bool) -> PrayResult<()> {
@@ -930,7 +1203,7 @@ fn print_update_summary(
     updated: &Lockfile,
     selected_package: Option<&str>,
     project: &pray_core::resolve::ResolvedProject,
-) {
+) -> PrayResult<()> {
     let previous_versions: std::collections::BTreeMap<&str, &str> = previous
         .into_iter()
         .flat_map(|lockfile| lockfile.package.iter())
@@ -964,6 +1237,7 @@ fn print_update_summary(
         .collect();
 
     let mut lines = Vec::new();
+    let mut structured_updates = Vec::new();
     for package in &updated.package {
         if let Some(selected_package) = selected_package {
             if package.name != selected_package {
@@ -1005,6 +1279,7 @@ fn print_update_summary(
             })
             .cloned()
             .collect();
+        let dependents = package_dependents(project, package.name.as_str());
 
         lines.push(format!(
             "Updated package {} {} -> {}",
@@ -1017,17 +1292,60 @@ fn print_update_summary(
             "  rendered files affected: {}",
             join_or_none(&rendered_files)
         ));
+        if !dependents.is_empty() {
+            lines.push(format!(
+                "  dependent packages affected: {}",
+                join_or_none(&dependents)
+            ));
+        }
         lines.push("  warnings: none".to_string());
+        structured_updates.push(serde_json::json!({
+            "name": package.name,
+            "from_version": previous_version,
+            "to_version": package.version,
+            "source": source,
+            "exports_affected": exports,
+            "targets_affected": targets,
+            "rendered_files_affected": rendered_files,
+            "dependent_packages_affected": dependents,
+            "warnings": [],
+        }));
     }
 
     if lines.is_empty() {
-        return;
+        return Ok(());
     }
 
     println!("Update summary");
     for line in lines {
         println!("{line}");
     }
+    println!(
+        "{}",
+        serde_json::to_string_pretty(&serde_json::json!({
+            "updated_packages": structured_updates,
+        }))
+        .map_err(|error| PrayError::Manifest(error.to_string()))?
+    );
+    Ok(())
+}
+
+fn package_dependents(
+    project: &pray_core::resolve::ResolvedProject,
+    selected_package: &str,
+) -> Vec<String> {
+    project
+        .packages
+        .iter()
+        .filter(|package| {
+            package
+                .spec
+                .dependencies
+                .iter()
+                .any(|dependency| dependency.name == selected_package)
+        })
+        .map(|package| package.declaration.name.clone())
+        .collect()
 }
 
 fn package_source_label(declaration: &pray_core::manifest::ManifestPackage) -> String {
@@ -1146,6 +1464,10 @@ fn print_help() {
     println!("  drift [--semantic]");
     println!("  format");
     println!("  package");
+    println!("  serve [--root PATH] [--host HOST] [--port PORT]");
+    println!(
+        "  confess <package> [--version VERSION] [--accepted|--rejected] [--note NOTE] [--url URL]"
+    );
     println!("  vendor");
     println!("  clean");
     println!("  tree");
