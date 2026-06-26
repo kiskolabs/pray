@@ -362,6 +362,7 @@ fn federation_endpoints_expose_discovery_and_sync_metadata() {
         &format!("{base_url}/v1/sync/push"),
         r#"{
             "name": "sample/extra",
+            "updated_at": "1712222222",
             "versions": [
                 {
                     "version": "2.0.0",
