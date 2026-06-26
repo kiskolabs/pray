@@ -16,6 +16,10 @@ use pray_core::render::{render_project, write_rendered_targets};
 use pray_core::resolve::{resolve_project, ResolvedProject};
 use pray_core::verify::{drift_project, format_verification_report, verify_project};
 use pray_core::{PrayError, PrayResult};
+use pray_transport::{
+    ArtifactRef, PeerConfig, PeerInfo, SyncDirection, TransportError, TransportRegistry, TrustLevel,
+};
+use std::collections::{BTreeMap, BTreeSet};
 use std::env;
 use std::fs;
 use std::io::Write;
@@ -85,6 +89,7 @@ fn run(arguments: Vec<String>) -> PrayResult<()> {
         Command::Vendor => vendor_command(),
         Command::Clean => clean_command(),
         Command::Tree => tree_command(),
+        Command::Sync { root, peers } => sync_command(root, peers),
     }
 }
 
@@ -150,6 +155,10 @@ enum Command {
     Vendor,
     Clean,
     Tree,
+    Sync {
+        root: PathBuf,
+        peers: Vec<String>,
+    },
 }
 
 fn parse_command(arguments: Vec<String>) -> PrayResult<Command> {
@@ -222,6 +231,7 @@ fn parse_command(arguments: Vec<String>) -> PrayResult<Command> {
         "vendor" => Ok(Command::Vendor),
         "clean" => Ok(Command::Clean),
         "tree" => Ok(Command::Tree),
+        "sync" => parse_sync_command(iter),
         "help" | "-h" | "--help" => {
             print_help();
             std::process::exit(0);
@@ -647,6 +657,42 @@ fn parse_serve_command(mut arguments: std::vec::IntoIter<String>) -> PrayResult<
     Ok(Command::Serve { root, host, port })
 }
 
+fn parse_sync_command(mut arguments: std::vec::IntoIter<String>) -> PrayResult<Command> {
+    let mut root = PathBuf::from(".");
+    let mut peers = Vec::new();
+    while let Some(argument) = arguments.next() {
+        match argument.as_str() {
+            "--root" => {
+                let Some(value) = arguments.next() else {
+                    return Err(PrayError::Unsupported(
+                        "sync requires a path after --root".to_string(),
+                    ));
+                };
+                root = PathBuf::from(value);
+            }
+            "--peer" => {
+                let Some(value) = arguments.next() else {
+                    return Err(PrayError::Unsupported(
+                        "sync requires a URL after --peer".to_string(),
+                    ));
+                };
+                peers.push(value);
+            }
+            other if other.starts_with("--") => {
+                return Err(PrayError::Unsupported(format!(
+                    "unknown sync flag: {other}"
+                )))
+            }
+            other => {
+                return Err(PrayError::Unsupported(format!(
+                    "unexpected sync argument: {other}"
+                )))
+            }
+        }
+    }
+    Ok(Command::Sync { root, peers })
+}
+
 fn parse_confess_command(mut arguments: std::vec::IntoIter<String>) -> PrayResult<Command> {
     let mut package = None;
     let mut version = None;
@@ -996,7 +1042,321 @@ fn publish_to_root(
     Ok(())
 }
 
-fn login_command(
+fn sync_command(root: PathBuf, peers: Vec<String>) -> PrayResult<()> {
+    let peer_sources = if peers.is_empty() {
+        load_sync_peers(&root)?
+    } else {
+        peers
+    };
+
+    if peer_sources.is_empty() {
+        return Err(PrayError::Unsupported(
+            "no federation peers configured".to_string(),
+        ));
+    }
+
+    let runtime = tokio::runtime::Builder::new_current_thread()
+        .enable_all()
+        .build()
+        .map_err(|error| PrayError::Unsupported(format!("failed to start sync runtime: {error}")))?;
+
+    let summary = runtime.block_on(async {
+        synchronize_registry(&root, peer_sources).await
+    })?;
+
+    println!(
+        "Synchronized {} package(s) from {} peer(s)",
+        summary.packages, summary.peers
+    );
+    Ok(())
+}
+
+struct SyncSummary {
+    peers: usize,
+    packages: usize,
+}
+
+async fn synchronize_registry(root: &Path, peer_sources: Vec<String>) -> PrayResult<SyncSummary> {
+    let registry = TransportRegistry::new();
+    let mut discovered_peers = BTreeSet::new();
+    let mut package_versions_by_name: BTreeMap<String, BTreeMap<String, RegistryPackageVersion>> =
+        BTreeMap::new();
+    let mut peer_count = 0usize;
+
+    for peer_source in peer_sources {
+        if !discovered_peers.insert(peer_source.clone()) {
+            continue;
+        }
+        peer_count += 1;
+        let peer = federation_peer_config(&peer_source);
+        let transport = registry
+            .create(&peer)
+            .map_err(map_transport_error)?;
+        let discovery = transport
+            .fetch_discovery(&peer)
+            .await
+            .map_err(map_transport_error)?;
+        if discovery.spec != "pray-federation-v1" {
+            return Err(PrayError::Resolution(format!(
+                "peer {peer_source} does not speak the pray federation protocol"
+            )));
+        }
+
+        let index = transport
+            .fetch_index(&peer, None)
+            .await
+            .map_err(map_transport_error)?;
+        if index.spec != "prayfile-distribution-1" {
+            return Err(PrayError::Resolution(format!(
+                "peer {peer_source} returned unsupported registry index spec: {}",
+                index.spec
+            )));
+        }
+
+        for package_summary in index.packages {
+            let metadata = transport
+                .fetch_package(&peer, &package_summary.name)
+                .await
+                .map_err(map_transport_error)?;
+            if metadata.name != package_summary.name {
+                return Err(PrayError::Resolution(format!(
+                    "peer {peer_source} returned mismatched package metadata for {}",
+                    package_summary.name
+                )));
+            }
+            sync_package_from_peer(
+                root,
+                &peer,
+                transport.as_ref(),
+                metadata,
+                &mut package_versions_by_name,
+            )
+            .await?;
+        }
+    }
+
+    let mut local_index = load_registry_index(root)?;
+    let mut package_names: BTreeSet<String> = local_index.packages.into_iter().collect();
+    for (package_name, version_map) in &package_versions_by_name {
+        write_synced_package_metadata(root, package_name, version_map)?;
+        package_names.insert(package_name.clone());
+    }
+    local_index.packages = package_names.into_iter().collect();
+    write_registry_index(root, &local_index)?;
+
+    Ok(SyncSummary {
+        peers: peer_count,
+        packages: package_versions_by_name.len(),
+    })
+}
+
+async fn sync_package_from_peer(
+    root: &Path,
+    peer: &PeerConfig,
+    transport: &dyn pray_transport::TransportAdapter,
+    metadata: pray_transport::PackageMetadata,
+    package_versions_by_name: &mut BTreeMap<String, BTreeMap<String, RegistryPackageVersion>>,
+) -> PrayResult<()> {
+    let package_versions = package_versions_by_name
+        .entry(metadata.name.clone())
+        .or_insert_with(|| load_local_package_versions(root, &metadata.name).unwrap_or_default());
+
+    for version in metadata.versions {
+        let local_version = sync_package_version_from_transport(&version)?;
+        if let Some(existing_version) = package_versions.get(&local_version.version) {
+            if existing_version == &local_version {
+                continue;
+            }
+            return Err(PrayError::Integrity(format!(
+                "conflicting metadata for package {} version {}",
+                metadata.name, local_version.version
+            )));
+        }
+
+        let artifact_hash = local_version.artifact_hash.as_ref().ok_or_else(|| {
+            PrayError::Integrity(format!(
+                "federation package {} {} is missing an artifact hash",
+                metadata.name, local_version.version
+            ))
+        })?;
+        let artifact = ArtifactRef {
+            name: metadata.name.clone(),
+            version: local_version.version.clone(),
+            url: local_version.artifact.clone(),
+            hash: artifact_hash.clone(),
+        };
+        let bytes = transport
+            .fetch_artifact(peer, &artifact)
+            .await
+            .map_err(map_transport_error)?;
+        let computed_hash = sha256_prefixed(&bytes);
+        if &computed_hash != artifact_hash {
+            return Err(PrayError::Integrity(format!(
+                "artifact hash mismatch for {} {}",
+                metadata.name, local_version.version
+            )));
+        }
+        if let Some(signature) = local_version.signature.as_ref() {
+            if let (Some(tree_hash), Some(signer)) = (
+                local_version.tree_hash.as_ref(),
+                local_version.signer.as_ref(),
+            ) {
+                let expected_signature = registry_artifact_signature(&bytes, tree_hash, signer);
+                if &expected_signature != signature {
+                    return Err(PrayError::Integrity(format!(
+                        "signature mismatch for {} {}",
+                        metadata.name, local_version.version
+                    )));
+                }
+            }
+        }
+
+        write_synced_artifact(root, &local_version.artifact, &bytes)?;
+        package_versions.insert(local_version.version.clone(), local_version);
+    }
+
+    Ok(())
+}
+
+fn load_local_package_versions(
+    root: &Path,
+    package_name: &str,
+) -> PrayResult<BTreeMap<String, RegistryPackageVersion>> {
+    let metadata_path = registry_metadata_path(root, package_name);
+    let metadata = load_registry_package_metadata(&metadata_path, package_name)?;
+    Ok(metadata
+        .versions
+        .into_iter()
+        .map(|version| (version.version.clone(), version))
+        .collect())
+}
+
+fn write_synced_package_metadata(
+    root: &Path,
+    package_name: &str,
+    versions: &BTreeMap<String, RegistryPackageVersion>,
+) -> PrayResult<()> {
+    let metadata = RegistryPackageMetadata {
+        name: package_name.to_string(),
+        versions: versions.values().cloned().collect(),
+    };
+    let metadata_path = registry_metadata_path(root, package_name);
+    write_registry_package_metadata(&metadata_path, &metadata)
+}
+
+fn write_synced_artifact(root: &Path, artifact_path: &str, bytes: &[u8]) -> PrayResult<()> {
+    let path = root.join(artifact_path);
+    if let Some(parent) = path.parent() {
+        fs::create_dir_all(parent)?;
+    }
+    fs::write(path, bytes)?;
+    Ok(())
+}
+
+fn federation_peer_config(peer_source: &str) -> PeerConfig {
+    PeerConfig {
+        name: peer_source.to_string(),
+        transport: "http".to_string(),
+        url: Some(peer_source.to_string()),
+        trust: TrustLevel::Full,
+        direction: SyncDirection::Pull,
+        config: serde_json::json!({}),
+    }
+}
+
+fn load_sync_peers(root: &Path) -> PrayResult<Vec<String>> {
+    let path = root.join("v1/peers.json");
+    let text = fs::read_to_string(&path).map_err(|error| {
+        if error.kind() == std::io::ErrorKind::NotFound {
+            PrayError::Unsupported("no federation peers configured".to_string())
+        } else {
+            PrayError::from(error)
+        }
+    })?;
+    let peers: Vec<PeerInfo> = serde_json::from_str(&text).map_err(|error| PrayError::Parse {
+        kind: "peer list",
+        message: error.to_string(),
+    })?;
+    let mut peer_sources = Vec::new();
+    for peer in peers {
+        if peer.url.trim().is_empty() {
+            return Err(PrayError::Resolution(
+                "peer list contains an entry with an empty url".to_string(),
+            ));
+        }
+        peer_sources.push(peer.url);
+    }
+    Ok(peer_sources)
+}
+
+fn sync_package_version_from_transport(
+    version: &pray_transport::PackageVersion,
+) -> PrayResult<RegistryPackageVersion> {
+    if version.version.trim().is_empty() {
+        return Err(PrayError::Resolution(
+            "federation package version missing version string".to_string(),
+        ));
+    }
+    if version.artifact.trim().is_empty() {
+        return Err(PrayError::Resolution(format!(
+            "federation package version {} missing artifact path",
+            version.version
+        )));
+    }
+    if version.artifact_hash.trim().is_empty() {
+        return Err(PrayError::Integrity(format!(
+            "federation package version {} missing artifact hash",
+            version.version
+        )));
+    }
+
+    let signer = version
+        .publisher
+        .as_ref()
+        .map(|publisher| publisher.id.clone())
+        .filter(|signer| !signer.trim().is_empty())
+        .or_else(|| {
+            version
+                .signature
+                .as_ref()
+                .map(|signature| signature.public_key.clone())
+                .filter(|signer| !signer.trim().is_empty())
+        });
+
+    Ok(RegistryPackageVersion {
+        version: version.version.clone(),
+        artifact: version.artifact.clone(),
+        artifact_hash: Some(version.artifact_hash.clone()),
+        tree_hash: if version.tree_hash.trim().is_empty() {
+            None
+        } else {
+            Some(version.tree_hash.clone())
+        },
+        yanked: version.yanked,
+        targets: version.targets.clone(),
+        exports: version.exports.clone(),
+        signer,
+        published_at: Some(version.published_at.clone()),
+        signature: version.signature.as_ref().map(|signature| signature.signature.clone()),
+    })
+}
+
+fn map_transport_error(error: TransportError) -> PrayError {
+    match error {
+        TransportError::InvalidResponse(message) => PrayError::Parse {
+            kind: "federation response",
+            message,
+        },
+        TransportError::Json(error) => PrayError::Parse {
+            kind: "federation response",
+            message: error.to_string(),
+        },
+        TransportError::Io(error) => PrayError::Io(error),
+        other => PrayError::Resolution(other.to_string()),
+    }
+}
+
+fn login_command
     servers: Vec<String>,
     email: String,
     credential_id: Option<String>,
@@ -1857,6 +2217,7 @@ fn print_help() {
     println!("  publish --root PATH");
     println!("  login --server URL --email EMAIL [--credential-id ID --passkey-key PATH | --public-key PATH --ssh-agent]");
     println!("  serve [--root PATH] [--host HOST] [--port PORT]");
+    println!("  sync [--root PATH] [--peer URL ...]");
     println!(
         "  confess <package> [--version VERSION] [--accepted|--rejected] [--note NOTE] [--url URL]"
     );
