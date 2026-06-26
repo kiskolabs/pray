@@ -820,7 +820,7 @@ fn publish_command(root: PathBuf) -> PrayResult<()> {
         let version_entry = RegistryPackageVersion {
             version: package.spec.version.clone(),
             artifact: artifact_path,
-            artifact_hash: Some(package.artifact_hash.clone()),
+            artifact_hash: Some(sha256_prefixed(&archive_bytes)),
             tree_hash: Some(package.tree_hash.clone()),
             yanked: false,
             targets: package.spec.targets.clone(),
