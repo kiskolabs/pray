@@ -1,4 +1,5 @@
 use pray_core::registry::{ConfessionSubmission, RegistryIndex, RegistryPackageMetadata};
+use pray_core::trust::read_registry_trust_settings;
 use pray_core::{PrayError, PrayResult};
 use std::fs;
 use std::io::{BufRead, BufReader, Read, Write};
@@ -91,6 +92,7 @@ struct Response {
 
 fn html_root_response(root: &Path) -> PrayResult<Response> {
     let index = read_registry_index(root)?;
+    let trust = read_registry_trust_settings(root)?;
     let mut list_items = String::new();
     for package in index.packages {
         list_items.push_str(&format!(
@@ -99,9 +101,13 @@ fn html_root_response(root: &Path) -> PrayResult<Response> {
         ));
     }
     let body = format!(
-        "<!doctype html><html><head><meta charset=\"utf-8\"><title>Pray distribution point</title></head><body><h1>Pray distribution point</h1><p>Spec: {}</p><ul>{}</ul></body></html>",
-        html_escape(&index.spec),
-        list_items
+        "<!doctype html><html><head><meta charset=\"utf-8\"><title>Pray distribution point</title></head><body><h1>Pray distribution point</h1><p>Spec: {spec}</p><p>Email confirmation: {email}</p><p>Passkeys: {passkeys}</p><p>SSH keys: {ssh_keys}</p><p>SSH-agent signing: {ssh_agent}</p><ul>{packages}</ul></body></html>",
+        spec = html_escape(&index.spec),
+        email = trust.email_confirmation_label(),
+        passkeys = trust.passkeys_label(),
+        ssh_keys = trust.ssh_keys_label(),
+        ssh_agent = trust.ssh_agent_label(),
+        packages = list_items,
     );
     Ok(Response {
         status: 200,

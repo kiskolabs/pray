@@ -7,6 +7,7 @@ pub mod package_spec;
 pub mod registry;
 pub mod render;
 pub mod resolve;
+pub mod trust;
 pub mod verify;
 
 pub use error::{PrayError, PrayResult};
