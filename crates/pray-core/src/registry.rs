@@ -39,6 +39,10 @@ pub struct RegistryPackageVersion {
     #[serde(default)]
     pub exports: Vec<String>,
     #[serde(default)]
+    pub signer: Option<String>,
+    #[serde(default)]
+    pub published_at: Option<String>,
+    #[serde(default)]
     pub signature: Option<String>,
 }
 
@@ -86,6 +90,15 @@ pub fn resolve_registry_package_root(
 
     let artifact_url = join_url(source_url, &selected.artifact);
     let artifact_bytes = http_get(&artifact_url)?;
+    if let Some(expected_artifact_hash) = selected.artifact_hash.as_deref() {
+        let artifact_hash = sha256_prefixed(&artifact_bytes);
+        if artifact_hash != expected_artifact_hash {
+            return Err(PrayError::Integrity(format!(
+                "package artifact hash mismatch for {} {}",
+                declaration.name, selected.version
+            )));
+        }
+    }
     unpack_praypkg(&artifact_bytes, &cache_directory)?;
 
     let spec_path = find_prayspec_file(&cache_directory)?;
@@ -106,7 +119,7 @@ pub fn resolve_registry_package_root(
     }
 
     let tree_hash = spec.tree_hash_for_root(&cache_directory)?;
-    if let Some(expected_tree_hash) = selected.tree_hash {
+    if let Some(expected_tree_hash) = selected.tree_hash.as_deref() {
         if tree_hash != expected_tree_hash {
             return Err(PrayError::Integrity(format!(
                 "package tree hash mismatch for {} {}",
@@ -115,7 +128,33 @@ pub fn resolve_registry_package_root(
         }
     }
 
+    if let Some(expected_signature) = selected.signature.as_deref() {
+        let signer = selected.signer.as_deref().ok_or_else(|| {
+            PrayError::Integrity(format!(
+                "package signature missing signer for {} {}",
+                declaration.name, selected.version
+            ))
+        })?;
+        let actual_signature = registry_artifact_signature(&artifact_bytes, &tree_hash, signer);
+        if actual_signature != expected_signature {
+            return Err(PrayError::Integrity(format!(
+                "package signature mismatch for {} {}",
+                declaration.name, selected.version
+            )));
+        }
+    }
+
     Ok(cache_directory)
+}
+
+pub fn registry_artifact_signature(artifact_bytes: &[u8], tree_hash: &str, signer: &str) -> String {
+    let mut payload = Vec::with_capacity(artifact_bytes.len() + tree_hash.len() + signer.len() + 2);
+    payload.extend_from_slice(artifact_bytes);
+    payload.push(0);
+    payload.extend_from_slice(tree_hash.as_bytes());
+    payload.push(0);
+    payload.extend_from_slice(signer.as_bytes());
+    sha256_prefixed(&payload)
 }
 
 pub fn submit_confession(source_url: &str, confession: &ConfessionSubmission) -> PrayResult<()> {

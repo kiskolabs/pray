@@ -3,7 +3,10 @@ mod server;
 use pray_core::hashing::{normalize_line_endings, sha256_prefixed};
 use pray_core::lockfile::{read_lockfile, write_lockfile, Lockfile};
 use pray_core::manifest::parse_manifest;
-use pray_core::registry::{submit_confession, ConfessionSubmission};
+use pray_core::registry::{
+    registry_artifact_signature, submit_confession, ConfessionSubmission, RegistryIndex,
+    RegistryPackageMetadata, RegistryPackageVersion,
+};
 use pray_core::render::{render_project, write_rendered_targets};
 use pray_core::resolve::resolve_project;
 use pray_core::verify::{drift_project, format_verification_report, verify_project};
@@ -49,6 +52,7 @@ fn run(arguments: Vec<String>) -> PrayResult<()> {
         Command::Drift { semantic } => drift_command(semantic),
         Command::Format => format_command(),
         Command::Package => package_command(),
+        Command::Publish { root } => publish_command(root),
         Command::Serve { root, host, port } => serve_command(root, host, port),
         Command::Confess {
             package,
@@ -99,6 +103,9 @@ enum Command {
     },
     Format,
     Package,
+    Publish {
+        root: PathBuf,
+    },
     Serve {
         root: PathBuf,
         host: String,
@@ -180,6 +187,7 @@ fn parse_command(arguments: Vec<String>) -> PrayResult<Command> {
         "drift" => Ok(Command::Drift { semantic }),
         "format" => Ok(Command::Format),
         "package" => Ok(Command::Package),
+        "publish" => parse_publish_command(iter),
         "serve" => parse_serve_command(iter),
         "confess" => parse_confess_command(iter),
         "vendor" => Ok(Command::Vendor),
@@ -435,6 +443,35 @@ fn parse_update_command(arguments: std::vec::IntoIter<String>) -> PrayResult<Com
         }
     }
     Ok(Command::Update { package, major })
+}
+
+fn parse_publish_command(mut arguments: std::vec::IntoIter<String>) -> PrayResult<Command> {
+    let mut root = None;
+    while let Some(argument) = arguments.next() {
+        match argument.as_str() {
+            "--root" => {
+                let Some(value) = arguments.next() else {
+                    return Err(PrayError::Unsupported(
+                        "publish requires a path after --root".to_string(),
+                    ));
+                };
+                root = Some(PathBuf::from(value));
+            }
+            other if other.starts_with("--") => {
+                return Err(PrayError::Unsupported(format!(
+                    "unknown publish flag: {other}"
+                )))
+            }
+            other => {
+                return Err(PrayError::Unsupported(format!(
+                    "unexpected publish argument: {other}"
+                )))
+            }
+        }
+    }
+    let root =
+        root.ok_or_else(|| PrayError::Unsupported("publish requires --root PATH".to_string()))?;
+    Ok(Command::Publish { root })
 }
 
 fn parse_serve_command(mut arguments: std::vec::IntoIter<String>) -> PrayResult<Command> {
@@ -718,9 +755,17 @@ fn confess_command(
 }
 
 fn current_signer() -> String {
-    std::env::var("USER")
+    std::env::var("PRAY_SIGNER")
+        .or_else(|_| std::env::var("USER"))
         .or_else(|_| std::env::var("USERNAME"))
         .unwrap_or_else(|_| "unknown".to_string())
+}
+
+fn current_timestamp() -> PrayResult<String> {
+    SystemTime::now()
+        .duration_since(UNIX_EPOCH)
+        .map_err(|error| PrayError::Resolution(error.to_string()))
+        .map(|duration| duration.as_secs().to_string())
 }
 
 fn format_command() -> PrayResult<()> {
@@ -744,6 +789,56 @@ fn package_command() -> PrayResult<()> {
         let output_path = package_archive_path(&package.declaration.name, &package.spec.version);
         write_package_archive(package, &output_path)?;
     }
+    Ok(())
+}
+
+fn publish_command(root: PathBuf) -> PrayResult<()> {
+    let project = resolve_project(&manifest_path())?;
+    let signer = current_signer();
+    let published_at = current_timestamp()?;
+    let mut registry_index = load_registry_index(&root)?;
+    let mut package_names = registry_index
+        .packages
+        .iter()
+        .cloned()
+        .collect::<std::collections::BTreeSet<_>>();
+
+    for package in &project.packages {
+        let archive_bytes = build_package_archive_bytes(package)?;
+        let artifact_path =
+            registry_artifact_path(&package.declaration.name, &package.spec.version);
+        let artifact_output_path = root.join(&artifact_path);
+        if let Some(parent) = artifact_output_path.parent() {
+            fs::create_dir_all(parent)?;
+        }
+        fs::write(&artifact_output_path, &archive_bytes)?;
+
+        let metadata_path = registry_metadata_path(&root, &package.declaration.name);
+        let mut metadata =
+            load_registry_package_metadata(&metadata_path, &package.declaration.name)?;
+        let signature = registry_artifact_signature(&archive_bytes, &package.tree_hash, &signer);
+        let version_entry = RegistryPackageVersion {
+            version: package.spec.version.clone(),
+            artifact: artifact_path,
+            artifact_hash: Some(package.artifact_hash.clone()),
+            tree_hash: Some(package.tree_hash.clone()),
+            yanked: false,
+            targets: package.spec.targets.clone(),
+            exports: package.spec.exports.keys().cloned().collect(),
+            signer: Some(signer.clone()),
+            published_at: Some(published_at.clone()),
+            signature: Some(signature),
+        };
+        metadata
+            .versions
+            .retain(|entry| entry.version != version_entry.version);
+        metadata.versions.push(version_entry);
+        write_registry_package_metadata(&metadata_path, &metadata)?;
+        package_names.insert(package.declaration.name.clone());
+    }
+
+    registry_index.packages = package_names.into_iter().collect();
+    write_registry_index(&root, &registry_index)?;
     Ok(())
 }
 
@@ -807,6 +902,16 @@ fn write_package_archive(
         fs::create_dir_all(parent)?;
     }
 
+    let archive_bytes = build_package_archive_bytes(package)?;
+    let mut output_file = fs::File::create(output_path)?;
+    output_file.write_all(&archive_bytes)?;
+    output_file.flush()?;
+    Ok(())
+}
+
+fn build_package_archive_bytes(
+    package: &pray_core::resolve::ResolvedPackage,
+) -> PrayResult<Vec<u8>> {
     let metadata = package_metadata(package)?;
     let mut tar_bytes = Vec::new();
     {
@@ -829,10 +934,95 @@ fn write_package_archive(
         archive.finish()?;
     }
 
-    let mut output_file = fs::File::create(output_path)?;
-    zstd::stream::copy_encode(&tar_bytes[..], &mut output_file, 0)?;
-    output_file.flush()?;
+    let mut output = Vec::new();
+    zstd::stream::copy_encode(&tar_bytes[..], &mut output, 0)?;
+    Ok(output)
+}
+
+fn load_registry_index(root: &Path) -> PrayResult<RegistryIndex> {
+    let path = root.join("v1/index.json");
+    let Ok(text) = fs::read_to_string(&path) else {
+        return Ok(RegistryIndex {
+            spec: "prayfile-distribution-1".to_string(),
+            packages: Vec::new(),
+        });
+    };
+    let index: RegistryIndex = serde_json::from_str(&text).map_err(|error| PrayError::Parse {
+        kind: "registry index",
+        message: error.to_string(),
+    })?;
+    if index.spec != "prayfile-distribution-1" {
+        return Err(PrayError::Resolution(format!(
+            "unsupported registry index spec: {}",
+            index.spec
+        )));
+    }
+    Ok(index)
+}
+
+fn load_registry_package_metadata(
+    path: &Path,
+    package_name: &str,
+) -> PrayResult<RegistryPackageMetadata> {
+    if path.exists() {
+        let text = fs::read_to_string(path)?;
+        let metadata: RegistryPackageMetadata =
+            serde_json::from_str(&text).map_err(|error| PrayError::Parse {
+                kind: "registry metadata",
+                message: error.to_string(),
+            })?;
+        if metadata.name != package_name {
+            return Err(PrayError::Resolution(format!(
+                "registry metadata name mismatch: expected {}, found {}",
+                package_name, metadata.name
+            )));
+        }
+        Ok(metadata)
+    } else {
+        Ok(RegistryPackageMetadata {
+            name: package_name.to_string(),
+            versions: Vec::new(),
+        })
+    }
+}
+
+fn write_registry_index(root: &Path, index: &RegistryIndex) -> PrayResult<()> {
+    let path = root.join("v1/index.json");
+    if let Some(parent) = path.parent() {
+        fs::create_dir_all(parent)?;
+    }
+    fs::write(
+        path,
+        serde_json::to_string_pretty(index)
+            .map_err(|error| PrayError::Manifest(error.to_string()))?,
+    )?;
     Ok(())
+}
+
+fn write_registry_package_metadata(
+    path: &Path,
+    metadata: &RegistryPackageMetadata,
+) -> PrayResult<()> {
+    if let Some(parent) = path.parent() {
+        fs::create_dir_all(parent)?;
+    }
+    fs::write(
+        path,
+        serde_json::to_string_pretty(metadata)
+            .map_err(|error| PrayError::Manifest(error.to_string()))?,
+    )?;
+    Ok(())
+}
+
+fn registry_metadata_path(root: &Path, package_name: &str) -> PathBuf {
+    root.join("v1/packages")
+        .join(package_name)
+        .with_extension("json")
+}
+
+fn registry_artifact_path(package_name: &str, version: &str) -> String {
+    let artifact_name = format!("{}-{}.praypkg", package_name.replace('/', "-"), version);
+    format!("v1/artifacts/{package_name}/{version}/{artifact_name}")
 }
 
 fn package_metadata(package: &pray_core::resolve::ResolvedPackage) -> PrayResult<String> {
@@ -1464,6 +1654,7 @@ fn print_help() {
     println!("  drift [--semantic]");
     println!("  format");
     println!("  package");
+    println!("  publish --root PATH");
     println!("  serve [--root PATH] [--host HOST] [--port PORT]");
     println!(
         "  confess <package> [--version VERSION] [--accepted|--rejected] [--note NOTE] [--url URL]"

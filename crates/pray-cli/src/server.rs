@@ -144,10 +144,24 @@ fn render_package_page(
 ) -> String {
     let mut versions = String::new();
     for version in &metadata.versions {
+        let mut details = String::new();
+        if let Some(signer) = version.signer.as_ref() {
+            details.push_str(&format!("<div>Signer: {}</div>", html_escape(signer)));
+        }
+        if let Some(signature) = version.signature.as_ref() {
+            details.push_str(&format!("<div>Signature: {}</div>", html_escape(signature)));
+        }
+        if let Some(published_at) = version.published_at.as_ref() {
+            details.push_str(&format!(
+                "<div>Published at: {}</div>",
+                html_escape(published_at)
+            ));
+        }
         versions.push_str(&format!(
-            "<li><a href=\"/{artifact}\">{version}</a></li>",
+            "<li><a href=\"/{artifact}\">{version}</a>{details}</li>",
             artifact = html_escape(&version.artifact),
-            version = html_escape(&version.version)
+            version = html_escape(&version.version),
+            details = details,
         ));
     }
     let accepted = confessions

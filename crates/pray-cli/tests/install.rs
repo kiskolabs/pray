@@ -544,8 +544,8 @@ fn install_offline_rejects_derived_package_paths() {
 }
 
 #[test]
-fn serve_install_and_confess_end_to_end_with_web_surface() {
-    let workspace = temporary_directory("pray-serve-e2e");
+fn publish_serve_install_and_confess_end_to_end_with_web_surface() {
+    let workspace = temporary_directory("pray-publish-e2e");
     let source_repo = workspace.join("source");
     let registry_root = workspace.join("registry");
     let client_a = workspace.join("client-a");
@@ -565,16 +565,51 @@ fn serve_install_and_confess_end_to_end_with_web_surface() {
         "add failed: {}",
         String::from_utf8_lossy(&add.stderr)
     );
-    let package = run_pray(&source_repo, &["package"]);
+
+    let publish = Command::new(env!("CARGO_BIN_EXE_pray"))
+        .args([
+            "publish",
+            "--root",
+            registry_root.to_str().expect("registry path"),
+        ])
+        .current_dir(&source_repo)
+        .env("PRAY_SIGNER", "sample-agent-packages-2026")
+        .output()
+        .expect("run publish");
     assert!(
-        package.status.success(),
-        "package failed: {}",
-        String::from_utf8_lossy(&package.stderr)
+        publish.status.success(),
+        "publish failed: {}",
+        String::from_utf8_lossy(&publish.stderr)
     );
 
-    let archive = source_repo.join("sample-base-1.4.3.praypkg");
-    let archive_entries = read_package_archive(&archive);
-    create_registry_fixture(&registry_root, &archive, &archive_entries, "tool_a");
+    let index_text =
+        fs::read_to_string(registry_root.join("v1/index.json")).expect("registry index");
+    assert!(index_text.contains("prayfile-distribution-1"));
+    assert!(index_text.contains("sample/base"));
+
+    let metadata_text = fs::read_to_string(registry_root.join("v1/packages/sample/base.json"))
+        .expect("package metadata");
+    let metadata: Value = serde_json::from_str(&metadata_text).expect("package metadata json");
+    let version = metadata
+        .get("versions")
+        .and_then(Value::as_array)
+        .and_then(|versions| versions.first())
+        .expect("published version");
+    let artifact_path = version
+        .get("artifact")
+        .and_then(Value::as_str)
+        .expect("artifact path");
+    let signature = version
+        .get("signature")
+        .and_then(Value::as_str)
+        .expect("signature");
+    let signer = version
+        .get("signer")
+        .and_then(Value::as_str)
+        .expect("signer");
+    assert_eq!(signer, "sample-agent-packages-2026");
+    assert!(signature.starts_with("sha256:"));
+    assert!(registry_root.join(artifact_path).is_file());
 
     let port = find_free_port();
     let mut server = Command::new(env!("CARGO_BIN_EXE_pray"))
@@ -710,81 +745,6 @@ end
     assert!(stderr.contains("sample/base 1.4.3 -> 1.4.4 would change 2 managed spans"));
 }
 
-fn create_registry_fixture(
-    registry_root: &Path,
-    archive: &Path,
-    archive_entries: &BTreeMap<String, String>,
-    target: &str,
-) {
-    let metadata_text = archive_entries
-        .get("metadata.json")
-        .expect("package metadata in archive");
-    let metadata: Value = serde_json::from_str(metadata_text).expect("archive metadata json");
-    let package_name = metadata
-        .get("name")
-        .and_then(Value::as_str)
-        .expect("package name")
-        .to_string();
-    let version = metadata
-        .get("version")
-        .and_then(Value::as_str)
-        .expect("package version")
-        .to_string();
-    let tree_hash = metadata
-        .get("tree_hash")
-        .and_then(Value::as_str)
-        .expect("tree hash")
-        .to_string();
-    let artifact_hash = metadata
-        .get("artifact_hash")
-        .and_then(Value::as_str)
-        .expect("artifact hash")
-        .to_string();
-    let exports = metadata
-        .get("exports")
-        .and_then(Value::as_array)
-        .expect("exports array")
-        .iter()
-        .map(|value| value.as_str().expect("export string").to_string())
-        .collect::<Vec<_>>();
-    let artifact_path = registry_artifact_path(&package_name, &version);
-    let package_metadata = serde_json::json!({
-        "name": package_name,
-        "versions": [
-            {
-                "version": version,
-                "artifact": artifact_path,
-                "artifact_hash": artifact_hash,
-                "tree_hash": tree_hash,
-                "yanked": false,
-                "targets": [target],
-                "exports": exports,
-            }
-        ]
-    });
-
-    let artifact_destination = registry_root.join(&artifact_path);
-    if let Some(parent) = artifact_destination.parent() {
-        fs::create_dir_all(parent).expect("artifact directories");
-    }
-    fs::copy(archive, &artifact_destination).expect("copy package archive");
-    fs::create_dir_all(registry_root.join("v1/packages/sample")).expect("package metadata dirs");
-    fs::write(
-        registry_root.join("v1/index.json"),
-        serde_json::to_string_pretty(&serde_json::json!({
-            "spec": "prayfile-distribution-1",
-            "packages": ["sample/base"],
-        }))
-        .expect("index json"),
-    )
-    .expect("write registry index");
-    fs::write(
-        registry_root.join("v1/packages/sample/base.json"),
-        serde_json::to_string_pretty(&package_metadata).expect("package metadata json"),
-    )
-    .expect("write package metadata");
-}
-
 fn write_registry_client_fixture(repo: &Path, server_url: &str) {
     fs::create_dir_all(repo).expect("client repo");
     fs::write(
@@ -802,11 +762,6 @@ render mode: :managed, conflict: :fail, churn: :minimal
         ),
     )
     .expect("write client Prayfile");
-}
-
-fn registry_artifact_path(package_name: &str, version: &str) -> String {
-    let artifact_name = format!("{}-{}.praypkg", package_name.replace('/', "-"), version);
-    format!("v1/artifacts/{package_name}/{version}/{artifact_name}")
 }
 
 fn find_free_port() -> u16 {
