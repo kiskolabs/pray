@@ -1,5 +1,9 @@
+mod auth_client;
 mod server;
 
+use auth_client::{
+    current_signer as current_signer_from_session, login_with_passkey, login_with_ssh_agent,
+};
 use pray_core::auth::RegistryAuthStore;
 use pray_core::hashing::{normalize_line_endings, sha256_prefixed};
 use pray_core::lockfile::{read_lockfile, write_lockfile, Lockfile};
@@ -54,6 +58,21 @@ fn run(arguments: Vec<String>) -> PrayResult<()> {
         Command::Format => format_command(),
         Command::Package => package_command(),
         Command::Publish { root } => publish_command(root),
+        Command::Login {
+            server,
+            email,
+            credential_id,
+            passkey_key,
+            public_key,
+            ssh_agent,
+        } => login_command(
+            server,
+            email,
+            credential_id,
+            passkey_key,
+            public_key,
+            ssh_agent,
+        ),
         Command::Serve { root, host, port } => serve_command(root, host, port),
         Command::Confess {
             package,
@@ -106,6 +125,14 @@ enum Command {
     Package,
     Publish {
         root: PathBuf,
+    },
+    Login {
+        server: String,
+        email: String,
+        credential_id: Option<String>,
+        passkey_key: Option<PathBuf>,
+        public_key: Option<PathBuf>,
+        ssh_agent: bool,
     },
     Serve {
         root: PathBuf,
@@ -189,6 +216,7 @@ fn parse_command(arguments: Vec<String>) -> PrayResult<Command> {
         "format" => Ok(Command::Format),
         "package" => Ok(Command::Package),
         "publish" => parse_publish_command(iter),
+        "login" => parse_login_command(iter),
         "serve" => parse_serve_command(iter),
         "confess" => parse_confess_command(iter),
         "vendor" => Ok(Command::Vendor),
@@ -473,6 +501,97 @@ fn parse_publish_command(mut arguments: std::vec::IntoIter<String>) -> PrayResul
     let root =
         root.ok_or_else(|| PrayError::Unsupported("publish requires --root PATH".to_string()))?;
     Ok(Command::Publish { root })
+}
+
+fn parse_login_command(mut arguments: std::vec::IntoIter<String>) -> PrayResult<Command> {
+    let mut server = None;
+    let mut email = None;
+    let mut credential_id = None;
+    let mut passkey_key = None;
+    let mut public_key = None;
+    let mut ssh_agent = false;
+    while let Some(argument) = arguments.next() {
+        match argument.as_str() {
+            "--server" => {
+                let Some(value) = arguments.next() else {
+                    return Err(PrayError::Unsupported(
+                        "login requires a URL after --server".to_string(),
+                    ));
+                };
+                server = Some(value);
+            }
+            "--email" => {
+                let Some(value) = arguments.next() else {
+                    return Err(PrayError::Unsupported(
+                        "login requires an email after --email".to_string(),
+                    ));
+                };
+                email = Some(value);
+            }
+            "--credential-id" => {
+                let Some(value) = arguments.next() else {
+                    return Err(PrayError::Unsupported(
+                        "login requires a credential id after --credential-id".to_string(),
+                    ));
+                };
+                credential_id = Some(value);
+            }
+            "--passkey-key" => {
+                let Some(value) = arguments.next() else {
+                    return Err(PrayError::Unsupported(
+                        "login requires a path after --passkey-key".to_string(),
+                    ));
+                };
+                passkey_key = Some(PathBuf::from(value));
+            }
+            "--public-key" => {
+                let Some(value) = arguments.next() else {
+                    return Err(PrayError::Unsupported(
+                        "login requires a path after --public-key".to_string(),
+                    ));
+                };
+                public_key = Some(PathBuf::from(value));
+            }
+            "--ssh-agent" => ssh_agent = true,
+            other if other.starts_with("--") => {
+                return Err(PrayError::Unsupported(format!(
+                    "unknown login flag: {other}"
+                )))
+            }
+            other => {
+                return Err(PrayError::Unsupported(format!(
+                    "unexpected login argument: {other}"
+                )))
+            }
+        }
+    }
+    let server =
+        server.ok_or_else(|| PrayError::Unsupported("login requires --server URL".to_string()))?;
+    let email = email
+        .ok_or_else(|| PrayError::Unsupported("login requires --email ADDRESS".to_string()))?;
+    if passkey_key.is_some() == ssh_agent || (passkey_key.is_none() && public_key.is_none()) {
+        return Err(PrayError::Unsupported(
+            "login requires exactly one authentication mode".to_string(),
+        ));
+    }
+    if passkey_key.is_some() && credential_id.is_none() {
+        return Err(PrayError::Unsupported(
+            "passkey login requires --credential-id".to_string(),
+        ));
+    }
+    if ssh_agent && public_key.is_none() {
+        return Err(PrayError::Unsupported(
+            "ssh-agent login requires --public-key".to_string(),
+        ));
+    }
+    Ok(Command::Login {
+        server,
+        email,
+        credential_id,
+        passkey_key,
+        public_key,
+        ssh_agent,
+    })
 }
 
 fn parse_serve_command(mut arguments: std::vec::IntoIter<String>) -> PrayResult<Command> {
@@ -856,6 +975,37 @@ fn publish_command(root: PathBuf) -> PrayResult<()> {
 
     registry_index.packages = package_names.into_iter().collect();
     write_registry_index(&root, &registry_index)?;
+    Ok(())
+}
+
+fn login_command(
+    server: String,
+    email: String,
+    credential_id: Option<String>,
+    passkey_key: Option<PathBuf>,
+    public_key: Option<PathBuf>,
+    ssh_agent: bool,
+) -> PrayResult<()> {
+    let session_root = workspace_root();
+    let session = if let Some(passkey_key) = passkey_key {
+        login_with_passkey(
+            &server,
+            credential_id.as_deref().unwrap_or_default(),
+            &passkey_key,
+            &session_root,
+        )?
+    } else if ssh_agent {
+        login_with_ssh_agent(
+            &server,
+            public_key.as_deref().unwrap_or_else(|| Path::new("")),
+            &session_root,
+        )?
+    } else {
+        return Err(PrayError::Unsupported(
+            "login requires an authentication mode".to_string(),
+        ));
+    };
+    println!("logged in as {} via {}", session.email, session.kind);
     Ok(())
 }
 

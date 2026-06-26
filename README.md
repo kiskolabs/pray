@@ -255,6 +255,8 @@ The distribution point is not part of inference. It is part of package discovery
 
 Prayfile should also support direct sources such as local paths, git repositories, archive URLs, and vendored `.praypkg` files. A centralized distribution point is useful, but not required.
 
+Prayfile should also leave room for peer-to-peer distribution transport: torrent-style seeding and collective-network discovery through a DHT, inspired by systems like BitTorrent, Freenet, and GNUnet. That transport should preserve the same hash verification, signature checking, and provenance guarantees as static hosting.
+
 ## Publishing and signatures
 
 Publishing changes the shared material placed before inference, so publishing must be treated as a high-trust operation.

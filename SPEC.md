@@ -156,7 +156,7 @@ The specification prioritizes:
 - lockfile-based reproducibility
 - cross-platform behavior
 - implementation in any language
-- support for public/private/local distribution
+- support for public/private/local and peer-to-peer distribution
 - safe package installation
 - no arbitrary code execution
 - easy recovery
@@ -1135,6 +1135,16 @@ Package metadata:
 ```
 
 No server API is required for v1. Static hosting must be enough.
+
+### 29.1 Peer-to-peer distribution transport
+
+The specification should also allow a peer-to-peer transport layer for package discovery and artifact seeding.
+
+A conforming implementation may use torrent-style swarms for content distribution and a collective DHT for discovery, inspired by BitTorrent, Freenet, and GNUnet.
+
+Peer-to-peer transport must preserve the same package identity, artifact hash verification, signature checks, yanking semantics, and provenance guarantees as static registry hosting.
+
+P2P transport is optional. A conforming implementation must still work with local, private, and static registry sources without it.
 
 ---
 

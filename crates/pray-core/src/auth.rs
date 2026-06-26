@@ -1,6 +1,8 @@
 use crate::hashing::sha256_prefixed;
 use crate::trust::EmailConfirmationPolicy;
 use crate::{PrayError, PrayResult};
+use base64::{engine::general_purpose::STANDARD, Engine as _};
+use ed25519_dalek::{Signature, Verifier, VerifyingKey};
 use rusqlite::{Connection, OptionalExtension};
 use serde::{Deserialize, Serialize};
 use std::fs;
@@ -33,8 +35,22 @@ pub struct AuthPasskeyEnrollmentRequest {
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct AuthPasskeyChallengeRequest {
+    pub credential_id: String,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct AuthPasskeyChallengeResponse {
+    pub credential_id: String,
+    pub challenge_id: String,
+    pub challenge: String,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct AuthPasskeyLoginRequest {
     pub credential_id: String,
+    pub challenge_id: String,
+    pub signature: String,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
@@ -46,8 +62,22 @@ pub struct AuthSshKeyEnrollmentRequest {
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct AuthSshKeyChallengeRequest {
+    pub public_key: String,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct AuthSshKeyChallengeResponse {
+    pub fingerprint: String,
+    pub challenge_id: String,
+    pub challenge: String,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct AuthSshKeyLoginRequest {
     pub public_key: String,
+    pub challenge_id: String,
+    pub signature: String,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
@@ -93,6 +123,12 @@ pub struct AuthPasskeyLoginResponse {
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct AuthChallengeResponse {
+    pub challenge_id: String,
+    pub challenge: String,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct AuthSshKeyEnrollmentResponse {
     pub email: String,
     pub fingerprint: String,
@@ -108,6 +144,14 @@ pub struct AuthSshKeyLoginResponse {
 #[derive(Debug, Clone)]
 pub struct RegistryAuthStore {
     database_path: PathBuf,
+}
+
+#[derive(Debug, Clone)]
+struct StoredChallenge {
+    challenge_id: String,
+    email: String,
+    challenge: String,
+    kind: String,
 }
 
 impl RegistryAuthStore {
@@ -209,6 +253,105 @@ impl RegistryAuthStore {
             )
             .optional()?;
         Ok(verified.unwrap_or(false))
+    }
+
+    pub fn request_passkey_challenge(
+        &self,
+        credential_id: &str,
+    ) -> PrayResult<AuthPasskeyChallengeResponse> {
+        validate_identifier(credential_id, "credential id")?;
+        let connection = self.connection()?;
+        let email: String = connection.query_row(
+            "SELECT email FROM passkeys WHERE credential_id = ?1",
+            rusqlite::params![credential_id],
+            |row| row.get(0),
+        )?;
+        let challenge = generate_auth_challenge("passkey", credential_id)?;
+        let challenge_id = generate_challenge_id(&email, credential_id, "passkey", &challenge)?;
+        store_challenge(&connection, &challenge_id, &email, &challenge, "passkey")?;
+        Ok(AuthPasskeyChallengeResponse {
+            credential_id: credential_id.to_string(),
+            challenge_id,
+            challenge,
+        })
+    }
+
+    pub fn respond_passkey_challenge(
+        &self,
+        credential_id: &str,
+        challenge_id: &str,
+        signature: &str,
+    ) -> PrayResult<AuthPasskeyLoginResponse> {
+        validate_identifier(credential_id, "credential id")?;
+        validate_identifier(challenge_id, "challenge id")?;
+        validate_signature(signature)?;
+        let connection = self.connection()?;
+        let email: String = connection.query_row(
+            "SELECT email FROM passkeys WHERE credential_id = ?1",
+            rusqlite::params![credential_id],
+            |row| row.get(0),
+        )?;
+        let challenge = load_challenge(&connection, challenge_id, &email, "passkey")?;
+        let public_key = load_passkey_public_key(&connection, credential_id)?;
+        verify_signature(&public_key, challenge.challenge.as_bytes(), signature)?;
+        mark_challenge_used(&connection, challenge_id)?;
+        let session = self.issue_session(&email, AuthSessionKind::Passkey)?;
+        Ok(AuthPasskeyLoginResponse {
+            email,
+            token: session.token,
+        })
+    }
+
+    pub fn request_ssh_key_challenge(
+        &self,
+        public_key: &str,
+    ) -> PrayResult<AuthSshKeyChallengeResponse> {
+        validate_public_key(public_key)?;
+        let connection = self.connection()?;
+        let fingerprint = ssh_key_fingerprint(public_key);
+        let email: String = connection.query_row(
+            "SELECT email FROM ssh_keys WHERE fingerprint = ?1",
+            rusqlite::params![fingerprint],
+            |row| row.get(0),
+        )?;
+        let challenge = generate_auth_challenge("ssh_key", public_key)?;
+        let challenge_id = generate_challenge_id(&email, &fingerprint, "ssh_key", &challenge)?;
+        store_challenge(&connection, &challenge_id, &email, &challenge, "ssh_key")?;
+        Ok(AuthSshKeyChallengeResponse {
+            fingerprint,
+            challenge_id,
+            challenge,
+        })
+    }
+
+    pub fn respond_ssh_key_challenge(
+        &self,
+        public_key: &str,
+        challenge_id: &str,
+        signature: &str,
+    ) -> PrayResult<AuthSshKeyLoginResponse> {
+        validate_public_key(public_key)?;
+        validate_identifier(challenge_id, "challenge id")?;
+        validate_signature(signature)?;
+        let fingerprint = ssh_key_fingerprint(public_key);
+        let connection = self.connection()?;
+        let email: String = connection.query_row(
+            "SELECT email FROM ssh_keys WHERE fingerprint = ?1",
+            rusqlite::params![fingerprint],
+            |row| row.get(0),
+        )?;
+        let challenge = load_challenge(&connection, challenge_id, &email, "ssh_key")?;
+        verify_signature(public_key, challenge.challenge.as_bytes(), signature)?;
+        mark_challenge_used(&connection, challenge_id)?;
+        let session = self.issue_session(&email, AuthSessionKind::SshKey)?;
+        Ok(AuthSshKeyLoginResponse {
+            email,
+            token: session.token,
+        })
+    }
+
+    pub fn email_for_session(&self, token: &str) -> PrayResult<Option<String>> {
+        Ok(self.resolve_session(token)?.map(|session| session.email))
     }
 
     pub fn issue_session(
@@ -425,6 +568,15 @@ impl RegistryAuthStore {
                 created_at INTEGER NOT NULL,
                 last_used_at INTEGER,
                 FOREIGN KEY(email) REFERENCES users(email) ON DELETE CASCADE
+            );
+            CREATE TABLE IF NOT EXISTS auth_challenges (
+                challenge_id TEXT PRIMARY KEY,
+                email TEXT NOT NULL,
+                kind TEXT NOT NULL,
+                challenge TEXT NOT NULL,
+                created_at INTEGER NOT NULL,
+                used_at INTEGER,
+                FOREIGN KEY(email) REFERENCES users(email) ON DELETE CASCADE
             );",
         )?;
         Ok(())
@@ -516,6 +668,139 @@ fn current_unix_timestamp() -> PrayResult<u64> {
         .duration_since(UNIX_EPOCH)
         .map_err(|error| PrayError::Resolution(error.to_string()))
         .map(|duration| duration.as_secs())
+}
+
+fn generate_auth_challenge(kind: &str, subject: &str) -> PrayResult<String> {
+    let timestamp = current_unix_timestamp()?;
+    Ok(sha256_prefixed(
+        format!("{kind}\0{subject}\0{timestamp}").as_bytes(),
+    ))
+}
+
+fn generate_challenge_id(
+    email: &str,
+    subject: &str,
+    kind: &str,
+    challenge: &str,
+) -> PrayResult<String> {
+    Ok(sha256_prefixed(
+        format!("challenge\0{email}\0{subject}\0{kind}\0{challenge}").as_bytes(),
+    ))
+}
+
+fn store_challenge(
+    connection: &Connection,
+    challenge_id: &str,
+    email: &str,
+    challenge: &str,
+    kind: &str,
+) -> PrayResult<()> {
+    let timestamp = current_unix_timestamp()?;
+    connection.execute(
+        "INSERT INTO auth_challenges (challenge_id, email, kind, challenge, created_at, used_at)
+         VALUES (?1, ?2, ?3, ?4, ?5, NULL)
+         ON CONFLICT(challenge_id) DO UPDATE SET email = excluded.email, kind = excluded.kind, challenge = excluded.challenge, created_at = excluded.created_at, used_at = NULL",
+        rusqlite::params![challenge_id, email, kind, challenge, timestamp],
+    )?;
+    Ok(())
+}
+
+fn load_challenge(
+    connection: &Connection,
+    challenge_id: &str,
+    email: &str,
+    kind: &str,
+) -> PrayResult<StoredChallenge> {
+    let challenge: Option<StoredChallenge> = connection
+        .query_row(
+            "SELECT challenge_id, email, challenge, kind FROM auth_challenges WHERE challenge_id = ?1 AND email = ?2 AND kind = ?3 AND used_at IS NULL",
+            rusqlite::params![challenge_id, email, kind],
+            |row| {
+                Ok(StoredChallenge {
+                    challenge_id: row.get(0)?,
+                    email: row.get(1)?,
+                    challenge: row.get(2)?,
+                    kind: row.get(3)?,
+                })
+            },
+        )
+        .optional()?;
+    challenge.ok_or_else(|| PrayError::Resolution(format!("challenge not found for {email}")))
+}
+
+fn mark_challenge_used(connection: &Connection, challenge_id: &str) -> PrayResult<()> {
+    let timestamp = current_unix_timestamp()?;
+    connection.execute(
+        "UPDATE auth_challenges SET used_at = ?2 WHERE challenge_id = ?1",
+        rusqlite::params![challenge_id, timestamp],
+    )?;
+    Ok(())
+}
+
+fn load_passkey_public_key(connection: &Connection, credential_id: &str) -> PrayResult<String> {
+    let public_key: String = connection.query_row(
+        "SELECT public_key FROM passkeys WHERE credential_id = ?1",
+        rusqlite::params![credential_id],
+        |row| row.get(0),
+    )?;
+    Ok(public_key)
+}
+
+fn validate_signature(signature: &str) -> PrayResult<()> {
+    if signature.trim().is_empty() {
+        return Err(PrayError::Unsupported(
+            "signature cannot be empty".to_string(),
+        ));
+    }
+    Ok(())
+}
+
+fn verify_signature(public_key: &str, message: &[u8], signature: &str) -> PrayResult<()> {
+    let verifying_key = parse_ssh_ed25519_public_key(public_key)?;
+    let signature_bytes =
+        STANDARD
+            .decode(signature.as_bytes())
+            .map_err(|error| PrayError::Parse {
+                kind: "signature",
+                message: error.to_string(),
+            })?;
+    let signature = Signature::from_slice(&signature_bytes)
+        .map_err(|error| PrayError::Verify(error.to_string()))?;
+    verifying_key
+        .verify(message, &signature)
+        .map_err(|error| PrayError::Verify(error.to_string()))
+}
+
+fn parse_ssh_ed25519_public_key(public_key: &str) -> PrayResult<VerifyingKey> {
+    let mut fields = public_key.split_whitespace();
+    let algorithm = fields.next().ok_or_else(|| {
+        PrayError::Unsupported("public key must include an algorithm".to_string())
+    })?;
+    if algorithm != "ssh-ed25519" && algorithm != "ed25519" {
+        return Err(PrayError::Unsupported(format!(
+            "unsupported public key algorithm: {algorithm}"
+        )));
+    }
+    let key_value = fields
+        .next()
+        .ok_or_else(|| PrayError::Unsupported("public key must include key bytes".to_string()))?;
+    let key_bytes = STANDARD
+        .decode(key_value.as_bytes())
+        .map_err(|error| PrayError::Parse {
+            kind: "public key",
+            message: error.to_string(),
+        })?;
+    let key_bytes: [u8; 32] = key_bytes
+        .as_slice()
+        .try_into()
+        .map_err(|_| PrayError::Parse {
+            kind: "public key",
+            message: "ed25519 public key must be 32 bytes".to_string(),
+        })?;
+    VerifyingKey::from_bytes(&key_bytes).map_err(|error| PrayError::Parse {
+        kind: "public key",
+        message: error.to_string(),
+    })
 }
 
 fn generate_verification_code(email: &str, timestamp: u64) -> String {

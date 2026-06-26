@@ -1,9 +1,10 @@
 use pray_core::auth::{
-    AuthPasskeyEnrollmentRequest, AuthPasskeyEnrollmentResponse, AuthPasskeyLoginRequest,
-    AuthPasskeyLoginResponse, AuthRegistrationRequest, AuthRegistrationResponse, AuthSessionKind,
-    AuthSessionRequest, AuthSessionResponse, AuthSshKeyEnrollmentRequest,
-    AuthSshKeyEnrollmentResponse, AuthSshKeyLoginRequest, AuthSshKeyLoginResponse,
-    AuthVerificationRequest, AuthVerificationResponse, RegistryAuthStore,
+    AuthPasskeyChallengeRequest, AuthPasskeyChallengeResponse, AuthPasskeyEnrollmentRequest,
+    AuthPasskeyEnrollmentResponse, AuthPasskeyLoginRequest, AuthPasskeyLoginResponse,
+    AuthRegistrationRequest, AuthRegistrationResponse, AuthSessionKind, AuthSessionRequest,
+    AuthSessionResponse, AuthSshKeyChallengeRequest, AuthSshKeyChallengeResponse,
+    AuthSshKeyEnrollmentRequest, AuthSshKeyEnrollmentResponse, AuthSshKeyLoginRequest,
+    AuthSshKeyLoginResponse, AuthVerificationRequest, AuthVerificationResponse, RegistryAuthStore,
 };
 use pray_core::registry::{ConfessionSubmission, RegistryIndex, RegistryPackageMetadata};
 use pray_core::trust::read_registry_trust_settings;
@@ -82,10 +83,12 @@ fn handle_connection(root: PathBuf, mut stream: TcpStream) -> PrayResult<()> {
         ("POST", "/v1/auth/register") => auth_register_response(&root, &body)?,
         ("POST", "/v1/auth/verify") => auth_verify_response(&root, &body)?,
         ("POST", "/v1/auth/session") => auth_session_response(&root, &body)?,
-        ("POST", "/v1/auth/passkeys/enroll") => auth_passkey_enroll_response(&root, &body)?,
+        ("POST", "/v1/auth/passkeys/challenge") => auth_passkey_challenge_response(&root, &body)?,
         ("POST", "/v1/auth/passkeys/login") => auth_passkey_login_response(&root, &body)?,
-        ("POST", "/v1/auth/ssh-keys/enroll") => auth_ssh_key_enroll_response(&root, &body)?,
+        ("POST", "/v1/auth/ssh-keys/challenge") => auth_ssh_key_challenge_response(&root, &body)?,
         ("POST", "/v1/auth/ssh-keys/login") => auth_ssh_key_login_response(&root, &body)?,
+        ("POST", "/v1/auth/passkeys/enroll") => auth_passkey_enroll_response(&root, &body)?,
+        ("POST", "/v1/auth/ssh-keys/enroll") => auth_ssh_key_enroll_response(&root, &body)?,
         _ => response_with_status(405, "text/plain", b"method not allowed".to_vec()),
     };
 
@@ -321,6 +324,24 @@ fn auth_passkey_enroll_response(root: &Path, body: &[u8]) -> PrayResult<Response
     })
 }
 
+fn auth_passkey_challenge_response(root: &Path, body: &[u8]) -> PrayResult<Response> {
+    let request: AuthPasskeyChallengeRequest =
+        serde_json::from_slice(body).map_err(|error| PrayError::Parse {
+            kind: "auth passkey challenge",
+            message: error.to_string(),
+        })?;
+    let store = RegistryAuthStore::open(root)?;
+    let response: AuthPasskeyChallengeResponse =
+        store.request_passkey_challenge(&request.credential_id)?;
+    let body =
+        serde_json::to_vec(&response).map_err(|error| PrayError::Manifest(error.to_string()))?;
+    Ok(Response {
+        status: 200,
+        content_type: "application/json".to_string(),
+        body,
+    })
+}
+
 fn auth_passkey_login_response(root: &Path, body: &[u8]) -> PrayResult<Response> {
     let request: AuthPasskeyLoginRequest =
         serde_json::from_slice(body).map_err(|error| PrayError::Parse {
@@ -328,7 +349,29 @@ fn auth_passkey_login_response(root: &Path, body: &[u8]) -> PrayResult<Response>
             message: error.to_string(),
         })?;
     let store = RegistryAuthStore::open(root)?;
-    let response: AuthPasskeyLoginResponse = store.login_with_passkey(&request.credential_id)?;
+    let response: AuthPasskeyLoginResponse = store.respond_passkey_challenge(
+        &request.credential_id,
+        &request.challenge_id,
+        &request.signature,
+    )?;
+    let body =
+        serde_json::to_vec(&response).map_err(|error| PrayError::Manifest(error.to_string()))?;
+    Ok(Response {
+        status: 200,
+        content_type: "application/json".to_string(),
+        body,
+    })
+}
+
+fn auth_ssh_key_challenge_response(root: &Path, body: &[u8]) -> PrayResult<Response> {
+    let request: AuthSshKeyChallengeRequest =
+        serde_json::from_slice(body).map_err(|error| PrayError::Parse {
+            kind: "auth ssh key challenge",
+            message: error.to_string(),
+        })?;
+    let store = RegistryAuthStore::open(root)?;
+    let response: AuthSshKeyChallengeResponse =
+        store.request_ssh_key_challenge(&request.public_key)?;
     let body =
         serde_json::to_vec(&response).map_err(|error| PrayError::Manifest(error.to_string()))?;
     Ok(Response {
