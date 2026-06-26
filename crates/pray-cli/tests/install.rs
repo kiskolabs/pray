@@ -456,6 +456,123 @@ fn package_builds_a_tar_zst_archive_from_package_contents() {
 }
 
 #[test]
+fn sync_pulls_packages_from_configured_peers() {
+    let workspace = temporary_directory("pray-sync");
+    let source_repo = workspace.join("source");
+    let upstream_root = workspace.join("upstream");
+    let downstream_root = workspace.join("downstream");
+    fs::create_dir_all(&source_repo).expect("source workspace");
+    fs::create_dir_all(&upstream_root).expect("upstream workspace");
+    fs::create_dir_all(&downstream_root).expect("downstream workspace");
+
+    create_add_fixture(&source_repo);
+    let add = run_pray(
+        &source_repo,
+        &["add", "sample/base", "--path", "packages/base"],
+    );
+    assert!(
+        add.status.success(),
+        "add failed: {}",
+        String::from_utf8_lossy(&add.stderr)
+    );
+
+    let publish = run_pray(
+        &source_repo,
+        &[
+            "publish",
+            "--root",
+            upstream_root.to_str().expect("upstream path"),
+        ],
+    );
+    assert!(
+        publish.status.success(),
+        "publish failed: {}",
+        String::from_utf8_lossy(&publish.stderr)
+    );
+
+    let port = find_free_port();
+    let mut server = Command::new(env!("CARGO_BIN_EXE_pray"))
+        .args([
+            "serve",
+            "--root",
+            upstream_root.to_str().expect("upstream path"),
+            "--host",
+            "127.0.0.1",
+            "--port",
+            &port.to_string(),
+        ])
+        .stdout(Stdio::null())
+        .stderr(Stdio::null())
+        .spawn()
+        .expect("spawn server");
+    wait_for_server(port);
+
+    let upstream_url = format!("http://127.0.0.1:{port}");
+    fs::create_dir_all(downstream_root.join("v1")).expect("downstream v1 workspace");
+    fs::write(
+        downstream_root.join("v1/peers.json"),
+        format!(
+            r#"[
+                {{
+                    "name": "upstream",
+                    "url": "{upstream_url}",
+                    "public": true
+                }}
+            ]"#
+        ),
+    )
+    .expect("write peer list");
+
+    let sync = run_pray(
+        &workspace,
+        &[
+            "sync",
+            "--root",
+            downstream_root.to_str().expect("downstream path"),
+        ],
+    );
+    assert!(
+        sync.status.success(),
+        "sync failed: {}",
+        String::from_utf8_lossy(&sync.stderr)
+    );
+    let stdout = String::from_utf8_lossy(&sync.stdout);
+    assert!(stdout.contains("Synchronized 1 package(s) from 1 peer(s)"));
+
+    let downstream_index_text =
+        fs::read_to_string(downstream_root.join("v1/index.json")).expect("downstream index");
+    assert!(downstream_index_text.contains("sample/base"));
+
+    let downstream_metadata_text =
+        fs::read_to_string(downstream_root.join("v1/packages/sample/base.json"))
+            .expect("downstream package metadata");
+    let downstream_metadata: Value =
+        serde_json::from_str(&downstream_metadata_text).expect("downstream metadata json");
+    assert_eq!(downstream_metadata["name"], "sample/base");
+    assert_eq!(
+        downstream_metadata["versions"]
+            .as_array()
+            .expect("versions")
+            .len(),
+        1
+    );
+    let downstream_version = downstream_metadata["versions"][0].clone();
+    assert_eq!(downstream_version["version"], "1.4.3");
+    let artifact_path = downstream_version["artifact"]
+        .as_str()
+        .expect("artifact path");
+    let downstream_artifact =
+        fs::read(downstream_root.join(artifact_path)).expect("downstream artifact");
+
+    let upstream_artifact_path = upstream_root.join(artifact_path);
+    let upstream_artifact = fs::read(&upstream_artifact_path).expect("upstream artifact");
+    assert_eq!(downstream_artifact, upstream_artifact);
+
+    let _ = server.kill();
+    let _ = server.wait();
+}
+
+#[test]
 fn update_rejects_unknown_package_selection() {
     let repo = temporary_directory("pray-update-unknown");
     create_add_fixture(&repo);

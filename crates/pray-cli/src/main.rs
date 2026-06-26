@@ -1058,11 +1058,11 @@ fn sync_command(root: PathBuf, peers: Vec<String>) -> PrayResult<()> {
     let runtime = tokio::runtime::Builder::new_current_thread()
         .enable_all()
         .build()
-        .map_err(|error| PrayError::Unsupported(format!("failed to start sync runtime: {error}")))?;
+        .map_err(|error| {
+            PrayError::Unsupported(format!("failed to start sync runtime: {error}"))
+        })?;
 
-    let summary = runtime.block_on(async {
-        synchronize_registry(&root, peer_sources).await
-    })?;
+    let summary = runtime.block_on(async { synchronize_registry(&root, peer_sources).await })?;
 
     println!(
         "Synchronized {} package(s) from {} peer(s)",
@@ -1089,9 +1089,7 @@ async fn synchronize_registry(root: &Path, peer_sources: Vec<String>) -> PrayRes
         }
         peer_count += 1;
         let peer = federation_peer_config(&peer_source);
-        let transport = registry
-            .create(&peer)
-            .map_err(map_transport_error)?;
+        let transport = registry.create(&peer).map_err(map_transport_error)?;
         let discovery = transport
             .fetch_discovery(&peer)
             .await
@@ -1337,7 +1335,10 @@ fn sync_package_version_from_transport(
         exports: version.exports.clone(),
         signer,
         published_at: Some(version.published_at.clone()),
-        signature: version.signature.as_ref().map(|signature| signature.signature.clone()),
+        signature: version
+            .signature
+            .as_ref()
+            .map(|signature| signature.signature.clone()),
     })
 }
 
@@ -1356,7 +1357,7 @@ fn map_transport_error(error: TransportError) -> PrayError {
     }
 }
 
-fn login_command
+fn login_command(
     servers: Vec<String>,
     email: String,
     credential_id: Option<String>,
