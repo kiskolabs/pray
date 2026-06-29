@@ -29,6 +29,9 @@ graph TD
 - Simple to operate
 - Single point of failure
 - Requires trust in one operator
+- Package payloads may be minimal text files plus `*.prayspec`
+- Servers may derive metadata such as language, encoding, summary, topics, counts, and embeddings
+- Confessions can be collected and relayed through federation
 
 ## 2. Federation (New Design)
 
@@ -70,6 +73,8 @@ graph TD
 - Clients query one server
 - Federation transparent to clients
 - Resilient to single server failure
+- Derived metadata is an annotation layer, not package identity
+- Confessions are feedback data that can be mirrored across trusted peers
 
 **Lessons from XMPP:**
 - DNS SRV records can enable automatic peer discovery
@@ -284,6 +289,8 @@ agent "sample/base", "~> 1.4"
 - **Content-addressed**: Packages identified by hash, not mutable names
 - **Eventual consistency**: Sync happens on schedule, not immediately
 - **No presence**: Servers don't maintain session state for peers
+- **Derived metadata**: Servers can enrich packages without changing identity
+- **Confessions**: Signed usage feedback can move through trusted federation paths
 
 **Why not use XMPP directly:**
 - XML overhead unnecessary for static package metadata

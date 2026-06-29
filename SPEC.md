@@ -346,6 +346,12 @@ Examples: registry, static index, git, local path, tarball, OCI artifact, file s
 
 **frozen install** — Install mode that refuses to update lockfile or generated files.
 
+**annotation** — Untrusted derived metadata, confession, or analysis output that describes a package, render, or usage event.
+
+**claim** — Any annotation, summary, confession, score, or metadata field supplied by a client, server, or engine.
+
+**render digest** — Exact hash of the final injected bytes after render and normalization.
+
 ---
 
 ## 9. Repository layout
@@ -765,6 +771,8 @@ Bad export names: `misc`, `rules`, `all`, `stuff`, `very-important`
 
 Recommended package layout:
 
+Packages are primarily text packages. A conforming package may consist only of minimal editable text files plus the required `*.prayspec`; richer assets are optional, not structural.
+
 ```
 sample-webapp/
   sample-webapp.prayspec
@@ -998,6 +1006,8 @@ V1 packages are data packages.
 
 Allowed package contents: Markdown, TOML, JSON, YAML, plain text, templates, declared assets, images/diagrams if useful for skills, scripts as inert assets only
 
+Text files are the default package substrate; additional asset types are optional and may be omitted entirely in minimal packages.
+
 Forbidden during install/render:
 
 - running shell scripts
@@ -1128,7 +1138,31 @@ Package metadata:
       "tree_hash": "sha256:...",
       "yanked": false,
       "targets": ["tool_a", "tool_b", "generic"],
-      "exports": ["working-agreements", "testing-basics"]
+      "exports": ["working-agreements", "testing-basics"],
+      "derived": {
+        "languages": ["markdown"],
+        "encodings": ["utf-8"],
+        "origins": ["git+ssh://git@example.com/base.git"],
+        "summary": "Shared operational guidance for agent use",
+        "categories": ["policy", "workflow"],
+        "topics": ["testing", "review", "migrations"],
+        "file_count": 12,
+        "character_count": 18420,
+        "token_count": 4120,
+        "possible_effects": ["reduce drift", "standardize review output"],
+        "possible_side_effects": ["narrower phrasing", "more explicit workflow bias"],
+        "embeddings": [
+          {
+            "model": "local-or-cloud-derived",
+            "scope": "package"
+          }
+        ]
+      },
+      "confessions": {
+        "published_by": "example-maintainer",
+        "collected_by": ["sample/base", "prayers.kisko.dev"],
+        "received": 18
+      }
     }
   ]
 }
@@ -1153,7 +1187,7 @@ The specification should allow distribution points to form federated networks th
 A conforming implementation may support a federation protocol inspired by FIDONet, NNTP, and ActivityPub where:
 
 - Servers establish explicit peer relationships through configuration
-- Servers sync package metadata and artifacts from trusted peers
+- Servers sync package metadata, derived metadata, confessions, and artifacts from trusted peers
 - Sync operates on a pull, push, or bidirectional model
 - Each server validates packages before accepting them
 - Consistency is eventual through periodic synchronization
@@ -1163,15 +1197,15 @@ Federation protocol requirements:
 
 - Discovery endpoint at `/.well-known/pray-federation.json` exposing server capabilities and sync URLs
 - Index sync endpoint returning changed packages since a timestamp
-- Package metadata sync endpoint with federation-specific fields (origin, publisher, signature)
+- Package metadata sync endpoint with federation-specific fields (origin, publisher, signature, derived metadata, confessions)
 - Standard artifact URLs for package file retrieval
 - Hash verification and signature validation before acceptance
 - Conflict detection for same version with different hashes
 
 Trust levels:
 
-- `full`: Accept metadata and artifacts, mirror packages locally
-- `metadata_only`: Accept metadata but fetch artifacts from origin
+- `full`: Accept metadata, derived metadata, confessions, and artifacts; mirror packages locally
+- `metadata_only`: Accept metadata, derived metadata, and confessions but fetch artifacts from origin
 - `disabled`: Peer listed but sync paused
 
 Sync directions:
@@ -1180,9 +1214,55 @@ Sync directions:
 - `push`: Server sends updates to peer
 - `bidirectional`: Both pull and push
 
-Servers may optionally publish their known peer list to enable discovery of the federation topology.
+Servers may optionally publish their known peer list, trusted publishers, and confession relay peers to enable discovery of the federation topology.
 
 Federation is optional. A conforming implementation must work without federation support.
+
+### 29.3 Derived metadata and confessions
+
+Distribution points may compute and publish derived metadata for each package version. Derived metadata is an annotation layer, not package identity. It does not change the artifact hash, tree hash, or version identity.
+
+Derived metadata may be computed locally, through cloud inference, or by combining both. Implementations may use language detection, encoding detection, summary generation, topic extraction, embedding generation, and similar analysis tools.
+
+Derived metadata may include:
+
+- detected languages
+- detected encodings
+- source origins and provenance notes
+- summary
+- categories
+- topics mentioned
+- file count
+- character count
+- token count
+- possible effects
+- possible side effects
+- embeddings
+
+A package may consist only of minimal editable text files intended for alteration. The distribution point may enrich that package with derived metadata without requiring the package itself to carry those annotations.
+
+Confessions are signed usage feedback records. A confession may be produced by a publisher, a distribution point, or a client that has received a package. Confessions may be collected, mirrored, and aggregated by publishers and trusted servers.
+
+Federated servers may share known peer and server lists, along with confessions they are authorized to relay. Publishers may use confessions to collect usage feedback across direct publication and server-to-server synchronization.
+
+Confessions do not alter package identity. They are feedback data attached to a package version, tree hash, or artifact hash.
+
+### 29.4 Zero-trust verification and engine-agnostic annotations
+
+Pray assumes zero trust. Any client, server, publisher, or federation peer may provide incorrect, partial, stale, or malicious data. All metadata, summaries, scores, confessions, and derived annotations are claims unless independently verified or explicitly accepted under local policy.
+
+Package authenticity and injection safety must be verified separately:
+
+- package bytes are verified with artifact hashes and signatures
+- package trees are verified with normalized tree hashes
+- final injected bytes are verified with exact render digests or equivalent deterministic byte checks
+- render plans are verified with canonical metadata about selected exports, exclusions, ordering, normalization, and target policy
+
+Derived metadata may be used for verification, but only as evidence. It can help prove what should be injected, what was excluded, and which inputs were used. It does not become truth simply because it is published by a server.
+
+Any participant may generate annotations using any method, including manual review, hardcoded logic, deterministic heuristics, local inference, cloud inference, or generative models. Implementations must record annotation provenance when they rely on such output, including the producer, method, policy or model version, and the input hash or equivalent binding used to generate the claim.
+
+If conflicting claims are received, local policy decides which claims to trust for discovery or display. Verification of the final injected bytes remains mandatory.
 
 Clients remain unaware of federation. A client queries a single distribution point, which may serve from local mirror, proxy to a peer, or return metadata with origin URLs.
 
@@ -1192,7 +1272,7 @@ Clients remain unaware of federation. A client queries a single distribution poi
 
 A registry package version should expose:
 
-name, version, summary, description, artifact location, artifact hash, tree hash, yanked flag, license, homepage, source code URI, changelog URI, targets, exports, dependencies, published_at optional, signature optional
+name, version, summary, description, artifact location, artifact hash, tree hash, yanked flag, license, homepage, source code URI, changelog URI, targets, exports, dependencies, published_at optional, signature optional, render_digest optional, annotation_provenance optional
 
 To reduce churn and privacy leakage, project lockfiles should not copy unnecessary registry metadata.
 
@@ -1340,7 +1420,7 @@ For each lockfile managed span:
 
 `pray verify` reports mismatches. It must not modify `Prayfile.lock` or target files.
 
-Also checks lockfile integrity, package checksums, signatures, cache validity, and confession references.
+Also checks lockfile integrity, package checksums, signatures, cache validity, confession references, and any recorded render digests or annotation provenance.
 
 ### `pray apply`
 

@@ -19,7 +19,7 @@ use pray_core::{PrayError, PrayResult};
 use pray_transport::{
     ArtifactRef, PeerConfig, PeerInfo, SyncDirection, TransportError, TransportRegistry, TrustLevel,
 };
-use std::collections::{BTreeMap, BTreeSet};
+use std::collections::{BTreeMap, BTreeSet, VecDeque};
 use std::env;
 use std::fs;
 use std::io::Write;
@@ -1045,6 +1045,9 @@ fn publish_to_root(
 fn sync_command(root: PathBuf, peers: Vec<String>) -> PrayResult<()> {
     let peer_sources = if peers.is_empty() {
         load_sync_peers(&root)?
+            .into_iter()
+            .map(|peer| peer.url)
+            .collect()
     } else {
         peers
     };
@@ -1065,8 +1068,8 @@ fn sync_command(root: PathBuf, peers: Vec<String>) -> PrayResult<()> {
     let summary = runtime.block_on(async { synchronize_registry(&root, peer_sources).await })?;
 
     println!(
-        "Synchronized {} package(s) from {} peer(s)",
-        summary.packages, summary.peers
+        "Synchronized {} package(s) from {} peer(s); learned {} peer(s)",
+        summary.packages, summary.peers, summary.known_peers
     );
     Ok(())
 }
@@ -1074,19 +1077,34 @@ fn sync_command(root: PathBuf, peers: Vec<String>) -> PrayResult<()> {
 struct SyncSummary {
     peers: usize,
     packages: usize,
+    known_peers: usize,
 }
 
 async fn synchronize_registry(root: &Path, peer_sources: Vec<String>) -> PrayResult<SyncSummary> {
     let registry = TransportRegistry::new();
-    let mut discovered_peers = BTreeSet::new();
+    let mut discovered_peers: BTreeSet<String> = peer_sources.iter().cloned().collect();
+    let mut pending_peers: VecDeque<String> = peer_sources.into_iter().collect();
+    let mut known_peers = load_known_peer_records(root)?;
     let mut package_versions_by_name: BTreeMap<String, BTreeMap<String, RegistryPackageVersion>> =
         BTreeMap::new();
     let mut peer_count = 0usize;
 
-    for peer_source in peer_sources {
-        if !discovered_peers.insert(peer_source.clone()) {
+    for peer_source in pending_peers.clone() {
+        upsert_known_peer(
+            &mut known_peers,
+            PeerInfo {
+                name: peer_source.clone(),
+                url: peer_source,
+                public: false,
+            },
+        );
+    }
+
+    while let Some(peer_source) = pending_peers.pop_front() {
+        if !discovered_peers.contains(&peer_source) {
             continue;
         }
+        discovered_peers.remove(&peer_source);
         peer_count += 1;
         let peer = federation_peer_config(&peer_source);
         let transport = registry.create(&peer).map_err(map_transport_error)?;
@@ -1098,6 +1116,22 @@ async fn synchronize_registry(root: &Path, peer_sources: Vec<String>) -> PrayRes
             return Err(PrayError::Resolution(format!(
                 "peer {peer_source} does not speak the pray federation protocol"
             )));
+        }
+
+        for discovered_peer in discovery.peers {
+            let discovered_peer = normalize_peer_info(discovered_peer)?;
+            if discovered_peer.url == peer_source {
+                continue;
+            }
+            upsert_known_peer(&mut known_peers, discovered_peer.clone());
+            if !pending_peers
+                .iter()
+                .any(|queued| queued == &discovered_peer.url)
+                && !pending_peers.contains(&discovered_peer.url)
+            {
+                pending_peers.push_back(discovered_peer.url.clone());
+                discovered_peers.insert(discovered_peer.url.clone());
+            }
         }
 
         let index = transport
@@ -1133,6 +1167,8 @@ async fn synchronize_registry(root: &Path, peer_sources: Vec<String>) -> PrayRes
         }
     }
 
+    write_known_peer_records(root, &known_peers)?;
+
     let mut local_index = load_registry_index(root)?;
     let mut package_names: BTreeSet<String> = local_index.packages.into_iter().collect();
     for (package_name, version_map) in &package_versions_by_name {
@@ -1145,6 +1181,7 @@ async fn synchronize_registry(root: &Path, peer_sources: Vec<String>) -> PrayRes
     Ok(SyncSummary {
         peers: peer_count,
         packages: package_versions_by_name.len(),
+        known_peers: known_peers.len(),
     })
 }
 
@@ -1266,7 +1303,7 @@ fn federation_peer_config(peer_source: &str) -> PeerConfig {
     }
 }
 
-fn load_sync_peers(root: &Path) -> PrayResult<Vec<String>> {
+fn load_sync_peers(root: &Path) -> PrayResult<Vec<PeerInfo>> {
     let path = root.join("v1/peers.json");
     let text = fs::read_to_string(&path).map_err(|error| {
         if error.kind() == std::io::ErrorKind::NotFound {
@@ -1279,16 +1316,70 @@ fn load_sync_peers(root: &Path) -> PrayResult<Vec<String>> {
         kind: "peer list",
         message: error.to_string(),
     })?;
-    let mut peer_sources = Vec::new();
+    let mut normalized_peers = Vec::new();
     for peer in peers {
-        if peer.url.trim().is_empty() {
-            return Err(PrayError::Resolution(
-                "peer list contains an entry with an empty url".to_string(),
-            ));
-        }
-        peer_sources.push(peer.url);
+        normalized_peers.push(normalize_peer_info(peer)?);
     }
-    Ok(peer_sources)
+    Ok(normalized_peers)
+}
+
+fn load_known_peer_records(root: &Path) -> PrayResult<BTreeMap<String, PeerInfo>> {
+    let path = root.join("v1/peers.json");
+    let Ok(text) = fs::read_to_string(&path) else {
+        return Ok(BTreeMap::new());
+    };
+    let peers: Vec<PeerInfo> = serde_json::from_str(&text).map_err(|error| PrayError::Parse {
+        kind: "peer list",
+        message: error.to_string(),
+    })?;
+    let mut records = BTreeMap::new();
+    for peer in peers {
+        let peer = normalize_peer_info(peer)?;
+        records.insert(peer.url.clone(), peer);
+    }
+    Ok(records)
+}
+
+fn write_known_peer_records(root: &Path, peers: &BTreeMap<String, PeerInfo>) -> PrayResult<()> {
+    let path = root.join("v1/peers.json");
+    if let Some(parent) = path.parent() {
+        fs::create_dir_all(parent)?;
+    }
+    let values: Vec<PeerInfo> = peers.values().cloned().collect();
+    fs::write(
+        path,
+        serde_json::to_string_pretty(&values)
+            .map_err(|error| PrayError::Manifest(error.to_string()))?,
+    )?;
+    Ok(())
+}
+
+fn normalize_peer_info(mut peer: PeerInfo) -> PrayResult<PeerInfo> {
+    if peer.url.trim().is_empty() {
+        return Err(PrayError::Resolution(
+            "peer list contains an entry with an empty url".to_string(),
+        ));
+    }
+    if peer.name.trim().is_empty() {
+        peer.name = peer.url.clone();
+    }
+    Ok(peer)
+}
+
+fn upsert_known_peer(records: &mut BTreeMap<String, PeerInfo>, peer: PeerInfo) {
+    let url = peer.url.clone();
+    match records.get_mut(&url) {
+        Some(existing) => {
+            if (existing.name == existing.url && peer.name != peer.url)
+                || (!existing.public && peer.public)
+            {
+                *existing = peer;
+            }
+        }
+        None => {
+            records.insert(url, peer);
+        }
+    }
 }
 
 fn sync_package_version_from_transport(

@@ -45,6 +45,8 @@ The durable problem is packaging and distributing the material that gets placed 
 
 Prayfile focuses on dependency management, version locking, deterministic resolution, reproducible rendering, provenance, verification, preservation, planning, publishing, signed feedback, and drift detection.
 
+Pray is zero trust: package metadata, summaries, scores, confessions, and derived annotations are claims unless verified against hashes, signatures, or exact rendered-byte digests. Any client or server may use manual review, hardcoded logic, heuristics, local inference, cloud inference, or generative models to produce annotations.
+
 It does not define an inference runtime. It does not require a specific model provider. It does not prescribe one correct format for intelligence, collaboration, review, or automation.
 
 It manages pre-inference material as data.
@@ -229,7 +231,7 @@ This keeps package use auditable and reduces the security risks of distributing 
 
 Prayfile packages may be fetched from distribution points.
 
-A distribution point is a registry-like source for package metadata, package archives, signatures, checksums, usage feedback, and optional web documentation.
+A distribution point is a registry-like source for package metadata, package archives, signatures, checksums, derived metadata, confessions, usage feedback, and optional web documentation.
 
 An example public or private distribution point could be:
 
@@ -254,6 +256,14 @@ A distribution point should expose a minimal API for:
 The distribution point is not part of inference. It is part of package discovery, publishing, verification, feedback, and preservation.
 
 Prayfile should also support direct sources such as local paths, git repositories, archive URLs, and vendored `.praypkg` files. A centralized distribution point is useful, but not required.
+
+Pray packages can be minimal text packages: a package may consist only of editable text files plus the required `*.prayspec`. The distribution point may compute derived metadata such as language, encoding, origin, summary, categories, topics, file counts, character counts, token counts, possible effects, possible side effects, and embeddings.
+
+Derived metadata is an annotation layer, not package identity. It does not change the artifact hash, tree hash, or version identity.
+
+Pray packages and rendered target bytes are verified separately. Packages are verified by hashes and signatures; the injected output is verified by exact render digests or equivalent deterministic byte checks.
+
+Confessions are signed usage feedback records. Publishers and trusted servers may collect, mirror, and aggregate them across direct publication and server-to-server synchronization.
 
 Prayfile should also leave room for peer-to-peer distribution transport: torrent-style seeding and collective-network discovery through a DHT, inspired by systems like BitTorrent, Freenet, and GNUnet. That transport should preserve the same hash verification, signature checking, and provenance guarantees as static hosting.
 
