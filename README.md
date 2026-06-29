@@ -8,8 +8,8 @@ It lets projects declare shared instructions, policies, memories, templates, rev
 
 The goal is simple: treat pre-inference input as a dependency.
 
-**Status:** Draft specification v0.1 — spec-first experiment.
-The open specification is the primary focus. The `pray` reference CLI is described in `SPEC.md`.
+**Status:** Active development toward a production-ready v0.1 release.
+The specification and the `pray` reference CLI evolve together. `SPEC.md` defines the current contracts.
 
 ## Why
 
@@ -261,7 +261,7 @@ Pray packages can be minimal text packages: a package may consist only of editab
 
 Derived metadata is an annotation layer, not package identity. It does not change the artifact hash, tree hash, or version identity.
 
-Pray packages and rendered target bytes are verified separately. Packages are verified by hashes and signatures; the injected output is verified by exact render digests or equivalent deterministic byte checks.
+Pray packages and rendered target bytes are verified separately. Packages are verified by hashes and signatures; the injected output is verified by exact render digests or equivalent deterministic byte checks. Prayfile.lock can also store canonical verification records that bind package claims, render plans, final injected bytes, and confessions to stable hashes and provenance.
 
 Confessions are signed usage feedback records. Publishers and trusted servers may collect, mirror, and aggregate them across direct publication and server-to-server synchronization.
 
@@ -781,11 +781,11 @@ App: Prayer::Context.for(:inference).to_s  # example API; not normative yet
 
 ## Is the specification final?
 
-No.
+Not yet.
 
-The project is experimental. Terminology, formats, package structure, resolver rules, rendering targets, cache behaviour, registry design, distribution APIs, marker syntax, formatting rules, signing policy, confession policy, and implementation details may evolve as the model is validated through real-world use.
+The project is under active development. Terminology, formats, package structure, resolver rules, rendering targets, cache behaviour, registry design, distribution APIs, marker syntax, formatting rules, signing policy, confession policy, and implementation details may still evolve as the system is hardened through real-world use.
 
-The specification is currently the main area of development.
+The current focus is building a production-ready implementation with stable contracts and strong validation.
 
 ## Core model
 

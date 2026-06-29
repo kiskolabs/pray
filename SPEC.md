@@ -1,6 +1,6 @@
 # Prayfile Open Specification
 
-**Status:** Draft v0.1  
+**Status:** Active development v0.1  
 **Primary file names:** Prayfile, Prayfile.lock, *.prayspec, *.praypkg  
 **Reference CLI name:** pray  
 **Project name:** pray  
@@ -55,8 +55,8 @@ Modern inference engines rely on surrounding input files such as `AGENTS.md`, `C
 | Is this a prompt framework? | No. The durable problem is packaging and distributing the material placed before inference—not prompt design itself. |
 | What is input drift? | The gradual divergence of instructions, policies, templates, memories, formatting rules, and workflow assumptions between projects. |
 | Why now? | Cross-tool support for `AGENTS.md`, `CLAUDE.md`, and similar files removed a major adoption blocker. Copy-paste still does not scale. |
-| Is the spec final? | No. Draft v0.1 is an experiment. Terminology, formats, and behaviour may evolve as the model is validated. |
-| Implementation status? | Spec-first. Reference CLI design lives in this document and `README.md`. |
+| Is the spec final? | Not yet. Terminology, formats, and behaviour may still evolve as the system is hardened through real-world use. |
+| Implementation status? | The specification and reference CLI evolve together, with production readiness as the goal. |
 
 **Design principles:**
 
@@ -97,11 +97,11 @@ Inference input is operational—it shapes what models notice, ignore, repeat, r
 
 These values inform lockfile fields, pray markers, `pray drift` output, `pray verify` checks, and the security model in later sections.
 
-### Experiment intent
+### Production intent
 
-Packaging shapes, tool conventions, and workflow surfaces for inference input will keep changing drastically—skills today, something else tomorrow. This specification is an experiment in *seeing* that motion, not in freezing one workflow bet.
+Packaging shapes, tool conventions, and workflow surfaces for inference input will keep changing drastically—skills today, something else tomorrow. Prayfile is designed to stay useful while that surface changes by defining stable contracts, clear indicators, and reviewable change paths.
 
-To observe change, you need indicators. Prayfile defines them as contracts: pinned lock state, pray markers, explicit diffs, integrity checks, and signed feedback. The core values above are those indicators made normative—so teams can measure what altered, when, and from where while the surrounding ecosystem shifts.
+To observe change, you need indicators. Prayfile defines them as contracts: pinned lock state, pray markers, explicit diffs, integrity checks, and signed feedback. The core values above are those indicators made normative so teams can measure what altered, when, and from where while the surrounding ecosystem shifts.
 
 ---
 
@@ -1288,6 +1288,30 @@ Reasons: readable, stable, small diffs, easy to parse, good for sorted package t
 
 Users should not edit Prayfile.lock by hand.
 
+### 31.1 Canonical verification records
+
+Prayfile.lock may include canonical verification records that bind claims to package, render, or confession identities. Verification records are machine-authored and should be stable across implementations.
+
+Recommended format: TOML tables.
+
+Required fields:
+
+| Field | Meaning |
+|-------|---------|
+| `kind` | Verification subject type: `package`, `render_plan`, `render_output`, or `confession` |
+| `subject` | Stable subject reference such as package name and version, managed span ID, confession ID, or artifact reference |
+| `subject_hash` | Expected hash for the subject being verified |
+| `verifier` | Identity of the client or server that performed the verification |
+| `method` | Verification method such as `hash`, `signature`, `manual`, `heuristic`, `local_model`, `cloud_model`, or `rule` |
+| `policy` | Policy or trust rule reference used during verification |
+| `input_hash` | Hash of the inputs used to produce the claim |
+| `observed_hash` | Hash actually observed during verification |
+| `observed_at` | Verification timestamp |
+| provenance | Origin, source, or federation path for the claim |
+| `signature` | Optional signature over the canonical record |
+
+Render-output records should bind the final injected bytes. Render-plan records should also record selected exports, exclusions, ordering, normalization, and target policy in their provenance or detail fields. Confession records should bind the confession body to the sender, package reference, and replay-prevention data.
+
 ---
 
 ## 32. Lockfile example
@@ -1366,6 +1390,56 @@ package = "sample/webapp"
 export = "webapp-review"
 source_checksum = "sha256:012def..."
 silenced = false
+
+[[verification_record]]
+kind = "package"
+subject = "sample/webapp@2.1.5"
+subject_hash = "sha256:..."
+verifier = "prayers.kisko.dev"
+method = "signature"
+policy = "registry-default"
+input_hash = "sha256:..."
+observed_hash = "sha256:..."
+observed_at = "2026-06-29T14:07:56Z"
+provenance = "registry"
+signature = "ed25519:..."
+
+[[verification_record]]
+kind = "render_plan"
+subject = "AGENTS.md#p7f3k9m2"
+subject_hash = "sha256:..."
+verifier = "pray 0.1.0"
+method = "rule"
+policy = "render-managed"
+input_hash = "sha256:..."
+observed_hash = "sha256:..."
+observed_at = "2026-06-29T14:07:56Z"
+provenance = "sample/base -> AGENTS.md; exports=testing-basics; exclusions=[]"
+
+[[verification_record]]
+kind = "render_output"
+subject = "AGENTS.md#p7f3k9m2"
+subject_hash = "sha256:..."
+verifier = "pray 0.1.0"
+method = "hash"
+policy = "render-managed"
+input_hash = "sha256:..."
+observed_hash = "sha256:..."
+observed_at = "2026-06-29T14:07:56Z"
+provenance = "final injected bytes"
+
+[[verification_record]]
+kind = "confession"
+subject = "sample/webapp@2.1.5"
+subject_hash = "sha256:..."
+verifier = "example-maintainer"
+method = "signature"
+policy = "confession-default"
+input_hash = "sha256:..."
+observed_hash = "sha256:..."
+observed_at = "2026-06-29T14:07:56Z"
+provenance = "publisher"
+signature = "ed25519:..."
 
 [[target]]
 name = "tool_b"

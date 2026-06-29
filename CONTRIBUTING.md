@@ -1,6 +1,6 @@
 # Contributing Guidelines
 
-Thank you for your interest in contributing to the pray open specification and the planned **pray** reference CLI. This repository is **spec-first**: polish the open specification before implementing the changes. We value learning over perfection but require rigor and responsibility.
+Thank you for your interest in contributing to the pray project and the **pray** reference CLI. This repository is focused on building a production-ready app with well-defined contracts, strong tests, and clear documentation. We value learning over perfection but require rigor and responsibility.
 
 ## The Golden Rule of Automation
 
@@ -75,7 +75,7 @@ cargo fmt --all --check
 cargo clippy --workspace -- -D warnings
 ```
 
-For specification-only changes, review [SPEC.md](SPEC.md) for internal consistency and update examples or fixtures when behavior changes.
+For documentation-only changes, review [SPEC.md](SPEC.md) for internal consistency and update examples or fixtures when behavior changes.
 
 ## Security
 

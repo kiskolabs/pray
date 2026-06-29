@@ -6,10 +6,10 @@ Read `README.md` for project positioning and `SPEC.md` for the normative Prayfil
 
 ## Project intent
 
-- **Spec first.** Polish the open specification before implementing the reference CLI. Implement changes to the system tool only after the specification is stable.
+- **Production readiness.** Build the reference CLI and specification together, prioritizing validated contracts, user-facing reliability, and test coverage.
 - **Problem focus.** Inference input is operational—it shapes what models notice, ignore, and prioritize. Packaging shapes (skills today, something else tomorrow) will keep changing. Prayfile targets reproducible composition, provenance markers, and sync of shared input libraries across repositories—not any one vendor workflow.
 - **What the tool must do.** Resolve declared input dependencies, lock exact versions and hashes, render tool-specific files under defined contracts, cite managed blocks with compact pray markers into `Prayfile.lock`, and keep shared input pinned and updatable through manifest + lockfile semantics.
-- **Experiment.** The repository and specification may be reworked as the model is validated. Packaging shapes will change drastically; the durable bet is indicators that make alteration visible (lockfile, provenance, drift, diffs)—not any one vendor workflow. Prefer spec contributions and contract clarity over premature implementation.
+- **Production focus.** Packaging shapes will keep changing; the durable bet is indicators that make alteration visible (lockfile, provenance, drift, diffs)—not any one vendor workflow. Prefer contract clarity, production validation, and test coverage over premature implementation.
 
 ## Working rules
 
