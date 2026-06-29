@@ -19,8 +19,9 @@ tokio = { version = "1", features = ["full"] }
 default = ["http"]
 http = []
 p2p = []
+torrent = []
 filesystem = []
-all = ["http", "p2p", "filesystem"]
+all = ["http", "p2p", "torrent", "filesystem"]
 
 [dev-dependencies]
 tokio-test = "0.4"

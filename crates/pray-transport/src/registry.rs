@@ -3,6 +3,8 @@ use crate::federation::FederationTransportFactory;
 use crate::http::HttpTransportFactory;
 #[cfg(feature = "p2p")]
 use crate::p2p::P2PTransportFactory;
+#[cfg(feature = "torrent")]
+use crate::torrent::TorrentTransportFactory;
 use crate::types::*;
 
 use std::collections::HashMap;
@@ -31,6 +33,9 @@ impl TransportRegistry {
             );
             registry.register("p2p", Arc::new(P2PTransportFactory));
         }
+
+        #[cfg(feature = "torrent")]
+        registry.register("torrent", Arc::new(TorrentTransportFactory));
 
         registry
     }
@@ -89,6 +94,12 @@ mod tests {
             assert!(!registry.has_transport("federation"));
             assert!(!registry.has_transport("p2p"));
         }
+
+        #[cfg(feature = "torrent")]
+        assert!(registry.has_transport("torrent"));
+
+        #[cfg(not(feature = "torrent"))]
+        assert!(!registry.has_transport("torrent"));
     }
 
     #[test]
@@ -127,6 +138,28 @@ mod tests {
 
             assert_eq!(federation_transport.name(), "federation");
             assert_eq!(p2p_transport.name(), "p2p");
+        }
+    }
+
+    #[test]
+    fn test_torrent_transport_is_available_when_enabled() {
+        #[cfg(feature = "torrent")]
+        {
+            let registry = TransportRegistry::new();
+            let torrent_peer = PeerConfig {
+                name: "torrent-peer".to_string(),
+                transport: "torrent".to_string(),
+                url: None,
+                trust: TrustLevel::Full,
+                direction: SyncDirection::Pull,
+                config: serde_json::json!({}),
+            };
+
+            let transport = registry
+                .create(&torrent_peer)
+                .expect("torrent transport should exist");
+
+            assert_eq!(transport.name(), "torrent");
         }
     }
 }

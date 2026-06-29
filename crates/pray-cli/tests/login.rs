@@ -96,6 +96,91 @@ fn login_recovers_after_auth_server_restart_and_persists_session() {
     let _ = server.wait();
 }
 
+#[test]
+fn login_supports_multiple_auth_origins() {
+    let workspace = temporary_directory("pray-login-multi-origin");
+    let client_repo = workspace.join("client");
+    let auth_root_a = workspace.join("auth-a");
+    let auth_root_b = workspace.join("auth-b");
+    fs::create_dir_all(&client_repo).expect("client workspace");
+    fs::create_dir_all(&auth_root_a).expect("auth root A workspace");
+    fs::create_dir_all(&auth_root_b).expect("auth root B workspace");
+    write_auth_registry_fixture(&auth_root_a);
+    write_auth_registry_fixture(&auth_root_b);
+
+    let auth_store_a = RegistryAuthStore::open(&auth_root_a).expect("open auth store A");
+    let auth_store_b = RegistryAuthStore::open(&auth_root_b).expect("open auth store B");
+    let login_email = "multi-origin@example.com";
+    let signing_key = signing_key_from_seed(21);
+    let public_key = ssh_public_key_text(&signing_key);
+
+    verify_email_registration(&auth_store_a, login_email);
+    verify_email_registration(&auth_store_b, login_email);
+    auth_store_a
+        .enroll_passkey(
+            login_email,
+            "multi-origin-passkey",
+            &public_key,
+            Some("auth origin A"),
+        )
+        .expect("enroll passkey on auth origin A");
+    auth_store_b
+        .enroll_passkey(
+            login_email,
+            "multi-origin-passkey",
+            &public_key,
+            Some("auth origin B"),
+        )
+        .expect("enroll passkey on auth origin B");
+
+    let port_a = find_free_port();
+    let port_b = find_free_port();
+    let mut server_a = spawn_server(&auth_root_a, port_a);
+    let mut server_b = spawn_server(&auth_root_b, port_b);
+    wait_for_server(port_a);
+    wait_for_server(port_b);
+
+    let server_url_a = format!("http://127.0.0.1:{port_a}");
+    let server_url_b = format!("http://127.0.0.1:{port_b}");
+    let private_key_path =
+        write_private_key_file(&client_repo, "multi-origin-passkey.bin", &signing_key);
+
+    let login = Command::new(env!("CARGO_BIN_EXE_pray"))
+        .args([
+            "login",
+            "--server",
+            &server_url_a,
+            "--server",
+            &server_url_b,
+            "--email",
+            login_email,
+            "--credential-id",
+            "multi-origin-passkey",
+            "--passkey-key",
+            private_key_path.to_str().expect("private key path"),
+        ])
+        .current_dir(&client_repo)
+        .output()
+        .expect("run multi-origin login");
+    assert!(
+        login.status.success(),
+        "multi-origin login failed: {}",
+        String::from_utf8_lossy(&login.stderr)
+    );
+
+    let session_text =
+        fs::read_to_string(client_repo.join(".pray/session.json")).expect("session file");
+    let session_json: Value = serde_json::from_str(&session_text).expect("session json");
+    let server_urls = session_server_urls(&session_json);
+    assert!(server_urls.contains(&server_url_a));
+    assert!(server_urls.contains(&server_url_b));
+
+    let _ = server_a.kill();
+    let _ = server_a.wait();
+    let _ = server_b.kill();
+    let _ = server_b.wait();
+}
+
 fn run_pray(repo: &std::path::Path, arguments: &[&str]) -> std::process::Output {
     Command::new(env!("CARGO_BIN_EXE_pray"))
         .args(arguments)
@@ -212,4 +297,24 @@ fn wait_for_server(port: u16) {
         thread::sleep(Duration::from_millis(100));
     }
     panic!("server did not start on port {port}");
+}
+
+fn session_server_urls(session_json: &Value) -> Vec<String> {
+    if let Some(sessions) = session_json.get("sessions").and_then(Value::as_array) {
+        return sessions
+            .iter()
+            .filter_map(|session| {
+                session
+                    .get("server_url")
+                    .and_then(Value::as_str)
+                    .map(ToString::to_string)
+            })
+            .collect();
+    }
+
+    session_json
+        .get("server_url")
+        .and_then(Value::as_str)
+        .map(|server_url| vec![server_url.to_string()])
+        .unwrap_or_default()
 }
