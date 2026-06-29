@@ -656,34 +656,8 @@ fn sync_crawls_discovered_peers_and_persists_them() {
     )
     .expect("write downstream peer list");
 
-    let mut seed_server = Command::new(env!("CARGO_BIN_EXE_pray"))
-        .args([
-            "serve",
-            "--root",
-            seed_root.to_str().expect("seed path"),
-            "--host",
-            "127.0.0.1",
-            "--port",
-            &seed_port.to_string(),
-        ])
-        .stdout(Stdio::null())
-        .stderr(Stdio::null())
-        .spawn()
-        .expect("spawn seed server");
-    let mut upstream_server = Command::new(env!("CARGO_BIN_EXE_pray"))
-        .args([
-            "serve",
-            "--root",
-            upstream_root.to_str().expect("upstream path"),
-            "--host",
-            "127.0.0.1",
-            "--port",
-            &upstream_port.to_string(),
-        ])
-        .stdout(Stdio::null())
-        .stderr(Stdio::null())
-        .spawn()
-        .expect("spawn upstream server");
+    let mut seed_server = spawn_server(&seed_root, seed_port);
+    let mut upstream_server = spawn_server(&upstream_root, upstream_port);
     wait_for_server(seed_port);
     wait_for_server(upstream_port);
 
@@ -707,16 +681,145 @@ fn sync_crawls_discovered_peers_and_persists_them() {
         fs::read_to_string(downstream_root.join("v1/index.json")).expect("downstream index");
     assert!(downstream_index_text.contains("sample/base"));
 
+    let downstream_metadata_text =
+        fs::read_to_string(downstream_root.join("v1/packages/sample/base.json"))
+            .expect("downstream package metadata");
+    let downstream_metadata: Value =
+        serde_json::from_str(&downstream_metadata_text).expect("downstream metadata json");
+    assert_eq!(downstream_metadata["name"], "sample/base");
+    assert_eq!(
+        downstream_metadata["versions"]
+            .as_array()
+            .expect("versions")
+            .len(),
+        1
+    );
+    let downstream_version = downstream_metadata["versions"][0].clone();
+    assert_eq!(downstream_version["version"], "1.4.3");
+    let artifact_path = downstream_version["artifact"]
+        .as_str()
+        .expect("artifact path");
+    let downstream_artifact =
+        fs::read(downstream_root.join(artifact_path)).expect("downstream artifact");
+
+    let upstream_artifact_path = upstream_root.join(artifact_path);
+    let upstream_artifact = fs::read(&upstream_artifact_path).expect("upstream artifact");
+    assert_eq!(downstream_artifact, upstream_artifact);
+
     let synced_peers_text =
         fs::read_to_string(downstream_root.join("v1/peers.json")).expect("synced peers file");
     let synced_peers: Value = serde_json::from_str(&synced_peers_text).expect("synced peers json");
-    let synced_peers = synced_peers.as_array().expect("peer array");
-    assert_eq!(synced_peers.len(), 2);
-    assert!(synced_peers.iter().any(|peer| peer["url"] == seed_url));
-    assert!(synced_peers.iter().any(|peer| peer["url"] == upstream_url));
+    assert_eq!(synced_peers.as_array().expect("peer array").len(), 2);
+    assert_eq!(synced_peers[0]["url"], seed_url);
+    assert_eq!(synced_peers[1]["url"], upstream_url);
 
     let _ = seed_server.kill();
     let _ = seed_server.wait();
+    let _ = upstream_server.kill();
+    let _ = upstream_server.wait();
+}
+
+#[test]
+fn sync_recovers_after_peer_restart_and_leaves_no_partial_state() {
+    let workspace = temporary_directory("pray-sync-recovery");
+    let source_repo = workspace.join("source");
+    let upstream_root = workspace.join("upstream");
+    let downstream_root = workspace.join("downstream");
+    fs::create_dir_all(&source_repo).expect("source workspace");
+    fs::create_dir_all(&upstream_root).expect("upstream workspace");
+    fs::create_dir_all(&downstream_root).expect("downstream workspace");
+
+    create_add_fixture(&source_repo);
+    let add = run_pray(
+        &source_repo,
+        &["add", "sample/base", "--path", "packages/base"],
+    );
+    assert!(
+        add.status.success(),
+        "add failed: {}",
+        String::from_utf8_lossy(&add.stderr)
+    );
+    let publish = run_pray(
+        &source_repo,
+        &[
+            "publish",
+            "--root",
+            upstream_root.to_str().expect("upstream path"),
+        ],
+    );
+    assert!(
+        publish.status.success(),
+        "publish failed: {}",
+        String::from_utf8_lossy(&publish.stderr)
+    );
+
+    let port = find_free_port();
+    let upstream_url = format!("http://127.0.0.1:{port}");
+    fs::create_dir_all(downstream_root.join("v1")).expect("downstream v1 workspace");
+    fs::write(
+        downstream_root.join("v1/peers.json"),
+        format!(
+            r#"[
+                {{
+                    "name": "upstream",
+                    "url": "{upstream_url}",
+                    "public": true
+                }}
+            ]"#
+        ),
+    )
+    .expect("write downstream peer list");
+    let initial_peers =
+        fs::read_to_string(downstream_root.join("v1/peers.json")).expect("initial peers file");
+
+    let failed_sync = run_pray(
+        &workspace,
+        &[
+            "sync",
+            "--root",
+            downstream_root.to_str().expect("downstream path"),
+        ],
+    );
+    assert!(!failed_sync.status.success());
+    assert!(matches!(failed_sync.status.code(), Some(1) | Some(3)));
+    let failed_stderr = String::from_utf8_lossy(&failed_sync.stderr);
+    assert!(
+        failed_stderr.contains("Network error")
+            || failed_stderr.contains("Connection refused")
+            || failed_stderr.contains("timed out")
+            || failed_stderr.contains("No such file")
+            || failed_stderr.contains("resolution error")
+    );
+    assert_eq!(
+        fs::read_to_string(downstream_root.join("v1/peers.json")).expect("peers after failure"),
+        initial_peers
+    );
+    assert!(!downstream_root.join("v1/index.json").exists());
+    assert!(!downstream_root.join("v1/packages").exists());
+
+    let mut upstream_server = spawn_server(&upstream_root, port);
+    wait_for_server(port);
+
+    let recovered_sync = run_pray(
+        &workspace,
+        &[
+            "sync",
+            "--root",
+            downstream_root.to_str().expect("downstream path"),
+        ],
+    );
+    assert!(
+        recovered_sync.status.success(),
+        "recovered sync failed: {}",
+        String::from_utf8_lossy(&recovered_sync.stderr)
+    );
+    let stdout = String::from_utf8_lossy(&recovered_sync.stdout);
+    assert!(stdout.contains("Synchronized 1 package(s) from 1 peer(s); learned 1 peer(s)"));
+    assert!(downstream_root.join("v1/index.json").exists());
+    assert!(downstream_root
+        .join("v1/packages/sample/base.json")
+        .exists());
+
     let _ = upstream_server.kill();
     let _ = upstream_server.wait();
 }
@@ -913,6 +1016,92 @@ fn verify_warns_on_orphan_markers_and_strict_fails() {
     assert_eq!(strict_verify.status.code(), Some(6));
     let strict_stderr = String::from_utf8_lossy(&strict_verify.stderr);
     assert!(strict_stderr.contains("orphan_marker"));
+}
+
+#[test]
+fn beta_flow_rejects_corrupted_lockfile_after_clean_install() {
+    let repo = temporary_directory("pray-beta-lockfile");
+    create_fixture(&repo);
+
+    let install = run_pray(&repo, &["install"]);
+    assert!(
+        install.status.success(),
+        "install failed: {}",
+        String::from_utf8_lossy(&install.stderr)
+    );
+
+    let verify = run_pray(&repo, &["verify"]);
+    assert!(
+        verify.status.success(),
+        "verify failed: {}",
+        String::from_utf8_lossy(&verify.stderr)
+    );
+
+    let drift = run_pray(&repo, &["drift"]);
+    assert!(
+        drift.status.success(),
+        "drift failed: {}",
+        String::from_utf8_lossy(&drift.stderr)
+    );
+
+    let format = run_pray(&repo, &["format"]);
+    assert!(
+        format.status.success(),
+        "format failed: {}",
+        String::from_utf8_lossy(&format.stderr)
+    );
+
+    fs::write(repo.join("Prayfile.lock"), "this is not a valid lockfile\n")
+        .expect("corrupt lockfile");
+
+    let corrupted_verify = run_pray(&repo, &["verify"]);
+    assert!(!corrupted_verify.status.success());
+    assert_eq!(corrupted_verify.status.code(), Some(2));
+    let stderr = String::from_utf8_lossy(&corrupted_verify.stderr);
+    assert!(stderr.contains("lockfile parse error") || stderr.contains("parse error"));
+}
+
+#[test]
+fn install_repairs_corrupted_rendered_output_and_lockfile() {
+    let repo = temporary_directory("pray-install-repair");
+    create_fixture(&repo);
+
+    let install = run_pray(&repo, &["install"]);
+    assert!(
+        install.status.success(),
+        "install failed: {}",
+        String::from_utf8_lossy(&install.stderr)
+    );
+
+    let original_lockfile = fs::read_to_string(repo.join("Prayfile.lock")).expect("lockfile");
+    let original_rendered = fs::read_to_string(repo.join("INSTRUCTIONS.md")).expect("rendered");
+
+    fs::write(repo.join("Prayfile.lock"), "this is not a valid lockfile\n")
+        .expect("corrupt lockfile");
+    fs::write(repo.join("INSTRUCTIONS.md"), "broken rendered output\n").expect("corrupt rendered");
+
+    let reinstall = run_pray(&repo, &["install"]);
+    assert!(
+        reinstall.status.success(),
+        "reinstall failed: {}",
+        String::from_utf8_lossy(&reinstall.stderr)
+    );
+
+    assert_eq!(
+        fs::read_to_string(repo.join("Prayfile.lock")).expect("restored lockfile"),
+        original_lockfile
+    );
+    assert_eq!(
+        fs::read_to_string(repo.join("INSTRUCTIONS.md")).expect("restored rendered"),
+        original_rendered
+    );
+
+    let verify = run_pray(&repo, &["verify"]);
+    assert!(
+        verify.status.success(),
+        "verify failed after repair: {}",
+        String::from_utf8_lossy(&verify.stderr)
+    );
 }
 
 #[test]
@@ -1213,6 +1402,215 @@ fn publish_serve_install_and_confess_end_to_end_with_web_surface() {
     );
     let stdout = String::from_utf8_lossy(&smoke.stdout);
     assert!(stdout.contains("distribution point smoke test passed"));
+}
+
+#[test]
+fn confess_recovers_after_server_restart_and_persists_submission() {
+    let workspace = temporary_directory("pray-confess-recovery");
+    let source_repo = workspace.join("source");
+    let registry_root = workspace.join("registry");
+    fs::create_dir_all(&source_repo).expect("source workspace");
+    fs::create_dir_all(&registry_root).expect("registry workspace");
+    fs::create_dir_all(registry_root.join("v1")).expect("registry v1 workspace");
+    fs::write(
+        registry_root.join("v1/index.json"),
+        r#"{
+            "spec": "prayfile-distribution-1",
+            "packages": []
+        }"#,
+    )
+    .expect("write registry index");
+    fs::write(
+        registry_root.join("v1/trust.json"),
+        r#"{
+            "email_confirmation": "disabled",
+            "passkeys_enabled": false,
+            "ssh_keys_enabled": false,
+            "ssh_agent_signing_enabled": false
+        }"#,
+    )
+    .expect("write trust settings");
+
+    create_add_fixture(&source_repo);
+    let add = run_pray(
+        &source_repo,
+        &["add", "sample/base", "--path", "packages/base"],
+    );
+    assert!(
+        add.status.success(),
+        "add failed: {}",
+        String::from_utf8_lossy(&add.stderr)
+    );
+    let publish = run_pray(
+        &source_repo,
+        &[
+            "publish",
+            "--root",
+            registry_root.to_str().expect("registry path"),
+        ],
+    );
+    assert!(
+        publish.status.success(),
+        "publish failed: {}",
+        String::from_utf8_lossy(&publish.stderr)
+    );
+
+    let port = find_free_port();
+    let server_url = format!("http://127.0.0.1:{port}");
+    let manifest_path = source_repo.join("Prayfile");
+    fs::write(
+        &manifest_path,
+        format!(
+            r#"
+prayfile "1"
+source "registry", "{server_url}"
+target :tool_a do
+  output "INSTRUCTIONS.md"
+end
+agent "sample/base", source: "registry"
+render mode: :managed, conflict: :fail, churn: :minimal
+"#,
+        ),
+    )
+    .expect("manifest with source");
+
+    let initial_confession_path = registry_root.join("v1/confessions.jsonl");
+    assert!(!initial_confession_path.exists());
+
+    let failed_confess = run_pray(
+        &source_repo,
+        &[
+            "confess",
+            "sample/base",
+            "--version",
+            "1.4.3",
+            "--accepted",
+            "--note",
+            "server down",
+        ],
+    );
+    assert!(!failed_confess.status.success());
+    assert!(matches!(failed_confess.status.code(), Some(1) | Some(3)));
+    let failed_stderr = String::from_utf8_lossy(&failed_confess.stderr);
+    assert!(
+        failed_stderr.contains("Connection refused")
+            || failed_stderr.contains("timed out")
+            || failed_stderr.contains("Network error")
+            || failed_stderr.contains("resolution error")
+    );
+    assert!(!initial_confession_path.exists());
+
+    let mut server = spawn_server(&registry_root, port);
+    wait_for_server(port);
+
+    let recovered_confess = run_pray(
+        &source_repo,
+        &[
+            "confess",
+            "sample/base",
+            "--version",
+            "1.4.3",
+            "--accepted",
+            "--note",
+            "server back",
+        ],
+    );
+    assert!(
+        recovered_confess.status.success(),
+        "confess failed after restart: {}",
+        String::from_utf8_lossy(&recovered_confess.stderr)
+    );
+
+    let confession_text = fs::read_to_string(&initial_confession_path).expect("confession log");
+    let confession_line = confession_text.lines().next().expect("confession line");
+    let confession: Value = serde_json::from_str(confession_line).expect("confession json");
+    assert_eq!(confession["package"], "sample/base");
+    assert_eq!(confession["version"], "1.4.3");
+    assert_eq!(confession["status"], "accepted");
+    assert_eq!(confession["note"], "server back");
+
+    let _ = server.kill();
+    let _ = server.wait();
+}
+
+#[test]
+fn publish_recovers_after_destination_root_is_repaired() {
+    let workspace = temporary_directory("pray-publish-recovery");
+    let source_repo = workspace.join("source");
+    let first_root = workspace.join("registry-a");
+    let repaired_root = workspace.join("registry-b");
+    fs::create_dir_all(&source_repo).expect("source workspace");
+    fs::create_dir_all(&first_root).expect("first registry workspace");
+
+    create_add_fixture(&source_repo);
+    let add = run_pray(
+        &source_repo,
+        &["add", "sample/base", "--path", "packages/base"],
+    );
+    assert!(
+        add.status.success(),
+        "add failed: {}",
+        String::from_utf8_lossy(&add.stderr)
+    );
+
+    let broken_root = workspace.join("broken-root");
+    fs::write(&broken_root, "not a directory\n").expect("broken destination root file");
+
+    let failed_publish = run_pray(
+        &source_repo,
+        &[
+            "publish",
+            "--root",
+            first_root.to_str().expect("first root path"),
+            "--root",
+            broken_root.to_str().expect("broken root path"),
+        ],
+    );
+    assert!(!failed_publish.status.success());
+    assert!(matches!(failed_publish.status.code(), Some(1) | Some(3)));
+    let failed_stderr = String::from_utf8_lossy(&failed_publish.stderr);
+    assert!(
+        failed_stderr.contains("Not a directory")
+            || failed_stderr.contains("not a directory")
+            || failed_stderr.contains("No such file or directory")
+    );
+
+    let first_root_index = first_root.join("v1/index.json");
+    assert!(first_root_index.exists());
+    let first_root_index_text = fs::read_to_string(&first_root_index).expect("first root index");
+    assert!(first_root_index_text.contains("sample/base"));
+
+    fs::remove_file(&broken_root).expect("remove broken destination root file");
+    fs::create_dir_all(&repaired_root).expect("repaired registry workspace");
+
+    let recovered_publish = run_pray(
+        &source_repo,
+        &[
+            "publish",
+            "--root",
+            first_root.to_str().expect("first root path"),
+            "--root",
+            repaired_root.to_str().expect("repaired root path"),
+        ],
+    );
+    assert!(
+        recovered_publish.status.success(),
+        "publish failed after repair: {}",
+        String::from_utf8_lossy(&recovered_publish.stderr)
+    );
+
+    for root in [&first_root, &repaired_root] {
+        let index_text = fs::read_to_string(root.join("v1/index.json")).expect("registry index");
+        assert!(index_text.contains("sample/base"));
+        let metadata_text = fs::read_to_string(root.join("v1/packages/sample/base.json"))
+            .expect("package metadata");
+        let metadata: Value = serde_json::from_str(&metadata_text).expect("metadata json");
+        assert_eq!(metadata["name"], "sample/base");
+        assert_eq!(metadata["versions"][0]["version"], "1.4.3");
+        assert!(root
+            .join("v1/artifacts/sample/base/1.4.3/sample-base-1.4.3.praypkg")
+            .is_file());
+    }
 }
 
 #[test]

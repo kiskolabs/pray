@@ -15,7 +15,7 @@ Read `README.md` for project positioning and `SPEC.md` for the normative Prayfil
 
 - When fixing or refactoring code, add or update tests first to expose the current bug, regression path, or missing contract; then implement the fix; then run focused and broader checks; do not ship behavior changes without proving before/after via tests.
 - Test coverage must follow `spec/README.md` guidelines.
-- Prefer files around 150 lines or fewer when cohesion allows; never split coherent logic purely to satisfy line count; split only when it improves ownership, readability, and reviewability.
+- Prefer files around 150 lines or fewer when cohesion allows; treat 300 lines as a hard upper bound for any source file unless a very small exception is clearly justified; when a file approaches that ceiling, split by semantic responsibility into separate modules, folders, or helpers rather than by arbitrary line count.
 - Use Rust and ecosystem features according to the versions declared in this repository.
 - Follow Rust coding conventions, principles, and best practices.
 - Do not use abbreviations or short names for variables, methods, classes, or modules unless the name is very common in the ecosystem.

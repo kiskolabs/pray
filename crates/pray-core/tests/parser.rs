@@ -1,5 +1,6 @@
 use pray_core::manifest::parse_manifest;
 use pray_core::package_spec::parse_package_spec;
+use pray_core::PrayError;
 
 #[test]
 fn parses_minimal_manifest_example() {
@@ -69,4 +70,42 @@ end
         "exports/testing-basics.md"
     );
     assert_eq!(package.dependencies[0].name, "sample/common");
+}
+
+#[test]
+fn rejects_manifest_without_prayfile_version() {
+    let error = parse_manifest(
+        r#"
+target :tool_a do
+  output "INSTRUCTIONS.md"
+end
+"#,
+    )
+    .expect_err("manifest should reject missing version");
+
+    match error {
+        PrayError::Manifest(message) => {
+            assert!(message.contains("missing prayfile version"));
+        }
+        other => panic!("unexpected error: {other:?}"),
+    }
+}
+
+#[test]
+fn rejects_package_spec_without_end() {
+    let error = parse_package_spec(
+        r#"
+Package::Specification.new do |spec|
+  spec.name = "sample/base"
+"#,
+    )
+    .expect_err("package spec should reject missing end");
+
+    match error {
+        PrayError::Parse { kind, message } => {
+            assert_eq!(kind, "prayspec");
+            assert!(message.contains("missing 'end'"));
+        }
+        other => panic!("unexpected error: {other:?}"),
+    }
 }

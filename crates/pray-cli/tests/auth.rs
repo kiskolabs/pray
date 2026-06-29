@@ -2,6 +2,7 @@ use base64::{engine::general_purpose::STANDARD, Engine as _};
 use ed25519_dalek::{Signer, SigningKey};
 use pray_core::auth::RegistryAuthStore;
 use pray_core::trust::EmailConfirmationPolicy;
+use pray_core::PrayError;
 use std::fs;
 use std::io::{Read, Write};
 use std::net::{TcpListener, TcpStream};
@@ -148,6 +149,66 @@ fn exercises_registration_session_passkey_and_ssh_key_over_http() {
 
     let _ = server.kill();
     let _ = server.wait();
+}
+
+#[test]
+fn rejects_invalid_passkey_and_ssh_signatures() {
+    let workspace = temporary_directory("pray-auth-invalid-signature");
+    let store = RegistryAuthStore::open(&workspace).expect("open auth store");
+    let signing_key = signing_key_from_seed(7);
+    let wrong_key = signing_key_from_seed(8);
+    let public_key = ssh_public_key_text(&signing_key);
+
+    let registration = store
+        .register_email("alice@example.com", EmailConfirmationPolicy::Disabled)
+        .expect("register");
+    assert!(registration.verified);
+
+    store
+        .enroll_passkey(
+            "alice@example.com",
+            "credential-1",
+            &public_key,
+            Some("laptop passkey"),
+        )
+        .expect("passkey enrollment");
+    store
+        .enroll_ssh_key("alice@example.com", &public_key, Some("workstation"))
+        .expect("ssh enrollment");
+
+    let passkey_challenge = store
+        .request_passkey_challenge("credential-1")
+        .expect("passkey challenge");
+    let invalid_passkey_signature = STANDARD.encode(
+        wrong_key
+            .sign(passkey_challenge.challenge.as_bytes())
+            .to_bytes(),
+    );
+    let passkey_error = store
+        .respond_passkey_challenge(
+            "credential-1",
+            &passkey_challenge.challenge_id,
+            &invalid_passkey_signature,
+        )
+        .expect_err("invalid passkey signature should fail");
+    assert!(matches!(passkey_error, PrayError::Verify(_)));
+
+    let ssh_challenge = store
+        .request_ssh_key_challenge(&public_key)
+        .expect("ssh challenge");
+    let invalid_ssh_signature = STANDARD.encode(
+        wrong_key
+            .sign(ssh_challenge.challenge.as_bytes())
+            .to_bytes(),
+    );
+    let ssh_error = store
+        .respond_ssh_key_challenge(
+            &public_key,
+            &ssh_challenge.challenge_id,
+            &invalid_ssh_signature,
+        )
+        .expect_err("invalid ssh signature should fail");
+    assert!(matches!(ssh_error, PrayError::Verify(_)));
 }
 
 struct HttpResponse {
