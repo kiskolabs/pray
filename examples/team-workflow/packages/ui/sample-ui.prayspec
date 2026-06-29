@@ -1,0 +1,26 @@
+Package::Specification.new do |spec|
+  spec.name = "sample/ui"
+  spec.version = "2.1.0"
+  spec.summary = "review and live-page guidance"
+  spec.description = "Guidance for reviewing UI changes, coordinating handoffs, and checking live surfaces."
+  spec.authors = ["Example Maintainer"]
+  spec.license = "MIT"
+  spec.files = [
+    "README.md",
+    "exports/webapp-review.md",
+    "exports/live-pages.md"
+  ]
+  spec.exports = {
+    "webapp-review" => {
+      type: "fragment",
+      path: "exports/webapp-review.md",
+      summary: "Review guidance"
+    },
+    "live-pages" => {
+      type: "fragment",
+      path: "exports/live-pages.md",
+      summary: "Live-page guidance"
+    }
+  }
+  spec.targets = ["tool_a", "tool_b"]
+end

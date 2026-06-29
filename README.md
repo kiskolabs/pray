@@ -115,6 +115,8 @@ CLAUDE.md
 
 Rendered target files are usually committed because current inference tools commonly read repository-visible files, not `Prayfile` directly.
 
+`examples/` contains small, self-contained project trees that show different Prayfile layouts and rendering styles.
+
 The local cache is ignored by default. It may be committed or archived only in hermetic, regulated, air-gapped, or long-term preservation modes.
 
 Expanded packages are not committed by default. They are dependencies, like gems.

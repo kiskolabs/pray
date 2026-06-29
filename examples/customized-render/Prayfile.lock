@@ -1,0 +1,44 @@
+prayfile_lock = "1"
+spec = "0.1"
+generated_by = "pray 0.1.0"
+manifest_hash = "sha256:975f10273e1d10c6234de0f973a7b4b26ff8df1591698feaf00f7aedd6ac68e0"
+source = []
+
+[[package]]
+name = "sample/compliance"
+version = "0.9.1"
+path = "packages/compliance"
+tree_hash = "sha256:8c05c4bc268ee1697343526f12ba5a0c514455bfa6352c861506cc8cb42f859a"
+artifact_hash = "sha256:8c05c4bc268ee1697343526f12ba5a0c514455bfa6352c861506cc8cb42f859a"
+artifact = "path:packages/compliance"
+exports = [
+    "audit-notes",
+    "rollback-plan",
+]
+dependencies = []
+
+[[target]]
+name = "tool_c"
+outputs = ["CHECKLIST.md"]
+
+[[managed_span]]
+id = "2cb9d907"
+target = "CHECKLIST.md"
+open_line = 13
+close_line = 16
+ideal_checksum = "sha256:826defc47232ee229507672708a816d6f360750450649549b8801f98f49397a9"
+package = "sample/compliance"
+export = "audit-notes"
+source_checksum = "sha256:8c05c4bc268ee1697343526f12ba5a0c514455bfa6352c861506cc8cb42f859a"
+silenced = false
+
+[[managed_span]]
+id = "03b7305e"
+target = "CHECKLIST.md"
+open_line = 18
+close_line = 21
+ideal_checksum = "sha256:eea378ae738f594ba4b16ac4b238f3f584486efe54884ef495a07a3fe9101ee8"
+package = "sample/compliance"
+export = "rollback-plan"
+source_checksum = "sha256:8c05c4bc268ee1697343526f12ba5a0c514455bfa6352c861506cc8cb42f859a"
+silenced = false

@@ -162,7 +162,7 @@ fn resolve_local_file(
             });
         }
         return Err(PrayError::Resolution(format!(
-            "missing local file: {}",
+            "missing local file: {}; restore the file and rerun pray install",
             declaration.path
         )));
     }

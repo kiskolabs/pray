@@ -67,7 +67,9 @@ fn collect_verification_report(
     if manifest_hash != lockfile.manifest_hash {
         report.findings.push(VerificationFinding {
             kind: "verify_error".to_string(),
-            message: "manifest hash differs from lockfile".to_string(),
+            message:
+                "manifest hash differs from lockfile; rerun pray install to refresh Prayfile.lock"
+                    .to_string(),
         });
     }
 
@@ -82,14 +84,14 @@ fn collect_verification_report(
                 if locked.tree_hash != package.tree_hash {
                     report.findings.push(VerificationFinding {
                         kind: "package_integrity".to_string(),
-                        message: format!("package {} tree hash mismatch", package.declaration.name),
+                        message: format!("package {} tree hash mismatch; rerun pray install to refresh the resolved package state", package.declaration.name),
                     });
                 }
                 if locked.version != package.spec.version {
                     report.findings.push(VerificationFinding {
                         kind: "verify_error".to_string(),
                         message: format!(
-                            "package {} version differs: lock {} vs current {}",
+                            "package {} version differs: lock {} vs current {}; rerun pray install to refresh the lockfile",
                             package.declaration.name, locked.version, package.spec.version
                         ),
                     });
@@ -97,14 +99,17 @@ fn collect_verification_report(
             }
             None => report.findings.push(VerificationFinding {
                 kind: "verify_error".to_string(),
-                message: format!("package {} missing from lockfile", package.declaration.name),
+                message: format!(
+                    "package {} missing from lockfile; rerun pray install to restore it",
+                    package.declaration.name
+                ),
             }),
         }
     }
     for locked in locked_packages.values() {
         report.findings.push(VerificationFinding {
             kind: "verify_error".to_string(),
-            message: format!("lockfile contains unexpected package {}", locked.name),
+            message: format!("lockfile contains unexpected package {}; rerun pray install to reconcile the lockfile", locked.name),
         });
     }
 
@@ -133,20 +138,20 @@ fn collect_verification_report(
             match markers.get(&span.id) {
                 None => report.findings.push(VerificationFinding {
                     kind: "removed_prayer".to_string(),
-                    message: format!("{} missing marker pair {}", target_path, span.id),
+                    message: format!("{} missing marker pair {} ({}::{}) ; rerun pray install to restore the managed span", target_path, span.id, span.package, span.export),
                 }),
                 Some((open_line, close_line, body)) => {
                     let actual_checksum = sha256_prefixed(normalize_line_endings(body).as_bytes());
                     if actual_checksum != span.ideal_checksum {
                         report.findings.push(VerificationFinding {
                             kind: "custom_implementation".to_string(),
-                            message: format!("{} marker {} body changed", target_path, span.id),
+                            message: format!("{} marker {} body changed ({}::{}) ; rerun pray install to restore the managed span", target_path, span.id, span.package, span.export),
                         });
                     }
                     if *open_line != span.open_line || *close_line != span.close_line {
                         report.findings.push(VerificationFinding {
                             kind: "position_drift".to_string(),
-                            message: format!("{} marker {} moved", target_path, span.id),
+                            message: format!("{} marker {} moved ({}::{}) ; rerun pray install to restore the managed span", target_path, span.id, span.package, span.export),
                         });
                     }
                 }
@@ -169,7 +174,10 @@ fn collect_verification_report(
         if !project.project_root.join(&local.path).exists() {
             report.findings.push(VerificationFinding {
                 kind: "verify_error".to_string(),
-                message: format!("missing local file: {}", local.path.display()),
+                message: format!(
+                    "missing local file: {}; restore the file and rerun pray install",
+                    local.path.display()
+                ),
             });
         }
     }

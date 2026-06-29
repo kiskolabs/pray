@@ -91,6 +91,9 @@ fn handle_connection(root: PathBuf, mut stream: TcpStream) -> PrayResult<()> {
             federation_package_response(&root, path)?
         }
         ("POST", "/v1/sync/push") => federation_push_response(&root, &body)?,
+        ("PUT", path) if path.starts_with("/v1/artifacts/") => {
+            artifact_upload_response(&root, path, &body)?
+        }
         ("GET", path) if path.starts_with("/packages/") => html_package_response(&root, path)?,
         ("GET", path) => static_file_response(&root, path)?,
         ("POST", "/v1/confessions") => confession_response(&root, &body)?,
@@ -321,7 +324,9 @@ fn latest_publish_timestamp(metadata: &RegistryPackageMetadata) -> Option<u64> {
         .max()
 }
 
-fn transport_package_metadata(metadata: &RegistryPackageMetadata) -> TransportPackageMetadata {
+pub(crate) fn transport_package_metadata(
+    metadata: &RegistryPackageMetadata,
+) -> TransportPackageMetadata {
     let versions = metadata
         .versions
         .iter()
@@ -336,7 +341,7 @@ fn transport_package_metadata(metadata: &RegistryPackageMetadata) -> TransportPa
     }
 }
 
-fn transport_package_version(version: &RegistryPackageVersion) -> PackageVersion {
+pub(crate) fn transport_package_version(version: &RegistryPackageVersion) -> PackageVersion {
     let published_at = version
         .published_at
         .clone()
@@ -656,6 +661,25 @@ fn confession_response(root: &Path, body: &[u8]) -> PrayResult<Response> {
         status: 201,
         content_type: "application/json".to_string(),
         body: response_body.into_bytes(),
+    })
+}
+
+fn artifact_upload_response(root: &Path, path: &str, body: &[u8]) -> PrayResult<Response> {
+    let relative_path = sanitize_request_path(path)?;
+    let artifact_path = root.join(relative_path);
+    if let Some(parent) = artifact_path.parent() {
+        fs::create_dir_all(parent)?;
+    }
+    fs::write(&artifact_path, body)?;
+    Ok(Response {
+        status: 201,
+        content_type: "application/json".to_string(),
+        body: serde_json::json!({
+            "status": "ok",
+            "artifact": path,
+        })
+        .to_string()
+        .into_bytes(),
     })
 }
 

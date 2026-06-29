@@ -1,6 +1,7 @@
 use base64::{engine::general_purpose::STANDARD, Engine as _};
 use ed25519_dalek::{Signer, SigningKey};
 use pray_core::auth::RegistryAuthStore;
+use pray_core::lockfile::read_lockfile;
 use pray_core::trust::EmailConfirmationPolicy;
 use serde_json::Value;
 use std::collections::BTreeMap;
@@ -171,6 +172,115 @@ end
     assert!(!lockfile.contains("sample/base"));
     let rendered = fs::read_to_string(repo.join("INSTRUCTIONS.md")).expect("rendered file exists");
     assert!(!rendered.contains("Testing guidance"));
+}
+
+#[test]
+fn list_reports_the_resolved_package_set() {
+    let repo = temporary_directory("pray-list");
+    create_fixture(&repo);
+
+    let install = run_pray(&repo, &["install"]);
+    assert!(
+        install.status.success(),
+        "install failed: {}",
+        String::from_utf8_lossy(&install.stderr)
+    );
+
+    let list = run_pray(&repo, &["list"]);
+    assert!(
+        list.status.success(),
+        "list failed: {}",
+        String::from_utf8_lossy(&list.stderr)
+    );
+
+    let stdout = String::from_utf8_lossy(&list.stdout);
+    assert!(stdout.contains("Package list"));
+    assert!(stdout.contains("sample/base 1.4.3"));
+    assert!(stdout.contains("source=path:packages/base"));
+    assert!(stdout.contains("exports="));
+    assert!(stdout.contains("testing-basics"));
+    assert!(stdout.contains("security-basics"));
+}
+
+#[test]
+fn outdated_reports_when_the_resolved_version_changes() {
+    let repo = temporary_directory("pray-outdated");
+    create_fixture(&repo);
+
+    let install = run_pray(&repo, &["install"]);
+    assert!(
+        install.status.success(),
+        "install failed: {}",
+        String::from_utf8_lossy(&install.stderr)
+    );
+
+    fs::write(
+        repo.join("packages/base/sample-base.prayspec"),
+        r#"
+Package::Specification.new do |spec|
+  spec.name = "sample/base"
+  spec.version = "1.4.4"
+  spec.summary = "shared guidance"
+  spec.files = ["README.md", "exports/testing-basics.md", "exports/security-basics.md"]
+  spec.exports = {
+    "testing-basics" => {
+      type: "fragment",
+      path: "exports/testing-basics.md",
+      summary: "Testing guidance"
+    },
+    "security-basics" => {
+      type: "fragment",
+      path: "exports/security-basics.md",
+      summary: "Security guidance"
+    }
+  }
+end
+"#,
+    )
+    .expect("rewrite prayspec");
+
+    let outdated = run_pray(&repo, &["outdated"]);
+    assert!(
+        outdated.status.success(),
+        "outdated failed: {}",
+        String::from_utf8_lossy(&outdated.stderr)
+    );
+
+    let stdout = String::from_utf8_lossy(&outdated.stdout);
+    assert!(stdout.contains("Outdated packages"));
+    assert!(stdout.contains("sample/base 1.4.3 -> 1.4.4"));
+}
+
+#[test]
+fn explain_reports_package_details_and_lockfile_context() {
+    let repo = temporary_directory("pray-explain");
+    create_fixture(&repo);
+
+    let install = run_pray(&repo, &["install"]);
+    assert!(
+        install.status.success(),
+        "install failed: {}",
+        String::from_utf8_lossy(&install.stderr)
+    );
+
+    let explain = run_pray(&repo, &["explain", "sample/base"]);
+    assert!(
+        explain.status.success(),
+        "explain failed: {}",
+        String::from_utf8_lossy(&explain.stderr)
+    );
+
+    let stdout = String::from_utf8_lossy(&explain.stdout);
+    assert!(stdout.contains("Package explanation"));
+    assert!(stdout.contains("name: sample/base"));
+    assert!(stdout.contains("constraint: ~> 1.4"));
+    assert!(stdout.contains("resolved version: 1.4.3"));
+    assert!(stdout.contains("source: path:packages/base"));
+    assert!(stdout.contains("exports:"));
+    assert!(stdout.contains("testing-basics"));
+    assert!(stdout.contains("security-basics"));
+    assert!(stdout.contains("dependencies: none"));
+    assert!(stdout.contains("lockfile version: 1.4.3"));
 }
 
 #[test]
@@ -993,6 +1103,8 @@ fn verify_reports_custom_implementation() {
     assert_eq!(verify.status.code(), Some(6));
     let stderr = String::from_utf8_lossy(&verify.stderr);
     assert!(stderr.contains("custom_implementation") || stderr.contains("verify error"));
+    assert!(stderr.contains("sample/base::testing-basics"));
+    assert!(stderr.contains("rerun pray install"));
 }
 
 #[test]
@@ -1016,6 +1128,93 @@ fn verify_warns_on_orphan_markers_and_strict_fails() {
     assert_eq!(strict_verify.status.code(), Some(6));
     let strict_stderr = String::from_utf8_lossy(&strict_verify.stderr);
     assert!(strict_stderr.contains("orphan_marker"));
+}
+
+#[test]
+#[ignore = "managed patching is not implemented yet"]
+fn install_preserves_unmanaged_content_when_patching_rendered_files() {
+    let repo = temporary_directory("pray-install-patch-preserve");
+    create_fixture(&repo);
+    assert!(run_pray(&repo, &["install"]).status.success());
+
+    let rendered_path = repo.join("INSTRUCTIONS.md");
+    let rendered = fs::read_to_string(&rendered_path).expect("rendered file exists");
+    let rendered = rendered.replace(
+        "## Shared instructions\n\n",
+        "## Shared instructions\n\nUser note: keep this line.\n\n",
+    );
+    fs::write(&rendered_path, rendered).expect("rendered file rewritten");
+
+    let install = run_pray(&repo, &["install"]);
+    assert!(
+        install.status.success(),
+        "install failed: {}",
+        String::from_utf8_lossy(&install.stderr)
+    );
+
+    let rendered = fs::read_to_string(&rendered_path).expect("rendered file exists");
+    assert!(rendered.contains("User note: keep this line."));
+    assert!(rendered.contains("Testing guidance"));
+}
+
+#[test]
+#[ignore = "conflict detection is not implemented yet"]
+fn install_rejects_conflicting_managed_changes_when_conflict_policy_is_fail() {
+    let repo = temporary_directory("pray-install-conflict");
+    create_fixture(&repo);
+    assert!(run_pray(&repo, &["install"]).status.success());
+
+    let rendered_path = repo.join("INSTRUCTIONS.md");
+    let rendered = fs::read_to_string(&rendered_path).expect("rendered file exists");
+    let rendered = rendered.replace("Testing guidance", "Conflicting guidance");
+    fs::write(&rendered_path, rendered).expect("rendered file rewritten");
+
+    let install = run_pray(&repo, &["install"]);
+    assert!(!install.status.success());
+    assert!(String::from_utf8_lossy(&install.stderr).contains("conflict"));
+    let rendered = fs::read_to_string(&rendered_path).expect("rendered file exists");
+    assert!(rendered.contains("Conflicting guidance"));
+}
+
+#[test]
+fn verify_reports_missing_managed_span_with_package_context_and_recovery_guidance() {
+    let repo = temporary_directory("pray-verify-missing-span");
+    create_fixture(&repo);
+    assert!(run_pray(&repo, &["install"]).status.success());
+
+    let rendered_path = repo.join("INSTRUCTIONS.md");
+    let rendered = fs::read_to_string(&rendered_path).expect("rendered file exists");
+    let rendered = rendered
+        .replace("<!-- pray:", "<!-- removed pray:")
+        .replace(" -->", " -->");
+    fs::write(&rendered_path, rendered).expect("rendered file rewritten");
+
+    let verify = run_pray(&repo, &["verify"]);
+    assert!(!verify.status.success());
+    assert_eq!(verify.status.code(), Some(6));
+    let stderr = String::from_utf8_lossy(&verify.stderr);
+    assert!(stderr.contains("removed_prayer"));
+    assert!(stderr.contains("INSTRUCTIONS.md"));
+    assert!(stderr.contains("sample/base::testing-basics"));
+    assert!(stderr.contains("rerun pray install"));
+}
+
+#[test]
+fn install_reports_missing_required_local_file_with_recovery_guidance() {
+    let repo = temporary_directory("pray-install-missing-local");
+    create_fixture(&repo);
+    assert!(run_pray(&repo, &["install"]).status.success());
+
+    fs::remove_file(repo.join("agent/local/project.md")).expect("remove local file");
+
+    let install = run_pray(&repo, &["install"]);
+    assert!(!install.status.success());
+    assert_eq!(install.status.code(), Some(3));
+    let stderr = String::from_utf8_lossy(&install.stderr);
+    assert!(stderr.contains("missing local file"));
+    assert!(stderr.contains("agent/local/project.md"));
+    assert!(stderr.contains("restore the file"));
+    assert!(stderr.contains("rerun pray install"));
 }
 
 #[test]
@@ -1110,6 +1309,9 @@ fn install_locked_rejects_lockfile_drift() {
     create_fixture(&repo);
     assert!(run_pray(&repo, &["install"]).status.success());
 
+    let original_lockfile = fs::read_to_string(repo.join("Prayfile.lock")).expect("lockfile");
+    let original_rendered = fs::read_to_string(repo.join("INSTRUCTIONS.md")).expect("rendered");
+
     fs::write(
         repo.join("agent/local/project.md"),
         "Local guidance\nExtra local guidance\n",
@@ -1120,7 +1322,16 @@ fn install_locked_rejects_lockfile_drift() {
     assert!(!locked.status.success());
     assert_eq!(locked.status.code(), Some(6));
     let stderr = String::from_utf8_lossy(&locked.stderr);
-    assert!(stderr.contains("lockfile needs update") || stderr.contains("verify error"));
+    assert!(stderr.contains("lockfile needs update"));
+    assert!(stderr.contains("rerun pray install"));
+    assert_eq!(
+        fs::read_to_string(repo.join("Prayfile.lock")).expect("preserved lockfile"),
+        original_lockfile
+    );
+    assert_eq!(
+        fs::read_to_string(repo.join("INSTRUCTIONS.md")).expect("preserved rendered"),
+        original_rendered
+    );
 }
 
 #[test]
@@ -1141,7 +1352,8 @@ fn install_frozen_rejects_stale_rendered_output() {
     assert!(!frozen.status.success());
     assert_eq!(frozen.status.code(), Some(5));
     let stderr = String::from_utf8_lossy(&frozen.stderr);
-    assert!(stderr.contains("stale") || stderr.contains("render error"));
+    assert!(stderr.contains("stale"));
+    assert!(stderr.contains("pray plan"));
 }
 
 #[test]
@@ -1529,6 +1741,46 @@ render mode: :managed, conflict: :fail, churn: :minimal
     assert_eq!(confession["status"], "accepted");
     assert_eq!(confession["note"], "server back");
 
+    let install = run_pray(&source_repo, &["install"]);
+    assert!(
+        install.status.success(),
+        "install failed before from-lock confession: {}",
+        String::from_utf8_lossy(&install.stderr)
+    );
+
+    let lockfile = read_lockfile(&source_repo.join("Prayfile.lock")).expect("lockfile");
+    let span_id = lockfile
+        .managed_span
+        .first()
+        .expect("managed span in lockfile")
+        .id
+        .clone();
+
+    let from_lock_confess = run_pray(
+        &source_repo,
+        &[
+            "confess",
+            "--from-lock",
+            &span_id,
+            "--accepted",
+            "--note",
+            "from lock",
+        ],
+    );
+    assert!(
+        from_lock_confess.status.success(),
+        "from-lock confess failed: {}",
+        String::from_utf8_lossy(&from_lock_confess.stderr)
+    );
+
+    let confession_text = fs::read_to_string(&initial_confession_path).expect("confession log");
+    let confession_line = confession_text.lines().last().expect("confession line");
+    let confession: Value = serde_json::from_str(confession_line).expect("confession json");
+    assert_eq!(confession["package"], "sample/base");
+    assert_eq!(confession["version"], "1.4.3");
+    assert_eq!(confession["status"], "accepted");
+    assert_eq!(confession["note"], "from lock");
+
     let _ = server.kill();
     let _ = server.wait();
 }
@@ -1611,6 +1863,266 @@ fn publish_recovers_after_destination_root_is_repaired() {
             .join("v1/artifacts/sample/base/1.4.3/sample-base-1.4.3.praypkg")
             .is_file());
     }
+}
+
+#[test]
+fn publish_recovers_after_server_restart_and_uploads_over_http() {
+    let workspace = temporary_directory("pray-publish-network-recovery");
+    let source_repo = workspace.join("source");
+    let registry_root = workspace.join("registry");
+    fs::create_dir_all(&source_repo).expect("source workspace");
+    fs::create_dir_all(&registry_root).expect("registry workspace");
+    fs::create_dir_all(registry_root.join("v1")).expect("registry v1 workspace");
+    fs::write(
+        registry_root.join("v1/index.json"),
+        r#"{
+            "spec": "prayfile-distribution-1",
+            "packages": []
+        }"#,
+    )
+    .expect("write registry index");
+    fs::write(
+        registry_root.join("v1/trust.json"),
+        r#"{
+            "email_confirmation": "required",
+            "passkeys_enabled": true,
+            "ssh_keys_enabled": true,
+            "ssh_agent_signing_enabled": true
+        }"#,
+    )
+    .expect("write trust settings");
+
+    create_add_fixture(&source_repo);
+    let add = run_pray(
+        &source_repo,
+        &["add", "sample/base", "--path", "packages/base"],
+    );
+    assert!(
+        add.status.success(),
+        "add failed: {}",
+        String::from_utf8_lossy(&add.stderr)
+    );
+
+    let auth_store = RegistryAuthStore::open(&registry_root).expect("open auth store");
+    let publisher_email = "publish-network-recovery@example.com";
+    let signing_key = signing_key_from_seed(51);
+    let public_key = ssh_public_key_text(&signing_key);
+    verify_email_registration(&auth_store, publisher_email);
+    auth_store
+        .enroll_passkey(
+            publisher_email,
+            "publish-network-recovery-passkey",
+            &public_key,
+            Some("publisher workstation"),
+        )
+        .expect("enroll passkey");
+
+    let private_key_path = write_private_key_file(
+        &source_repo,
+        "publish-network-recovery-passkey.bin",
+        &signing_key,
+    );
+    let port = find_free_port();
+    let server_url = format!("http://127.0.0.1:{port}");
+    let mut server = spawn_server(&registry_root, port);
+    wait_for_server(port);
+
+    run_pray_login_passkey(
+        &source_repo,
+        &server_url,
+        publisher_email,
+        "publish-network-recovery-passkey",
+        &private_key_path,
+    );
+
+    let _ = server.kill();
+    let _ = server.wait();
+
+    let failed_publish = run_pray(&source_repo, &["publish", "--server", &server_url]);
+    assert!(!failed_publish.status.success());
+    let failed_stderr = String::from_utf8_lossy(&failed_publish.stderr);
+    assert!(
+        failed_stderr.contains("Network error")
+            || failed_stderr.contains("Connection refused")
+            || failed_stderr.contains("timed out")
+            || failed_stderr.contains("No such file")
+            || failed_stderr.contains("unknown publish flag")
+    );
+    assert!(!registry_root.join("v1/packages/sample/base.json").exists());
+
+    let mut server = spawn_server(&registry_root, port);
+    wait_for_server(port);
+
+    let recovered_publish = run_pray(&source_repo, &["publish", "--server", &server_url]);
+    assert!(
+        recovered_publish.status.success(),
+        "publish failed after restart: {}",
+        String::from_utf8_lossy(&recovered_publish.stderr)
+    );
+
+    let metadata_text = fs::read_to_string(registry_root.join("v1/packages/sample/base.json"))
+        .expect("package metadata");
+    let metadata: Value = serde_json::from_str(&metadata_text).expect("metadata json");
+    assert_eq!(metadata["name"], "sample/base");
+    assert_eq!(metadata["versions"][0]["signer"], publisher_email);
+    assert!(registry_root
+        .join("v1/artifacts/sample/base/1.4.3/sample-base-1.4.3.praypkg")
+        .is_file());
+
+    let _ = server.kill();
+    let _ = server.wait();
+}
+
+#[test]
+fn install_recovers_after_distribution_point_restart_and_consumes_published_package() {
+    let workspace = temporary_directory("pray-install-distribution-recovery");
+    let source_repo = workspace.join("source");
+    let registry_root = workspace.join("registry");
+    let consumer_repo = workspace.join("consumer");
+    fs::create_dir_all(&source_repo).expect("source workspace");
+    fs::create_dir_all(&registry_root).expect("registry workspace");
+    fs::create_dir_all(&consumer_repo).expect("consumer workspace");
+    fs::create_dir_all(registry_root.join("v1")).expect("registry v1 workspace");
+    fs::write(
+        registry_root.join("v1/index.json"),
+        r#"{
+            "spec": "prayfile-distribution-1",
+            "packages": []
+        }"#,
+    )
+    .expect("write registry index");
+    fs::write(
+        registry_root.join("v1/trust.json"),
+        r#"{
+            "email_confirmation": "required",
+            "passkeys_enabled": true,
+            "ssh_keys_enabled": true,
+            "ssh_agent_signing_enabled": true
+        }"#,
+    )
+    .expect("write trust settings");
+
+    create_add_fixture(&source_repo);
+    let add = run_pray(
+        &source_repo,
+        &["add", "sample/base", "--path", "packages/base"],
+    );
+    assert!(
+        add.status.success(),
+        "add failed: {}",
+        String::from_utf8_lossy(&add.stderr)
+    );
+
+    let auth_store = RegistryAuthStore::open(&registry_root).expect("open auth store");
+    let publisher_email = "install-distribution-publisher@example.com";
+    let consumer_email = "install-distribution-consumer@example.com";
+    let publisher_key = signing_key_from_seed(61);
+    let consumer_key = signing_key_from_seed(62);
+    let publisher_public_key = ssh_public_key_text(&publisher_key);
+    let consumer_public_key = ssh_public_key_text(&consumer_key);
+
+    verify_email_registration(&auth_store, publisher_email);
+    verify_email_registration(&auth_store, consumer_email);
+    auth_store
+        .enroll_passkey(
+            publisher_email,
+            "install-distribution-publisher-passkey",
+            &publisher_public_key,
+            Some("publisher workstation"),
+        )
+        .expect("enroll publisher passkey");
+    auth_store
+        .enroll_passkey(
+            consumer_email,
+            "install-distribution-consumer-passkey",
+            &consumer_public_key,
+            Some("consumer workstation"),
+        )
+        .expect("enroll consumer passkey");
+
+    let publisher_private_key_path = write_private_key_file(
+        &source_repo,
+        "install-distribution-publisher-passkey.bin",
+        &publisher_key,
+    );
+    let consumer_private_key_path = write_private_key_file(
+        &consumer_repo,
+        "install-distribution-consumer-passkey.bin",
+        &consumer_key,
+    );
+
+    let port = find_free_port();
+    let server_url = format!("http://127.0.0.1:{port}");
+    let mut server = spawn_server(&registry_root, port);
+    wait_for_server(port);
+
+    write_registry_client_fixture(&consumer_repo, &server_url);
+
+    run_pray_login_passkey(
+        &source_repo,
+        &server_url,
+        publisher_email,
+        "install-distribution-publisher-passkey",
+        &publisher_private_key_path,
+    );
+    run_pray_login_passkey(
+        &consumer_repo,
+        &server_url,
+        consumer_email,
+        "install-distribution-consumer-passkey",
+        &consumer_private_key_path,
+    );
+
+    let published = run_pray(&source_repo, &["publish", "--server", &server_url]);
+    assert!(
+        published.status.success(),
+        "publish failed: {}",
+        String::from_utf8_lossy(&published.stderr)
+    );
+    let published_metadata_text =
+        fs::read_to_string(registry_root.join("v1/packages/sample/base.json"))
+            .expect("published metadata");
+    let published_metadata: Value =
+        serde_json::from_str(&published_metadata_text).expect("published metadata json");
+    assert_eq!(published_metadata["name"], "sample/base");
+    assert!(registry_root
+        .join("v1/artifacts/sample/base/1.4.3/sample-base-1.4.3.praypkg")
+        .is_file());
+
+    let _ = server.kill();
+    let _ = server.wait();
+
+    let failed_install = run_pray(&consumer_repo, &["install"]);
+    assert!(!failed_install.status.success());
+    assert!(matches!(failed_install.status.code(), Some(1) | Some(3)));
+    let failed_stderr = String::from_utf8_lossy(&failed_install.stderr);
+    assert!(
+        failed_stderr.contains("Network error")
+            || failed_stderr.contains("Connection refused")
+            || failed_stderr.contains("timed out")
+            || failed_stderr.contains("resolution error")
+            || failed_stderr.contains("No such file")
+    );
+    assert!(!consumer_repo.join("Prayfile.lock").exists());
+    assert!(!consumer_repo.join("INSTRUCTIONS.md").exists());
+
+    let mut server = spawn_server(&registry_root, port);
+    wait_for_server(port);
+
+    let recovered_install = run_pray(&consumer_repo, &["install"]);
+    assert!(
+        recovered_install.status.success(),
+        "install failed after restart: {}",
+        String::from_utf8_lossy(&recovered_install.stderr)
+    );
+    let rendered =
+        fs::read_to_string(consumer_repo.join("INSTRUCTIONS.md")).expect("rendered instructions");
+    assert!(rendered.contains("Testing guidance"));
+    let lockfile = fs::read_to_string(consumer_repo.join("Prayfile.lock")).expect("lockfile");
+    assert!(lockfile.contains("sample/base"));
+
+    let _ = server.kill();
+    let _ = server.wait();
 }
 
 #[test]

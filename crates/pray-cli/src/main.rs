@@ -9,8 +9,8 @@ use pray_core::hashing::{normalize_line_endings, sha256_prefixed};
 use pray_core::lockfile::{read_lockfile, write_lockfile, Lockfile};
 use pray_core::manifest::parse_manifest;
 use pray_core::registry::{
-    registry_artifact_signature, submit_confession, ConfessionSubmission, RegistryIndex,
-    RegistryPackageMetadata, RegistryPackageVersion,
+    registry_artifact_signature, submit_confession, upload_registry_artifact, ConfessionSubmission,
+    RegistryIndex, RegistryPackageMetadata, RegistryPackageVersion,
 };
 use pray_core::render::{render_project, write_rendered_targets};
 use pray_core::resolve::{resolve_project, ResolvedProject};
@@ -61,7 +61,7 @@ fn run(arguments: Vec<String>) -> PrayResult<()> {
         Command::Drift { semantic } => drift_command(semantic),
         Command::Format => format_command(),
         Command::Package => package_command(),
-        Command::Publish { roots } => publish_command(roots),
+        Command::Publish { roots, servers } => publish_command(roots, servers),
         Command::Login {
             servers,
             email,
@@ -80,12 +80,16 @@ fn run(arguments: Vec<String>) -> PrayResult<()> {
         Command::Serve { root, host, port } => serve_command(root, host, port),
         Command::Confess {
             package,
+            from_lock,
             version,
             accepted,
             rejected,
             note,
             url,
-        } => confess_command(package, version, accepted, rejected, note, url),
+        } => confess_command(package, from_lock, version, accepted, rejected, note, url),
+        Command::List => list_command(),
+        Command::Outdated => outdated_command(),
+        Command::Explain { package } => explain_command(package),
         Command::Vendor => vendor_command(),
         Command::Clean => clean_command(),
         Command::Tree => tree_command(),
@@ -130,6 +134,7 @@ enum Command {
     Package,
     Publish {
         roots: Vec<PathBuf>,
+        servers: Vec<String>,
     },
     Login {
         servers: Vec<String>,
@@ -145,12 +150,18 @@ enum Command {
         port: u16,
     },
     Confess {
-        package: String,
+        package: Option<String>,
+        from_lock: Option<String>,
         version: Option<String>,
         accepted: bool,
         rejected: bool,
         note: Option<String>,
         url: Option<String>,
+    },
+    List,
+    Outdated,
+    Explain {
+        package: String,
     },
     Vendor,
     Clean,
@@ -228,6 +239,9 @@ fn parse_command(arguments: Vec<String>) -> PrayResult<Command> {
         "login" => parse_login_command(iter),
         "serve" => parse_serve_command(iter),
         "confess" => parse_confess_command(iter),
+        "list" => Ok(Command::List),
+        "outdated" => Ok(Command::Outdated),
+        "explain" => parse_explain_command(iter),
         "vendor" => Ok(Command::Vendor),
         "clean" => Ok(Command::Clean),
         "tree" => Ok(Command::Tree),
@@ -486,6 +500,7 @@ fn parse_update_command(arguments: std::vec::IntoIter<String>) -> PrayResult<Com
 
 fn parse_publish_command(mut arguments: std::vec::IntoIter<String>) -> PrayResult<Command> {
     let mut roots = Vec::new();
+    let mut servers = Vec::new();
     while let Some(argument) = arguments.next() {
         match argument.as_str() {
             "--root" => {
@@ -495,6 +510,14 @@ fn parse_publish_command(mut arguments: std::vec::IntoIter<String>) -> PrayResul
                     ));
                 };
                 roots.push(PathBuf::from(value));
+            }
+            "--server" => {
+                let Some(value) = arguments.next() else {
+                    return Err(PrayError::Unsupported(
+                        "publish requires a URL after --server".to_string(),
+                    ));
+                };
+                servers.push(value);
             }
             other if other.starts_with("--") => {
                 return Err(PrayError::Unsupported(format!(
@@ -508,12 +531,12 @@ fn parse_publish_command(mut arguments: std::vec::IntoIter<String>) -> PrayResul
             }
         }
     }
-    if roots.is_empty() {
+    if roots.is_empty() && servers.is_empty() {
         return Err(PrayError::Unsupported(
-            "publish requires at least one --root PATH".to_string(),
+            "publish requires at least one --root PATH or --server URL".to_string(),
         ));
     }
-    Ok(Command::Publish { roots })
+    Ok(Command::Publish { roots, servers })
 }
 
 fn parse_login_command(mut arguments: std::vec::IntoIter<String>) -> PrayResult<Command> {
@@ -695,6 +718,7 @@ fn parse_sync_command(mut arguments: std::vec::IntoIter<String>) -> PrayResult<C
 
 fn parse_confess_command(mut arguments: std::vec::IntoIter<String>) -> PrayResult<Command> {
     let mut package = None;
+    let mut from_lock = None;
     let mut version = None;
     let mut accepted = false;
     let mut rejected = false;
@@ -702,6 +726,14 @@ fn parse_confess_command(mut arguments: std::vec::IntoIter<String>) -> PrayResul
     let mut url = None;
     while let Some(argument) = arguments.next() {
         match argument.as_str() {
+            "--from-lock" => {
+                let Some(value) = arguments.next() else {
+                    return Err(PrayError::Unsupported(
+                        "confess requires a lockfile span id after --from-lock".to_string(),
+                    ));
+                };
+                from_lock = Some(value);
+            }
             "--version" => {
                 let Some(value) = arguments.next() else {
                     return Err(PrayError::Unsupported(
@@ -734,7 +766,7 @@ fn parse_confess_command(mut arguments: std::vec::IntoIter<String>) -> PrayResul
                 )))
             }
             other => {
-                if package.is_none() {
+                if package.is_none() && from_lock.is_none() {
                     package = Some(other.to_string());
                 } else {
                     return Err(PrayError::Unsupported(format!(
@@ -744,8 +776,11 @@ fn parse_confess_command(mut arguments: std::vec::IntoIter<String>) -> PrayResul
             }
         }
     }
-    let package = package
-        .ok_or_else(|| PrayError::Unsupported("confess requires a package name".to_string()))?;
+    if package.is_some() == from_lock.is_some() {
+        return Err(PrayError::Unsupported(
+            "confess requires exactly one of a package name or --from-lock".to_string(),
+        ));
+    }
     if accepted == rejected {
         return Err(PrayError::Unsupported(
             "confess requires exactly one of --accepted or --rejected".to_string(),
@@ -753,6 +788,7 @@ fn parse_confess_command(mut arguments: std::vec::IntoIter<String>) -> PrayResul
     }
     Ok(Command::Confess {
         package,
+        from_lock,
         version,
         accepted,
         rejected,
@@ -841,12 +877,109 @@ fn tree_command() -> PrayResult<()> {
     Ok(())
 }
 
+fn list_command() -> PrayResult<()> {
+    let project = resolve_project(&manifest_path())?;
+    let mut lines = vec!["Package list".to_string()];
+    for package in &project.packages {
+        lines.push(format!(
+            "{} {} source={} exports={}",
+            package.declaration.name,
+            package.spec.version,
+            package_source_summary(package),
+            format_list(&package.selected_exports)
+        ));
+    }
+    println!("{}", lines.join("\n"));
+    Ok(())
+}
+
+fn outdated_command() -> PrayResult<()> {
+    let project = resolve_project(&manifest_path())?;
+    let lockfile = read_lockfile(&lockfile_path()).ok();
+    let mut lines = vec!["Outdated packages".to_string()];
+    let mut outdated_count = 0usize;
+
+    for package in &project.packages {
+        let locked_version = lockfile
+            .as_ref()
+            .and_then(|lockfile| locked_package_version(lockfile, package));
+        if locked_version != Some(package.spec.version.as_str()) {
+            outdated_count += 1;
+            lines.push(format!(
+                "{} {} -> {}",
+                package.declaration.name,
+                locked_version.unwrap_or("not locked"),
+                package.spec.version
+            ));
+        }
+    }
+
+    if outdated_count == 0 {
+        lines.push("All packages up to date".to_string());
+    }
+
+    println!("{}", lines.join("\n"));
+    Ok(())
+}
+
+fn explain_command(package_name: String) -> PrayResult<()> {
+    let project = resolve_project(&manifest_path())?;
+    let lockfile = read_lockfile(&lockfile_path()).ok();
+    let package = project
+        .packages
+        .iter()
+        .find(|package| package.declaration.name == package_name)
+        .ok_or_else(|| PrayError::Resolution(format!("package {package_name} not found")))?;
+    let lockfile_package = lockfile
+        .as_ref()
+        .and_then(|lockfile| locked_package(lockfile, package));
+
+    let mut lines = vec!["Package explanation".to_string()];
+    lines.push(format!("name: {}", package.declaration.name));
+    lines.push(format!("constraint: {}", package.declaration.constraint));
+    lines.push(format!("resolved version: {}", package.spec.version));
+    lines.push(format!("source: {}", package_source_summary(package)));
+    lines.push(format!(
+        "exports: {}",
+        format_list(&package.selected_exports)
+    ));
+    lines.push(format!(
+        "dependencies: {}",
+        format_list(
+            &package
+                .spec
+                .dependencies
+                .iter()
+                .map(|dependency| dependency.name.clone())
+                .collect::<Vec<_>>()
+        )
+    ));
+    lines.push(format!("tree hash: {}", package.tree_hash));
+    lines.push(format!("artifact hash: {}", package.artifact_hash));
+
+    match lockfile_package {
+        Some(record) => {
+            lines.push(format!("lockfile version: {}", record.version));
+            lines.push(format!("lockfile path: {}", record.path));
+            lines.push(format!(
+                "lockfile exports: {}",
+                format_list(&record.exports)
+            ));
+        }
+        None => lines.push("lockfile record: missing".to_string()),
+    }
+
+    println!("{}", lines.join("\n"));
+    Ok(())
+}
+
 fn serve_command(root: PathBuf, host: String, port: u16) -> PrayResult<()> {
     server::run_server(root, host, port)
 }
 
 fn confess_command(
-    package: String,
+    package: Option<String>,
+    from_lock: Option<String>,
     version: Option<String>,
     accepted: bool,
     rejected: bool,
@@ -860,25 +993,64 @@ fn confess_command(
     }
 
     let project = resolve_project(&manifest_path())?;
-    let package_resolution = project
-        .packages
-        .iter()
-        .find(|resolved_package| resolved_package.declaration.name == package)
-        .ok_or_else(|| PrayError::Resolution(format!("package {package} not found")))?;
+    let lockfile = read_lockfile(&lockfile_path()).ok();
 
-    let resolved_version = version.unwrap_or_else(|| package_resolution.spec.version.clone());
-    if resolved_version != package_resolution.spec.version {
-        return Err(PrayError::Resolution(format!(
-            "package {package} version {} does not match resolved version {}",
-            resolved_version, package_resolution.spec.version
-        )));
-    }
+    let (package_name, resolved_version, package_resolution) = if let Some(span_id) = from_lock {
+        let lockfile = lockfile.as_ref().ok_or_else(|| {
+            PrayError::Resolution("confess --from-lock requires an existing lockfile".to_string())
+        })?;
+        let span = lockfile
+            .managed_span
+            .iter()
+            .find(|record| record.id == span_id)
+            .ok_or_else(|| PrayError::Resolution(format!("lockfile span {span_id} not found")))?;
+        let package_resolution = project
+            .packages
+            .iter()
+            .find(|resolved_package| resolved_package.declaration.name == span.package)
+            .ok_or_else(|| PrayError::Resolution(format!("package {} not found", span.package)))?;
+        let locked_package = locked_package(lockfile, package_resolution).ok_or_else(|| {
+            PrayError::Resolution(format!("lockfile package {} not found", span.package))
+        })?;
+        let resolved_version = match version {
+            Some(requested_version) if requested_version != locked_package.version => {
+                return Err(PrayError::Resolution(format!(
+                    "lockfile span {} version {} does not match requested version {}",
+                    span_id, locked_package.version, requested_version
+                )));
+            }
+            Some(requested_version) => requested_version,
+            None => locked_package.version.clone(),
+        };
+        (span.package.clone(), resolved_version, package_resolution)
+    } else {
+        let package_name = package
+            .ok_or_else(|| PrayError::Unsupported("confess requires a package name".to_string()))?;
+        let package_resolution = project
+            .packages
+            .iter()
+            .find(|resolved_package| resolved_package.declaration.name == package_name)
+            .ok_or_else(|| PrayError::Resolution(format!("package {package_name} not found")))?;
+        let resolved_version = match version {
+            Some(requested_version) if requested_version != package_resolution.spec.version => {
+                return Err(PrayError::Resolution(format!(
+                    "package {package_name} version {} does not match resolved version {}",
+                    requested_version, package_resolution.spec.version
+                )));
+            }
+            Some(requested_version) => requested_version,
+            None => package_resolution.spec.version.clone(),
+        };
+        (package_name, resolved_version, package_resolution)
+    };
 
     let source_name = package_resolution
         .declaration
         .source
         .as_ref()
-        .ok_or_else(|| PrayError::Resolution(format!("package {package} is missing a source")))?;
+        .ok_or_else(|| {
+            PrayError::Resolution(format!("package {package_name} is missing a source"))
+        })?;
     let source_url = if let Some(url) = url {
         url
     } else {
@@ -891,7 +1063,6 @@ fn confess_command(
             .ok_or_else(|| PrayError::Resolution(format!("unknown source: {source_name}")))?
     };
 
-    let lockfile = read_lockfile(&lockfile_path()).ok();
     let lockfile_reference = lockfile
         .as_ref()
         .and_then(|lockfile| lockfile.file_hash().ok());
@@ -901,7 +1072,7 @@ fn confess_command(
         .as_secs()
         .to_string();
     let mut confession = ConfessionSubmission {
-        package: package.clone(),
+        package: package_name.clone(),
         version: resolved_version,
         status: if accepted {
             "accepted".to_string()
@@ -980,12 +1151,30 @@ fn package_command() -> PrayResult<()> {
     Ok(())
 }
 
-fn publish_command(roots: Vec<PathBuf>) -> PrayResult<()> {
+fn publish_command(roots: Vec<PathBuf>, servers: Vec<String>) -> PrayResult<()> {
     let project = resolve_project(&manifest_path())?;
     let signer = current_signer();
     let published_at = current_timestamp()?;
+    let runtime = if servers.is_empty() {
+        None
+    } else {
+        Some(
+            tokio::runtime::Builder::new_current_thread()
+                .enable_all()
+                .build()
+                .map_err(|error| {
+                    PrayError::Unsupported(format!("failed to start publish runtime: {error}"))
+                })?,
+        )
+    };
+
     for root in roots {
         publish_to_root(&project, &signer, &published_at, &root)?;
+    }
+    if let Some(runtime) = &runtime {
+        for server_url in servers {
+            publish_to_server(&project, &signer, &published_at, &server_url, runtime)?;
+        }
     }
     Ok(())
 }
@@ -1016,19 +1205,13 @@ fn publish_to_root(
         let metadata_path = registry_metadata_path(root, &package.declaration.name);
         let mut metadata =
             load_registry_package_metadata(&metadata_path, &package.declaration.name)?;
-        let signature = registry_artifact_signature(&archive_bytes, &package.tree_hash, signer);
-        let version_entry = RegistryPackageVersion {
-            version: package.spec.version.clone(),
-            artifact: artifact_path,
-            artifact_hash: Some(sha256_prefixed(&archive_bytes)),
-            tree_hash: Some(package.tree_hash.clone()),
-            yanked: false,
-            targets: package.spec.targets.clone(),
-            exports: package.spec.exports.keys().cloned().collect(),
-            signer: Some(signer.to_string()),
-            published_at: Some(published_at.to_string()),
-            signature: Some(signature),
-        };
+        let version_entry = published_registry_package_version(
+            package,
+            signer,
+            published_at,
+            &artifact_path,
+            &archive_bytes,
+        );
         metadata
             .versions
             .retain(|entry| entry.version != version_entry.version);
@@ -1039,6 +1222,74 @@ fn publish_to_root(
 
     registry_index.packages = package_names.into_iter().collect();
     write_registry_index(root, &registry_index)?;
+    Ok(())
+}
+
+fn published_registry_package_version(
+    package: &pray_core::resolve::ResolvedPackage,
+    signer: &str,
+    published_at: &str,
+    artifact_path: &str,
+    archive_bytes: &[u8],
+) -> RegistryPackageVersion {
+    RegistryPackageVersion {
+        version: package.spec.version.clone(),
+        artifact: artifact_path.to_string(),
+        artifact_hash: Some(sha256_prefixed(archive_bytes)),
+        tree_hash: Some(package.tree_hash.clone()),
+        yanked: false,
+        targets: package.spec.targets.clone(),
+        exports: package.spec.exports.keys().cloned().collect(),
+        signer: Some(signer.to_string()),
+        published_at: Some(published_at.to_string()),
+        signature: Some(registry_artifact_signature(
+            archive_bytes,
+            &package.tree_hash,
+            signer,
+        )),
+    }
+}
+
+fn publish_to_server(
+    project: &ResolvedProject,
+    signer: &str,
+    published_at: &str,
+    server_url: &str,
+    runtime: &tokio::runtime::Runtime,
+) -> PrayResult<()> {
+    let peer = PeerConfig {
+        name: server_url.to_string(),
+        transport: "http".to_string(),
+        url: Some(server_url.to_string()),
+        trust: TrustLevel::Full,
+        direction: SyncDirection::Push,
+        config: serde_json::json!({}),
+    };
+    let registry = TransportRegistry::new();
+    let transport = registry.create(&peer).map_err(map_transport_error)?;
+
+    for package in &project.packages {
+        let archive_bytes = build_package_archive_bytes(package)?;
+        let artifact_path =
+            registry_artifact_path(&package.declaration.name, &package.spec.version);
+        upload_registry_artifact(server_url, &artifact_path, &archive_bytes)?;
+
+        let metadata = RegistryPackageMetadata {
+            name: package.declaration.name.clone(),
+            versions: vec![published_registry_package_version(
+                package,
+                signer,
+                published_at,
+                &artifact_path,
+                &archive_bytes,
+            )],
+        };
+        let transport_metadata = server::transport_package_metadata(&metadata);
+        runtime
+            .block_on(transport.push_package(&peer, &transport_metadata))
+            .map_err(map_transport_error)?;
+    }
+
     Ok(())
 }
 
@@ -1887,7 +2138,9 @@ fn default_output_for_target(target: &str) -> String {
 
 fn ensure_existing_lockfile(path: &Path) -> PrayResult<Lockfile> {
     if !path.exists() {
-        return Err(PrayError::Verify("missing Prayfile.lock".to_string()));
+        return Err(PrayError::Verify(
+            "missing Prayfile.lock; run pray install first".to_string(),
+        ));
     }
     read_lockfile(path)
 }
@@ -1899,7 +2152,9 @@ fn ensure_lockfile_current(
 ) -> PrayResult<()> {
     let current = build_lockfile(project, rendered)?;
     if current.canonicalized() != existing.canonicalized() {
-        return Err(PrayError::Verify("lockfile needs update".to_string()));
+        return Err(PrayError::Verify(
+            "lockfile needs update; rerun pray install to refresh Prayfile.lock".to_string(),
+        ));
     }
     Ok(())
 }
@@ -1912,7 +2167,10 @@ fn ensure_rendered_outputs_current(
         let path = project.project_root.join(&target.path);
         let on_disk = fs::read_to_string(&path).map_err(PrayError::from)?;
         if on_disk != target.content {
-            return Err(PrayError::Render(format!("{} is stale", path.display())));
+            return Err(PrayError::Render(format!(
+                "{} is stale; rerun pray install to regenerate it or pray plan to inspect the diff",
+                path.display()
+            )));
         }
     }
     Ok(())
@@ -2295,6 +2553,59 @@ fn render_tree_node(
     ancestry.remove(&package.declaration.name);
 }
 
+fn package_source_summary(package: &pray_core::resolve::ResolvedPackage) -> String {
+    package
+        .declaration
+        .path
+        .as_ref()
+        .map(|path| format!("path:{path}"))
+        .or_else(|| {
+            package
+                .declaration
+                .source
+                .as_ref()
+                .map(|source| format!("source:{source}"))
+        })
+        .unwrap_or_else(|| format!("root:{}", package.root.display()))
+}
+
+fn locked_package_version<'a>(
+    lockfile: &'a Lockfile,
+    package: &pray_core::resolve::ResolvedPackage,
+) -> Option<&'a str> {
+    locked_package(lockfile, package).map(|record| record.version.as_str())
+}
+
+fn locked_package<'a>(
+    lockfile: &'a Lockfile,
+    package: &pray_core::resolve::ResolvedPackage,
+) -> Option<&'a pray_core::lockfile::LockedPackage> {
+    lockfile.package.iter().find(|record| {
+        record.name == package.declaration.name
+            && record.source.as_deref() == package.declaration.source.as_deref()
+    })
+}
+
+fn format_list(values: &[String]) -> String {
+    if values.is_empty() {
+        "none".to_string()
+    } else {
+        values.join(", ")
+    }
+}
+
+fn parse_explain_command(mut arguments: std::vec::IntoIter<String>) -> PrayResult<Command> {
+    let package = arguments
+        .next()
+        .ok_or_else(|| PrayError::Unsupported("explain requires a package name".to_string()))?;
+    if let Some(argument) = arguments.next() {
+        return Err(PrayError::Unsupported(format!(
+            "unexpected explain argument: {argument}"
+        )));
+    }
+    Ok(Command::Explain { package })
+}
+
 fn print_help() {
     println!("pray <command>");
     println!("  manifest");
@@ -2310,13 +2621,16 @@ fn print_help() {
     println!("  drift [--semantic]");
     println!("  format");
     println!("  package");
-    println!("  publish --root PATH");
+    println!("  publish --root PATH [--server URL ...]");
     println!("  login --server URL --email EMAIL [--credential-id ID --passkey-key PATH | --public-key PATH --ssh-agent]");
     println!("  serve [--root PATH] [--host HOST] [--port PORT]");
     println!("  sync [--root PATH] [--peer URL ...]");
     println!(
-        "  confess <package> [--version VERSION] [--accepted|--rejected] [--note NOTE] [--url URL]"
+        "  confess <package> | --from-lock SPAN_ID [--version VERSION] [--accepted|--rejected] [--note NOTE] [--url URL]"
     );
+    println!("  list");
+    println!("  outdated");
+    println!("  explain <package>");
     println!("  vendor");
     println!("  clean");
     println!("  tree");

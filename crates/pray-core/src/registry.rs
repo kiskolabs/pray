@@ -171,6 +171,22 @@ pub fn submit_confession(source_url: &str, confession: &ConfessionSubmission) ->
     Ok(())
 }
 
+pub fn upload_registry_artifact(
+    source_url: &str,
+    artifact_path: &str,
+    bytes: &[u8],
+) -> PrayResult<()> {
+    let endpoint = join_url(source_url, artifact_path);
+    let response = http_put(&endpoint, "application/octet-stream", bytes)?;
+    if response.status / 100 != 2 {
+        return Err(PrayError::Resolution(format!(
+            "artifact upload failed with HTTP {}",
+            response.status
+        )));
+    }
+    Ok(())
+}
+
 fn fetch_registry_package_metadata(
     source_url: &str,
     package_name: &str,
@@ -401,6 +417,10 @@ fn http_get(url: &str) -> PrayResult<Vec<u8>> {
 
 fn http_post(url: &str, content_type: &str, body: &[u8]) -> PrayResult<HttpResponse> {
     http_request("POST", url, Some(content_type), Some(body))
+}
+
+fn http_put(url: &str, content_type: &str, body: &[u8]) -> PrayResult<HttpResponse> {
+    http_request("PUT", url, Some(content_type), Some(body))
 }
 
 fn http_request(

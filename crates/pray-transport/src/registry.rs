@@ -1,3 +1,5 @@
+#[cfg(feature = "p2p")]
+use crate::federation::FederationTransportFactory;
 use crate::http::HttpTransportFactory;
 #[cfg(feature = "p2p")]
 use crate::p2p::P2PTransportFactory;
@@ -22,7 +24,13 @@ impl TransportRegistry {
         registry.register("http", Arc::new(HttpTransportFactory));
 
         #[cfg(feature = "p2p")]
-        registry.register("p2p", Arc::new(P2PTransportFactory));
+        {
+            registry.register(
+                "federation",
+                Arc::new(FederationTransportFactory::default()),
+            );
+            registry.register("p2p", Arc::new(P2PTransportFactory));
+        }
 
         registry
     }
@@ -69,12 +77,18 @@ mod tests {
         // HTTP should always be available
         assert!(registry.has_transport("http"));
 
-        // P2P availability depends on features
+        // Federation and P2P availability depend on features
         #[cfg(feature = "p2p")]
-        assert!(registry.has_transport("p2p"));
+        {
+            assert!(registry.has_transport("federation"));
+            assert!(registry.has_transport("p2p"));
+        }
 
         #[cfg(not(feature = "p2p"))]
-        assert!(!registry.has_transport("p2p"));
+        {
+            assert!(!registry.has_transport("federation"));
+            assert!(!registry.has_transport("p2p"));
+        }
     }
 
     #[test]
@@ -83,5 +97,36 @@ mod tests {
         let transports = registry.available_transports();
 
         assert!(transports.contains(&"http".to_string()));
+    }
+
+    #[test]
+    fn test_create_federation_and_p2p_transports_when_enabled() {
+        #[cfg(feature = "p2p")]
+        {
+            let registry = TransportRegistry::new();
+            let federation_peer = PeerConfig {
+                name: "peer-a".to_string(),
+                transport: "federation".to_string(),
+                url: Some("https://peer-a.example".to_string()),
+                trust: TrustLevel::Full,
+                direction: SyncDirection::Pull,
+                config: serde_json::json!({}),
+            };
+
+            let p2p_peer = PeerConfig {
+                transport: "p2p".to_string(),
+                ..federation_peer.clone()
+            };
+
+            let federation_transport = registry
+                .create(&federation_peer)
+                .expect("federation transport should exist");
+            let p2p_transport = registry
+                .create(&p2p_peer)
+                .expect("p2p transport should exist");
+
+            assert_eq!(federation_transport.name(), "federation");
+            assert_eq!(p2p_transport.name(), "p2p");
+        }
     }
 }
