@@ -1,3 +1,5 @@
+#![allow(dead_code)]
+
 use base64::{engine::general_purpose::STANDARD, Engine as _};
 use ed25519_dalek::SigningKey;
 use pray_core::auth::RegistryAuthStore;
