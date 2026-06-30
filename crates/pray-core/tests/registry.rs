@@ -1,3 +1,4 @@
+use pray_core::derived_metadata::RegistryDerivedMetadata;
 use pray_core::hashing::sha256_prefixed;
 use pray_core::manifest::ManifestPackage;
 use pray_core::registry::{
@@ -51,6 +52,41 @@ fn prefers_torrent_sidecar_when_available() {
         counts.range_artifact.load(Ordering::SeqCst),
         expected_piece_count(&artifact_bytes, piece_size)
     );
+}
+
+#[test]
+fn registry_package_version_merges_derived_metadata_without_conflict() {
+    let mut existing = RegistryPackageVersion {
+        version: "1.0.0".to_string(),
+        artifact: "v1/artifacts/sample/base/1.0.0/package.praypkg".to_string(),
+        artifact_hash: Some("sha256:existing".to_string()),
+        tree_hash: Some("sha256:tree".to_string()),
+        yanked: false,
+        targets: vec![],
+        exports: vec![],
+        signer: Some("publisher@example.com".to_string()),
+        published_at: Some("1".to_string()),
+        signature: Some("signature".to_string()),
+        derived_metadata: None,
+    };
+    let incoming = RegistryPackageVersion {
+        derived_metadata: Some(RegistryDerivedMetadata {
+            summary: "shared guidance".to_string(),
+            topics: vec!["guidance".to_string()],
+            categories: vec!["documentation".to_string()],
+            possible_effects: vec!["clarifies usage".to_string()],
+            possible_side_effects: vec![],
+            embeddings: vec![],
+            file_count: Some(2),
+            character_count: Some(42),
+            token_count: Some(7),
+        }),
+        ..existing.clone()
+    };
+
+    assert!(existing.same_identity(&incoming));
+    existing.merge_annotations_from(&incoming);
+    assert_eq!(existing.derived_metadata, incoming.derived_metadata);
 }
 
 #[test]
@@ -314,6 +350,7 @@ fn registry_metadata(artifact_path: &str, artifact_bytes: &[u8]) -> RegistryPack
             signer: None,
             published_at: None,
             signature: None,
+            derived_metadata: None,
         }],
     }
 }

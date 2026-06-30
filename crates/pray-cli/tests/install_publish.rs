@@ -58,13 +58,33 @@ fn publish_writes_torrent_manifest_sidecar_for_registry_artifacts() {
         .as_str()
         .expect("artifact hash")
         .starts_with("sha256:"));
-    assert!(manifest["pieces"].as_array().expect("pieces").len() > 0);
+    assert!(!manifest["pieces"].as_array().expect("pieces").is_empty());
     assert!(manifest["sources"]
         .as_array()
         .expect("sources")
         .contains(&Value::String(
             "v1/artifacts/sample/base/1.4.3/sample-base-1.4.3.praypkg".to_string()
         )));
+
+    let package_metadata_path = registry_root.join("v1/packages/sample/base.json");
+    let package_metadata_text =
+        fs::read_to_string(&package_metadata_path).expect("package metadata");
+    let package_metadata: Value =
+        serde_json::from_str(&package_metadata_text).expect("package metadata json");
+    let derived = &package_metadata["versions"][0]["derived_metadata"];
+    assert!(derived["summary"]
+        .as_str()
+        .expect("summary")
+        .contains("shared guidance"));
+    assert!(derived["summary"]
+        .as_str()
+        .expect("summary")
+        .contains("Testing guidance"));
+    assert!(!derived["topics"].as_array().expect("topics").is_empty());
+    assert!(!derived["embeddings"]
+        .as_array()
+        .expect("embeddings")
+        .is_empty());
 }
 
 #[test]
@@ -248,6 +268,10 @@ fn publish_recovers_after_server_restart_and_uploads_over_http() {
     let metadata: Value = serde_json::from_str(&metadata_text).expect("metadata json");
     assert_eq!(metadata["name"], "sample/base");
     assert_eq!(metadata["versions"][0]["signer"], publisher_email);
+    assert!(metadata["versions"][0]["derived_metadata"]["summary"]
+        .as_str()
+        .expect("summary")
+        .contains("shared guidance"));
     assert!(registry_root
         .join("v1/artifacts/sample/base/1.4.3/sample-base-1.4.3.praypkg")
         .is_file());

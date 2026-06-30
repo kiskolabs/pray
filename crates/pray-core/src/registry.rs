@@ -1,3 +1,4 @@
+use crate::derived_metadata::RegistryDerivedMetadata;
 use crate::hashing::sha256_prefixed;
 use crate::manifest::ManifestPackage;
 use crate::package_spec::parse_package_spec;
@@ -46,6 +47,29 @@ pub struct RegistryPackageVersion {
     pub published_at: Option<String>,
     #[serde(default)]
     pub signature: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub derived_metadata: Option<RegistryDerivedMetadata>,
+}
+
+impl RegistryPackageVersion {
+    pub fn same_identity(&self, other: &Self) -> bool {
+        self.version == other.version
+            && self.artifact == other.artifact
+            && self.artifact_hash == other.artifact_hash
+            && self.tree_hash == other.tree_hash
+            && self.yanked == other.yanked
+            && self.targets == other.targets
+            && self.exports == other.exports
+            && self.signer == other.signer
+            && self.published_at == other.published_at
+            && self.signature == other.signature
+    }
+
+    pub fn merge_annotations_from(&mut self, other: &Self) {
+        if self.derived_metadata.is_none() {
+            self.derived_metadata = other.derived_metadata.clone();
+        }
+    }
 }
 
 #[derive(Debug, Clone, Default, Serialize, Deserialize, PartialEq, Eq)]

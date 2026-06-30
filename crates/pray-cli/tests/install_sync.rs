@@ -99,6 +99,14 @@ fn sync_pulls_packages_from_configured_peers() {
     );
     let downstream_version = downstream_metadata["versions"][0].clone();
     assert_eq!(downstream_version["version"], "1.4.3");
+    assert!(downstream_version["derived_metadata"]["summary"]
+        .as_str()
+        .expect("summary")
+        .contains("shared guidance"));
+    assert!(!downstream_version["derived_metadata"]["topics"]
+        .as_array()
+        .expect("topics")
+        .is_empty());
     let artifact_path = downstream_version["artifact"]
         .as_str()
         .expect("artifact path");

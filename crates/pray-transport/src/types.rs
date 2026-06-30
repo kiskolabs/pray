@@ -1,4 +1,5 @@
 use async_trait::async_trait;
+use pray_core::derived_metadata::RegistryDerivedMetadata;
 use serde::{Deserialize, Serialize};
 use std::fmt;
 
@@ -134,6 +135,8 @@ pub struct PackageVersion {
     pub signature: Option<SignatureInfo>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub origin: Option<OriginInfo>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub derived_metadata: Option<RegistryDerivedMetadata>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]

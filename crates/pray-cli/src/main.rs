@@ -5,6 +5,7 @@ use auth_client::{
     current_signer as current_signer_from_session, login_with_passkey, login_with_ssh_agent,
 };
 use pray_core::auth::RegistryAuthStore;
+use pray_core::derived_metadata::derive_registry_derived_metadata_from_archive_bytes;
 use pray_core::hashing::{normalize_line_endings, sha256_prefixed};
 use pray_core::lockfile::{read_lockfile, write_lockfile, Lockfile};
 use pray_core::manifest::parse_manifest;
@@ -1210,7 +1211,7 @@ fn publish_to_root(
             published_at,
             &artifact_path,
             &archive_bytes,
-        );
+        )?;
         metadata
             .versions
             .retain(|entry| entry.version != version_entry.version);
@@ -1230,8 +1231,8 @@ fn published_registry_package_version(
     published_at: &str,
     artifact_path: &str,
     archive_bytes: &[u8],
-) -> RegistryPackageVersion {
-    RegistryPackageVersion {
+) -> PrayResult<RegistryPackageVersion> {
+    Ok(RegistryPackageVersion {
         version: package.spec.version.clone(),
         artifact: artifact_path.to_string(),
         artifact_hash: Some(sha256_prefixed(archive_bytes)),
@@ -1246,7 +1247,10 @@ fn published_registry_package_version(
             &package.tree_hash,
             signer,
         )),
-    }
+        derived_metadata: Some(derive_registry_derived_metadata_from_archive_bytes(
+            archive_bytes,
+        )?),
+    })
 }
 
 fn publish_to_server(
@@ -1286,7 +1290,7 @@ fn publish_to_server(
                 published_at,
                 &artifact_path,
                 &archive_bytes,
-            )],
+            )?],
         };
         let transport_metadata = server::transport_package_metadata(&metadata);
         runtime
@@ -1456,9 +1460,12 @@ async fn sync_package_from_peer(
         .expect("package versions should be initialized");
 
     for version in metadata.versions {
-        let local_version = sync_package_version_from_transport(&version)?;
+        let mut local_version = sync_package_version_from_transport(&version)?;
         if let Some(existing_version) = package_versions.get(&local_version.version) {
-            if existing_version == &local_version {
+            if existing_version.same_identity(&local_version) {
+                let mut merged_version = existing_version.clone();
+                merged_version.merge_annotations_from(&local_version);
+                package_versions.insert(local_version.version.clone(), merged_version);
                 continue;
             }
             return Err(PrayError::Integrity(format!(
@@ -1503,6 +1510,11 @@ async fn sync_package_from_peer(
                     )));
                 }
             }
+        }
+
+        if local_version.derived_metadata.is_none() {
+            local_version.derived_metadata =
+                Some(derive_registry_derived_metadata_from_archive_bytes(&bytes)?);
         }
 
         write_synced_artifact(root, &local_version.artifact, &bytes)?;
@@ -1689,6 +1701,7 @@ fn sync_package_version_from_transport(
             .signature
             .as_ref()
             .map(|signature| signature.signature.clone()),
+        derived_metadata: version.derived_metadata.clone(),
     })
 }
 

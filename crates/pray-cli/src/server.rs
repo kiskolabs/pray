@@ -6,6 +6,7 @@ use pray_core::auth::{
     AuthSshKeyEnrollmentRequest, AuthSshKeyEnrollmentResponse, AuthSshKeyLoginRequest,
     AuthSshKeyLoginResponse, AuthVerificationRequest, AuthVerificationResponse, RegistryAuthStore,
 };
+use pray_core::derived_metadata::derive_registry_derived_metadata_from_archive_bytes;
 use pray_core::registry::{
     ConfessionSubmission, RegistryIndex, RegistryPackageMetadata, RegistryPackageVersion,
 };
@@ -232,7 +233,8 @@ fn federation_push_response(root: &Path, body: &[u8]) -> PrayResult<Response> {
             message: error.to_string(),
         })?;
     let registry_metadata = registry_package_metadata_from_transport(&incoming)?;
-    let merged_metadata = merge_registry_package_metadata(root, registry_metadata)?;
+    let mut merged_metadata = merge_registry_package_metadata(root, registry_metadata)?;
+    ensure_derived_metadata(root, &mut merged_metadata)?;
     let metadata_path = registry_metadata_path(root, &merged_metadata.name);
     write_registry_package_metadata(&metadata_path, &merged_metadata)?;
     update_registry_index_with_package(root, &merged_metadata.name)?;
@@ -245,6 +247,29 @@ fn federation_push_response(root: &Path, body: &[u8]) -> PrayResult<Response> {
         }))
         .map_err(|error| PrayError::Manifest(error.to_string()))?,
     })
+}
+
+fn ensure_derived_metadata(root: &Path, metadata: &mut RegistryPackageMetadata) -> PrayResult<()> {
+    for version in &mut metadata.versions {
+        if version.derived_metadata.is_some() {
+            continue;
+        }
+        let artifact_path = root.join(&version.artifact);
+        let artifact_bytes = fs::read(&artifact_path).map_err(|error| {
+            if error.kind() == std::io::ErrorKind::NotFound {
+                PrayError::Resolution(format!(
+                    "artifact not found for derived metadata: {}",
+                    version.artifact
+                ))
+            } else {
+                PrayError::from(error)
+            }
+        })?;
+        version.derived_metadata = Some(derive_registry_derived_metadata_from_archive_bytes(
+            &artifact_bytes,
+        )?);
+    }
+    Ok(())
 }
 
 fn read_registry_package_metadata(
@@ -374,6 +399,7 @@ pub(crate) fn transport_package_version(version: &RegistryPackageVersion) -> Pac
         publisher,
         signature,
         origin,
+        derived_metadata: version.derived_metadata.clone(),
     }
 }
 
@@ -453,6 +479,7 @@ fn registry_package_version_from_transport(
         signer,
         published_at,
         signature,
+        derived_metadata: version.derived_metadata.clone(),
     })
 }
 
@@ -467,13 +494,15 @@ fn merge_registry_package_metadata(
             .iter()
             .position(|version| version.version == incoming_version.version)
         {
-            Some(index) if current.versions[index] != incoming_version => {
+            Some(index) if current.versions[index].same_identity(&incoming_version) => {
+                current.versions[index].merge_annotations_from(&incoming_version);
+            }
+            Some(_) => {
                 return Err(PrayError::Resolution(format!(
                     "conflicting package version received for {} {}",
                     incoming.name, incoming_version.version
                 )));
             }
-            Some(_) => {}
             None => current.versions.push(incoming_version),
         }
     }

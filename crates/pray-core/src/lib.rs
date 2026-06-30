@@ -1,4 +1,5 @@
 pub mod auth;
+pub mod derived_metadata;
 pub mod error;
 pub mod hashing;
 pub mod literal;
