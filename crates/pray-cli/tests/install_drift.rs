@@ -63,14 +63,14 @@ Package::Specification.new do |spec|
   spec.files = ["README.md", "exports/testing-basics.md", "exports/security-basics.md"]
   spec.exports = {
     "testing-basics" => {
-      type = "fragment"
-      path = "exports/testing-basics.md"
-      summary = "Testing guidance"
+      type: "fragment",
+      path: "exports/testing-basics.md",
+      summary: "Testing guidance"
     },
     "security-basics" => {
-      type = "fragment"
-      path = "exports/security-basics.md"
-      summary = "Security guidance"
+      type: "fragment",
+      path: "exports/security-basics.md",
+      summary: "Security guidance"
     }
   }
 end

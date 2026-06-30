@@ -253,6 +253,8 @@ Prayfile packages may be fetched from distribution points.
 
 A distribution point is a registry-like source for package metadata, package archives, signatures, checksums, derived metadata, confessions, usage feedback, and optional web documentation.
 
+Deployment notes for `pray serve` on Heroku, Fly.io, Hetzner, Cloudflare, and Dokku live in `docs/serve-platforms.md`.
+
 An example public or private distribution point could be:
 
 ```text

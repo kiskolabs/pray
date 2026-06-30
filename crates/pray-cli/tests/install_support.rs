@@ -55,13 +55,13 @@ Package::Specification.new do |spec|
   spec.files = ["README.md", "exports/testing-basics.md", "exports/security-basics.md"]
   spec.exports = {
     "testing-basics" => {
-      type: "fragment"
-      path: "exports/testing-basics.md"
+      type: "fragment",
+      path: "exports/testing-basics.md",
       summary: "Testing guidance"
     },
     "security-basics" => {
-      type: "fragment"
-      path: "exports/security-basics.md"
+      type: "fragment",
+      path: "exports/security-basics.md",
       summary: "Security guidance"
     }
   }
@@ -108,8 +108,8 @@ Package::Specification.new do |spec|
   spec.files = ["README.md", "exports/testing-basics.md"]
   spec.exports = {
     "testing-basics" => {
-      type: "fragment"
-      path: "exports/testing-basics.md"
+      type: "fragment",
+      path: "exports/testing-basics.md",
       summary: "Testing guidance"
     }
   }
@@ -153,8 +153,8 @@ Package::Specification.new do |spec|
   spec.files = ["README.md", "exports/testing-basics.md"]
   spec.exports = {
     "testing-basics" => {
-      type: "fragment"
-      path: "exports/testing-basics.md"
+      type: "fragment",
+      path: "exports/testing-basics.md",
       summary: "Testing guidance"
     }
   }
@@ -181,8 +181,8 @@ Package::Specification.new do |spec|
   spec.files = ["README.md", "exports/common-basics.md"]
   spec.exports = {
     "common-basics" => {
-      type: "fragment"
-      path: "exports/common-basics.md"
+      type: "fragment",
+      path: "exports/common-basics.md",
       summary: "Common guidance"
     }
   }
@@ -224,8 +224,8 @@ Package::Specification.new do |spec|
   spec.files = ["README.md", "exports/testing-basics.md"]
   spec.exports = {
     "testing-basics" => {
-      type: "fragment"
-      path: "exports/testing-basics.md"
+      type: "fragment",
+      path: "exports/testing-basics.md",
       summary: "Testing guidance"
     }
   }

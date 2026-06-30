@@ -33,9 +33,9 @@ Package::Specification.new do |spec|
   spec.files = ["README.md", "exports/testing-basics.md"]
   spec.exports = {
     "testing-basics" => {
-      type = "fragment"
-      path = "exports/testing-basics.md"
-      summary = "Testing guidance"
+      type: "fragment",
+      path: "exports/testing-basics.md",
+      summary: "Testing guidance"
     }
   }
   spec.add_dependency "sample/common", "~> 1.0"
@@ -53,9 +53,9 @@ Package::Specification.new do |spec|
   spec.files = ["README.md", "exports/common-basics.md"]
   spec.exports = {
     "common-basics" => {
-      type = "fragment"
-      path = "exports/common-basics.md"
-      summary = "Common guidance"
+      type: "fragment",
+      path: "exports/common-basics.md",
+      summary: "Common guidance"
     }
   }
 end
@@ -97,9 +97,9 @@ Package::Specification.new do |spec|
   spec.files = ["README.md", "exports/common-basics.md"]
   spec.exports = {
     "common-basics" => {
-      type = "fragment"
-      path = "exports/common-basics.md"
-      summary = "Common guidance"
+      type: "fragment",
+      path: "exports/common-basics.md",
+      summary: "Common guidance"
     }
   }
 end

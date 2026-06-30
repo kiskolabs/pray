@@ -13,8 +13,8 @@ mod distribution_support;
 use distribution_support::{run_pray_login_ssh_agent, spawn_mock_ssh_agent, write_public_key_file};
 use support::{
     create_add_fixture, find_free_port, run_pray, run_pray_login_passkey, signing_key_from_seed,
-    spawn_server, ssh_public_key_text, temporary_directory, verify_email_registration,
-    wait_for_server, write_private_key_file, write_registry_client_fixture,
+    ssh_public_key_text, temporary_directory, verify_email_registration, wait_for_server,
+    write_private_key_file, write_registry_client_fixture,
 };
 
 #[test]
