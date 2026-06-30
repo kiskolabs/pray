@@ -110,6 +110,6 @@ Finite state machines are not only for workflow logic. They can compactly repres
 
 ## Engineering audit mode
 
-Engineering audits and reviews use the pipeline lens and evidence-first finding format in `.agents/tech-audit/engineering-audit.md`. Read that file for dimensions, stage checks, output fields, and ranking.
+Engineering audits and reviews use the pipeline lens and evidence-first finding format in `.agents/skills/engineering-audit/SKILL.md`. Read that file for pipeline stages, dimensions, output fields, and ranking.
 
 Order findings by danger, then certainty, then impact, then fix cost. Smallest credible fix before structural rewrite. Separate missing coverage from futile coverage.
