@@ -23,6 +23,12 @@ cargo install --git https://github.com/kiskolabs/pray --locked pray
 
 Cargo installs the `pray` executable into your user bin directory, typically `~/.cargo/bin`.
 
+If `~/.cargo/bin` is not already on your `PATH`, add this line to `~/.zshrc`, `~/.bashrc`, `~/.zprofile`, or `~/.bash_profile`:
+
+```sh
+export PATH="$PATH:~/.cargo/bin"
+```
+
 ## Why
 
 Modern inference engines increasingly rely on surrounding input files such as `AGENTS.md`, `CLAUDE.md`, instruction libraries, prompt templates, review checklists, memories, formatting rules, and workflow notes.
