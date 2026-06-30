@@ -11,6 +11,18 @@ The goal is simple: treat pre-inference input as a dependency.
 **Status:** Active development toward a production-ready v0.1 release.
 The specification and the `pray` reference CLI evolve together. `SPEC.md` defines the current contracts.
 
+## Install `pray`
+
+The canonical GitHub repository is `kiskolabs/pray`.
+
+Install the reference CLI as a system-wide binary with Cargo:
+
+```sh
+cargo install --git https://github.com/kiskolabs/pray --locked pray
+```
+
+Cargo installs the `pray` executable into your user bin directory, typically `~/.cargo/bin`.
+
 ## Why
 
 Modern inference engines increasingly rely on surrounding input files such as `AGENTS.md`, `CLAUDE.md`, instruction libraries, prompt templates, review checklists, memories, formatting rules, and workflow notes.
