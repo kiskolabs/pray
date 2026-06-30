@@ -360,171 +360,6 @@ fn format_normalizes_pray_markers_and_line_endings() {
 }
 
 #[test]
-fn federation_endpoints_expose_discovery_and_sync_metadata() {
-    let registry_root = temporary_directory("pray-federation-http");
-    fs::create_dir_all(registry_root.join("v1/packages/sample")).expect("registry directories");
-    fs::write(
-        registry_root.join("v1/index.json"),
-        r#"{
-            "spec": "prayfile-distribution-1",
-            "packages": ["sample/base"]
-        }"#,
-    )
-    .expect("write index");
-    fs::write(
-        registry_root.join("v1/peers.json"),
-        r#"[
-            {
-                "name": "seed-one",
-                "url": "https://seed-one.example",
-                "public": true
-            }
-        ]"#,
-    )
-    .expect("write peers");
-    fs::write(
-        registry_root.join("v1/packages/sample/base.json"),
-        r#"{
-            "name": "sample/base",
-            "versions": [
-                {
-                    "version": "1.0.0",
-                    "artifact": "v1/artifacts/sample/base/1.0.0/sample-base-1.0.0.praypkg",
-                    "artifact_hash": "sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
-                    "tree_hash": "sha256:bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
-                    "yanked": false,
-                    "targets": ["tool_a"],
-                    "exports": ["basics"],
-                    "published_at": "1711111111",
-                    "signer": "publisher-a",
-                    "signature": "sha256:cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc"
-                }
-            ]
-        }"#,
-    )
-    .expect("write package metadata");
-
-    let port = find_free_port();
-    let mut server = Command::new(env!("CARGO_BIN_EXE_pray"))
-        .args([
-            "serve",
-            "--root",
-            registry_root.to_str().expect("registry path"),
-            "--host",
-            "127.0.0.1",
-            "--port",
-            &port.to_string(),
-        ])
-        .stdout(Stdio::null())
-        .stderr(Stdio::null())
-        .spawn()
-        .expect("spawn server");
-    wait_for_server(port);
-
-    let base_url = format!("http://127.0.0.1:{port}");
-
-    let discovery = fetch_http_get(&format!("{base_url}/.well-known/pray-federation.json"));
-    assert_eq!(discovery.status, 200);
-    let discovery_json: Value = serde_json::from_str(&discovery.body).expect("discovery json");
-    assert_eq!(discovery_json["spec"], "pray-federation-v1");
-    assert_eq!(discovery_json["server"]["name"], "pray");
-    assert!(discovery_json["server"]["capabilities"]
-        .as_array()
-        .expect("capabilities")
-        .iter()
-        .any(|value| value.as_str() == Some("federation")));
-    assert_eq!(discovery_json["peers"].as_array().expect("peers").len(), 1);
-
-    let index = fetch_http_get(&format!("{base_url}/v1/sync/index"));
-    assert_eq!(index.status, 200);
-    let index_json: Value = serde_json::from_str(&index.body).expect("index json");
-    assert_eq!(index_json["spec"], "prayfile-distribution-1");
-    assert_eq!(
-        index_json["packages"].as_array().expect("packages").len(),
-        1
-    );
-    assert_eq!(index_json["packages"][0]["name"], "sample/base");
-    assert_eq!(index_json["packages"][0]["updated_at"], "1711111111");
-
-    let filtered_index = fetch_http_get(&format!("{base_url}/v1/sync/index?since=1711111111"));
-    assert_eq!(filtered_index.status, 200);
-    let filtered_json: Value =
-        serde_json::from_str(&filtered_index.body).expect("filtered index json");
-    assert_eq!(
-        filtered_json["packages"]
-            .as_array()
-            .expect("filtered packages")
-            .len(),
-        0
-    );
-
-    let package = fetch_http_get(&format!("{base_url}/v1/sync/package/sample/base"));
-    assert_eq!(package.status, 200);
-    let package_json: Value = serde_json::from_str(&package.body).expect("package json");
-    assert_eq!(package_json["name"], "sample/base");
-    assert_eq!(package_json["versions"][0]["published_at"], "1711111111");
-    assert_eq!(
-        package_json["versions"][0]["publisher"]["id"],
-        "publisher-a"
-    );
-
-    let pushed = fetch_http_post(
-        &format!("{base_url}/v1/sync/push"),
-        r#"{
-            "name": "sample/extra",
-            "updated_at": "1712222222",
-            "versions": [
-                {
-                    "version": "2.0.0",
-                    "artifact": "v1/artifacts/sample/extra/2.0.0/sample-extra-2.0.0.praypkg",
-                    "artifact_hash": "sha256:dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd",
-                    "tree_hash": "sha256:eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee",
-                    "yanked": false,
-                    "targets": ["tool_a"],
-                    "exports": ["extra"],
-                    "published_at": "1712222222",
-                    "publisher": {
-                        "id": "publisher-b",
-                        "key_fingerprint": "publisher-b"
-                    },
-                    "signature": {
-                        "algorithm": "sha256",
-                        "signature": "sha256:ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff",
-                        "public_key": "publisher-b"
-                    },
-                    "origin": {
-                        "server": "peer-one",
-                        "first_seen": "1712222222"
-                    }
-                }
-            ]
-        }"#,
-    );
-    assert_eq!(pushed.status, 201);
-
-    let pushed_metadata_text =
-        fs::read_to_string(registry_root.join("v1/packages/sample/extra.json"))
-            .expect("pushed package metadata");
-    let pushed_metadata: Value =
-        serde_json::from_str(&pushed_metadata_text).expect("pushed metadata json");
-    assert_eq!(pushed_metadata["name"], "sample/extra");
-    assert_eq!(pushed_metadata["versions"][0]["signer"], "publisher-b");
-
-    let updated_index_text =
-        fs::read_to_string(registry_root.join("v1/index.json")).expect("updated index");
-    let updated_index: Value =
-        serde_json::from_str(&updated_index_text).expect("updated index json");
-    assert!(updated_index["packages"]
-        .as_array()
-        .expect("updated packages")
-        .iter()
-        .any(|value| value.as_str() == Some("sample/extra")));
-
-    let _ = server.kill();
-    let _ = server.wait();
-}
-
-#[test]
 fn package_builds_a_tar_zst_archive_from_package_contents() {
     let repo = temporary_directory("pray-package");
     create_add_fixture(&repo);
@@ -566,20 +401,12 @@ fn package_builds_a_tar_zst_archive_from_package_contents() {
 }
 
 #[test]
-fn sync_pulls_packages_from_configured_peers() {
-    let workspace = temporary_directory("pray-sync");
-    let source_repo = workspace.join("source");
-    let upstream_root = workspace.join("upstream");
-    let downstream_root = workspace.join("downstream");
-    fs::create_dir_all(&source_repo).expect("source workspace");
-    fs::create_dir_all(&upstream_root).expect("upstream workspace");
-    fs::create_dir_all(&downstream_root).expect("downstream workspace");
+fn publish_writes_torrent_manifest_sidecar_for_registry_artifacts() {
+    let repo = temporary_directory("pray-publish-torrent");
+    let registry_root = temporary_directory("pray-publish-torrent-root");
+    create_add_fixture(&repo);
 
-    create_add_fixture(&source_repo);
-    let add = run_pray(
-        &source_repo,
-        &["add", "sample/base", "--path", "packages/base"],
-    );
+    let add = run_pray(&repo, &["add", "sample/base", "--path", "packages/base"]);
     assert!(
         add.status.success(),
         "add failed: {}",
@@ -587,11 +414,11 @@ fn sync_pulls_packages_from_configured_peers() {
     );
 
     let publish = run_pray(
-        &source_repo,
+        &repo,
         &[
             "publish",
             "--root",
-            upstream_root.to_str().expect("upstream path"),
+            registry_root.to_str().expect("registry path"),
         ],
     );
     assert!(
@@ -600,338 +427,33 @@ fn sync_pulls_packages_from_configured_peers() {
         String::from_utf8_lossy(&publish.stderr)
     );
 
-    let port = find_free_port();
-    let mut server = Command::new(env!("CARGO_BIN_EXE_pray"))
-        .args([
-            "serve",
-            "--root",
-            upstream_root.to_str().expect("upstream path"),
-            "--host",
-            "127.0.0.1",
-            "--port",
-            &port.to_string(),
-        ])
-        .stdout(Stdio::null())
-        .stderr(Stdio::null())
-        .spawn()
-        .expect("spawn server");
-    wait_for_server(port);
+    let artifact_path =
+        registry_root.join("v1/artifacts/sample/base/1.4.3/sample-base-1.4.3.praypkg");
+    assert!(artifact_path.is_file());
 
-    let upstream_url = format!("http://127.0.0.1:{port}");
-    fs::create_dir_all(downstream_root.join("v1")).expect("downstream v1 workspace");
-    fs::write(
-        downstream_root.join("v1/peers.json"),
-        format!(
-            r#"[
-                {{
-                    "name": "upstream",
-                    "url": "{upstream_url}",
-                    "public": true
-                }}
-            ]"#
-        ),
-    )
-    .expect("write peer list");
+    let manifest_path = PathBuf::from(format!("{}.praytorrent.json", artifact_path.display()));
+    assert!(manifest_path.is_file());
 
-    let sync = run_pray(
-        &workspace,
-        &[
-            "sync",
-            "--root",
-            downstream_root.to_str().expect("downstream path"),
-        ],
-    );
-    assert!(
-        sync.status.success(),
-        "sync failed: {}",
-        String::from_utf8_lossy(&sync.stderr)
-    );
-    let stdout = String::from_utf8_lossy(&sync.stdout);
-    assert!(stdout.contains("Synchronized 1 package(s) from 1 peer(s); learned 1 peer(s)"));
-
-    let downstream_index_text =
-        fs::read_to_string(downstream_root.join("v1/index.json")).expect("downstream index");
-    assert!(downstream_index_text.contains("sample/base"));
-
-    let downstream_metadata_text =
-        fs::read_to_string(downstream_root.join("v1/packages/sample/base.json"))
-            .expect("downstream package metadata");
-    let downstream_metadata: Value =
-        serde_json::from_str(&downstream_metadata_text).expect("downstream metadata json");
-    assert_eq!(downstream_metadata["name"], "sample/base");
+    let manifest_text = fs::read_to_string(&manifest_path).expect("torrent manifest");
+    let manifest: Value = serde_json::from_str(&manifest_text).expect("torrent manifest json");
+    assert_eq!(manifest["spec"], "pray-torrent-v1");
+    assert_eq!(manifest["name"], "sample/base");
+    assert_eq!(manifest["version"], "1.4.3");
     assert_eq!(
-        downstream_metadata["versions"]
-            .as_array()
-            .expect("versions")
-            .len(),
-        1
+        manifest["artifact_url"],
+        "v1/artifacts/sample/base/1.4.3/sample-base-1.4.3.praypkg"
     );
-    let downstream_version = downstream_metadata["versions"][0].clone();
-    assert_eq!(downstream_version["version"], "1.4.3");
-    let artifact_path = downstream_version["artifact"]
+    assert!(manifest["artifact_hash"]
         .as_str()
-        .expect("artifact path");
-    let downstream_artifact =
-        fs::read(downstream_root.join(artifact_path)).expect("downstream artifact");
-
-    let upstream_artifact_path = upstream_root.join(artifact_path);
-    let upstream_artifact = fs::read(&upstream_artifact_path).expect("upstream artifact");
-    assert_eq!(downstream_artifact, upstream_artifact);
-
-    let synced_peers_text =
-        fs::read_to_string(downstream_root.join("v1/peers.json")).expect("synced peers file");
-    let synced_peers: Value = serde_json::from_str(&synced_peers_text).expect("synced peers json");
-    assert_eq!(synced_peers.as_array().expect("peer array").len(), 1);
-    assert_eq!(synced_peers[0]["url"], upstream_url);
-
-    let _ = server.kill();
-    let _ = server.wait();
-}
-
-#[test]
-fn sync_crawls_discovered_peers_and_persists_them() {
-    let workspace = temporary_directory("pray-sync-crawl");
-    let source_repo = workspace.join("source");
-    let seed_root = workspace.join("seed");
-    let upstream_root = workspace.join("upstream");
-    let downstream_root = workspace.join("downstream");
-    fs::create_dir_all(&source_repo).expect("source workspace");
-    fs::create_dir_all(&seed_root).expect("seed workspace");
-    fs::create_dir_all(&upstream_root).expect("upstream workspace");
-    fs::create_dir_all(&downstream_root).expect("downstream workspace");
-
-    create_add_fixture(&source_repo);
-    let add = run_pray(
-        &source_repo,
-        &["add", "sample/base", "--path", "packages/base"],
-    );
-    assert!(
-        add.status.success(),
-        "add failed: {}",
-        String::from_utf8_lossy(&add.stderr)
-    );
-    let publish = run_pray(
-        &source_repo,
-        &[
-            "publish",
-            "--root",
-            upstream_root.to_str().expect("upstream path"),
-        ],
-    );
-    assert!(
-        publish.status.success(),
-        "publish failed: {}",
-        String::from_utf8_lossy(&publish.stderr)
-    );
-
-    fs::create_dir_all(seed_root.join("v1")).expect("seed v1 workspace");
-    fs::write(
-        seed_root.join("v1/index.json"),
-        r#"{
-            "spec": "prayfile-distribution-1",
-            "packages": []
-        }"#,
-    )
-    .expect("write seed index");
-
-    let seed_port = find_free_port();
-    let upstream_port = find_free_port();
-    let upstream_url = format!("http://127.0.0.1:{upstream_port}");
-    let seed_url = format!("http://127.0.0.1:{seed_port}");
-    fs::write(
-        seed_root.join("v1/peers.json"),
-        format!(
-            r#"[
-                {{
-                    "name": "upstream",
-                    "url": "{upstream_url}",
-                    "public": true
-                }}
-            ]"#
-        ),
-    )
-    .expect("write seed peers");
-    fs::create_dir_all(downstream_root.join("v1")).expect("downstream v1 workspace");
-    fs::write(
-        downstream_root.join("v1/peers.json"),
-        format!(
-            r#"[
-                {{
-                    "name": "seed",
-                    "url": "{seed_url}",
-                    "public": true
-                }}
-            ]"#
-        ),
-    )
-    .expect("write downstream peer list");
-
-    let mut seed_server = spawn_server(&seed_root, seed_port);
-    let mut upstream_server = spawn_server(&upstream_root, upstream_port);
-    wait_for_server(seed_port);
-    wait_for_server(upstream_port);
-
-    let sync = run_pray(
-        &workspace,
-        &[
-            "sync",
-            "--root",
-            downstream_root.to_str().expect("downstream path"),
-        ],
-    );
-    assert!(
-        sync.status.success(),
-        "sync failed: {}",
-        String::from_utf8_lossy(&sync.stderr)
-    );
-    let stdout = String::from_utf8_lossy(&sync.stdout);
-    assert!(stdout.contains("Synchronized 1 package(s) from 2 peer(s); learned 2 peer(s)"));
-
-    let downstream_index_text =
-        fs::read_to_string(downstream_root.join("v1/index.json")).expect("downstream index");
-    assert!(downstream_index_text.contains("sample/base"));
-
-    let downstream_metadata_text =
-        fs::read_to_string(downstream_root.join("v1/packages/sample/base.json"))
-            .expect("downstream package metadata");
-    let downstream_metadata: Value =
-        serde_json::from_str(&downstream_metadata_text).expect("downstream metadata json");
-    assert_eq!(downstream_metadata["name"], "sample/base");
-    assert_eq!(
-        downstream_metadata["versions"]
-            .as_array()
-            .expect("versions")
-            .len(),
-        1
-    );
-    let downstream_version = downstream_metadata["versions"][0].clone();
-    assert_eq!(downstream_version["version"], "1.4.3");
-    let artifact_path = downstream_version["artifact"]
-        .as_str()
-        .expect("artifact path");
-    let downstream_artifact =
-        fs::read(downstream_root.join(artifact_path)).expect("downstream artifact");
-
-    let upstream_artifact_path = upstream_root.join(artifact_path);
-    let upstream_artifact = fs::read(&upstream_artifact_path).expect("upstream artifact");
-    assert_eq!(downstream_artifact, upstream_artifact);
-
-    let synced_peers_text =
-        fs::read_to_string(downstream_root.join("v1/peers.json")).expect("synced peers file");
-    let synced_peers: Value = serde_json::from_str(&synced_peers_text).expect("synced peers json");
-    assert_eq!(synced_peers.as_array().expect("peer array").len(), 2);
-    assert_eq!(synced_peers[0]["url"], seed_url);
-    assert_eq!(synced_peers[1]["url"], upstream_url);
-
-    let _ = seed_server.kill();
-    let _ = seed_server.wait();
-    let _ = upstream_server.kill();
-    let _ = upstream_server.wait();
-}
-
-#[test]
-fn sync_recovers_after_peer_restart_and_leaves_no_partial_state() {
-    let workspace = temporary_directory("pray-sync-recovery");
-    let source_repo = workspace.join("source");
-    let upstream_root = workspace.join("upstream");
-    let downstream_root = workspace.join("downstream");
-    fs::create_dir_all(&source_repo).expect("source workspace");
-    fs::create_dir_all(&upstream_root).expect("upstream workspace");
-    fs::create_dir_all(&downstream_root).expect("downstream workspace");
-
-    create_add_fixture(&source_repo);
-    let add = run_pray(
-        &source_repo,
-        &["add", "sample/base", "--path", "packages/base"],
-    );
-    assert!(
-        add.status.success(),
-        "add failed: {}",
-        String::from_utf8_lossy(&add.stderr)
-    );
-    let publish = run_pray(
-        &source_repo,
-        &[
-            "publish",
-            "--root",
-            upstream_root.to_str().expect("upstream path"),
-        ],
-    );
-    assert!(
-        publish.status.success(),
-        "publish failed: {}",
-        String::from_utf8_lossy(&publish.stderr)
-    );
-
-    let port = find_free_port();
-    let upstream_url = format!("http://127.0.0.1:{port}");
-    fs::create_dir_all(downstream_root.join("v1")).expect("downstream v1 workspace");
-    fs::write(
-        downstream_root.join("v1/peers.json"),
-        format!(
-            r#"[
-                {{
-                    "name": "upstream",
-                    "url": "{upstream_url}",
-                    "public": true
-                }}
-            ]"#
-        ),
-    )
-    .expect("write downstream peer list");
-    let initial_peers =
-        fs::read_to_string(downstream_root.join("v1/peers.json")).expect("initial peers file");
-
-    let failed_sync = run_pray(
-        &workspace,
-        &[
-            "sync",
-            "--root",
-            downstream_root.to_str().expect("downstream path"),
-        ],
-    );
-    assert!(!failed_sync.status.success());
-    assert!(matches!(failed_sync.status.code(), Some(1) | Some(3)));
-    let failed_stderr = String::from_utf8_lossy(&failed_sync.stderr);
-    assert!(
-        failed_stderr.contains("Network error")
-            || failed_stderr.contains("Connection refused")
-            || failed_stderr.contains("timed out")
-            || failed_stderr.contains("No such file")
-            || failed_stderr.contains("resolution error")
-    );
-    assert_eq!(
-        fs::read_to_string(downstream_root.join("v1/peers.json")).expect("peers after failure"),
-        initial_peers
-    );
-    assert!(!downstream_root.join("v1/index.json").exists());
-    assert!(!downstream_root.join("v1/packages").exists());
-
-    let mut upstream_server = spawn_server(&upstream_root, port);
-    wait_for_server(port);
-
-    let recovered_sync = run_pray(
-        &workspace,
-        &[
-            "sync",
-            "--root",
-            downstream_root.to_str().expect("downstream path"),
-        ],
-    );
-    assert!(
-        recovered_sync.status.success(),
-        "recovered sync failed: {}",
-        String::from_utf8_lossy(&recovered_sync.stderr)
-    );
-    let stdout = String::from_utf8_lossy(&recovered_sync.stdout);
-    assert!(stdout.contains("Synchronized 1 package(s) from 1 peer(s); learned 1 peer(s)"));
-    assert!(downstream_root.join("v1/index.json").exists());
-    assert!(downstream_root
-        .join("v1/packages/sample/base.json")
-        .exists());
-
-    let _ = upstream_server.kill();
-    let _ = upstream_server.wait();
+        .expect("artifact hash")
+        .starts_with("sha256:"));
+    assert!(manifest["pieces"].as_array().expect("pieces").len() > 0);
+    assert!(manifest["sources"]
+        .as_array()
+        .expect("sources")
+        .contains(&Value::String(
+            "v1/artifacts/sample/base/1.4.3/sample-base-1.4.3.praypkg".to_string()
+        )));
 }
 
 #[test]
@@ -2152,48 +1674,6 @@ fn verify_email_registration(store: &RegistryAuthStore, email: &str) {
     store
         .verify_email(email, verification_code)
         .expect("verify email");
-}
-
-fn write_auth_registry_fixture(root: &Path) {
-    fs::create_dir_all(root.join("v1")).expect("auth root directories");
-    fs::write(
-        root.join("v1/index.json"),
-        r#"{
-            "spec": "prayfile-distribution-1",
-            "packages": []
-        }"#,
-    )
-    .expect("write auth index");
-    fs::write(
-        root.join("v1/trust.json"),
-        r#"{
-            "email_confirmation": "required",
-            "passkeys_enabled": true,
-            "ssh_keys_enabled": true,
-            "ssh_agent_signing_enabled": true
-        }"#,
-    )
-    .expect("write auth trust settings");
-}
-
-fn session_server_urls(session_json: &Value) -> Vec<String> {
-    if let Some(sessions) = session_json.get("sessions").and_then(Value::as_array) {
-        return sessions
-            .iter()
-            .filter_map(|session| {
-                session
-                    .get("server_url")
-                    .and_then(Value::as_str)
-                    .map(ToString::to_string)
-            })
-            .collect();
-    }
-
-    session_json
-        .get("server_url")
-        .and_then(Value::as_str)
-        .map(|server_url| vec![server_url.to_string()])
-        .unwrap_or_default()
 }
 
 fn spawn_server(root: &Path, port: u16) -> Child {

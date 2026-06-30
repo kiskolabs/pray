@@ -10,6 +10,8 @@ use std::io::{Read, Write};
 use std::net::TcpStream;
 use std::path::{Path, PathBuf};
 
+const TORRENT_MANIFEST_SPEC: &str = "pray-torrent-v1";
+
 #[derive(Debug, Clone, Default, Serialize, Deserialize, PartialEq, Eq)]
 pub struct RegistryIndex {
     pub spec: String,
@@ -65,6 +67,87 @@ pub struct ConfessionSubmission {
     pub signature: Option<String>,
 }
 
+#[derive(Debug, Clone, Default, Serialize, Deserialize, PartialEq, Eq)]
+struct TorrentManifest {
+    spec: String,
+    name: String,
+    version: String,
+    artifact_url: String,
+    artifact_hash: String,
+    piece_size: usize,
+    length: usize,
+    pieces: Vec<String>,
+    #[serde(default)]
+    sources: Vec<String>,
+    #[serde(default)]
+    trackers: Vec<String>,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+struct TorrentPieceRange {
+    start: usize,
+    end: usize,
+    hash: String,
+}
+
+impl TorrentManifest {
+    fn validate(&self) -> PrayResult<()> {
+        if self.spec != TORRENT_MANIFEST_SPEC {
+            return Err(PrayError::Parse {
+                kind: "torrent manifest",
+                message: format!("unexpected spec: {}", self.spec),
+            });
+        }
+        if self.piece_size == 0 {
+            return Err(PrayError::Parse {
+                kind: "torrent manifest",
+                message: "piece size must be greater than zero".to_string(),
+            });
+        }
+        let expected_piece_count = if self.length == 0 {
+            0
+        } else {
+            (self.length + self.piece_size - 1) / self.piece_size
+        };
+        if self.pieces.len() != expected_piece_count {
+            return Err(PrayError::Parse {
+                kind: "torrent manifest",
+                message: format!(
+                    "expected {} piece hash(es), found {}",
+                    expected_piece_count,
+                    self.pieces.len()
+                ),
+            });
+        }
+        Ok(())
+    }
+
+    fn piece_ranges(&self) -> Vec<TorrentPieceRange> {
+        self.pieces
+            .iter()
+            .enumerate()
+            .map(|(index, hash)| {
+                let start = index * self.piece_size;
+                let end = self
+                    .length
+                    .saturating_sub(1)
+                    .min(start + self.piece_size - 1);
+                TorrentPieceRange {
+                    start,
+                    end,
+                    hash: hash.clone(),
+                }
+            })
+            .collect()
+    }
+}
+
+impl TorrentPieceRange {
+    fn length(&self) -> usize {
+        self.end.saturating_sub(self.start) + 1
+    }
+}
+
 pub fn resolve_registry_package_root(
     project_root: &Path,
     source_url: &str,
@@ -89,7 +172,12 @@ pub fn resolve_registry_package_root(
     fs::create_dir_all(&cache_directory)?;
 
     let artifact_url = join_url(source_url, &selected.artifact);
-    let artifact_bytes = http_get(&artifact_url)?;
+    let torrent_manifest = fetch_torrent_manifest(source_url, &selected.artifact)?;
+    let artifact_bytes = if let Some(manifest) = torrent_manifest {
+        fetch_torrent_artifact(source_url, &selected.artifact, &manifest)?
+    } else {
+        http_get(&artifact_url)?
+    };
     if let Some(expected_artifact_hash) = selected.artifact_hash.as_deref() {
         let artifact_hash = sha256_prefixed(&artifact_bytes);
         if artifact_hash != expected_artifact_hash {
@@ -197,6 +285,92 @@ fn fetch_registry_package_metadata(
         kind: "registry metadata",
         message: error.to_string(),
     })
+}
+
+fn fetch_torrent_manifest(
+    source_url: &str,
+    artifact_path: &str,
+) -> PrayResult<Option<TorrentManifest>> {
+    let url = join_url(source_url, &format!("{}.praytorrent.json", artifact_path));
+    match http_get(&url) {
+        Ok(response) => {
+            let manifest: TorrentManifest =
+                serde_json::from_slice(&response).map_err(|error| PrayError::Parse {
+                    kind: "torrent manifest",
+                    message: error.to_string(),
+                })?;
+            manifest.validate()?;
+            Ok(Some(manifest))
+        }
+        Err(PrayError::Resolution(message)) if message.contains("HTTP 404") => Ok(None),
+        Err(error) => Err(error),
+    }
+}
+
+fn fetch_torrent_artifact(
+    source_url: &str,
+    artifact_path: &str,
+    manifest: &TorrentManifest,
+) -> PrayResult<Vec<u8>> {
+    let artifact_url = if manifest.artifact_url.starts_with("http://")
+        || manifest.artifact_url.starts_with("https://")
+    {
+        manifest.artifact_url.clone()
+    } else {
+        join_url(source_url, &manifest.artifact_url)
+    };
+
+    let sources = if manifest.sources.is_empty() {
+        vec![artifact_url]
+    } else {
+        manifest
+            .sources
+            .iter()
+            .map(|source| {
+                if source.starts_with("http://") || source.starts_with("https://") {
+                    source.clone()
+                } else {
+                    join_url(source_url, source)
+                }
+            })
+            .collect()
+    };
+
+    let mut bytes = vec![0u8; manifest.length];
+    for piece in manifest.piece_ranges() {
+        let piece_bytes = download_torrent_piece(&sources, &piece)?;
+        if sha256_prefixed(&piece_bytes) != piece.hash {
+            return Err(PrayError::Integrity(format!(
+                "torrent piece hash mismatch for {artifact_path} {}..{}",
+                piece.start, piece.end
+            )));
+        }
+        bytes[piece.start..=piece.end].copy_from_slice(&piece_bytes);
+    }
+
+    if sha256_prefixed(&bytes) != manifest.artifact_hash {
+        return Err(PrayError::Integrity(format!(
+            "torrent artifact hash mismatch for {artifact_path}"
+        )));
+    }
+
+    Ok(bytes)
+}
+
+fn download_torrent_piece(sources: &[String], piece: &TorrentPieceRange) -> PrayResult<Vec<u8>> {
+    let range_header = format!("bytes={}-{}", piece.start, piece.end);
+    for source in sources {
+        match http_get_with_headers(source, &[("Range", &range_header)]) {
+            Ok((response, _status)) if response.len() == piece.length() => return Ok(response),
+            Ok(_) => continue,
+            Err(_) => continue,
+        }
+    }
+
+    Err(PrayError::Resolution(format!(
+        "unable to download torrent piece {}-{}",
+        piece.start, piece.end
+    )))
 }
 
 fn select_package_version(
@@ -405,7 +579,7 @@ struct HttpResponse {
 }
 
 fn http_get(url: &str) -> PrayResult<Vec<u8>> {
-    let response = http_request("GET", url, None, None)?;
+    let response = http_request("GET", url, None, None, &[])?;
     if response.status / 100 != 2 {
         return Err(PrayError::Resolution(format!(
             "GET {url} failed with HTTP {}",
@@ -415,12 +589,17 @@ fn http_get(url: &str) -> PrayResult<Vec<u8>> {
     Ok(response.body)
 }
 
+fn http_get_with_headers(url: &str, headers: &[(&str, &str)]) -> PrayResult<(Vec<u8>, u16)> {
+    let response = http_request("GET", url, None, None, headers)?;
+    Ok((response.body, response.status))
+}
+
 fn http_post(url: &str, content_type: &str, body: &[u8]) -> PrayResult<HttpResponse> {
-    http_request("POST", url, Some(content_type), Some(body))
+    http_request("POST", url, Some(content_type), Some(body), &[])
 }
 
 fn http_put(url: &str, content_type: &str, body: &[u8]) -> PrayResult<HttpResponse> {
-    http_request("PUT", url, Some(content_type), Some(body))
+    http_request("PUT", url, Some(content_type), Some(body), &[])
 }
 
 fn http_request(
@@ -428,6 +607,7 @@ fn http_request(
     url: &str,
     content_type: Option<&str>,
     body: Option<&[u8]>,
+    headers: &[(&str, &str)],
 ) -> PrayResult<HttpResponse> {
     let (host, port, path) = parse_http_url(url)?;
     let mut stream = TcpStream::connect((host.as_str(), port))?;
@@ -436,6 +616,9 @@ fn http_request(
         format!("{method} {path} HTTP/1.1\r\nHost: {host}:{port}\r\nConnection: close\r\n");
     if let Some(content_type) = content_type {
         request.push_str(&format!("Content-Type: {content_type}\r\n"));
+    }
+    for (name, value) in headers {
+        request.push_str(&format!("{name}: {value}\r\n"));
     }
     if !body.is_empty() {
         request.push_str(&format!("Content-Length: {}\r\n", body.len()));

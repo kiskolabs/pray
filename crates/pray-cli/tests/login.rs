@@ -10,6 +10,11 @@ use std::process::{Command, Stdio};
 use std::thread;
 use std::time::Duration;
 
+#[path = "login_support.rs"]
+mod support;
+
+use support::write_auth_registry_fixture;
+
 #[test]
 fn login_recovers_after_auth_server_restart_and_persists_session() {
     let workspace = temporary_directory("pray-login-recovery");
@@ -171,7 +176,24 @@ fn login_supports_multiple_auth_origins() {
     let session_text =
         fs::read_to_string(client_repo.join(".pray/session.json")).expect("session file");
     let session_json: Value = serde_json::from_str(&session_text).expect("session json");
-    let server_urls = session_server_urls(&session_json);
+    let server_urls = if let Some(sessions) = session_json.get("sessions").and_then(Value::as_array)
+    {
+        sessions
+            .iter()
+            .filter_map(|session| {
+                session
+                    .get("server_url")
+                    .and_then(Value::as_str)
+                    .map(ToString::to_string)
+            })
+            .collect::<Vec<String>>()
+    } else {
+        session_json
+            .get("server_url")
+            .and_then(Value::as_str)
+            .map(|server_url| vec![server_url.to_string()])
+            .unwrap_or_default()
+    };
     assert!(server_urls.contains(&server_url_a));
     assert!(server_urls.contains(&server_url_b));
 
@@ -187,28 +209,6 @@ fn run_pray(repo: &std::path::Path, arguments: &[&str]) -> std::process::Output 
         .current_dir(repo)
         .output()
         .expect("run pray command")
-}
-
-fn write_auth_registry_fixture(root: &std::path::Path) {
-    fs::create_dir_all(root.join("v1")).expect("auth root directories");
-    fs::write(
-        root.join("v1/index.json"),
-        r#"{
-            "spec": "prayfile-distribution-1",
-            "packages": []
-        }"#,
-    )
-    .expect("write auth index");
-    fs::write(
-        root.join("v1/trust.json"),
-        r#"{
-            "email_confirmation": "required",
-            "passkeys_enabled": true,
-            "ssh_keys_enabled": true,
-            "ssh_agent_signing_enabled": true
-        }"#,
-    )
-    .expect("write auth trust settings");
 }
 
 fn verify_email_registration(store: &RegistryAuthStore, email: &str) {
@@ -297,24 +297,4 @@ fn wait_for_server(port: u16) {
         thread::sleep(Duration::from_millis(100));
     }
     panic!("server did not start on port {port}");
-}
-
-fn session_server_urls(session_json: &Value) -> Vec<String> {
-    if let Some(sessions) = session_json.get("sessions").and_then(Value::as_array) {
-        return sessions
-            .iter()
-            .filter_map(|session| {
-                session
-                    .get("server_url")
-                    .and_then(Value::as_str)
-                    .map(ToString::to_string)
-            })
-            .collect();
-    }
-
-    session_json
-        .get("server_url")
-        .and_then(Value::as_str)
-        .map(|server_url| vec![server_url.to_string()])
-        .unwrap_or_default()
 }

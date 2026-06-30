@@ -17,7 +17,8 @@ use pray_core::resolve::{resolve_project, ResolvedProject};
 use pray_core::verify::{drift_project, format_verification_report, verify_project};
 use pray_core::{PrayError, PrayResult};
 use pray_transport::{
-    ArtifactRef, PeerConfig, PeerInfo, SyncDirection, TransportError, TransportRegistry, TrustLevel,
+    ArtifactRef, PeerConfig, PeerInfo, SyncDirection, TorrentConfig, TorrentTransport,
+    TransportError, TransportRegistry, TrustLevel,
 };
 use std::collections::{BTreeMap, BTreeSet, VecDeque};
 use std::env;
@@ -1197,10 +1198,8 @@ fn publish_to_root(
         let artifact_path =
             registry_artifact_path(&package.declaration.name, &package.spec.version);
         let artifact_output_path = root.join(&artifact_path);
-        if let Some(parent) = artifact_output_path.parent() {
-            fs::create_dir_all(parent)?;
-        }
-        fs::write(&artifact_output_path, &archive_bytes)?;
+        write_output_bytes(&artifact_output_path, &archive_bytes)?;
+        write_torrent_manifest(root, package, &artifact_path, &archive_bytes)?;
 
         let metadata_path = registry_metadata_path(root, &package.declaration.name);
         let mut metadata =
@@ -1273,6 +1272,11 @@ fn publish_to_server(
         let artifact_path =
             registry_artifact_path(&package.declaration.name, &package.spec.version);
         upload_registry_artifact(server_url, &artifact_path, &archive_bytes)?;
+        upload_registry_artifact(
+            server_url,
+            &torrent_manifest_path(&artifact_path),
+            &torrent_manifest_bytes(package, &artifact_path, &archive_bytes)?,
+        )?;
 
         let metadata = RegistryPackageMetadata {
             name: package.declaration.name.clone(),
@@ -1923,6 +1927,49 @@ fn registry_metadata_path(root: &Path, package_name: &str) -> PathBuf {
 fn registry_artifact_path(package_name: &str, version: &str) -> String {
     let artifact_name = format!("{}-{}.praypkg", package_name.replace('/', "-"), version);
     format!("v1/artifacts/{package_name}/{version}/{artifact_name}")
+}
+
+fn torrent_manifest_path(artifact_path: &str) -> String {
+    format!("{artifact_path}.praytorrent.json")
+}
+
+fn torrent_manifest_bytes(
+    package: &pray_core::resolve::ResolvedPackage,
+    artifact_path: &str,
+    archive_bytes: &[u8],
+) -> PrayResult<Vec<u8>> {
+    let torrent_config = TorrentConfig::default();
+    let manifest = TorrentTransport::build_manifest(
+        package.declaration.name.clone(),
+        package.spec.version.clone(),
+        artifact_path.to_string(),
+        archive_bytes,
+        torrent_config.piece_size,
+        vec![artifact_path.to_string()],
+        torrent_config.bootstrap_trackers,
+    );
+    serde_json::to_vec_pretty(&manifest).map_err(|error| PrayError::Manifest(error.to_string()))
+}
+
+fn write_torrent_manifest(
+    root: &Path,
+    package: &pray_core::resolve::ResolvedPackage,
+    artifact_path: &str,
+    archive_bytes: &[u8],
+) -> PrayResult<()> {
+    let manifest_path = root.join(torrent_manifest_path(artifact_path));
+    write_output_bytes(
+        &manifest_path,
+        &torrent_manifest_bytes(package, artifact_path, archive_bytes)?,
+    )
+}
+
+fn write_output_bytes(path: &Path, bytes: &[u8]) -> PrayResult<()> {
+    if let Some(parent) = path.parent() {
+        fs::create_dir_all(parent)?;
+    }
+    fs::write(path, bytes)?;
+    Ok(())
 }
 
 fn package_metadata(package: &pray_core::resolve::ResolvedPackage) -> PrayResult<String> {
