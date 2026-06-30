@@ -1,0 +1,6 @@
+prayfile "1"
+target :prayer_publisher do
+  output ".agents/skills/prayer-publisher/SKILL.md"
+end
+agent "prayer-publisher", path: "packages/prayer-publisher", exports: ["skill"]
+render mode: :managed, conflict: :fail, churn: :minimal

@@ -1,4 +1,5 @@
 /target
 /.pray/cache
 /Cargo.lock
+/*.praypkg
 .DS_Store

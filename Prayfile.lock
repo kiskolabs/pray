@@ -1,0 +1,30 @@
+prayfile_lock = "1"
+spec = "0.1"
+generated_by = "pray 0.1.0"
+manifest_hash = "sha256:87be77c34aff13b4312f0925c42f1259277b83152696750fce99f27fb6c6a3d6"
+source = []
+
+[[package]]
+name = "prayer-publisher"
+version = "0.1.0"
+path = "packages/prayer-publisher"
+tree_hash = "sha256:04fa64e31ec08f1cd0ac95ba18eac1b4ddb81cdbe2910aafb5951c26fc949ff1"
+artifact_hash = "sha256:04fa64e31ec08f1cd0ac95ba18eac1b4ddb81cdbe2910aafb5951c26fc949ff1"
+artifact = "path:packages/prayer-publisher"
+exports = ["skill"]
+dependencies = []
+
+[[target]]
+name = "prayer_publisher"
+outputs = [".agents/skills/prayer-publisher/SKILL.md"]
+
+[[managed_span]]
+id = "7305c5b8"
+target = ".agents/skills/prayer-publisher/SKILL.md"
+open_line = 13
+close_line = 105
+ideal_checksum = "sha256:4b26df73e70beae7972ff70bfdce340c27658ec5cbdefefd07d6af9a405ac1e7"
+package = "prayer-publisher"
+export = "skill"
+source_checksum = "sha256:04fa64e31ec08f1cd0ac95ba18eac1b4ddb81cdbe2910aafb5951c26fc949ff1"
+silenced = false
