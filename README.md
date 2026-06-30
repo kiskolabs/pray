@@ -421,6 +421,49 @@ Example:
 pray serve --root ./prayers --host 127.0.0.1 --port 7429
 ```
 
+### Local serve behind Cloudflare Zero Trust Tunnel
+
+A common way to distribute prayers from a laptop or private server is to keep `pray serve` bound to localhost and publish it through a Cloudflare Zero Trust Tunnel.
+
+1. Authenticate Cloudflare access on the machine that runs `pray serve`.
+2. Create a named tunnel.
+3. Route a hostname to the local `pray serve` port.
+4. Add Cloudflare Access if you want login protection before people can reach the server.
+
+Example setup:
+
+```sh
+cloudflared tunnel login
+cloudflared tunnel create pray
+cloudflared tunnel route dns pray prayers.example.com
+```
+
+Example tunnel config:
+
+```yml
+tunnel: <tunnel-uuid>
+credentials-file: ~/.cloudflared/<tunnel-uuid>.json
+
+ingress:
+  - hostname: prayers.example.com
+    service: http://127.0.0.1:7429
+  - service: http_status:404
+```
+
+Run the tunnel:
+
+```sh
+cloudflared tunnel run pray
+```
+
+For a quick one-off test, Cloudflare also supports a temporary tunnel URL:
+
+```sh
+cloudflared tunnel --url http://127.0.0.1:7429
+```
+
+Keep publish and moderation routes behind Cloudflare Access or another stronger auth layer when those actions are exposed publicly.
+
 The server should provide API endpoints for package metadata, archive retrieval, signature retrieval, and confession submission. It may also provide simple human-readable HTML pages.
 
 The server is a distribution and feedback mechanism, not an inference runtime.
