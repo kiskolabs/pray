@@ -128,6 +128,60 @@ end
     .expect("write export");
 }
 
+pub fn create_prayer_install_fixture(repo: &Path) {
+    fs::create_dir_all(repo.join("packages/prayer-publisher")).expect("fixture directories");
+    fs::create_dir_all(repo.join(".agents/skills/prayer-publisher")).expect("skill directories");
+
+    fs::write(
+        repo.join("Prayfile"),
+        r#"
+prayfile "1"
+target :prayer_publisher do
+  output ".agents/skills/prayer-publisher/SKILL.md"
+end
+agent "prayer-publisher", path: "packages/prayer-publisher", exports: ["skill"]
+render mode: :managed, conflict: :fail, churn: :minimal
+"#,
+    )
+    .expect("write Prayfile");
+
+    fs::write(
+        repo.join("packages/prayer-publisher/prayer-publisher.prayspec"),
+        r#"
+Package::Specification.new do |spec|
+  spec.name = "prayer-publisher"
+  spec.version = "0.1.0"
+  spec.summary = "Language-first packaging guidance for prayer-managed content"
+  spec.files = ["SKILL.md"]
+  spec.exports = {
+    "skill" => {
+      type: "fragment",
+      path: "SKILL.md",
+      summary: "Prayer publisher guidance"
+    }
+  }
+end
+"#,
+    )
+    .expect("write prayspec");
+
+    fs::write(
+        repo.join("packages/prayer-publisher/SKILL.md"),
+        r#"---
+name: prayer-publisher
+description: Turn source text, files, or folders into packaged prayer and publish it.
+---
+
+# Prayer Publisher
+
+## Purpose
+
+Turn a source text file, folder, or existing prayer content into a package and manage it through the Pray workflow.
+"#,
+    )
+    .expect("write skill");
+}
+
 pub fn create_tree_fixture(repo: &Path) {
     fs::create_dir_all(repo.join("packages/base/exports")).expect("base directories");
     fs::create_dir_all(repo.join("packages/common/exports")).expect("common directories");
@@ -248,20 +302,17 @@ pub fn read_package_archive(path: &Path) -> BTreeMap<String, String> {
     let file = fs::File::open(path).expect("open package archive");
     let decoder = zstd::stream::read::Decoder::new(file).expect("decode archive");
     let mut archive = tar::Archive::new(decoder);
-    let mut entries = BTreeMap::new();
-    for entry in archive.entries().expect("read archive entries") {
+    let mut contents = BTreeMap::new();
+    for entry in archive.entries().expect("archive entries") {
         let mut entry = entry.expect("archive entry");
-        if entry.header().entry_type().is_dir() {
-            continue;
-        }
         let path = entry
             .path()
             .expect("entry path")
             .to_string_lossy()
             .to_string();
-        let mut content = String::new();
-        entry.read_to_string(&mut content).expect("entry contents");
-        entries.insert(path, content);
+        let mut text = String::new();
+        entry.read_to_string(&mut text).expect("read entry");
+        contents.insert(path, text);
     }
-    entries
+    contents
 }

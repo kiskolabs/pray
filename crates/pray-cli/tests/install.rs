@@ -5,7 +5,10 @@ use std::fs;
 use std::thread::sleep;
 use std::time::Duration;
 
-use support::{create_add_fixture, create_fixture, run_pray, temporary_directory};
+use support::{
+    create_add_fixture, create_fixture, create_prayer_install_fixture, run_pray,
+    temporary_directory,
+};
 
 #[test]
 fn installs_renders_and_verifies_a_local_package() {
@@ -48,6 +51,29 @@ fn installs_renders_and_verifies_a_local_package() {
         "verify failed: {}",
         String::from_utf8_lossy(&verify.stderr)
     );
+}
+
+#[test]
+fn installs_prayer_package_into_a_managed_skill_path() {
+    let repo = temporary_directory("pray-install-prayer");
+    create_prayer_install_fixture(&repo);
+
+    let install = run_pray(&repo, &["install"]);
+    assert!(
+        install.status.success(),
+        "install failed: {}",
+        String::from_utf8_lossy(&install.stderr)
+    );
+
+    let rendered_skill = repo.join(".agents/skills/prayer-publisher/SKILL.md");
+    assert!(rendered_skill.is_file(), "managed skill file missing");
+
+    let skill_text = fs::read_to_string(&rendered_skill).expect("rendered skill text");
+    assert!(skill_text.contains("<!-- pray:"));
+    assert!(skill_text.contains("Prayer Publisher"));
+
+    let lockfile = fs::read_to_string(repo.join("Prayfile.lock")).expect("lockfile");
+    assert!(lockfile.contains("prayer-publisher"));
 }
 
 #[test]

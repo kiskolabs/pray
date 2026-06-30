@@ -1,16 +1,3 @@
-<!-- pray:0 ignore-comments -->
-
-# Agent context
-
-Do not edit managed blocks or managed skills.
-Add or change project-specific instructions in `agent/local/` only.
-To change shared guidance, ask a human to update `Prayfile` and run `pray`.
-
-## Project-local instructions
-
-## Shared instructions
-
-<!-- pray:7305c5b8 -->
 ---
 name: prayer-publisher
 description: Turn source text, files, or folders into packaged prayer and publish it.
@@ -102,4 +89,3 @@ A successful run produces:
 - Include examples only when they help use or review the skill.
 - Use `render mode: :managed` for repository-shared output.
 - Use `conflict: :fail` unless there is a strong reason to do otherwise.
-<!-- pray:7305c5b8 -->
