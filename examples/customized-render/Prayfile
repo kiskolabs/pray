@@ -1,0 +1,17 @@
+prayfile "1"
+
+target :tool_c do
+  output "CHECKLIST.md"
+  rules ".tool-c/rules"
+end
+agent "sample/compliance", "~> 0.9",
+  path: "packages/compliance",
+  exports: ["audit-notes", "rollback-plan"]
+local "agent/local/project.md"
+local "agent/local/security.md", optional: true
+render mode: :managed,
+  conflict: :fail,
+  churn: :minimal,
+  header: false,
+  section_markers: false,
+  line_endings: "lf"

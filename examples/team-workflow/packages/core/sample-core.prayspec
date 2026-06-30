@@ -1,0 +1,26 @@
+Package::Specification.new do |spec|
+  spec.name = "sample/core"
+  spec.version = "3.2.0"
+  spec.summary = "incident response and testing guidance"
+  spec.description = "Shared operational guidance for incidents, regressions, and release checks."
+  spec.authors = ["Example Maintainer"]
+  spec.license = "MIT"
+  spec.files = [
+    "README.md",
+    "exports/incident-triage.md",
+    "exports/testing-basics.md"
+  ]
+  spec.exports = {
+    "incident-triage" => {
+      type: "fragment",
+      path: "exports/incident-triage.md",
+      summary: "Incident response guidance"
+    },
+    "testing-basics" => {
+      type: "fragment",
+      path: "exports/testing-basics.md",
+      summary: "Testing guidance"
+    }
+  }
+  spec.targets = ["tool_a", "tool_b"]
+end

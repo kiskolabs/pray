@@ -1,0 +1,26 @@
+Package::Specification.new do |spec|
+  spec.name = "sample/compliance"
+  spec.version = "0.9.1"
+  spec.summary = "audit checklist and rollback guidance"
+  spec.description = "Operational guidance for compliance-minded reviews and safe rollbacks."
+  spec.authors = ["Example Maintainer"]
+  spec.license = "MIT"
+  spec.files = [
+    "README.md",
+    "exports/audit-notes.md",
+    "exports/rollback-plan.md"
+  ]
+  spec.exports = {
+    "audit-notes" => {
+      type: "fragment",
+      path: "exports/audit-notes.md",
+      summary: "Audit checklist guidance"
+    },
+    "rollback-plan" => {
+      type: "fragment",
+      path: "exports/rollback-plan.md",
+      summary: "Rollback guidance"
+    }
+  }
+  spec.targets = ["tool_c"]
+end

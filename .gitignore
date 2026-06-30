@@ -1,0 +1,4 @@
+/target
+/.pray/cache
+/Cargo.lock
+.DS_Store

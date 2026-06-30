@@ -1,0 +1,28 @@
+[package]
+name = "pray-transport"
+version = "0.1.0"
+edition = "2021"
+
+[dependencies]
+async-trait = "0.1"
+anyhow = "1"
+chrono = { version = "0.4", features = ["serde"] }
+hex = "0.4"
+pray-core = { path = "../pray-core" }
+reqwest = { version = "0.12", features = ["json"] }
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+sha2 = "0.10"
+thiserror = "1"
+tokio = { version = "1", features = ["full"] }
+
+[features]
+default = ["http"]
+http = []
+p2p = []
+torrent = []
+filesystem = []
+all = ["http", "p2p", "torrent", "filesystem"]
+
+[dev-dependencies]
+tokio-test = "0.4"

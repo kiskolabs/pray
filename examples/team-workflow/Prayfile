@@ -1,0 +1,28 @@
+prayfile "1"
+
+target :tool_a do
+  output "INSTRUCTIONS.md"
+  skills ".agents/skills"
+  max_bytes 120_000
+end
+target :tool_b do
+  output "REVIEW.md"
+  commands ".tool-b/commands"
+end
+group :core do
+  agent "sample/core", "~> 3.2",
+    path: "packages/core",
+    exports: ["incident-triage", "testing-basics"]
+end
+group :ui do
+  agent "sample/ui", "~> 2.1",
+    path: "packages/ui",
+    exports: ["webapp-review", "live-pages"]
+end
+local "agent/local/project.md", position: :before
+local "agent/local/testing.md", position: :after
+render mode: :managed,
+  conflict: :fail,
+  churn: :minimal,
+  header: true,
+  section_markers: true

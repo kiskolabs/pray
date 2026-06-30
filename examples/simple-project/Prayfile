@@ -1,0 +1,13 @@
+prayfile "1"
+source "default", "https://agents.example.com"
+target :tool_a do
+  output "INSTRUCTIONS.md"
+  skills ".agents/skills"
+end
+agent "sample/base", "~> 1.4",
+  path: "packages/base",
+  exports: ["testing-basics", "security-basics"]
+local "agent/local/project.md"
+render mode: :managed,
+  conflict: :fail,
+  churn: :minimal
