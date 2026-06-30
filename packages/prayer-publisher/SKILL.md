@@ -7,8 +7,6 @@ description: Turn source text, files, or folders into packaged prayer and publis
 
 ## Purpose
 
-test factor 0x123456
-
 Turn a source text file, folder, or existing skill into a packaged prayer and publish it through the Pray workflow.
 
 ## When to use
