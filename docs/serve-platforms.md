@@ -2,13 +2,13 @@
 
 `pray serve` is a self-hosted distribution-point server. The specification defines the server behavior, but not a single hosted platform.
 
-Use the platform guides below for concrete deployment templates:
+Use the deployment guides below for concrete templates:
 
-- [Heroku](deployments/heroku.md)
-- [Fly.io](deployments/flyio.md)
-- [Hetzner](deployments/hetzner.md)
-- [Cloudflare](deployments/cloudflare.md)
-- [Dokku](deployments/dokku.md)
+- managed hosting
+- general-purpose hosted app platform
+- dedicated server
+- edge proxy or tunnel in front of another host
+- self-managed app server
 
 ## Common requirements
 
@@ -59,10 +59,10 @@ A practical admin UI would usually include:
 
 ## Suggested deployment choice
 
-- **Heroku**: fine for small deployments with external storage
-- **Fly.io**: strong general-purpose choice
-- **Hetzner**: best for full control and durability
-- **Cloudflare**: best as a proxy and security layer in front of another host
-- **Dokku**: best if you want Heroku-like deploys on your own server
+- managed hosting: fine for small deployments with external storage
+- general-purpose hosted app platform: strong default choice
+- dedicated server: best for full control and durability
+- edge proxy or tunnel: best as a layer in front of another host
+- self-managed app server: best if you want app-server-style deploys on your own server
 
-If you want a concrete setup next, start with the platform guide that matches your hosting choice.
+If you want a concrete setup next, start with the guide that matches your hosting choice.

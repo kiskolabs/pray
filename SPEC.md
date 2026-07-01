@@ -11,7 +11,7 @@
 
 ## 1. Summary
 
-Prayfile is an open specification for reproducible inference input composition.
+Prayfile is an open specification for reproducible pre-inference input composition.
 
 It lets projects declare shared instructions, policies, memories, templates, review checklists, formatting rules, and workflows in one place; resolve them deterministically; lock exact versions and hashes; preserve original source fragments; and render tool-specific outputs with compact provenance markers.
 
@@ -46,7 +46,7 @@ Prayfile is an open specification for reproducible inference input composition.
 
 **Short pitch:**
 
-Modern inference engines rely on surrounding input files such as `AGENTS.md`, `CLAUDE.md`, instruction libraries, prompt templates, review checklists, memories, formatting rules, and workflow notes. These files are often distributed manually through copy-paste. Prayfile lets projects declare shared input dependencies, resolve them deterministically, lock exact versions and content hashes, preserve original source fragments, and render tool-specific outputs with compact provenance markers.
+Modern tools rely on surrounding instruction files, templates, review checklists, memories, formatting rules, and workflow notes. These files are often distributed manually through copy-paste. Prayfile lets projects declare shared input dependencies, resolve them deterministically, lock exact versions and content hashes, preserve original source fragments, and render tool-specific outputs with compact provenance markers.
 
 **FAQ:**
 
@@ -54,7 +54,7 @@ Modern inference engines rely on surrounding input files such as `AGENTS.md`, `C
 |----------|--------|
 | Is this a prompt framework? | No. The durable problem is packaging and distributing the material placed before inference—not prompt design itself. |
 | What is input drift? | The gradual divergence of instructions, policies, templates, memories, formatting rules, and workflow assumptions between projects. |
-| Why now? | Cross-tool support for `AGENTS.md`, `CLAUDE.md`, and similar files removed a major adoption blocker. Copy-paste still does not scale. |
+| Why now? | More tools now read repository-local instruction files, but manual copy-paste still does not scale. |
 | Is the spec final? | Not yet. Terminology, formats, and behaviour may still evolve as the system is hardened through real-world use. |
 | Implementation status? | The specification and reference CLI evolve together, with production readiness as the goal. |
 
@@ -100,7 +100,7 @@ These values inform lockfile fields, pray markers, `pray drift` output, `pray ve
 
 ### Production intent
 
-Packaging shapes, tool conventions, and workflow surfaces for inference input will keep changing drastically—skills today, something else tomorrow. Prayfile is designed to stay useful while that surface changes by defining stable contracts, clear indicators, and reviewable change paths.
+Packaging shapes, tool conventions, and workflow surfaces for inference input will keep changing drastically. Prayfile is designed to stay useful while that surface changes by defining stable contracts, clear indicators, and reviewable change paths.
 
 To observe change, you need indicators. Prayfile defines them as contracts: pinned lock state, pray markers, explicit diffs, integrity checks, and signed feedback. The core values above are those indicators made normative so teams can measure what altered, when, and from where while the surrounding ecosystem shifts.
 
@@ -110,10 +110,7 @@ To observe change, you need indicators. Prayfile defines them as contracts: pinn
 
 Inference-oriented development now commonly uses files and folders such as:
 
-- AGENTS.md
-- CLAUDE.md
-- `.github/copilot-instructions.md`
-- `.agents/`
+- instruction files
 - instruction libraries
 - prompt templates
 - review checklists
@@ -291,31 +288,31 @@ Semantic analogy:
 Legacy registries may execute host-language code.  
 Prayfile must parse declarations only.
 
-### RubyGems alignment
+### Dependency ecosystem alignment
 
-Prayfile is Bundler-shaped for resolve and lock, with an additional render phase. RubyGems and Bundler are the closest reference ecosystem; the core values in section 2 extend their indicator model to inference-input dependencies.
+Prayfile is lockfile-shaped for resolve and render, with an additional materialize phase. Existing dependency ecosystems provide the closest reference patterns; the core values in section 2 extend their indicator model to inference-input dependencies.
 
-| Prayfile | RubyGems / Bundler |
-|-----------|-------------------|
-| Prayfile | Gemfile |
-| Prayfile.lock | Gemfile.lock |
-| *.prayspec | *.gemspec |
-| *.praypkg | `.gem` |
-| resolve (lock) | resolver / `bundle lock` |
-| render (fetch + materialize) | no direct equivalent — gems install as code trees, not merged context files |
-| pray verify | `bundle check` and sanity checks |
+| Prayfile | Dependency ecosystem |
+|----------|---------------------|
+| Prayfile | dependency manifest |
+| Prayfile.lock | lockfile |
+| *.prayspec | package spec |
+| *.praypkg | package archive |
+| resolve (lock) | resolver / lock step |
+| render (fetch + materialize) | no direct equivalent — dependencies install as their own artifacts, not merged context files |
+| pray verify | checksum / integrity checks |
 | pray drift | lockfile diff plus rendered-output diff |
 
-| Core value | RubyGems / Bundler | Prayfile extension |
-|------------|-------------------|---------------------|
-| Auditable traces | lockfile pins; package name and version | compact pray markers inside rendered target files |
-| Temporal clarity | lockfile history; yanked gems; explicit `bundle update` | `pray drift` across lock and render; marker-level blame and rollback |
+| Core value | Dependency ecosystem | Prayfile extension |
+|------------|---------------------|---------------------|
+| Auditable traces | lockfile pins; versioned artifacts | compact pray markers inside rendered target files |
+| Temporal clarity | lockfile history; explicit updates | `pray drift` across lock and render; marker-level blame and rollback |
 | Measurable effects | manifest → lock → install; behavior validated by tests | manifest → lock → rendered bytes → diff; inference behaviour stays human-validated |
-| Security | checksums; yanked gems; optional signing; vendoring | same supply-chain baseline; packages are static declarations only — no host-language execution |
+| Security | checksums; optional signing; vendoring | same supply-chain baseline; packages are static declarations only — no host-language execution |
 
-Prayfile does not replace RubyGems. It applies reproducibility and audit patterns proven necessary for code dependencies to inference-input dependencies: lock what resolved, render what landed, cite managed spans compactly in target files.
+Prayfile does not replace dependency ecosystems. It applies reproducibility and audit patterns proven necessary for code dependencies to inference-input dependencies: lock what resolved, render what landed, cite managed spans compactly in target files.
 
-A planned Ruby gem may provide runtime prayer loading and assembly for Rails and other Ruby web applications. The gem consumes `Prayfile.lock` and cache artifacts produced by `pray`; it does not replace the CLI resolve/render pipeline. See `README.md` — Ruby and Rails integration (planned).
+A planned host-language adapter may provide runtime loading and assembly for applications that need it; it consumes `Prayfile.lock` and cache artifacts produced by `pray`, and it does not replace the CLI resolve/render pipeline.
 
 ---
 
@@ -361,14 +358,12 @@ Examples: registry, static index, git, local path, tarball, OCI artifact, file s
 
 ## 9. Repository layout
 
-Recommended project layout:
+### Recommended project layout:
 
 ```
 Prayfile
 Prayfile.lock
-AGENTS.md
-CLAUDE.md
-.github/copilot-instructions.md
+tool-specific instruction files
 
 .pray/cache/                # ignored by default
 .pray/vendor/               # optional, committed only in hermetic/offline mode
@@ -392,7 +387,7 @@ Depending on repository policy, rendered target files may be committed or ignore
 
 - commit Prayfile
 - commit Prayfile.lock
-- commit rendered target files such as `AGENTS.md` and `CLAUDE.md` when tools require repository-local files
+- commit rendered target files when tools require repository-local files
 - ignore cache
 - ignore state
 
@@ -1370,13 +1365,13 @@ exports = [
 [[target]]
 name = "tool_a"
 outputs = [
-  "AGENTS.md",
-  ".agents/skills",
+  "INSTRUCTIONS.md",
+  ".tool-a/",
 ]
 
 [[managed_span]]
 id = "p7f3k9m2"
-target = "AGENTS.md"
+target = "INSTRUCTIONS.md"
 open_line = 14
 close_line = 20
 ideal_checksum = "sha256:abc123..."
@@ -1387,7 +1382,7 @@ silenced = false
 
 [[managed_span]]
 id = "q8g4h1j6"
-target = "AGENTS.md"
+target = "INSTRUCTIONS.md"
 open_line = 24
 close_line = 30
 ideal_checksum = "sha256:789abc..."
@@ -1411,7 +1406,7 @@ signature = "ed25519:..."
 
 [[verification_record]]
 kind = "render_plan"
-subject = "AGENTS.md#p7f3k9m2"
+subject = "INSTRUCTIONS.md#p7f3k9m2"
 subject_hash = "sha256:..."
 verifier = "pray 0.1.0"
 method = "rule"
@@ -1419,11 +1414,11 @@ policy = "render-managed"
 input_hash = "sha256:..."
 observed_hash = "sha256:..."
 observed_at = "2026-06-29T14:07:56Z"
-provenance = "sample/base -> AGENTS.md; exports=testing-basics; exclusions=[]"
+provenance = "sample/base -> INSTRUCTIONS.md; exports=testing-basics; exclusions=[]"
 
 [[verification_record]]
 kind = "render_output"
-subject = "AGENTS.md#p7f3k9m2"
+subject = "INSTRUCTIONS.md#p7f3k9m2"
 subject_hash = "sha256:..."
 verifier = "pray 0.1.0"
 method = "hash"
@@ -1449,8 +1444,8 @@ signature = "ed25519:..."
 [[target]]
 name = "tool_b"
 outputs = [
-  "CLAUDE.md",
-  ".tool-b/skills",
+  "NOTES.md",
+  ".tool-b/",
 ]
 ```
 
@@ -1894,23 +1889,23 @@ Edit Prayfile or agent/local/*.md, not this file.
 ...
 ## Shared instructions
 ...
-## Available skills
+## Available capabilities
 - code-review
 - schema-migration
 ```
 
-Do not dump every skill body into root files if target supports skills.
+Do not dump every capability body into root files if target supports capabilities.
 
 ---
 
-## 48. Example generated AGENTS.md
+## 48. Example generated instruction file
 
 ```markdown
 <!-- pray:0 ignore-comments -->
 
-# Agent context
+# Input context
 
-Do not edit managed blocks or managed skills.
+Do not edit managed blocks.
 Add or change project-specific instructions in `agent/local/` only.
 To change shared guidance, ask a human to update `Prayfile` and run `pray`.
 
@@ -1944,9 +1939,9 @@ Check migrations, callbacks, authorization boundaries, background jobs, and data
 
 ---
 
-## 49. Example generated skill
+## 49. Example generated capability
 
-Path: `.agents/skills/code-review/SKILL.md`
+Path: `generated/capabilities/code-review.md`
 
 ```markdown
 # Code review
@@ -2082,11 +2077,11 @@ Semantic diff: `pray drift --semantic`
 Example output:
 
 ```
-managed_span q8g4h1j6 AGENTS.md
+managed_span q8g4h1j6 INSTRUCTIONS.md
   kind: custom_implementation
   ideal_checksum: sha256:789abc...
   actual_checksum: sha256:111222...
-managed_span p7f3k9m2 AGENTS.md
+managed_span p7f3k9m2 INSTRUCTIONS.md
   kind: removed_prayer
   expected lines: 14-20
 renderer_drift
@@ -2694,7 +2689,7 @@ Milestone 3:
 - update command
 - semantic diff
 - tool_b target
-- skills rendering
+- tool-specific rendering
 - vendor mode
 - offline mode
 - publish static registry
@@ -2702,28 +2697,28 @@ Milestone 3:
 
 ---
 
-## 80. Ownership and agent contract
+## 80. Ownership and generated-output contract
 
-The hardest part of Prayfile is keeping **managed** rendered output stable and read-only for agents while **local** additions remain editable and safe from overwrite.
+The hardest part of Prayfile is keeping **managed** rendered output stable and read-only while **local** additions remain editable and safe from overwrite.
 
-The model is not “one big `AGENTS.md` everyone edits.” It is three zones with different owners.
+The model is not one shared rendered file everyone edits. It is three zones with different owners.
 
 ### Three zones
 
 | Zone | Source | Who edits | What pray does |
 |------|--------|-----------|----------------|
 | **Recipe** | Prayfile, packages, Prayfile.lock | Humans via `pray add`, `pray remove`, `pray update` | resolves and locks |
-| **Local** | `agent/local/**` | Humans and agents | reads on render; **never writes** |
-| **Managed** | Generated target files, package skills, package rules | Nobody directly | fully regenerates from lock + recipe + local inputs |
+| **Local** | `agent/local/**` | Humans and applications | reads on render; **never writes** |
+| **Managed** | Generated target files and package-owned rules | Nobody directly | fully regenerates from lock + recipe + local inputs |
 
-Package exports and skills live only in the managed zone. They are pinned by recipe and hash. Agents consume them; they do not rewrite them.
+Package exports live only in the managed zone. They are pinned by recipe and hash. Applications consume them; they do not rewrite them.
 
 Local overrides live only under `agent/local/`. They are not locked, not hashed in `Prayfile.lock`, and are re-embedded into rendered output on every `pray render`.
 
 ### Golden rules
 
-1. Agents must **not** edit managed files, managed blocks, or managed skill directories.
-2. Agents **may** edit `agent/local/**` when project-specific input must change.
+1. Applications must **not** edit managed files or managed blocks.
+2. Applications **may** edit `agent/local/**` when project-specific input must change.
 3. Humans change shared packages by editing **Prayfile** and running **pray**, not by patching rendered target files.
 4. Render reconstructs managed output from inputs. There is no three-way merge in v1.
 
@@ -2735,7 +2730,7 @@ Root files are assembled in a fixed order:
 preamble              # short contract (generated)
 local embeds          # copied from agent/local/*.md
 managed blocks        # one block per package export
-skills index          # names only; bodies live in skill dirs
+index                 # names only; bodies live elsewhere
 ```
 
 Managed blocks use opaque pray markers from section 41:
@@ -2759,31 +2754,31 @@ Recommended shape:
 ```markdown
 <!-- pray:0 ignore-comments -->
 
-# Agent context
+# Input context
 
-Do not edit managed blocks or managed skills.
+Do not edit managed blocks.
 Add or change project-specific instructions in `agent/local/` only.
 To change shared guidance, ask a human to update `Prayfile` and run `pray`.
 ```
 
-The ignore marker is for tooling. The visible lines are for the agent.
+The ignore marker is for tooling. The visible lines are for the application.
 
-### Skills ownership
+### Managed output ownership
 
-Package skills install under the target skills directory, for example `.agents/skills/`.
+Managed output installs under the target directory for the current project.
 
-Each managed skill directory must carry origin metadata, either in `SKILL.md` front matter or a small `.pray-origin.toml`:
+Each managed directory or file must carry origin metadata, either in front matter or a small `.pray-origin.toml`:
 
 ```toml
 package = "sample/webapp"
-skill = "code-review"
+export = "code-review"
 version = "2.1.5"
 tree_hash = "sha256:..."
 ```
 
-Optional local skills live under `agent/local/skills/` and copy to `.agents/skills/local/<name>/`. They are not origin-tagged as packages. Name collisions between local and managed skills are **conflicts** unless policy says otherwise.
+Optional local additions live under `agent/local/` and are not origin-tagged as packages. Name collisions between local and managed content are **conflicts** unless policy says otherwise.
 
-Agents must not edit managed skill directories. They may edit `agent/local/skills/`.
+Applications must not edit managed directories. They may edit `agent/local/`.
 
 ### Idempotency
 
@@ -2808,7 +2803,7 @@ Guarantees:
 
 Local file edits change only local embeds and the root file hash. They do not require resolve unless Prayfile changed.
 
-Package updates change only blocks and skills owned by affected packages.
+Package updates change only managed blocks owned by affected packages.
 
 ### Update behavior
 
@@ -2818,9 +2813,9 @@ pray update sample/webapp
 
 1. resolve selects new version within constraints and updates Prayfile.lock.
 2. render replaces every managed block mapped to `sample/webapp` in `Prayfile.lock`.
-3. render replaces skill directories whose origin package is `sample/webapp`.
+3. render replaces managed directories whose origin package is `sample/webapp`.
 4. Local embeds and `agent/local/**` are re-read but not modified on disk.
-5. `pray drift` shows recipe, lock, managed-block, skill, and render changes.
+5. `pray drift` shows recipe, lock, managed-block, and render changes.
 
 Pray markers make updates surgical in diffs even though render is logically full reconstruction.
 
@@ -2833,7 +2828,7 @@ pray remove sample/webapp
 1. Remove declaration from Prayfile.
 2. resolve recomputes lock without that package.
 3. render deletes all managed blocks mapped to `sample/webapp`.
-4. render deletes managed skills tagged with that package origin.
+4. render deletes managed directories tagged with that package origin.
 5. `agent/local/**` is preserved.
 6. Orphan pray markers after remove are **verify errors**.
 
@@ -2847,11 +2842,11 @@ Must detect:
 - **removed prayer** — lockfile managed span exists; marker pair missing
 - **position drift** — body checksum matches `ideal_checksum`; marker lines moved
 - **orphan marker** — marker pair exists; no lock managed span record
-- manual edits inside managed skill directories
+- manual edits inside managed directories
 - content outside any allowed marker region in managed root files
 - stale render relative to lock and local inputs
 - missing local files referenced by Prayfile
-- duplicate skill names across local and managed paths
+- duplicate managed names across local and managed paths
 - invalid, nested, or unmatched pray markers
 
 Strict mode turns all of these into errors. CI uses `pray install --frozen`, `pray verify --strict`, and `pray drift`.
@@ -2860,14 +2855,14 @@ To refresh ideal checksums and line positions after intentional changes, run `pr
 
 ### Why this works
 
-Agents are untrusted editors. Treat managed rendered output like compiled output:
+Applications are untrusted editors. Treat managed rendered output like compiled output:
 
 ```
 Prayfile + packages  →  resolve  →  lock
-lock + local + packages  →  render  →  AGENTS.md + skills
+lock + local + packages  →  render  →  rendered targets
 ```
 
-If an agent rewrites a managed block in `AGENTS.md`, the next `pray render` or CI frozen check fails. The fix is not merge logic. The fix is regenerate and move custom text into `agent/local/`.
+If an application rewrites a managed block, the next `pray render` or CI frozen check fails. The fix is not merge logic. The fix is regenerate and move custom text into `agent/local/`.
 
 That keeps shared packages stable, local overrides editable, and the system idempotent.
 
