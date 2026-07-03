@@ -44,23 +44,27 @@ fn render_target(
 ) -> PrayResult<RenderedTarget> {
     let mut lines = Vec::<String>::new();
     if project.manifest.render.header {
+        let output_name = output
+            .file_name()
+            .map(|name| name.to_string_lossy().to_string())
+            .unwrap_or_else(|| output.to_string_lossy().to_string());
         lines.push("<!-- pray:0 ignore-comments -->".to_string());
         lines.push(String::new());
         lines.push("# Agent context".to_string());
         lines.push(String::new());
-        lines.push("Do not edit managed blocks or managed skills.".to_string());
+        lines.push(format!(
+            "Do not edit managed blocks in `{output_name}` or skills under `.agents/`."
+        ));
         lines.push(
-            "Add or change project-specific instructions in `agent/local/` only.".to_string(),
-        );
-        lines.push(
-            "To change shared guidance, ask a human to update `Prayfile` and run `pray`."
-                .to_string(),
+            "To change shared guidance, update `Prayfile` and run `pray install`.".to_string(),
         );
         lines.push(String::new());
     }
 
-    lines.push("## Project-local instructions".to_string());
-    lines.push(String::new());
+    if !project.local_files.is_empty() {
+        lines.push("## Additional instructions".to_string());
+        lines.push(String::new());
+    }
     for local in &project.local_files {
         if local.content.is_empty() && local.optional {
             continue;

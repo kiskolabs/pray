@@ -2275,10 +2275,7 @@ fn load_manifest() -> PrayResult<pray_core::manifest::Manifest> {
 }
 
 fn workspace_root() -> PathBuf {
-    manifest_path()
-        .parent()
-        .map(Path::to_path_buf)
-        .unwrap_or_else(|| PathBuf::from("."))
+    pray_core::resolve::project_root_from_manifest(&manifest_path())
 }
 
 fn manifest_path() -> PathBuf {
