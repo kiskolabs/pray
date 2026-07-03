@@ -44,11 +44,15 @@ impl ResolvedProject {
     }
 }
 
+pub fn project_root_from_manifest(manifest_path: &Path) -> PathBuf {
+    match manifest_path.parent() {
+        Some(parent) if !parent.as_os_str().is_empty() => parent.to_path_buf(),
+        _ => PathBuf::from("."),
+    }
+}
+
 pub fn resolve_project(manifest_path: &Path) -> PrayResult<ResolvedProject> {
-    let project_root = manifest_path
-        .parent()
-        .unwrap_or_else(|| Path::new("."))
-        .to_path_buf();
+    let project_root = project_root_from_manifest(manifest_path);
     let manifest_text = fs::read_to_string(manifest_path)?;
     let manifest = crate::manifest::parse_manifest(&manifest_text)?;
     let sources = source_map(&manifest.sources);
@@ -291,6 +295,14 @@ fn remove_path_if_exists(path: &Path) -> PrayResult<()> {
     }
 }
 
+pub fn missing_local_embed_guidance(path: impl AsRef<str>) -> String {
+    let path = path.as_ref();
+    format!(
+        "Prayfile lists `local \"{path}\"` but the file does not exist. \
+         Create the file or remove the entry from Prayfile, then run `pray install`."
+    )
+}
+
 fn resolve_local_file(
     project_root: &Path,
     declaration: &crate::manifest::ManifestLocal,
@@ -305,10 +317,7 @@ fn resolve_local_file(
                 optional: true,
             });
         }
-        return Err(PrayError::Resolution(format!(
-            "missing local file: {}; restore the file and rerun pray install",
-            declaration.path
-        )));
+        return Err(PrayError::Resolution(missing_local_embed_guidance(&declaration.path)));
     }
     Ok(ResolvedLocalFile {
         content: read_text(&path)?,
@@ -404,4 +413,22 @@ fn ruby_pessimistic_to_semver(constraint: &str) -> PrayResult<String> {
 fn read_text(path: &Path) -> PrayResult<String> {
     let text = fs::read_to_string(path)?;
     Ok(crate::hashing::normalize_line_endings(&text))
+}
+
+#[cfg(test)]
+mod tests {
+    use super::project_root_from_manifest;
+    use std::path::Path;
+
+    #[test]
+    fn project_root_from_manifest_uses_cwd_for_bare_filename() {
+        let root = project_root_from_manifest(Path::new("Prayfile"));
+        assert_eq!(root, Path::new("."));
+    }
+
+    #[test]
+    fn project_root_from_manifest_uses_parent_directory() {
+        let root = project_root_from_manifest(Path::new("examples/simple-project/Prayfile"));
+        assert_eq!(root, Path::new("examples/simple-project"));
+    }
 }

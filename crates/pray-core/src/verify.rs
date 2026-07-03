@@ -1,7 +1,7 @@
 use crate::hashing::{normalize_line_endings, sha256_prefixed};
 use crate::lockfile::{Lockfile, ManagedSpanRecord};
 use crate::render::render_project;
-use crate::resolve::ResolvedProject;
+use crate::resolve::{missing_local_embed_guidance, ResolvedProject};
 use crate::{PrayError, PrayResult};
 use std::collections::{BTreeMap, BTreeSet};
 use std::fs;
@@ -68,7 +68,7 @@ fn collect_verification_report(
         report.findings.push(VerificationFinding {
             kind: "verify_error".to_string(),
             message:
-                "manifest hash differs from lockfile; rerun pray install to refresh Prayfile.lock"
+                "Prayfile changed since `Prayfile.lock` was generated. Run `pray install` to refresh the lockfile."
                     .to_string(),
         });
     }
@@ -84,15 +84,18 @@ fn collect_verification_report(
                 if locked.tree_hash != package.tree_hash {
                     report.findings.push(VerificationFinding {
                         kind: "package_integrity".to_string(),
-                        message: format!("package {} tree hash mismatch; rerun pray install to refresh the resolved package state", package.declaration.name),
+                        message: format!(
+                            "Package `{}` no longer matches the locked tree hash. Run `pray install` to re-resolve packages.",
+                            package.declaration.name
+                        ),
                     });
                 }
                 if locked.version != package.spec.version {
                     report.findings.push(VerificationFinding {
                         kind: "verify_error".to_string(),
                         message: format!(
-                            "package {} version differs: lock {} vs current {}; rerun pray install to refresh the lockfile",
-                            package.declaration.name, locked.version, package.spec.version
+                            "Package `{}` resolved to version {} but `Prayfile.lock` has {}. Run `pray install` to refresh the lockfile.",
+                            package.declaration.name, package.spec.version, locked.version
                         ),
                     });
                 }
@@ -100,7 +103,7 @@ fn collect_verification_report(
             None => report.findings.push(VerificationFinding {
                 kind: "verify_error".to_string(),
                 message: format!(
-                    "package {} missing from lockfile; rerun pray install to restore it",
+                    "Package `{}` is declared in Prayfile but missing from `Prayfile.lock`. Run `pray install` to update the lockfile.",
                     package.declaration.name
                 ),
             }),
@@ -109,7 +112,10 @@ fn collect_verification_report(
     for locked in locked_packages.values() {
         report.findings.push(VerificationFinding {
             kind: "verify_error".to_string(),
-            message: format!("lockfile contains unexpected package {}; rerun pray install to reconcile the lockfile", locked.name),
+            message: format!(
+                "Package `{}` is in `Prayfile.lock` but not declared in Prayfile. Remove it from the lockfile with `pray install` or add it back to Prayfile.",
+                locked.name
+            ),
         });
     }
 
@@ -126,7 +132,10 @@ fn collect_verification_report(
         if !absolute_path.exists() {
             report.findings.push(VerificationFinding {
                 kind: "verify_error".to_string(),
-                message: format!("missing target file: {}", target_path),
+                message: format!(
+                    "Rendered file `{}` is missing. Run `pray install` to generate it.",
+                    target_path
+                ),
             });
             continue;
         }
@@ -138,20 +147,29 @@ fn collect_verification_report(
             match markers.get(&span.id) {
                 None => report.findings.push(VerificationFinding {
                     kind: "removed_prayer".to_string(),
-                    message: format!("{} missing marker pair {} ({}::{}) ; rerun pray install to restore the managed span", target_path, span.id, span.package, span.export),
+                    message: format!(
+                        "`{}` is missing managed marker `{}` for `{}::{}`. Run `pray install` to restore the managed span.",
+                        target_path, span.id, span.package, span.export
+                    ),
                 }),
                 Some((open_line, close_line, body)) => {
                     let actual_checksum = sha256_prefixed(normalize_line_endings(body).as_bytes());
                     if actual_checksum != span.ideal_checksum {
                         report.findings.push(VerificationFinding {
                             kind: "custom_implementation".to_string(),
-                            message: format!("{} marker {} body changed ({}::{}) ; rerun pray install to restore the managed span", target_path, span.id, span.package, span.export),
+                            message: format!(
+                                "`{}` marker `{}` (`{}::{}`) was edited. Restore the managed block or run `pray install` to regenerate it.",
+                                target_path, span.id, span.package, span.export
+                            ),
                         });
                     }
                     if *open_line != span.open_line || *close_line != span.close_line {
                         report.findings.push(VerificationFinding {
                             kind: "position_drift".to_string(),
-                            message: format!("{} marker {} moved ({}::{}) ; rerun pray install to restore the managed span", target_path, span.id, span.package, span.export),
+                            message: format!(
+                                "`{}` marker `{}` (`{}::{}`) moved to different lines. Run `pray install` to restore expected positions.",
+                                target_path, span.id, span.package, span.export
+                            ),
                         });
                     }
                 }
@@ -161,7 +179,10 @@ fn collect_verification_report(
             if !spans.iter().any(|span| span.id == marker_id) && marker_id != "0" {
                 report.findings.push(VerificationFinding {
                     kind: "orphan_marker".to_string(),
-                    message: format!("{} has orphan marker {}", target_path, marker_id),
+                    message: format!(
+                        "`{}` contains marker `{}` that is not tracked in `Prayfile.lock`. Remove the marker or run `pray install` to reconcile.",
+                        target_path, marker_id
+                    ),
                 });
             }
         }
@@ -174,10 +195,7 @@ fn collect_verification_report(
         if !project.project_root.join(&local.path).exists() {
             report.findings.push(VerificationFinding {
                 kind: "verify_error".to_string(),
-                message: format!(
-                    "missing local file: {}; restore the file and rerun pray install",
-                    local.path.display()
-                ),
+                message: missing_local_embed_guidance(&local.path.to_string_lossy()),
             });
         }
     }

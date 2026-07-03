@@ -22,7 +22,7 @@ fn verify_reports_custom_implementation() {
     let stderr = String::from_utf8_lossy(&verify.stderr);
     assert!(stderr.contains("custom_implementation") || stderr.contains("verify error"));
     assert!(stderr.contains("sample/base::testing-basics"));
-    assert!(stderr.contains("rerun pray install"));
+    assert!(stderr.contains("pray install"));
 }
 
 #[test]
@@ -114,7 +114,7 @@ fn verify_reports_missing_managed_span_with_package_context_and_recovery_guidanc
     assert!(stderr.contains("removed_prayer"));
     assert!(stderr.contains("INSTRUCTIONS.md"));
     assert!(stderr.contains("sample/base::testing-basics"));
-    assert!(stderr.contains("rerun pray install"));
+    assert!(stderr.contains("pray install"));
 }
 
 #[test]
@@ -129,10 +129,10 @@ fn install_reports_missing_required_local_file_with_recovery_guidance() {
     assert!(!install.status.success());
     assert_eq!(install.status.code(), Some(3));
     let stderr = String::from_utf8_lossy(&install.stderr);
-    assert!(stderr.contains("missing local file"));
+    assert!(stderr.contains("Prayfile lists"));
     assert!(stderr.contains("agent/local/project.md"));
-    assert!(stderr.contains("restore the file"));
-    assert!(stderr.contains("rerun pray install"));
+    assert!(stderr.contains("Create the file"));
+    assert!(stderr.contains("pray install"));
 }
 
 #[test]
@@ -241,7 +241,7 @@ fn install_locked_rejects_lockfile_drift() {
     assert_eq!(locked.status.code(), Some(6));
     let stderr = String::from_utf8_lossy(&locked.stderr);
     assert!(stderr.contains("lockfile needs update"));
-    assert!(stderr.contains("rerun pray install"));
+    assert!(stderr.contains("pray install"));
     assert_eq!(
         fs::read_to_string(repo.join("Prayfile.lock")).expect("preserved lockfile"),
         original_lockfile
@@ -261,7 +261,7 @@ fn install_frozen_rejects_stale_rendered_output() {
     let rendered_path = repo.join("INSTRUCTIONS.md");
     let rendered = fs::read_to_string(&rendered_path).expect("rendered file exists");
     let rendered = rendered.replace(
-        "Do not edit managed blocks or managed skills.",
+        "Do not edit managed blocks in `INSTRUCTIONS.md` or skills under `.agents/`.",
         "Managed blocks stay read-only.",
     );
     fs::write(&rendered_path, rendered).expect("rendered file rewritten");
