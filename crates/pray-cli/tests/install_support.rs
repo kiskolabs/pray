@@ -129,15 +129,16 @@ end
 }
 
 pub fn create_prayer_install_fixture(repo: &Path) {
-    fs::create_dir_all(repo.join("packages/prayer-publisher")).expect("fixture directories");
-    fs::create_dir_all(repo.join(".agents/skills/prayer-publisher")).expect("skill directories");
+    fs::create_dir_all(repo.join("packages/prayer-publisher/skills/prayer-publisher"))
+        .expect("fixture directories");
 
     fs::write(
         repo.join("Prayfile"),
         r#"
 prayfile "1"
-target :prayer_publisher do
-  output ".agents/skills/prayer-publisher/SKILL.md"
+target :agents do
+  output "AGENTS.md"
+  skills ".agents/skills"
 end
 agent "prayer-publisher", path: "packages/prayer-publisher", exports: ["skill"]
 render mode: :managed, conflict: :fail, churn: :minimal
@@ -152,11 +153,17 @@ Package::Specification.new do |spec|
   spec.name = "prayer-publisher"
   spec.version = "0.1.0"
   spec.summary = "Language-first packaging guidance for prayer-managed content"
-  spec.files = ["SKILL.md"]
+  spec.files = ["skills/prayer-publisher/SKILL.md"]
   spec.exports = {
     "skill" => {
       type: "fragment",
-      path: "SKILL.md",
+      path: "skills/prayer-publisher/SKILL.md",
+      summary: "Prayer publisher guidance"
+    }
+  }
+  spec.skills = {
+    "prayer-publisher" => {
+      path: "skills/prayer-publisher",
       summary: "Prayer publisher guidance"
     }
   }
@@ -166,7 +173,7 @@ end
     .expect("write prayspec");
 
     fs::write(
-        repo.join("packages/prayer-publisher/SKILL.md"),
+        repo.join("packages/prayer-publisher/skills/prayer-publisher/SKILL.md"),
         r#"---
 name: prayer-publisher
 description: Turn source text, files, or folders into packaged prayer and publish it.

@@ -24,6 +24,8 @@ fn installs_renders_and_verifies_a_local_package() {
 
     let rendered = fs::read_to_string(repo.join("INSTRUCTIONS.md")).expect("rendered file exists");
     assert!(rendered.contains("<!-- pray:"));
+    assert!(rendered.contains("### .agents/project.md"));
+    assert!(!rendered.contains("/Users/"));
 
     let lockfile = repo.join("Prayfile.lock");
     let initial_modified = fs::metadata(&lockfile)
@@ -204,12 +206,15 @@ fn installs_prayer_package_into_a_managed_skill_path() {
         String::from_utf8_lossy(&install.stderr)
     );
 
-    let rendered_skill = repo.join(".agents/skills/prayer-publisher/SKILL.md");
-    assert!(rendered_skill.is_file(), "managed skill file missing");
+    let materialized_skill = repo.join(".agents/skills/prayer-publisher/SKILL.md");
+    assert!(materialized_skill.is_file(), "materialized skill file missing");
 
-    let skill_text = fs::read_to_string(&rendered_skill).expect("rendered skill text");
-    assert!(skill_text.contains("<!-- pray:"));
+    let skill_text = fs::read_to_string(&materialized_skill).expect("materialized skill text");
     assert!(skill_text.contains("Prayer Publisher"));
+
+    let agents = fs::read_to_string(repo.join("AGENTS.md")).expect("rendered agents file");
+    assert!(agents.contains("<!-- pray:"));
+    assert!(agents.contains("Prayer Publisher"));
 
     let lockfile = fs::read_to_string(repo.join("Prayfile.lock")).expect("lockfile");
     assert!(lockfile.contains("prayer-publisher"));

@@ -186,7 +186,7 @@ fn collect_verification_report(
         if !project.project_root.join(&local.path).exists() {
             report.findings.push(VerificationFinding {
                 kind: "verify_error".to_string(),
-                message: missing_local_embed_guidance(local.path.to_string_lossy()),
+                message: missing_local_embed_guidance(&local.manifest_path),
             });
         }
     }

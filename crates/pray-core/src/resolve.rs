@@ -42,6 +42,7 @@ pub struct ResolvedPackage {
 #[derive(Debug, Clone)]
 pub struct ResolvedLocalFile {
     pub path: PathBuf,
+    pub manifest_path: String,
     pub content: String,
     pub position: String,
     pub optional: bool,
@@ -793,6 +794,7 @@ fn resolve_local_file(
         if declaration.optional {
             return Ok(ResolvedLocalFile {
                 path,
+                manifest_path: declaration.path.clone(),
                 content: String::new(),
                 position: declaration.position.clone(),
                 optional: true,
@@ -805,6 +807,7 @@ fn resolve_local_file(
     Ok(ResolvedLocalFile {
         content: read_text(&path)?,
         path,
+        manifest_path: declaration.path.clone(),
         position: declaration.position.clone(),
         optional: declaration.optional,
     })

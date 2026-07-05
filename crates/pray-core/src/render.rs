@@ -182,7 +182,7 @@ fn render_target(
         if local.content.is_empty() && local.optional {
             continue;
         }
-        builder.append_line(&format!("### {}", local.path.display()));
+        builder.append_line(&format!("### {}", local.manifest_path));
         builder.append_body(&local.content);
         builder.append_empty_line();
     }
