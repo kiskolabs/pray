@@ -219,7 +219,23 @@ pub fn resolve_local_registry_package_root(
     declaration: &ManifestPackage,
 ) -> PrayResult<PathBuf> {
     let metadata_path = source_root.join(format!("v1/packages/{}.json", declaration.name));
-    let metadata_text = fs::read_to_string(&metadata_path)?;
+    let metadata_text = fs::read_to_string(&metadata_path).map_err(|error| {
+        if error.kind() == std::io::ErrorKind::NotFound {
+            PrayError::Resolution(format!(
+                "package {} not found in distribution {:?}. \
+                 Missing {}. Check the package name, version constraint `{}`, and that the source publishes registry metadata.",
+                declaration.name,
+                source_root,
+                metadata_path.display(),
+                declaration.constraint
+            ))
+        } else {
+            PrayError::Resolution(format!(
+                "failed to read package metadata {}: {error}",
+                metadata_path.display()
+            ))
+        }
+    })?;
     let metadata: RegistryPackageMetadata =
         serde_json::from_str(&metadata_text).map_err(|error| PrayError::Parse {
             kind: "registry metadata",
@@ -473,7 +489,20 @@ fn read_local_registry_artifact_bytes(source_root: &Path, artifact: &str) -> Pra
     }
     let artifact_path = Path::new(artifact);
     validate_package_relative_path(artifact_path)?;
-    fs::read(source_root.join(artifact_path)).map_err(Into::into)
+    let full_path = source_root.join(artifact_path);
+    fs::read(&full_path).map_err(|error| {
+        if error.kind() == std::io::ErrorKind::NotFound {
+            PrayError::Resolution(format!(
+                "package artifact missing at {}. The distribution metadata may be stale or incomplete.",
+                full_path.display()
+            ))
+        } else {
+            PrayError::Resolution(format!(
+                "failed to read package artifact {}: {error}",
+                full_path.display()
+            ))
+        }
+    })
 }
 
 fn select_package_version(

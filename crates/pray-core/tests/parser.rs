@@ -14,7 +14,7 @@ target :tool_a do
 end
 agent "sample/base", "~> 1.4",
   exports: ["testing-basics", "security-basics"]
-local "agent/local/project.md"
+local ".agents/project.md"
 render mode: :managed,
   conflict: :fail,
   churn: :minimal
@@ -30,7 +30,7 @@ render mode: :managed,
         vec!["INSTRUCTIONS.md".to_string()]
     );
     assert_eq!(manifest.packages[0].name, "sample/base");
-    assert_eq!(manifest.local[0].path, "agent/local/project.md");
+    assert_eq!(manifest.local[0].path, ".agents/project.md");
     assert_eq!(manifest.render.mode, "managed");
 }
 
@@ -70,6 +70,26 @@ end
         "exports/testing-basics.md"
     );
     assert_eq!(package.dependencies[0].name, "sample/common");
+}
+
+#[test]
+fn parses_git_source_keyword_form() {
+    let manifest = parse_manifest(
+        r#"
+prayfile "1"
+source "amkisko", git: "https://github.com/amkisko/prayers"
+agent "amkisko/working-rules", "~> 1.0", source: "amkisko"
+"#,
+    )
+    .expect("manifest parses");
+
+    assert_eq!(manifest.sources.len(), 1);
+    assert_eq!(manifest.sources[0].name, "amkisko");
+    assert_eq!(manifest.sources[0].kind, "git");
+    assert_eq!(
+        manifest.sources[0].url,
+        "git+https://github.com/amkisko/prayers"
+    );
 }
 
 #[test]

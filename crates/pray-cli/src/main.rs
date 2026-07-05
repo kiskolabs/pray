@@ -16,7 +16,7 @@ use pray_core::registry::{
     RegistryIndex, RegistryPackageMetadata, RegistryPackageVersion,
 };
 use pray_core::render::{render_project, write_rendered_targets};
-use pray_core::resolve::{resolve_project, ResolvedProject};
+use pray_core::resolve::{refresh_git_sources, resolve_project, ResolvedProject};
 use pray_core::trust::{write_registry_trust_settings, RegistryTrustSettings};
 use pray_core::verify::{drift_project, format_verification_report, verify_project};
 use pray_core::{PrayError, PrayResult};
@@ -451,6 +451,7 @@ fn update_command(package: Option<String>, major: bool) -> PrayResult<()> {
     }
 
     let previous_lockfile = read_lockfile(&lockfile_path()).ok();
+    refresh_git_sources(&manifest_path())?;
     install_command(false, false, false)?;
     let updated_lockfile = read_lockfile(&lockfile_path())?;
     let merged_lockfile = if let (Some(previous_lockfile), Some(package_name)) =

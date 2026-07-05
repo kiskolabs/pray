@@ -19,8 +19,8 @@ group :ui do
     path: "packages/ui",
     exports: ["webapp-review", "live-pages"]
 end
-local "agent/local/project.md", position: :before
-local "agent/local/testing.md", position: :after
+local ".agents/project.md", position: :before
+local ".agents/testing.md", position: :after
 render mode: :managed,
   conflict: :fail,
   churn: :minimal,

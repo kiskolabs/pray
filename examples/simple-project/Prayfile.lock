@@ -1,7 +1,7 @@
 prayfile_lock = "1"
 spec = "0.1"
 generated_by = "pray 0.1.0"
-manifest_hash = "sha256:4fc3dc5a68c1bcff1c4e835abdffc3c02f9b67d541f1a39c93808ccc7ce84212"
+manifest_hash = "sha256:340c8fc15fa0196aadea58a50834d4f726698fb74a4967cdc340e3e653950326"
 
 [[source]]
 name = "default"
@@ -11,10 +11,10 @@ url = "https://agents.example.com"
 [[package]]
 name = "sample/base"
 version = "1.4.3"
-path = "packages/base"
+path = "./packages/base"
 tree_hash = "sha256:e44996a4fe56c88a2f0f6e9cbd4b40b5b0b1425d0d02a14254fec4915d391853"
 artifact_hash = "sha256:e44996a4fe56c88a2f0f6e9cbd4b40b5b0b1425d0d02a14254fec4915d391853"
-artifact = "path:packages/base"
+artifact = "path:./packages/base"
 exports = [
     "testing-basics",
     "security-basics",
@@ -28,8 +28,8 @@ outputs = ["INSTRUCTIONS.md"]
 [[managed_span]]
 id = "621c7072"
 target = "INSTRUCTIONS.md"
-open_line = 17
-close_line = 20
+open_line = 16
+close_line = 19
 ideal_checksum = "sha256:f9c12155822e6cef961610d3b037c408f1223eb2979b62212a8228af903c6cd0"
 package = "sample/base"
 export = "testing-basics"
@@ -39,8 +39,8 @@ silenced = false
 [[managed_span]]
 id = "b8c5e234"
 target = "INSTRUCTIONS.md"
-open_line = 22
-close_line = 25
+open_line = 21
+close_line = 24
 ideal_checksum = "sha256:abbd7b4b11c35cd569786d8cce785415f1c98d602f91b2344344a11950ca82f0"
 package = "sample/base"
 export = "security-basics"

@@ -1,16 +1,16 @@
 prayfile_lock = "1"
 spec = "0.1"
 generated_by = "pray 0.1.0"
-manifest_hash = "sha256:975f10273e1d10c6234de0f973a7b4b26ff8df1591698feaf00f7aedd6ac68e0"
+manifest_hash = "sha256:d0d8d8f0d502ef535d2553eb483eddfefe0bab87ccdad1d545393e374b2b21d4"
 source = []
 
 [[package]]
 name = "sample/compliance"
 version = "0.9.1"
-path = "packages/compliance"
+path = "./packages/compliance"
 tree_hash = "sha256:8c05c4bc268ee1697343526f12ba5a0c514455bfa6352c861506cc8cb42f859a"
 artifact_hash = "sha256:8c05c4bc268ee1697343526f12ba5a0c514455bfa6352c861506cc8cb42f859a"
-artifact = "path:packages/compliance"
+artifact = "path:./packages/compliance"
 exports = [
     "audit-notes",
     "rollback-plan",

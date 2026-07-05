@@ -123,6 +123,98 @@ render mode: :managed, conflict: :fail, churn: :minimal
 }
 
 #[test]
+fn install_reuses_git_cache_on_second_run() {
+    let workspace = temporary_directory("pray-install-git-cache");
+    let source_repo = workspace.join("source");
+    let distribution_repo = workspace.join("distribution");
+    let prayers_root = distribution_repo.join("prayers");
+    let consumer_repo = workspace.join("consumer");
+    fs::create_dir_all(&source_repo).expect("source workspace");
+    fs::create_dir_all(&distribution_repo).expect("distribution workspace");
+    fs::create_dir_all(&consumer_repo).expect("consumer workspace");
+
+    create_add_fixture(&source_repo);
+    let add = run_pray(
+        &source_repo,
+        &["add", "sample/base", "--path", "packages/base"],
+    );
+    assert!(
+        add.status.success(),
+        "add failed: {}",
+        String::from_utf8_lossy(&add.stderr)
+    );
+
+    let publish = run_pray(
+        &source_repo,
+        &[
+            "publish",
+            "--root",
+            prayers_root.to_str().expect("distribution path"),
+        ],
+    );
+    assert!(
+        publish.status.success(),
+        "publish failed: {}",
+        String::from_utf8_lossy(&publish.stderr)
+    );
+
+    assert_success(
+        &git(&distribution_repo, &["init", "-b", "main"]),
+        "git init",
+    );
+    assert_success(
+        &git(&distribution_repo, &["config", "user.name", "Pray Test"]),
+        "git user.name",
+    );
+    assert_success(
+        &git(
+            &distribution_repo,
+            &["config", "user.email", "pray@example.com"],
+        ),
+        "git user.email",
+    );
+    assert_success(&git(&distribution_repo, &["add", "-A"]), "git add");
+    assert_success(
+        &git(
+            &distribution_repo,
+            &["commit", "-m", "initial distribution"],
+        ),
+        "git commit",
+    );
+
+    fs::write(
+        consumer_repo.join("Prayfile"),
+        format!(
+            r#"
+prayfile "1"
+source "dist", "git+file://{distribution}"
+agent "sample/base", "~> 1.4", source: "dist"
+target :tool_a do
+  output "INSTRUCTIONS.md"
+end
+render mode: :managed, conflict: :fail, churn: :minimal
+"#,
+            distribution = distribution_repo.display()
+        ),
+    )
+    .expect("write consumer Prayfile");
+
+    let first_install = run_pray(&consumer_repo, &["install"]);
+    assert!(
+        first_install.status.success(),
+        "first install failed: {}",
+        String::from_utf8_lossy(&first_install.stderr)
+    );
+
+    let second_install = run_pray(&consumer_repo, &["install", "--locked"]);
+    assert!(
+        second_install.status.success(),
+        "second install failed: {}",
+        String::from_utf8_lossy(&second_install.stderr)
+    );
+}
+
+#[test]
 fn publish_serve_install_and_confess_end_to_end_with_web_surface() {
     let workspace = temporary_directory("pray-publish-e2e");
     let source_repo = workspace.join("source");

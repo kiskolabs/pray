@@ -31,7 +31,7 @@ pub fn temporary_directory(prefix: &str) -> PathBuf {
 
 pub fn create_fixture(repo: &Path) {
     fs::create_dir_all(repo.join("packages/base/exports")).expect("fixture directories");
-    fs::create_dir_all(repo.join("agent/local")).expect("local directories");
+    fs::create_dir_all(repo.join(".agents")).expect("local directories");
 
     fs::write(
         repo.join("Prayfile"),
@@ -41,7 +41,7 @@ target :tool_a do
   output "INSTRUCTIONS.md"
 end
 agent "sample/base", "~> 1.4", path: "packages/base"
-local "agent/local/project.md"
+local ".agents/project.md"
 render mode: :managed, conflict: :fail, churn: :minimal
 "#,
     )
@@ -83,7 +83,7 @@ end
         "Security guidance\n",
     )
     .expect("write export");
-    fs::write(repo.join("agent/local/project.md"), "Local guidance\n").expect("write local");
+    fs::write(repo.join(".agents/project.md"), "Local guidance\n").expect("write local");
 }
 
 pub fn create_add_fixture(repo: &Path) {

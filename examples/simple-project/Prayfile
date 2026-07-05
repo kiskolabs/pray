@@ -7,7 +7,7 @@ end
 agent "sample/base", "~> 1.4",
   path: "packages/base",
   exports: ["testing-basics", "security-basics"]
-local "agent/local/project.md"
+local ".agents/project.md"
 render mode: :managed,
   conflict: :fail,
   churn: :minimal

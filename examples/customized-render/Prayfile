@@ -7,8 +7,8 @@ end
 agent "sample/compliance", "~> 0.9",
   path: "packages/compliance",
   exports: ["audit-notes", "rollback-plan"]
-local "agent/local/project.md"
-local "agent/local/security.md", optional: true
+local ".agents/project.md"
+local ".agents/security.md", optional: true
 render mode: :managed,
   conflict: :fail,
   churn: :minimal,
