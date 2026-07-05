@@ -2,11 +2,17 @@ Package::Specification.new do |spec|
   spec.name = "prayer-publisher"
   spec.version = "0.1.0"
   spec.summary = "Language-first packaging guidance for prayer-managed content"
-  spec.files = ["SKILL.md"]
+  spec.files = ["skills/prayer-publisher/SKILL.md"]
   spec.exports = {
     "skill" => {
       type: "fragment",
-      path: "SKILL.md",
+      path: "skills/prayer-publisher/SKILL.md",
+      summary: "Prayer publisher guidance"
+    }
+  }
+  spec.skills = {
+    "prayer-publisher" => {
+      path: "skills/prayer-publisher",
       summary: "Prayer publisher guidance"
     }
   }

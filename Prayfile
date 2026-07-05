@@ -7,10 +7,6 @@ target :agents do
   skills ".agents/skills"
 end
 
-target :prayer_publisher do
-  output ".agents/skills/prayer-publisher/SKILL.md"
-end
-
 agent "amkisko/working-rules", "~> 1.0", source: "amkisko", exports: ["working-rules"]
 agent "amkisko/docs-conventions", "~> 1.0", source: "amkisko", exports: ["docs-conventions"]
 agent "amkisko/dependency-issues", "~> 1.0", source: "amkisko", exports: ["dependency-issues"]
