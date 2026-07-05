@@ -171,32 +171,79 @@ fn resolve_git_package_root(
         );
     }
 
+    let git_cache_directory = ensure_git_repository(project_root, clone_url, false)?;
+    let distribution_root = require_distribution_root(&git_cache_directory)?;
+    let source_key = format!("{}@clone", clone_url);
+    resolve_local_registry_package_root(
+        project_root,
+        &source_key,
+        &distribution_root,
+        declaration,
+    )
+}
+
+pub fn refresh_git_sources(manifest_path: &Path) -> PrayResult<()> {
+    let project_root = project_root_from_manifest(manifest_path);
+    let manifest_text = fs::read_to_string(manifest_path)?;
+    let manifest = crate::manifest::parse_manifest(&manifest_text)?;
+    for source in &manifest.sources {
+        if source.kind != "git" {
+            continue;
+        }
+        let clone_url = source.url.strip_prefix("git+").unwrap_or(&source.url);
+        if local_git_source_root(clone_url).is_some() {
+            continue;
+        }
+        let _ = ensure_git_repository(&project_root, clone_url, true)?;
+    }
+    Ok(())
+}
+
+fn ensure_git_repository(
+    project_root: &Path,
+    clone_url: &str,
+    refresh: bool,
+) -> PrayResult<PathBuf> {
     let git_cache_directory = project_root
         .join(".pray/cache/git")
         .join(cache_key(clone_url));
+
+    if git_cache_directory.join(".git").is_dir() {
+        if refresh {
+            run_git_success(&git_cache_directory, &["fetch", "--depth", "1", "origin"])?;
+            run_git_success(
+                &git_cache_directory,
+                &["reset", "--hard", "FETCH_HEAD"],
+            )?;
+        }
+        return Ok(git_cache_directory);
+    }
+
     if git_cache_directory.exists() {
         remove_path_if_exists(&git_cache_directory)?;
     }
     if let Some(parent) = git_cache_directory.parent() {
         fs::create_dir_all(parent)?;
     }
+    let destination = git_cache_directory.to_str().ok_or_else(|| {
+        PrayError::Resolution(format!("invalid git cache path: {:?}", git_cache_directory))
+    })?;
     run_git_success(
         project_root,
-        &[
-            "clone",
-            clone_url,
-            git_cache_directory.to_str().ok_or_else(|| {
-                PrayError::Resolution(format!("invalid git cache path: {:?}", git_cache_directory))
-            })?,
-        ],
+        &["clone", "--depth", "1", clone_url, destination],
     )?;
-    let source_key = format!("{}@clone", clone_url);
-    resolve_local_registry_package_root(
-        project_root,
-        &source_key,
-        &git_cache_directory,
-        declaration,
-    )
+    Ok(git_cache_directory)
+}
+
+fn require_distribution_root(repo_root: &Path) -> PrayResult<PathBuf> {
+    discover_distribution_root(repo_root).ok_or_else(|| {
+        PrayError::Resolution(format!(
+            "no pray distribution root in git source {:?}. \
+             Expected v1/packages at the repository root or under prayers/. \
+             Publish with `pray publish --root ./prayers` or point the source at a distribution repository.",
+            repo_root
+        ))
+    })
 }
 
 fn local_git_source_root(clone_url: &str) -> Option<PathBuf> {
@@ -206,10 +253,13 @@ fn local_git_source_root(clone_url: &str) -> Option<PathBuf> {
         PathBuf::from(clone_url)
     };
 
-    local_distribution_root(&path)
+    if !path.exists() {
+        return None;
+    }
+    discover_distribution_root(&path)
 }
 
-fn local_distribution_root(path: &Path) -> Option<PathBuf> {
+fn discover_distribution_root(path: &Path) -> Option<PathBuf> {
     if is_local_distribution_root(path) {
         return Some(path.to_path_buf());
     }
@@ -219,11 +269,7 @@ fn local_distribution_root(path: &Path) -> Option<PathBuf> {
         return Some(prayers_root);
     }
 
-    if path.exists() {
-        Some(path.to_path_buf())
-    } else {
-        None
-    }
+    None
 }
 
 fn is_local_distribution_root(path: &Path) -> bool {
@@ -417,7 +463,8 @@ fn read_text(path: &Path) -> PrayResult<String> {
 
 #[cfg(test)]
 mod tests {
-    use super::project_root_from_manifest;
+    use super::{discover_distribution_root, project_root_from_manifest};
+    use std::fs;
     use std::path::Path;
 
     #[test]
@@ -430,5 +477,43 @@ mod tests {
     fn project_root_from_manifest_uses_parent_directory() {
         let root = project_root_from_manifest(Path::new("examples/simple-project/Prayfile"));
         assert_eq!(root, Path::new("examples/simple-project"));
+    }
+
+    #[test]
+    fn discover_distribution_root_finds_root_and_prayers_subdirectory() {
+        let workspace = std::env::temp_dir().join(format!(
+            "pray-discover-distribution-{}",
+            std::process::id()
+        ));
+        let _ = fs::remove_dir_all(&workspace);
+        let repo_root = workspace.join("repo");
+        let prayers_root = repo_root.join("prayers");
+        fs::create_dir_all(prayers_root.join("v1/packages")).expect("prayers distribution");
+        fs::create_dir_all(repo_root.join("v1/packages")).expect("root distribution");
+
+        assert_eq!(
+            discover_distribution_root(&repo_root),
+            Some(repo_root.clone())
+        );
+
+        fs::remove_dir_all(repo_root.join("v1")).expect("remove root distribution");
+        assert_eq!(
+            discover_distribution_root(&repo_root),
+            Some(prayers_root)
+        );
+        let _ = fs::remove_dir_all(&workspace);
+    }
+
+    #[test]
+    fn discover_distribution_root_returns_none_without_registry_layout() {
+        let workspace = std::env::temp_dir().join(format!(
+            "pray-discover-missing-{}",
+            std::process::id()
+        ));
+        let _ = fs::remove_dir_all(&workspace);
+        let repo_root = workspace.join("repo");
+        fs::create_dir_all(&repo_root).expect("repo root");
+        assert_eq!(discover_distribution_root(&repo_root), None);
+        let _ = fs::remove_dir_all(&workspace);
     }
 }

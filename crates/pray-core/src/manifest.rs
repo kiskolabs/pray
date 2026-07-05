@@ -295,10 +295,16 @@ impl<'a> BlockParser<'a> {
 
 fn parse_source(rest: &str) -> PrayResult<ManifestSource> {
     let (values, keywords) = parse_call(rest)?;
-    if values.len() < 2 && !keywords.contains_key("path") {
+    if values.is_empty() {
         return Err(PrayError::Parse {
             kind: "manifest",
-            message: "source requires a name and url or path".to_string(),
+            message: "source requires a name".to_string(),
+        });
+    }
+    if values.len() < 2 && !keywords.contains_key("path") && !keywords.contains_key("git") {
+        return Err(PrayError::Parse {
+            kind: "manifest",
+            message: "source requires a name and url, path:, or git:".to_string(),
         });
     }
     let name = string_from_value(values.first().ok_or_else(|| PrayError::Parse {
@@ -307,6 +313,12 @@ fn parse_source(rest: &str) -> PrayResult<ManifestSource> {
     })?)?;
     let (kind, url) = if let Some(path) = keywords.get("path") {
         ("path".to_string(), string_from_value(path)?)
+    } else if let Some(git) = keywords.get("git") {
+        let mut url = string_from_value(git)?;
+        if !url.starts_with("git+") {
+            url = format!("git+{url}");
+        }
+        (String::from("git"), url)
     } else {
         let url = string_from_value(values.get(1).ok_or_else(|| PrayError::Parse {
             kind: "manifest",

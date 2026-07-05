@@ -54,6 +54,73 @@ fn installs_renders_and_verifies_a_local_package() {
 }
 
 #[test]
+fn materializes_package_skill_directories_into_target_skills_path() {
+    let repo = temporary_directory("pray-install-skill-tree");
+    fs::create_dir_all(repo.join("packages/audit-skill/skills/audit")).expect("skill tree");
+    fs::write(
+        repo.join("Prayfile"),
+        r#"
+prayfile "1"
+target :agents do
+  output "INSTRUCTIONS.md"
+  skills ".agents/skills"
+end
+agent "sample/audit-skill", path: "packages/audit-skill", exports: ["skill"]
+render mode: :managed, conflict: :fail, churn: :minimal
+"#,
+    )
+    .expect("write Prayfile");
+    fs::write(
+        repo.join("packages/audit-skill/audit-skill.prayspec"),
+        r#"
+Package::Specification.new do |spec|
+  spec.name = "sample/audit-skill"
+  spec.version = "1.0.0"
+  spec.summary = "Audit skill package"
+  spec.files = [
+    "skills/audit/SKILL.md",
+    "skills/audit/details.md"
+  ]
+  spec.exports = {
+    "skill" => {
+      type: "fragment",
+      path: "skills/audit/SKILL.md",
+      summary: "Audit skill entrypoint"
+    }
+  }
+  spec.skills = {
+    "audit" => {
+      path: "skills/audit",
+      summary: "Audit skill"
+    }
+  }
+end
+"#,
+    )
+    .expect("write prayspec");
+    fs::write(
+        repo.join("packages/audit-skill/skills/audit/SKILL.md"),
+        "# Audit skill\n",
+    )
+    .expect("write skill");
+    fs::write(
+        repo.join("packages/audit-skill/skills/audit/details.md"),
+        "# Details\n",
+    )
+    .expect("write details");
+
+    let install = run_pray(&repo, &["install"]);
+    assert!(
+        install.status.success(),
+        "install failed: {}",
+        String::from_utf8_lossy(&install.stderr)
+    );
+
+    assert!(repo.join(".agents/skills/audit/SKILL.md").is_file());
+    assert!(repo.join(".agents/skills/audit/details.md").is_file());
+}
+
+#[test]
 fn installs_prayer_package_into_a_managed_skill_path() {
     let repo = temporary_directory("pray-install-prayer");
     create_prayer_install_fixture(&repo);

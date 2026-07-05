@@ -4,7 +4,7 @@ This folder contains small, self-contained Prayfile examples that show different
 
 ## Included projects
 
-- `simple-project/` — one package, one target, default rendering, and a local project note
+- `simple-project/` — one package, one target, default rendering, and a project note under `.agents/`
 - `team-workflow/` — multiple packages, multiple targets, grouped dependencies, and target-specific local input
 - `customized-render/` — custom source wiring, optional local input, and an explicit render policy
 

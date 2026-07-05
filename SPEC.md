@@ -368,7 +368,7 @@ tool-specific instruction files
 .pray/cache/                # ignored by default
 .pray/vendor/               # optional, committed only in hermetic/offline mode
 
-agent/local/                # optional human-owned overrides
+.agents/                     # skills and other project agent inputs
 ```
 
 Recommended `.gitignore`:
@@ -434,7 +434,7 @@ target :tool_a do
 end
 agent "sample/base", "~> 1.4",
   exports: ["testing-basics", "security-basics"]
-local "agent/local/project.md"
+local ".agents/project.md"
 render mode: :managed
 ```
 
@@ -461,6 +461,42 @@ The parser must reject:
 - shell execution
 - network access
 - dynamic evaluation
+
+### Editor language mode
+
+`Prayfile` and `Prayfile.lock` have no file extension. Editors that auto-detect language from buffer content may misclassify them (for example as TypeScript) because the DSL uses Gemfile-like keyword arguments, string literals, and symbol-like tokens (`:managed`). That is an editor integration gap, not invalid Prayfile syntax.
+
+Until a dedicated `prayfile` grammar exists, pin language mode by filename in editor settings.
+
+Ruby is the closest practical match for `Prayfile` highlighting today:
+
+```json
+"files.associations": {
+  "Prayfile": "ruby",
+  "Prayfile.lock": "toml"
+}
+```
+
+Use plain text when syntax highlighting is not needed and false diagnostics are distracting:
+
+```json
+"files.associations": {
+  "Prayfile": "plaintext",
+  "Prayfile.lock": "toml"
+}
+```
+
+When extensionless files keep flipping language after auto-detection, disable detection workspace-wide:
+
+```json
+"workbench.editor.languageDetection": false
+```
+
+Manual override through the status bar language picker (Ruby or Plain Text) should stick once chosen; auto-detection must not override an explicit picker selection.
+
+Longer term, a small editor extension should register language id `prayfile` with a TextMate grammar and ship `files.associations` for `Prayfile` and `Prayfile.lock`, similar to how `Gemfile` is commonly associated with Ruby or handled by dedicated tooling.
+
+Implementations may document the snippets above in repository `README.md` or contributor setup notes; the spec does not require a particular editor.
 
 ---
 
@@ -497,7 +533,7 @@ Example:
   ],
   "local": [
     {
-      "path": "agent/local/project.md",
+      "path": ".agents/project.md",
       "position": "after"
     }
   ],
@@ -532,7 +568,7 @@ agent "public/base", "~> 1.0",
   exports: ["repository-basics", "testing-basics"]
 agent "public/webapp", "~> 2.2",
   exports: ["webapp-review", "data-layer", "testing"]
-local "agent/local/project.md"
+local ".agents/project.md"
 render mode: :managed,
   conflict: :fail,
   churn: :minimal
@@ -580,8 +616,8 @@ group :webapp do
   agent "public/ui-kit", "^1.0",
     exports: ["component-guidance"]
 end
-local "agent/local/project.md", position: :after
-local "agent/local/testing.md", position: :after
+local ".agents/project.md", position: :after
+local ".agents/testing.md", position: :after
 render mode: :managed,
   conflict: :fail,
   churn: :minimal,
@@ -683,9 +719,9 @@ Groups are organizational unless explicitly connected to targets or features.
 Includes human-owned local project context.
 
 ```
-local "agent/local/project.md"
-local "agent/local/security.md", position: :after
-local "agent/local/private.md", optional: true
+local ".agents/project.md"
+local ".agents/security.md", position: :after
+local ".agents/private.md", optional: true
 ```
 
 Supported positions: `before`, `after`, `target_after`
@@ -1777,11 +1813,12 @@ Avoid: giant concatenated instruction files, giant duplicated target files, gene
 Local files are human-owned.
 
 ```
-local "agent/local/project.md", position: :after
+local ".agents/project.md", position: :after
 ```
 
 Rules:
 
+- store human-owned project context under `.agents/` (for example `.agents/project.md`), not under alternate trees such as `agent/local/`
 - never overwritten by pray on disk
 - content is re-embedded into rendered root files on each render run
 - agents edit local source files, not the embed copy inside INSTRUCTIONS.md
@@ -1794,7 +1831,7 @@ Rules:
 Optional local file:
 
 ```
-local "agent/local/private.md", optional: true
+local ".agents/private.md", optional: true
 ```
 
 Local file hashes may be stored in `.pray/state.json`, not Prayfile.lock.
@@ -1882,10 +1919,10 @@ Recommended root file shape:
 ```markdown
 <!--
 
-Edit Prayfile or agent/local/*.md, not this file.
+Edit `Prayfile`, not this file.
 -->
 # Agent context
-## Project-local instructions
+## Additional instructions
 ...
 ## Shared instructions
 ...
@@ -1905,13 +1942,12 @@ Do not dump every capability body into root files if target supports capabilitie
 
 # Input context
 
-Do not edit managed blocks.
-Add or change project-specific instructions in `agent/local/` only.
-To change shared guidance, ask a human to update `Prayfile` and run `pray`.
+Do not edit managed blocks in `AGENTS.md` or skills under `.agents/`.
+To change shared guidance, update `Prayfile` and run `pray`.
 
 <!-- pray:l3m8n2p4 -->
 
-## Project-local instructions
+## Additional instructions
 This repository uses a web stack, test framework, UI library, and relational database.
 
 <!-- pray:l3m8n2p4 -->
@@ -2708,17 +2744,17 @@ The model is not one shared rendered file everyone edits. It is three zones with
 | Zone | Source | Who edits | What pray does |
 |------|--------|-----------|----------------|
 | **Recipe** | Prayfile, packages, Prayfile.lock | Humans via `pray add`, `pray remove`, `pray update` | resolves and locks |
-| **Local** | `agent/local/**` | Humans and applications | reads on render; **never writes** |
-| **Managed** | Generated target files and package-owned rules | Nobody directly | fully regenerates from lock + recipe + local inputs |
+| **`.agents`** | `.agents/**` (human-owned; `.agents/skills/**` is package-managed) | Humans and applications | reads on render; **never writes** |
+| **Managed** | `AGENTS.md`, generated target files, package-owned rules | Nobody directly | fully regenerates from lock + recipe + `.agents` inputs |
 
 Package exports live only in the managed zone. They are pinned by recipe and hash. Applications consume them; they do not rewrite them.
 
-Local overrides live only under `agent/local/`. They are not locked, not hashed in `Prayfile.lock`, and are re-embedded into rendered output on every `pray render`.
+Human-owned files under `.agents/` (outside package-managed `.agents/skills/**`) are not locked, not hashed in `Prayfile.lock`, and are re-embedded into rendered output on every `pray render` when listed in `Prayfile`.
 
 ### Golden rules
 
 1. Applications must **not** edit managed files or managed blocks.
-2. Applications **may** edit `agent/local/**` when project-specific input must change.
+2. Applications **may** edit human-owned files under `.agents/` when project-specific input must change.
 3. Humans change shared packages by editing **Prayfile** and running **pray**, not by patching rendered target files.
 4. Render reconstructs managed output from inputs. There is no three-way merge in v1.
 
@@ -2728,7 +2764,7 @@ Root files are assembled in a fixed order:
 
 ```
 preamble              # short contract (generated)
-local embeds          # copied from agent/local/*.md
+embedded inputs       # files listed in Prayfile under `.agents/`
 managed blocks        # one block per package export
 index                 # names only; bodies live elsewhere
 ```
@@ -2743,7 +2779,7 @@ Managed blocks use opaque pray markers from section 41:
 <!-- pray:p7f3k9m2 -->
 ```
 
-On render, pray replaces each managed block from locked package content and re-embeds local files into their managed spans. Anything outside allowed marker regions is a **verify error**.
+On render, pray replaces each managed block from locked package content and re-embeds listed `.agents` files into their spans. Anything outside allowed marker regions is a **verify error**.
 
 ### Target preamble
 
@@ -2756,9 +2792,8 @@ Recommended shape:
 
 # Input context
 
-Do not edit managed blocks.
-Add or change project-specific instructions in `agent/local/` only.
-To change shared guidance, ask a human to update `Prayfile` and run `pray`.
+Do not edit managed blocks in `AGENTS.md` or skills under `.agents/`.
+To change shared guidance, update `Prayfile` and run `pray`.
 ```
 
 The ignore marker is for tooling. The visible lines are for the application.
@@ -2776,9 +2811,9 @@ version = "2.1.5"
 tree_hash = "sha256:..."
 ```
 
-Optional local additions live under `agent/local/` and are not origin-tagged as packages. Name collisions between local and managed content are **conflicts** unless policy says otherwise.
+Optional human-owned files under `.agents/` are not origin-tagged as packages. Name collisions between human-owned and managed content are **conflicts** unless policy says otherwise.
 
-Applications must not edit managed directories. They may edit `agent/local/`.
+Applications must not edit managed directories. They may edit other files under `.agents/`.
 
 ### Idempotency
 
@@ -2788,7 +2823,7 @@ Inputs to render:
 
 - Prayfile.lock
 - resolved package trees (verified by tree hash)
-- `agent/local/**` contents
+- `.agents/**` contents listed in `Prayfile`
 - render policy from Prayfile
 - target adapter
 
@@ -2814,7 +2849,7 @@ pray update sample/webapp
 1. resolve selects new version within constraints and updates Prayfile.lock.
 2. render replaces every managed block mapped to `sample/webapp` in `Prayfile.lock`.
 3. render replaces managed directories whose origin package is `sample/webapp`.
-4. Local embeds and `agent/local/**` are re-read but not modified on disk.
+4. Embedded `.agents` files are re-read but not modified on disk.
 5. `pray drift` shows recipe, lock, managed-block, and render changes.
 
 Pray markers make updates surgical in diffs even though render is logically full reconstruction.
@@ -2829,7 +2864,7 @@ pray remove sample/webapp
 2. resolve recomputes lock without that package.
 3. render deletes all managed blocks mapped to `sample/webapp`.
 4. render deletes managed directories tagged with that package origin.
-5. `agent/local/**` is preserved.
+5. Human-owned `.agents/**` files are preserved.
 6. Orphan pray markers after remove are **verify errors**.
 
 ### Verify enforcement
@@ -2862,7 +2897,7 @@ Prayfile + packages  →  resolve  →  lock
 lock + local + packages  →  render  →  rendered targets
 ```
 
-If an application rewrites a managed block, the next `pray render` or CI frozen check fails. The fix is not merge logic. The fix is regenerate and move custom text into `agent/local/`.
+If an application rewrites a managed block, the next `pray render` or CI frozen check fails. The fix is not merge logic. The fix is regenerate and move custom text into `.agents/` or update `Prayfile`.
 
 That keeps shared packages stable, local overrides editable, and the system idempotent.
 

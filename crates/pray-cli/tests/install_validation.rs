@@ -123,14 +123,14 @@ fn install_reports_missing_required_local_file_with_recovery_guidance() {
     create_fixture(&repo);
     assert!(run_pray(&repo, &["install"]).status.success());
 
-    fs::remove_file(repo.join("agent/local/project.md")).expect("remove local file");
+    fs::remove_file(repo.join(".agents/project.md")).expect("remove local file");
 
     let install = run_pray(&repo, &["install"]);
     assert!(!install.status.success());
     assert_eq!(install.status.code(), Some(3));
     let stderr = String::from_utf8_lossy(&install.stderr);
     assert!(stderr.contains("Prayfile lists"));
-    assert!(stderr.contains("agent/local/project.md"));
+    assert!(stderr.contains(".agents/project.md"));
     assert!(stderr.contains("Create the file"));
     assert!(stderr.contains("pray install"));
 }
@@ -231,7 +231,7 @@ fn install_locked_rejects_lockfile_drift() {
     let original_rendered = fs::read_to_string(repo.join("INSTRUCTIONS.md")).expect("rendered");
 
     fs::write(
-        repo.join("agent/local/project.md"),
+        repo.join(".agents/project.md"),
         "Local guidance\nExtra local guidance\n",
     )
     .expect("rewrite local file");

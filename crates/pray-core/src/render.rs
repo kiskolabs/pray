@@ -34,6 +34,79 @@ pub fn write_rendered_targets(
         }
         fs::write(path, &target.content)?;
     }
+    materialize_target_skills(project)?;
+    Ok(())
+}
+
+pub fn materialize_target_skills(project: &ResolvedProject) -> PrayResult<()> {
+    for target in &project.manifest.targets {
+        for skills_root in &target.skills {
+            let destination_root = project.project_root.join(skills_root);
+            for package in &project.packages {
+                for (skill_name, skill) in &package.spec.skills {
+                    copy_skill_tree(
+                        &package.root.join(&skill.path),
+                        &destination_root.join(skill_name),
+                        &package.spec.files,
+                        &skill.path,
+                    )?;
+                }
+            }
+        }
+    }
+    Ok(())
+}
+
+fn copy_skill_tree(
+    source_root: &Path,
+    destination_root: &Path,
+    package_files: &[String],
+    skill_path: &str,
+) -> PrayResult<()> {
+    if !source_root.is_dir() {
+        return Err(PrayError::Render(format!(
+            "skill source directory missing: {}",
+            source_root.display()
+        )));
+    }
+
+    let skill_prefix = skill_path.trim_end_matches('/');
+    let mut copied = false;
+    for file in package_files {
+        let relative = file.strip_prefix(skill_prefix).and_then(|rest| {
+            let trimmed = rest.trim_start_matches('/');
+            if trimmed.is_empty() || file == skill_prefix {
+                None
+            } else {
+                Some(trimmed)
+            }
+        });
+        let Some(relative) = relative else {
+            continue;
+        };
+
+        let source = source_root.join(relative);
+        if !source.is_file() {
+            return Err(PrayError::Render(format!(
+                "skill file missing: {}",
+                source.display()
+            )));
+        }
+        let destination = destination_root.join(relative);
+        if let Some(parent) = destination.parent() {
+            fs::create_dir_all(parent)?;
+        }
+        fs::copy(&source, &destination)?;
+        copied = true;
+    }
+
+    if !copied {
+        return Err(PrayError::Render(format!(
+            "no skill files listed in package manifest for {}",
+            source_root.display()
+        )));
+    }
+
     Ok(())
 }
 

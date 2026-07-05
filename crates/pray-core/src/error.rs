@@ -40,7 +40,7 @@ impl Display for PrayError {
             Self::Render(message) => write!(f, "render error: {}", message),
             Self::Verify(message) => write!(f, "verify error: {}", message),
             Self::Unsupported(message) => write!(f, "unsupported feature: {}", message),
-            Self::Io(error) => Display::fmt(error, f),
+            Self::Io(error) => write!(f, "I/O error: {error}"),
         }
     }
 }

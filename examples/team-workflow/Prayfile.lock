@@ -1,16 +1,16 @@
 prayfile_lock = "1"
 spec = "0.1"
 generated_by = "pray 0.1.0"
-manifest_hash = "sha256:85677ba6cb05c319d8242d1ea15cf760fc1cf710fae67c97dd63b0717f621f96"
+manifest_hash = "sha256:04932da0b4b77b547596d8a464ea0f835c4f1f80aee560b566ebc5969e7c23cc"
 source = []
 
 [[package]]
 name = "sample/core"
 version = "3.2.0"
-path = "packages/core"
+path = "./packages/core"
 tree_hash = "sha256:f2c91485563e5402327f8e69365d8dae82be7b36b0c705b72a30f890d3d0b6a8"
 artifact_hash = "sha256:f2c91485563e5402327f8e69365d8dae82be7b36b0c705b72a30f890d3d0b6a8"
-artifact = "path:packages/core"
+artifact = "path:./packages/core"
 exports = [
     "incident-triage",
     "testing-basics",
@@ -20,10 +20,10 @@ dependencies = []
 [[package]]
 name = "sample/ui"
 version = "2.1.0"
-path = "packages/ui"
+path = "./packages/ui"
 tree_hash = "sha256:f90be3d10fe47930e42832baa4e6f3e0e81018354c5fbe30d0eb82fdacbd3f90"
 artifact_hash = "sha256:f90be3d10fe47930e42832baa4e6f3e0e81018354c5fbe30d0eb82fdacbd3f90"
-artifact = "path:packages/ui"
+artifact = "path:./packages/ui"
 exports = [
     "webapp-review",
     "live-pages",
@@ -41,8 +41,8 @@ outputs = ["REVIEW.md"]
 [[managed_span]]
 id = "556a5efa"
 target = "INSTRUCTIONS.md"
-open_line = 20
-close_line = 23
+open_line = 19
+close_line = 22
 ideal_checksum = "sha256:b7968841fd256d3510b7c11a99604b739a5ccab423aa6448859c704cb7b6f39e"
 package = "sample/core"
 export = "incident-triage"
@@ -52,8 +52,8 @@ silenced = false
 [[managed_span]]
 id = "058035e9"
 target = "INSTRUCTIONS.md"
-open_line = 25
-close_line = 28
+open_line = 24
+close_line = 27
 ideal_checksum = "sha256:946d5e6e22632014468e0ea30c03de24b1d32963c8bd24c327116c5834c57549"
 package = "sample/core"
 export = "testing-basics"
@@ -63,8 +63,8 @@ silenced = false
 [[managed_span]]
 id = "5deca903"
 target = "INSTRUCTIONS.md"
-open_line = 30
-close_line = 33
+open_line = 29
+close_line = 32
 ideal_checksum = "sha256:8c8a52a9d49b2ff07d82609ec8a2c0cb8715e16b630ac004ab29ec4d7654726a"
 package = "sample/ui"
 export = "webapp-review"
@@ -74,8 +74,8 @@ silenced = false
 [[managed_span]]
 id = "4427fed9"
 target = "INSTRUCTIONS.md"
-open_line = 35
-close_line = 38
+open_line = 34
+close_line = 37
 ideal_checksum = "sha256:33a6c129d5f3bc63e5ff0b361dc9c7604cd2da80ae2f240ef0513b332561fbe7"
 package = "sample/ui"
 export = "live-pages"
@@ -85,8 +85,8 @@ silenced = false
 [[managed_span]]
 id = "5236da8c"
 target = "REVIEW.md"
-open_line = 20
-close_line = 23
+open_line = 19
+close_line = 22
 ideal_checksum = "sha256:b7968841fd256d3510b7c11a99604b739a5ccab423aa6448859c704cb7b6f39e"
 package = "sample/core"
 export = "incident-triage"
@@ -96,8 +96,8 @@ silenced = false
 [[managed_span]]
 id = "7191bb2f"
 target = "REVIEW.md"
-open_line = 25
-close_line = 28
+open_line = 24
+close_line = 27
 ideal_checksum = "sha256:946d5e6e22632014468e0ea30c03de24b1d32963c8bd24c327116c5834c57549"
 package = "sample/core"
 export = "testing-basics"
@@ -107,8 +107,8 @@ silenced = false
 [[managed_span]]
 id = "0cb2be24"
 target = "REVIEW.md"
-open_line = 30
-close_line = 33
+open_line = 29
+close_line = 32
 ideal_checksum = "sha256:8c8a52a9d49b2ff07d82609ec8a2c0cb8715e16b630ac004ab29ec4d7654726a"
 package = "sample/ui"
 export = "webapp-review"
@@ -118,8 +118,8 @@ silenced = false
 [[managed_span]]
 id = "32b8c448"
 target = "REVIEW.md"
-open_line = 35
-close_line = 38
+open_line = 34
+close_line = 37
 ideal_checksum = "sha256:33a6c129d5f3bc63e5ff0b361dc9c7604cd2da80ae2f240ef0513b332561fbe7"
 package = "sample/ui"
 export = "live-pages"

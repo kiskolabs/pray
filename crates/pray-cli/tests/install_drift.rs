@@ -12,7 +12,7 @@ fn drift_reports_renderer_changes_in_sections() {
     assert!(run_pray(&repo, &["install"]).status.success());
 
     fs::write(
-        repo.join("agent/local/project.md"),
+        repo.join(".agents/project.md"),
         "Local guidance\nChanged local guidance\n",
     )
     .expect("rewrite local file");

@@ -2,17 +2,16 @@
 
 # Agent context
 
-Do not edit managed blocks or managed skills.
-Add or change project-specific instructions in `agent/local/` only.
-To change shared guidance, ask a human to update `Prayfile` and run `pray`.
+Do not edit managed blocks in `INSTRUCTIONS.md` or skills under `.agents/`.
+To change shared guidance, update `Prayfile` and run `pray install`.
 
-## Project-local instructions
+## Additional instructions
 
-### agent/local/project.md
+### ./.agents/project.md
 Coordinate larger changes through a short checklist.
 Call out any file that should not be rewritten automatically.
 
-### agent/local/testing.md
+### ./.agents/testing.md
 Add a regression test for any change that touches rendered files, lockfiles, or recovery flows.
 
 ## Shared instructions
