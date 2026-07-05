@@ -1,7 +1,10 @@
 use crate::hashing::sha256_prefixed;
-use crate::literal::{find_top_level, is_balanced, parse_literal, split_top_level, LiteralValue};
+use crate::literal::{
+    find_top_level, is_balanced, parse_literal, prepare_parser_lines, split_top_level, LiteralValue,
+};
 use crate::{PrayError, PrayResult};
 use serde::{Deserialize, Serialize};
+use std::borrow::Cow;
 use std::collections::BTreeMap;
 
 #[derive(Debug, Clone, Default, Serialize, Deserialize, PartialEq)]
@@ -19,6 +22,8 @@ pub struct ManifestSource {
     pub name: String,
     pub kind: String,
     pub url: String,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub subdir: Option<String>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
@@ -108,47 +113,18 @@ impl Manifest {
 }
 
 pub fn parse_manifest(text: &str) -> PrayResult<Manifest> {
-    let lines = prepare_lines(text);
+    let lines = prepare_parser_lines(text);
     let mut parser = BlockParser::new(&lines);
     parser.parse_root()
 }
 
-fn prepare_lines(text: &str) -> Vec<String> {
-    text.lines()
-        .map(|line| strip_comment(line).trim_end().to_string())
-        .collect()
-}
-
-fn strip_comment(line: &str) -> String {
-    let mut quote: Option<char> = None;
-    let mut escaped = false;
-    for (index, character) in line.char_indices() {
-        if let Some(quote_char) = quote {
-            if escaped {
-                escaped = false;
-            } else if character == '\\' {
-                escaped = true;
-            } else if character == quote_char {
-                quote = None;
-            }
-            continue;
-        }
-        match character {
-            '"' | '\'' => quote = Some(character),
-            '#' => return line[..index].to_string(),
-            _ => {}
-        }
-    }
-    line.to_string()
-}
-
 struct BlockParser<'a> {
-    lines: &'a [String],
+    lines: &'a [Cow<'a, str>],
     cursor: usize,
 }
 
 impl<'a> BlockParser<'a> {
-    fn new(lines: &'a [String]) -> Self {
+    fn new(lines: &'a [Cow<'a, str>]) -> Self {
         Self { lines, cursor: 0 }
     }
 
@@ -166,7 +142,7 @@ impl<'a> BlockParser<'a> {
         if manifest.prayfile_version.is_empty() {
             return Err(PrayError::Manifest("missing prayfile version".to_string()));
         }
-        Ok(manifest.canonicalized())
+        Ok(manifest)
     }
 
     fn parse_nested(&mut self, manifest: &mut Manifest, stop_on_end: bool) -> PrayResult<()> {
@@ -326,12 +302,20 @@ fn parse_source(rest: &str) -> PrayResult<ManifestSource> {
         })?)?;
         let kind = if url.starts_with("git+") {
             "git"
+        } else if url.starts_with("pray+ssh://") || url.starts_with("ssh+pray://") {
+            "pray_ssh"
         } else {
             "registry"
         };
         (kind.to_string(), url)
     };
-    Ok(ManifestSource { name, kind, url })
+    let subdir = keywords.get("subdir").map(string_from_value).transpose()?;
+    Ok(ManifestSource {
+        name,
+        kind,
+        url,
+        subdir,
+    })
 }
 
 fn parse_target_header(rest: &str) -> PrayResult<(ManifestTarget, bool)> {

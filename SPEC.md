@@ -646,12 +646,13 @@ Declares package source.
 ```
 source "default", "https://agents.example.com"
 source "sample", "git+ssh://git@example.com/agent-index.git"
+source "team", "pray+ssh://pray@prayers.internal"
 source "local", path: "../agent-packages"
 ```
 
 Source names must be unique.
 
-Supported source kinds: `registry`, `static_index`, `git`, `path`, `tarball`, `oci`
+Supported source kinds: `registry`, `static_index`, `git`, `path`, `tarball`, `oci`, `pray_ssh`
 
 ### target
 
@@ -1115,13 +1116,14 @@ Prayfile.lock records this hash.
 
 ## 28. Sources
 
-Supported source kinds: registry, static index, git, local path, tarball, OCI artifact
+Supported source kinds: registry, static index, git, local path, tarball, OCI artifact, pray SSH
 
 Examples:
 
 ```
 source "default", "https://agents.example.com"
 source "sample", "git+ssh://git@example.com/agent-context/index.git"
+source "team", "pray+ssh://pray@prayers.internal"
 source "local", path: "../agent-packages"
 ```
 
@@ -1301,6 +1303,184 @@ Any participant may generate annotations using any method, including manual revi
 If conflicting claims are received, local policy decides which claims to trust for discovery or display. Verification of the final injected bytes remains mandatory.
 
 Clients remain unaware of federation. A client queries a single distribution point, which may serve from local mirror, proxy to a peer, or return metadata with origin URLs.
+
+### 29.5 SSH-native distribution transport
+
+A conforming implementation may expose a distribution point over SSH without HTTP. The client opens an SSH session; the server runs `pray serve --stdio` (or an equivalent subsystem entrypoint) and exchanges the same logical registry operations as Section 29 and Section 29.2 through a framed RPC protocol on stdin and stdout.
+
+This transport is optional. A conforming implementation must still support static hosting, HTTP `pray serve`, and the other source kinds in Section 28 without SSH.
+
+#### URL scheme
+
+Pray SSH sources use the `pray+ssh://` scheme:
+
+```
+source "team", "pray+ssh://pray@prayers.internal"
+source "team", "pray+ssh://pray@prayers.internal:2222"
+```
+
+Form:
+
+```
+pray+ssh://[<user>@]<host>[:<port>][/<path>]
+```
+
+- `user` defaults to implementation policy or the current SSH username
+- `port` defaults to `22`
+- `path` is an optional hint; the server root is normally fixed by server configuration (`--root`)
+
+Lockfile records:
+
+```toml
+[[source]]
+name = "team"
+kind = "pray_ssh"
+url = "pray+ssh://pray@prayers.internal"
+```
+
+#### Deployment
+
+A typical private host uses OpenSSH with a forced command or subsystem:
+
+```sshconfig
+Subsystem pray /usr/bin/pray serve --stdio --root /var/lib/pray
+```
+
+The server stores the same static layout as Section 29 (`v1/index.json`, `v1/packages/...`, `v1/artifacts/...`). No HTTP listener is required.
+
+#### Wire protocol
+
+Spec identifier: `pray-ssh-rpc-v1`
+
+Framing:
+
+```text
+frame := u32_be(byte_length) utf8_json
+```
+
+Each SSH session carries one or more request/response frame pairs on the server process stdin and stdout.
+
+Request envelope:
+
+```json
+{
+  "spec": "pray-ssh-rpc-v1",
+  "id": "<correlation-id>",
+  "method": "<method>",
+  "params": {}
+}
+```
+
+Response envelope:
+
+```json
+{
+  "spec": "pray-ssh-rpc-v1",
+  "id": "<correlation-id>",
+  "status": 200,
+  "content_type": "application/json",
+  "body": {}
+}
+```
+
+Binary payloads use `content_type: "application/octet-stream"` and `body_encoding: "base64"` on the response, or base64 in `params.body` for uploads.
+
+Conforming implementations must accept frames of at least 16 MiB.
+
+#### RPC methods
+
+RPC methods mirror the reference HTTP distribution API. Params replace path segments and query parameters.
+
+Required methods:
+
+| Method | HTTP equivalent | Params |
+|--------|-----------------|--------|
+| `federation.discovery` | `GET /.well-known/pray-federation.json` | none |
+| `sync.index` | `GET /v1/sync/index` | `since` optional, integer |
+| `sync.package` | `GET /v1/sync/package/{name}` | `name` string |
+| `sync.push` | `POST /v1/sync/push` | `metadata` package metadata object |
+| `artifact.get` | `GET` static artifact path | `path` relative path under server root |
+| `artifact.put` | `PUT /v1/artifacts/...` | `path`, `body` base64 |
+
+Optional methods:
+
+| Method | HTTP equivalent |
+|--------|-----------------|
+| `confession.submit` | `POST /v1/confessions` |
+| `auth.register` | `POST /v1/auth/register` |
+| `auth.verify` | `POST /v1/auth/verify` |
+| `auth.session` | `POST /v1/auth/session` |
+| `auth.passkeys.challenge` | `POST /v1/auth/passkeys/challenge` |
+| `auth.passkeys.login` | `POST /v1/auth/passkeys/login` |
+| `auth.passkeys.enroll` | `POST /v1/auth/passkeys/enroll` |
+| `auth.ssh_keys.challenge` | `POST /v1/auth/ssh-keys/challenge` |
+| `auth.ssh_keys.login` | `POST /v1/auth/ssh-keys/login` |
+| `auth.ssh_keys.enroll` | `POST /v1/auth/ssh-keys/enroll` |
+
+JSON shapes for `federation.discovery`, `sync.index`, `sync.package`, `sync.push`, artifacts, confessions, and auth match the HTTP API and federation types in Section 29.2. HTML index and package pages are not exposed over SSH-RPC.
+
+#### Authentication
+
+SSH-native mode uses SSH for transport authentication:
+
+- host identity via `known_hosts` or equivalent host key pinning (`allowed_host_keys` in client `trust.toml`, optional `host_key_fingerprint` in `Prayfile.lock`)
+- user identity via SSH public key fingerprints (`signer_fingerprint` in package metadata, `allowed_publishers` in client trust policy)
+
+The server maps SSH public key fingerprints to publisher identities for push authorization (`v1/ssh_publishers.json`). The reference CLI reads `PRAY_SSH_USER_FINGERPRINT`, `SSH_USER_FINGERPRINT`, or `PRAY_SSH_PUBLISHER` on the server during push. Clients record `signer` (human label) and `signer_fingerprint` (canonical signing identity) in registry metadata; package signatures use the fingerprint when present.
+
+HTTP-style `auth.*` RPC methods are optional and intended for hybrid hosts. SSH-only servers may reject them.
+
+Package hashes, tree hashes, signatures, and render digests are still verified on the client. SSH establishes who connected and encrypts the channel; it does not replace package signature verification.
+
+#### Federation
+
+SSH may be used as a federation transport between peers:
+
+```toml
+[[federation.peers]]
+name = "team-vps"
+transport = "ssh"
+url = "pray+ssh://pray@prayers.internal"
+trust = "full"
+direction = "bidirectional"
+```
+
+The logical federation protocol in Section 29.2 is unchanged; only the wire transport differs from HTTP.
+
+### 29.6 Client git source trust policy
+
+A conforming client implementation may enforce optional trust policy for remote `git` sources before resolving packages from a cloned distribution repository.
+
+Policy file location (reference CLI): `~/.pray/trust.toml`. Override with `PRAY_HOME` or `PRAY_USER_HOME` per implementation.
+
+```toml
+[default]
+allow = true
+require_signed_commit = false
+allowed_signing_keys = []
+
+[[rules]]
+match_prefix = "https://github.com/example/"
+require_signed_commit = true
+allowed_signing_keys = ["SHA256:ABCDEF..."]
+```
+
+Longest `match_prefix` wins; otherwise `[default]` applies.
+
+When policy exists, the client may:
+
+- deny sources with `allow = false`
+- require `git verify-commit HEAD` when `require_signed_commit = true`
+- restrict signers to `allowed_signing_keys` when that list is non-empty
+- prompt for consent when HEAD has no verified-good signature and the signer is not already trusted
+
+SSH-signed commits should use per-source `allowedSignersFile` values scoped to the client's own git subprocesses (`$PRAY_HOME/trust/allowed_signers/`), without modifying the user's global git configuration.
+
+For `pray+ssh` sources, trust rules may also set `allowed_host_keys` (server host key fingerprints) and `allowed_publishers` (SSH user key fingerprints allowed to publish). Package metadata should record `signer_fingerprint` separately from the human-readable `signer` label; signatures use the fingerprint when present.
+
+Reference CLI commands: `pray trust list|show|add-key|remove-key|set-signed|set-allow|import-repo|import-registry|check`. `pray trust import-registry` reads `v1/ssh_publishers.json` from a distribution point and records publisher fingerprints in `allowed_publishers` for the matching rule; for `pray+ssh` sources it also records the server host key in `allowed_host_keys` unless `--no-host-key` is passed. `pray trust check` compares trusted keys against a compromised-key feed (HTTP URL, local file, or git repository).
+
+Global flags: `--trust` imports signer keys after interactive consent; `--global --trust` imports into `[default]`. `PRAY_TRUST_ASSUME_YES=1` auto-consents in non-interactive environments. `--rm` uses an ephemeral `PRAY_HOME` but still copies persistent trust policy into it.
 
 ---
 

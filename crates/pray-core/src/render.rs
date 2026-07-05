@@ -1,4 +1,4 @@
-use crate::hashing::{marker_id, normalize_line_endings, sha256_prefixed};
+use crate::hashing::{checksum_managed_span_content, marker_id};
 use crate::lockfile::ManagedSpanRecord;
 use crate::resolve::ResolvedProject;
 use crate::{PrayError, PrayResult};
@@ -44,11 +44,16 @@ pub fn materialize_target_skills(project: &ResolvedProject) -> PrayResult<()> {
             let destination_root = project.project_root.join(skills_root);
             for package in &project.packages {
                 for (skill_name, skill) in &package.spec.skills {
+                    let skill_files = package.skill_files.get(skill_name).ok_or_else(|| {
+                        PrayError::Render(format!(
+                            "package {} has no indexed files for skill {}",
+                            package.declaration.name, skill_name
+                        ))
+                    })?;
                     copy_skill_tree(
                         &package.root.join(&skill.path),
                         &destination_root.join(skill_name),
-                        &package.spec.files,
-                        &skill.path,
+                        skill_files,
                     )?;
                 }
             }
@@ -60,8 +65,7 @@ pub fn materialize_target_skills(project: &ResolvedProject) -> PrayResult<()> {
 fn copy_skill_tree(
     source_root: &Path,
     destination_root: &Path,
-    package_files: &[String],
-    skill_path: &str,
+    skill_files: &[String],
 ) -> PrayResult<()> {
     if !source_root.is_dir() {
         return Err(PrayError::Render(format!(
@@ -70,21 +74,14 @@ fn copy_skill_tree(
         )));
     }
 
-    let skill_prefix = skill_path.trim_end_matches('/');
-    let mut copied = false;
-    for file in package_files {
-        let relative = file.strip_prefix(skill_prefix).and_then(|rest| {
-            let trimmed = rest.trim_start_matches('/');
-            if trimmed.is_empty() || file == skill_prefix {
-                None
-            } else {
-                Some(trimmed)
-            }
-        });
-        let Some(relative) = relative else {
-            continue;
-        };
+    if skill_files.is_empty() {
+        return Err(PrayError::Render(format!(
+            "no skill files listed in package manifest for {}",
+            source_root.display()
+        )));
+    }
 
+    for relative in skill_files {
         let source = source_root.join(relative);
         if !source.is_file() {
             return Err(PrayError::Render(format!(
@@ -97,17 +94,62 @@ fn copy_skill_tree(
             fs::create_dir_all(parent)?;
         }
         fs::copy(&source, &destination)?;
-        copied = true;
-    }
-
-    if !copied {
-        return Err(PrayError::Render(format!(
-            "no skill files listed in package manifest for {}",
-            source_root.display()
-        )));
     }
 
     Ok(())
+}
+
+struct ContentBuilder {
+    content: String,
+}
+
+impl ContentBuilder {
+    fn with_capacity(capacity: usize) -> Self {
+        Self {
+            content: String::with_capacity(capacity),
+        }
+    }
+
+    fn next_line_number(&self) -> usize {
+        self.content.matches('\n').count() + 1
+    }
+
+    fn append_line(&mut self, line: &str) {
+        self.content.push_str(line);
+        self.content.push('\n');
+    }
+
+    fn append_empty_line(&mut self) {
+        self.content.push('\n');
+    }
+
+    fn append_body(&mut self, body: &str) {
+        let trimmed = body.trim_end_matches('\n');
+        if trimmed.is_empty() {
+            return;
+        }
+        for line in trimmed.split('\n') {
+            self.append_line(line);
+        }
+    }
+
+    fn finish(mut self) -> String {
+        while self.content.ends_with("\n\n") {
+            self.content.pop();
+        }
+        if !self.content.ends_with('\n') {
+            self.content.push('\n');
+        }
+        self.content
+    }
+}
+
+fn should_inline_export(package: &crate::resolve::ResolvedPackage, export_name: &str) -> bool {
+    package
+        .spec
+        .exports
+        .get(export_name)
+        .is_none_or(|export| export.kind != "skill")
 }
 
 fn render_target(
@@ -115,104 +157,78 @@ fn render_target(
     target: &crate::manifest::ManifestTarget,
     output: &Path,
 ) -> PrayResult<RenderedTarget> {
-    let mut lines = Vec::<String>::new();
+    let mut builder = ContentBuilder::with_capacity(8_192);
     if project.manifest.render.header {
         let output_name = output
             .file_name()
             .map(|name| name.to_string_lossy().to_string())
             .unwrap_or_else(|| output.to_string_lossy().to_string());
-        lines.push("<!-- pray:0 ignore-comments -->".to_string());
-        lines.push(String::new());
-        lines.push("# Agent context".to_string());
-        lines.push(String::new());
-        lines.push(format!(
+        builder.append_line("<!-- pray:0 ignore-comments -->");
+        builder.append_empty_line();
+        builder.append_line("# Agent context");
+        builder.append_empty_line();
+        builder.append_line(&format!(
             "Do not edit managed blocks in `{output_name}` or skills under `.agents/`."
         ));
-        lines.push(
-            "To change shared guidance, update `Prayfile` and run `pray install`.".to_string(),
-        );
-        lines.push(String::new());
+        builder.append_line("To change shared guidance, update `Prayfile` and run `pray install`.");
+        builder.append_empty_line();
     }
 
     if !project.local_files.is_empty() {
-        lines.push("## Additional instructions".to_string());
-        lines.push(String::new());
+        builder.append_line("## Additional instructions");
+        builder.append_empty_line();
     }
     for local in &project.local_files {
         if local.content.is_empty() && local.optional {
             continue;
         }
-        lines.push(format!("### {}", local.path.display()));
-        push_body(&mut lines, &local.content);
-        lines.push(String::new());
+        builder.append_line(&format!("### {}", local.path.display()));
+        builder.append_body(&local.content);
+        builder.append_empty_line();
     }
 
-    lines.push("## Shared instructions".to_string());
-    lines.push(String::new());
+    builder.append_line("## Shared instructions");
+    builder.append_empty_line();
 
     let mut managed_spans = Vec::new();
     for package in &project.packages {
         for export in &package.selected_exports {
-            let entry = package.spec.exports.get(export).ok_or_else(|| {
+            if !should_inline_export(package, export) {
+                continue;
+            }
+            let body = package.export_bodies.get(export).ok_or_else(|| {
                 PrayError::Render(format!(
-                    "package {} is missing export {}",
+                    "package {} is missing cached export {}",
                     package.declaration.name, export
                 ))
             })?;
-            let body = read_export_body(&package.root.join(&entry.path))?;
             let id = marker_id(&format!(
                 "{}:{}:{}",
                 package.declaration.name, export, target.name
             ));
-            let normalized_body = normalize_line_endings(&body);
-            let body_for_checksum = normalized_body.trim_end_matches('\n').to_string();
-            let open_line = lines.len() + 1;
-            lines.push(format!("<!-- pray:{} -->", id));
-            push_body(&mut lines, &body);
-            let close_line = lines.len() + 1;
-            lines.push(format!("<!-- pray:{} -->", id));
+            let open_line = builder.next_line_number();
+            builder.append_line(&format!("<!-- pray:{id} -->"));
+            builder.append_body(body);
+            let close_line = builder.next_line_number();
+            builder.append_line(&format!("<!-- pray:{id} -->"));
             managed_spans.push(ManagedSpanRecord {
                 id,
                 target: output.to_string_lossy().to_string(),
                 open_line,
                 close_line,
-                ideal_checksum: sha256_prefixed(body_for_checksum.as_bytes()),
+                ideal_checksum: checksum_managed_span_content(body),
                 package: package.declaration.name.clone(),
                 export: export.clone(),
                 source_checksum: package.source_checksum.clone(),
                 silenced: false,
             });
-            lines.push(String::new());
+            builder.append_empty_line();
         }
     }
 
-    if lines.last().map(|line| line.is_empty()).unwrap_or(false) {
-        lines.pop();
-    }
-
-    let mut content = lines.join("\n");
-    if !content.ends_with('\n') {
-        content.push('\n');
-    }
     Ok(RenderedTarget {
         path: output.to_path_buf(),
-        content,
+        content: builder.finish(),
         managed_spans,
     })
-}
-
-fn push_body(lines: &mut Vec<String>, body: &str) {
-    let normalized = normalize_line_endings(body);
-    let trimmed = normalized.trim_end_matches('\n');
-    if trimmed.is_empty() {
-        return;
-    }
-    for line in trimmed.split('\n') {
-        lines.push(line.to_string());
-    }
-}
-
-fn read_export_body(path: &Path) -> PrayResult<String> {
-    let text = fs::read_to_string(path)?;
-    Ok(normalize_line_endings(&text))
 }

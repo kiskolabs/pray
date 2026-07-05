@@ -3,6 +3,7 @@ use crate::federation::FederationTransportFactory;
 use crate::http::HttpTransportFactory;
 #[cfg(feature = "p2p")]
 use crate::p2p::P2PTransportFactory;
+use crate::ssh::SshTransportFactory;
 #[cfg(feature = "torrent")]
 use crate::torrent::TorrentTransportFactory;
 use crate::types::*;
@@ -24,6 +25,7 @@ impl TransportRegistry {
 
         // Register built-in transports
         registry.register("http", Arc::new(HttpTransportFactory));
+        registry.register("ssh", Arc::new(SshTransportFactory));
 
         #[cfg(feature = "p2p")]
         {
@@ -81,6 +83,7 @@ mod tests {
 
         // HTTP should always be available
         assert!(registry.has_transport("http"));
+        assert!(registry.has_transport("ssh"));
 
         // Federation and P2P availability depend on features
         #[cfg(feature = "p2p")]

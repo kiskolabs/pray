@@ -7,6 +7,7 @@ Use the deployment guides below for concrete templates:
 - managed hosting
 - general-purpose hosted app platform
 - dedicated server
+- [SSH-only distribution](deployments/ssh.md) (no HTTP listener)
 - edge proxy or tunnel in front of another host
 - self-managed app server
 

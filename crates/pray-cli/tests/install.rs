@@ -83,7 +83,7 @@ Package::Specification.new do |spec|
   ]
   spec.exports = {
     "skill" => {
-      type: "fragment",
+      type: "skill",
       path: "skills/audit/SKILL.md",
       summary: "Audit skill entrypoint"
     }
@@ -118,6 +118,78 @@ end
 
     assert!(repo.join(".agents/skills/audit/SKILL.md").is_file());
     assert!(repo.join(".agents/skills/audit/details.md").is_file());
+
+    let rendered = fs::read_to_string(repo.join("INSTRUCTIONS.md")).expect("rendered file");
+    assert!(
+        !rendered.contains("# Audit skill"),
+        "skill exports must not be inlined into root target files when skills path is configured"
+    );
+}
+
+#[test]
+fn preserves_prayfile_package_order_in_rendered_output() {
+    let repo = temporary_directory("pray-install-order");
+    fs::create_dir_all(repo.join("packages/zebra/exports")).expect("zebra directories");
+    fs::create_dir_all(repo.join("packages/alpha/exports")).expect("alpha directories");
+    fs::write(
+        repo.join("Prayfile"),
+        r#"
+prayfile "1"
+target :tool_a do
+  output "INSTRUCTIONS.md"
+end
+agent "sample/zebra", path: "packages/zebra", exports: ["zebra"]
+agent "sample/alpha", path: "packages/alpha", exports: ["alpha"]
+render mode: :managed, conflict: :fail, churn: :minimal
+"#,
+    )
+    .expect("write Prayfile");
+    for (name, export_name, body) in [
+        ("zebra", "zebra", "Zebra guidance\n"),
+        ("alpha", "alpha", "Alpha guidance\n"),
+    ] {
+        fs::write(
+            repo.join(format!("packages/{name}/{name}.prayspec")),
+            format!(
+                r#"
+Package::Specification.new do |spec|
+  spec.name = "sample/{name}"
+  spec.version = "1.0.0"
+  spec.summary = "{name} guidance"
+  spec.files = ["exports/{export_name}.md"]
+  spec.exports = {{
+    "{export_name}" => {{
+      type: "fragment",
+      path: "exports/{export_name}.md",
+      summary: "{name} guidance"
+    }}
+  }}
+end
+"#
+            ),
+        )
+        .expect("write prayspec");
+        fs::write(
+            repo.join(format!("packages/{name}/exports/{export_name}.md")),
+            body,
+        )
+        .expect("write export");
+    }
+
+    let install = run_pray(&repo, &["install"]);
+    assert!(
+        install.status.success(),
+        "install failed: {}",
+        String::from_utf8_lossy(&install.stderr)
+    );
+
+    let rendered = fs::read_to_string(repo.join("INSTRUCTIONS.md")).expect("rendered file");
+    let zebra_index = rendered.find("Zebra guidance").expect("zebra content");
+    let alpha_index = rendered.find("Alpha guidance").expect("alpha content");
+    assert!(
+        zebra_index < alpha_index,
+        "rendered output should follow Prayfile package order"
+    );
 }
 
 #[test]

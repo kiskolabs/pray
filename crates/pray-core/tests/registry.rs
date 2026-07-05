@@ -4,6 +4,7 @@ use pray_core::manifest::ManifestPackage;
 use pray_core::registry::{
     resolve_registry_package_root, RegistryPackageMetadata, RegistryPackageVersion,
 };
+use pray_core::resolve_context::PackageResolutionContext;
 
 use serde::Serialize;
 use std::fs;
@@ -40,8 +41,14 @@ fn prefers_torrent_sidecar_when_available() {
         oci: None,
     };
 
-    let resolved_root = resolve_registry_package_root(&project_root, &source_url, &declaration)
-        .expect("torrent sidecar should resolve");
+    let resolved_root = resolve_registry_package_root(
+        &project_root,
+        &source_url,
+        &declaration,
+        &PackageResolutionContext::default(),
+    )
+    .expect("torrent sidecar should resolve")
+    .root;
 
     assert!(resolved_root.join("package.prayspec").exists());
     let counts = read_request_counts(&source_url);
@@ -65,6 +72,7 @@ fn registry_package_version_merges_derived_metadata_without_conflict() {
         targets: vec![],
         exports: vec![],
         signer: Some("publisher@example.com".to_string()),
+        signer_fingerprint: None,
         published_at: Some("1".to_string()),
         signature: Some("signature".to_string()),
         derived_metadata: None,
@@ -112,8 +120,14 @@ fn falls_back_to_direct_artifact_when_sidecar_is_missing() {
         oci: None,
     };
 
-    let resolved_root = resolve_registry_package_root(&project_root, &source_url, &declaration)
-        .expect("direct artifact fallback should resolve");
+    let resolved_root = resolve_registry_package_root(
+        &project_root,
+        &source_url,
+        &declaration,
+        &PackageResolutionContext::default(),
+    )
+    .expect("direct artifact fallback should resolve")
+    .root;
 
     assert!(resolved_root.join("package.prayspec").exists());
     let counts = read_request_counts(&source_url);
@@ -348,6 +362,7 @@ fn registry_metadata(artifact_path: &str, artifact_bytes: &[u8]) -> RegistryPack
             targets: vec![],
             exports: vec![],
             signer: None,
+            signer_fingerprint: None,
             published_at: None,
             signature: None,
             derived_metadata: None,

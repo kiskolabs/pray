@@ -2,21 +2,33 @@ mod auth_client;
 mod revision;
 mod revision_backend;
 mod server;
+mod server_stdio;
+mod trust_command;
 
 use auth_client::{
-    current_signer as current_signer_from_session, login_with_passkey, login_with_ssh_agent,
+    current_signer as current_signer_from_session,
+    current_signer_fingerprint as current_signer_fingerprint_from_session, login_with_passkey,
+    login_with_ssh_agent,
 };
 use pray_core::auth::RegistryAuthStore;
+use pray_core::client_trust::prepare_ephemeral_home;
 use pray_core::derived_metadata::derive_registry_derived_metadata_from_archive_bytes;
 use pray_core::hashing::{normalize_line_endings, sha256_prefixed};
-use pray_core::lockfile::{read_lockfile, write_lockfile, Lockfile};
+use pray_core::lockfile::{
+    lockfiles_equivalent, read_lockfile, write_lockfile, write_lockfile_if_changed, Lockfile,
+};
 use pray_core::manifest::parse_manifest;
 use pray_core::registry::{
-    registry_artifact_signature, submit_confession, upload_registry_artifact, ConfessionSubmission,
-    RegistryIndex, RegistryPackageMetadata, RegistryPackageVersion,
+    registry_artifact_signature, registry_package_signing_identity, submit_confession,
+    upload_registry_artifact, ConfessionSubmission, RegistryIndex, RegistryPackageMetadata,
+    RegistryPackageVersion,
 };
 use pray_core::render::{render_project, write_rendered_targets};
-use pray_core::resolve::{refresh_git_sources, resolve_project, ResolvedProject};
+use pray_core::resolve::{
+    refresh_git_sources, resolve_project, resolve_project_with_options, ResolvedProject,
+};
+use pray_core::resolve_context::ResolveOptions;
+use pray_core::ssh_identity::{active_ssh_user_fingerprint, signing_identity};
 use pray_core::trust::{write_registry_trust_settings, RegistryTrustSettings};
 use pray_core::verify::{drift_project, format_verification_report, verify_project};
 use pray_core::{PrayError, PrayResult};
@@ -44,8 +56,28 @@ fn main() {
 }
 
 fn run(arguments: Vec<String>) -> PrayResult<()> {
-    let command = parse_command(arguments)?;
-    match command {
+    let ephemeral = arguments.iter().any(|argument| argument == "--rm");
+    let trust_import = arguments.iter().any(|argument| argument == "--trust");
+    let trust_global = arguments.iter().any(|argument| argument == "--global");
+    let filtered: Vec<String> = arguments
+        .into_iter()
+        .filter(|argument| argument != "--rm" && argument != "--trust" && argument != "--global")
+        .collect();
+    let ephemeral_home = if ephemeral {
+        Some(prepare_ephemeral_home()?)
+    } else {
+        None
+    };
+    if trust_import {
+        std::env::set_var("PRAY_TRUST_IMPORT", "1");
+    }
+    if trust_global && !trust_import {
+        return Err(PrayError::Unsupported(
+            "--global requires --trust on install, update, or refresh".into(),
+        ));
+    }
+
+    let result = match parse_command(filtered)? {
         Command::Manifest => manifest_command(),
         Command::Init { targets } => init_command(targets),
         Command::PrayerInit => prayer_init_command(),
@@ -57,6 +89,7 @@ fn run(arguments: Vec<String>) -> PrayResult<()> {
         } => add_command(name, constraint, path),
         Command::Remove { name } => remove_command(name),
         Command::Update { package, major } => update_command(package, major),
+        Command::Unlock { package } => unlock_command(package),
         Command::Install {
             locked,
             frozen,
@@ -85,7 +118,12 @@ fn run(arguments: Vec<String>) -> PrayResult<()> {
             public_key,
             ssh_agent,
         ),
-        Command::Serve { root, host, port } => serve_command(root, host, port),
+        Command::Serve {
+            root,
+            host,
+            port,
+            stdio,
+        } => serve_command(root, host, port, stdio),
         Command::Confess {
             package,
             from_lock,
@@ -102,7 +140,13 @@ fn run(arguments: Vec<String>) -> PrayResult<()> {
         Command::Clean => clean_command(),
         Command::Tree => tree_command(),
         Command::Sync { root, peers } => sync_command(root, peers),
+        Command::Trust { arguments } => trust_command::run_trust_command(arguments),
+    };
+
+    if let Some(home) = ephemeral_home {
+        let _ = fs::remove_dir_all(home);
     }
+    result
 }
 
 enum Command {
@@ -128,6 +172,9 @@ enum Command {
     Update {
         package: Option<String>,
         major: bool,
+    },
+    Unlock {
+        package: String,
     },
     Render {
         check: bool,
@@ -158,6 +205,7 @@ enum Command {
         root: PathBuf,
         host: String,
         port: u16,
+        stdio: bool,
     },
     Confess {
         package: Option<String>,
@@ -179,6 +227,9 @@ enum Command {
     Sync {
         root: PathBuf,
         peers: Vec<String>,
+    },
+    Trust {
+        arguments: Vec<String>,
     },
 }
 
@@ -240,6 +291,7 @@ fn parse_command(arguments: Vec<String>) -> PrayResult<Command> {
         "add" => parse_add_command(iter),
         "remove" => parse_remove_command(iter),
         "update" => parse_update_command(iter),
+        "unlock" => parse_unlock_command(iter),
         "render" => Ok(Command::Render { check }),
         "plan" => Ok(Command::Plan),
         "apply" => Ok(Command::Apply),
@@ -258,6 +310,10 @@ fn parse_command(arguments: Vec<String>) -> PrayResult<Command> {
         "clean" => Ok(Command::Clean),
         "tree" => Ok(Command::Tree),
         "sync" => parse_sync_command(iter),
+        "trust" => {
+            let arguments: Vec<String> = iter.collect();
+            Ok(Command::Trust { arguments })
+        }
         "help" | "-h" | "--help" => {
             print_help();
             std::process::exit(0);
@@ -473,6 +529,30 @@ fn update_command(package: Option<String>, major: bool) -> PrayResult<()> {
     Ok(())
 }
 
+fn unlock_command(package: String) -> PrayResult<()> {
+    let project = resolve_project(&manifest_path())?;
+    if !project
+        .manifest
+        .packages
+        .iter()
+        .any(|declaration| declaration.name == package)
+    {
+        return Err(PrayError::Manifest(format!("package {package} not found")));
+    }
+    let previous_lockfile = read_lockfile(&lockfile_path())?;
+    let mut options = ResolveOptions::default();
+    options.unlocked_packages.insert(package.clone());
+    let project = resolve_project_with_options(&manifest_path(), &options)?;
+    let rendered = render_project(&project)?;
+    let updated_lockfile = build_lockfile(&project, &rendered)?;
+    let merged_lockfile =
+        merge_selected_package_update(&previous_lockfile, &updated_lockfile, &package);
+    write_lockfile(&lockfile_path(), &merged_lockfile)?;
+    write_rendered_targets(&project, &rendered)?;
+    println!("Unlocked {package}");
+    Ok(())
+}
+
 fn insert_manifest_statement(text: &str, statement: &str) -> String {
     let mut lines: Vec<String> = text.lines().map(|line| line.to_string()).collect();
     let insertion_index = lines
@@ -598,6 +678,31 @@ fn parse_update_command(arguments: std::vec::IntoIter<String>) -> PrayResult<Com
         }
     }
     Ok(Command::Update { package, major })
+}
+
+fn parse_unlock_command(arguments: std::vec::IntoIter<String>) -> PrayResult<Command> {
+    let mut package = None;
+    for argument in arguments {
+        match argument.as_str() {
+            other if other.starts_with("--") => {
+                return Err(PrayError::Unsupported(format!(
+                    "unknown unlock flag: {other}"
+                )))
+            }
+            other => {
+                if package.is_none() {
+                    package = Some(other.to_string());
+                } else {
+                    return Err(PrayError::Unsupported(format!(
+                        "unexpected unlock argument: {other}"
+                    )));
+                }
+            }
+        }
+    }
+    let package = package
+        .ok_or_else(|| PrayError::Unsupported("unlock requires a package name".to_string()))?;
+    Ok(Command::Unlock { package })
 }
 
 fn parse_publish_command(mut arguments: std::vec::IntoIter<String>) -> PrayResult<Command> {
@@ -739,6 +844,7 @@ fn parse_serve_command(mut arguments: std::vec::IntoIter<String>) -> PrayResult<
     let mut root = PathBuf::from(".");
     let mut host = "127.0.0.1".to_string();
     let mut port = 7429u16;
+    let mut stdio = false;
     while let Some(argument) = arguments.next() {
         match argument.as_str() {
             "--root" => {
@@ -767,6 +873,7 @@ fn parse_serve_command(mut arguments: std::vec::IntoIter<String>) -> PrayResult<
                     .parse::<u16>()
                     .map_err(|error| PrayError::Unsupported(error.to_string()))?;
             }
+            "--stdio" => stdio = true,
             other if other.starts_with("--") => {
                 return Err(PrayError::Unsupported(format!(
                     "unknown serve flag: {other}"
@@ -779,7 +886,12 @@ fn parse_serve_command(mut arguments: std::vec::IntoIter<String>) -> PrayResult<
             }
         }
     }
-    Ok(Command::Serve { root, host, port })
+    Ok(Command::Serve {
+        root,
+        host,
+        port,
+        stdio,
+    })
 }
 
 fn parse_sync_command(mut arguments: std::vec::IntoIter<String>) -> PrayResult<Command> {
@@ -900,10 +1012,11 @@ fn parse_confess_command(mut arguments: std::vec::IntoIter<String>) -> PrayResul
 }
 
 fn install_command(locked: bool, frozen: bool, offline: bool) -> PrayResult<()> {
-    let project = resolve_project(&manifest_path())?;
-    if offline {
-        ensure_offline_ready(&project)?;
-    }
+    let options = ResolveOptions {
+        offline,
+        ..ResolveOptions::default()
+    };
+    let project = resolve_project_with_options(&manifest_path(), &options)?;
     let rendered = render_project(&project)?;
     let lockfile_path = lockfile_path();
     if locked {
@@ -930,7 +1043,7 @@ fn plan_command() -> PrayResult<()> {
     let mut lines = Vec::new();
 
     match read_lockfile(&lockfile_path()) {
-        Ok(existing) if existing.canonicalized() == lockfile.canonicalized() => {
+        Ok(existing) if lockfiles_equivalent(&lockfile, &existing) => {
             lines.push("Prayfile.lock unchanged".to_string());
         }
         Ok(_) => lines.push("Prayfile.lock would be updated".to_string()),
@@ -1075,8 +1188,12 @@ fn explain_command(package_name: String) -> PrayResult<()> {
     Ok(())
 }
 
-fn serve_command(root: PathBuf, host: String, port: u16) -> PrayResult<()> {
-    server::run_server(root, host, port)
+fn serve_command(root: PathBuf, host: String, port: u16, stdio: bool) -> PrayResult<()> {
+    if stdio {
+        server_stdio::run_stdio_server(root)
+    } else {
+        server::run_server(root, host, port)
+    }
 }
 
 fn confess_command(
@@ -1222,6 +1339,13 @@ fn current_signer() -> String {
         .unwrap_or_else(|_| "unknown".to_string())
 }
 
+fn current_signer_fingerprint() -> Option<String> {
+    if let Some(fingerprint) = active_ssh_user_fingerprint() {
+        return Some(fingerprint);
+    }
+    current_signer_fingerprint_from_session(&workspace_root())
+}
+
 fn current_timestamp() -> PrayResult<String> {
     SystemTime::now()
         .duration_since(UNIX_EPOCH)
@@ -1256,6 +1380,7 @@ fn package_command() -> PrayResult<()> {
 fn publish_command(roots: Vec<PathBuf>, servers: Vec<String>) -> PrayResult<()> {
     let project = resolve_project(&manifest_path())?;
     let signer = current_signer();
+    let signer_fingerprint = current_signer_fingerprint();
     let published_at = current_timestamp()?;
     let runtime = if servers.is_empty() {
         None
@@ -1271,12 +1396,25 @@ fn publish_command(roots: Vec<PathBuf>, servers: Vec<String>) -> PrayResult<()> 
     };
 
     for root in roots {
-        publish_to_root(&project, &signer, &published_at, &root)?;
+        publish_to_root(
+            &project,
+            &signer,
+            signer_fingerprint.as_deref(),
+            &published_at,
+            &root,
+        )?;
         record_root_revision(&root, RevisionAction::Publish)?;
     }
     if let Some(runtime) = &runtime {
         for server_url in servers {
-            publish_to_server(&project, &signer, &published_at, &server_url, runtime)?;
+            publish_to_server(
+                &project,
+                &signer,
+                signer_fingerprint.as_deref(),
+                &published_at,
+                &server_url,
+                runtime,
+            )?;
         }
     }
     Ok(())
@@ -1285,6 +1423,7 @@ fn publish_command(roots: Vec<PathBuf>, servers: Vec<String>) -> PrayResult<()> 
 fn publish_to_root(
     project: &ResolvedProject,
     signer: &str,
+    signer_fingerprint: Option<&str>,
     published_at: &str,
     root: &Path,
 ) -> PrayResult<()> {
@@ -1309,6 +1448,7 @@ fn publish_to_root(
         let version_entry = published_registry_package_version(
             package,
             signer,
+            signer_fingerprint,
             published_at,
             &artifact_path,
             &archive_bytes,
@@ -1329,10 +1469,12 @@ fn publish_to_root(
 fn published_registry_package_version(
     package: &pray_core::resolve::ResolvedPackage,
     signer: &str,
+    signer_fingerprint: Option<&str>,
     published_at: &str,
     artifact_path: &str,
     archive_bytes: &[u8],
 ) -> PrayResult<RegistryPackageVersion> {
+    let signing_identity = signing_identity(signer, signer_fingerprint);
     Ok(RegistryPackageVersion {
         version: package.spec.version.clone(),
         artifact: artifact_path.to_string(),
@@ -1342,11 +1484,12 @@ fn published_registry_package_version(
         targets: package.spec.targets.clone(),
         exports: package.spec.exports.keys().cloned().collect(),
         signer: Some(signer.to_string()),
+        signer_fingerprint: signer_fingerprint.map(str::to_string),
         published_at: Some(published_at.to_string()),
         signature: Some(registry_artifact_signature(
             archive_bytes,
             &package.tree_hash,
-            signer,
+            &signing_identity,
         )),
         derived_metadata: Some(derive_registry_derived_metadata_from_archive_bytes(
             archive_bytes,
@@ -1357,10 +1500,21 @@ fn published_registry_package_version(
 fn publish_to_server(
     project: &ResolvedProject,
     signer: &str,
+    signer_fingerprint: Option<&str>,
     published_at: &str,
     server_url: &str,
     runtime: &tokio::runtime::Runtime,
 ) -> PrayResult<()> {
+    if pray_core::ssh_client::is_pray_ssh_url(server_url) {
+        return publish_to_ssh_server(
+            project,
+            signer,
+            signer_fingerprint,
+            published_at,
+            server_url,
+        );
+    }
+
     let peer = PeerConfig {
         name: server_url.to_string(),
         transport: "http".to_string(),
@@ -1388,6 +1542,7 @@ fn publish_to_server(
             versions: vec![published_registry_package_version(
                 package,
                 signer,
+                signer_fingerprint,
                 published_at,
                 &artifact_path,
                 &archive_bytes,
@@ -1400,6 +1555,65 @@ fn publish_to_server(
     }
 
     Ok(())
+}
+
+fn publish_to_ssh_server(
+    project: &ResolvedProject,
+    signer: &str,
+    signer_fingerprint: Option<&str>,
+    published_at: &str,
+    server_url: &str,
+) -> PrayResult<()> {
+    use base64::{engine::general_purpose::STANDARD, Engine as _};
+    use pray_core::ssh_client::with_pray_ssh_session;
+    use serde_json::json;
+
+    with_pray_ssh_session(server_url, |session| {
+        for package in &project.packages {
+            let archive_bytes = build_package_archive_bytes(package)?;
+            let artifact_path =
+                registry_artifact_path(&package.declaration.name, &package.spec.version);
+            session.call_json(
+                "artifact.put",
+                json!({
+                    "path": artifact_path,
+                    "body": STANDARD.encode(&archive_bytes),
+                }),
+            )?;
+            let torrent_path = torrent_manifest_path(&artifact_path);
+            session.call_json(
+                "artifact.put",
+                json!({
+                    "path": torrent_path,
+                    "body": STANDARD.encode(&torrent_manifest_bytes(
+                        package,
+                        &artifact_path,
+                        &archive_bytes,
+                    )?),
+                }),
+            )?;
+
+            let metadata = RegistryPackageMetadata {
+                name: package.declaration.name.clone(),
+                versions: vec![published_registry_package_version(
+                    package,
+                    signer,
+                    signer_fingerprint,
+                    published_at,
+                    &artifact_path,
+                    &archive_bytes,
+                )?],
+            };
+            let transport_metadata = server::transport_package_metadata(&metadata);
+            session.call_json(
+                "sync.push",
+                json!({
+                    "metadata": transport_metadata,
+                }),
+            )?;
+        }
+        Ok(())
+    })
 }
 
 fn sync_command(root: PathBuf, peers: Vec<String>) -> PrayResult<()> {
@@ -1600,16 +1814,16 @@ async fn sync_package_from_peer(
             )));
         }
         if let Some(signature) = local_version.signature.as_ref() {
-            if let (Some(tree_hash), Some(signer)) = (
-                local_version.tree_hash.as_ref(),
-                local_version.signer.as_ref(),
-            ) {
-                let expected_signature = registry_artifact_signature(&bytes, tree_hash, signer);
-                if &expected_signature != signature {
-                    return Err(PrayError::Integrity(format!(
-                        "signature mismatch for {} {}",
-                        metadata.name, local_version.version
-                    )));
+            if let Some(signing_identity) = registry_package_signing_identity(&local_version) {
+                if let Some(tree_hash) = local_version.tree_hash.as_ref() {
+                    let expected_signature =
+                        registry_artifact_signature(&bytes, tree_hash, &signing_identity);
+                    if &expected_signature != signature {
+                        return Err(PrayError::Integrity(format!(
+                            "signature mismatch for {} {}",
+                            metadata.name, local_version.version
+                        )));
+                    }
                 }
             }
         }
@@ -1662,9 +1876,14 @@ fn write_synced_artifact(root: &Path, artifact_path: &str, bytes: &[u8]) -> Pray
 }
 
 fn federation_peer_config(peer_source: &str) -> PeerConfig {
+    let transport = if pray_core::ssh_client::is_pray_ssh_url(peer_source) {
+        "ssh"
+    } else {
+        "http"
+    };
     PeerConfig {
         name: peer_source.to_string(),
-        transport: "http".to_string(),
+        transport: transport.to_string(),
         url: Some(peer_source.to_string()),
         trust: TrustLevel::Full,
         direction: SyncDirection::Pull,
@@ -1785,6 +2004,12 @@ fn sync_package_version_from_transport(
                 .filter(|signer| !signer.trim().is_empty())
         });
 
+    let signer_fingerprint = version
+        .publisher
+        .as_ref()
+        .map(|publisher| publisher.key_fingerprint.clone())
+        .filter(|fingerprint| !fingerprint.trim().is_empty());
+
     Ok(RegistryPackageVersion {
         version: version.version.clone(),
         artifact: version.artifact.clone(),
@@ -1798,6 +2023,7 @@ fn sync_package_version_from_transport(
         targets: version.targets.clone(),
         exports: version.exports.clone(),
         signer,
+        signer_fingerprint,
         published_at: Some(version.published_at.clone()),
         signature: version
             .signature
@@ -2267,6 +2493,8 @@ fn build_lockfile(
         &project.manifest.targets,
         rendered,
         &project.packages,
+        &project.source_revisions,
+        &project.source_host_keys,
     ))
 }
 
@@ -2310,7 +2538,7 @@ fn ensure_lockfile_current(
     existing: &Lockfile,
 ) -> PrayResult<()> {
     let current = build_lockfile(project, rendered)?;
-    if current.canonicalized() != existing.canonicalized() {
+    if !lockfiles_equivalent(&current, existing) {
         return Err(PrayError::Verify(
             "lockfile needs update; rerun pray install to refresh Prayfile.lock".to_string(),
         ));
@@ -2331,40 +2559,6 @@ fn ensure_rendered_outputs_current(
                 path.display()
             )));
         }
-    }
-    Ok(())
-}
-
-fn write_lockfile_if_changed(path: &Path, lockfile: &Lockfile) -> PrayResult<()> {
-    if path.exists() {
-        if let Ok(existing) = read_lockfile(path) {
-            if existing.canonicalized() == lockfile.canonicalized() {
-                return Ok(());
-            }
-        }
-    }
-    write_lockfile(path, lockfile)
-}
-
-fn ensure_offline_ready(project: &pray_core::resolve::ResolvedProject) -> PrayResult<()> {
-    for declaration in &project.manifest.packages {
-        if declaration.path.is_some() {
-            continue;
-        }
-        if let Some(source_name) = &declaration.source {
-            let source = project
-                .manifest
-                .sources
-                .iter()
-                .find(|candidate| candidate.name == *source_name)
-                .ok_or_else(|| PrayError::Resolution(format!("unknown source: {source_name}")))?;
-            if source.kind == "path" {
-                continue;
-            }
-        }
-        return Err(PrayError::Unsupported(
-            "offline mode requires explicit local path packages".to_string(),
-        ));
     }
     Ok(())
 }
@@ -2774,6 +2968,7 @@ fn print_help() {
     println!("  add <name> [constraint] [--path PATH]");
     println!("  remove <name>");
     println!("  update [package] [--major]");
+    println!("  unlock <package>");
     println!("  install [--locked|--frozen|--offline]");
     println!("  render [--check]");
     println!("  plan");
@@ -2786,6 +2981,8 @@ fn print_help() {
     println!("  login --server URL --email EMAIL [--credential-id ID --passkey-key PATH | --public-key PATH --ssh-agent]");
     println!("  serve [--root PATH] [--host HOST] [--port PORT]");
     println!("  sync [--root PATH] [--peer URL ...]");
+    println!("  trust list|show|add-key|remove-key|set-signed|set-allow|import-repo|import-registry|check");
+    println!("  Global flags: --rm (ephemeral home), --trust [--global] (install/update)");
     println!(
         "  confess <package> | --from-lock SPAN_ID [--version VERSION] [--accepted|--rejected] [--note NOTE] [--url URL]"
     );
