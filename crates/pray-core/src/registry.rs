@@ -2,6 +2,7 @@ use crate::derived_metadata::RegistryDerivedMetadata;
 use crate::hashing::sha256_prefixed;
 use crate::manifest::ManifestPackage;
 use crate::package_spec::parse_package_spec;
+use crate::resolve_context::PackageResolutionContext;
 use crate::{PrayError, PrayResult};
 use semver::{Version, VersionReq};
 use serde::{Deserialize, Serialize};
@@ -10,6 +11,20 @@ use std::fs;
 use std::io::{Read, Write};
 use std::net::TcpStream;
 use std::path::{Path, PathBuf};
+
+#[derive(Debug, Clone)]
+pub struct RegistryPackageResolution {
+    pub root: PathBuf,
+    pub signer_fingerprint: Option<String>,
+}
+
+pub fn lockfile_signer_fingerprint(version: &RegistryPackageVersion) -> Option<String> {
+    version
+        .signer_fingerprint
+        .as_deref()
+        .filter(|value| crate::ssh_identity::looks_like_ssh_fingerprint(value))
+        .map(crate::ssh_identity::normalize_identity)
+}
 
 const TORRENT_MANIFEST_SPEC: &str = "pray-torrent-v1";
 
@@ -43,6 +58,8 @@ pub struct RegistryPackageVersion {
     pub exports: Vec<String>,
     #[serde(default)]
     pub signer: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub signer_fingerprint: Option<String>,
     #[serde(default)]
     pub published_at: Option<String>,
     #[serde(default)]
@@ -61,6 +78,7 @@ impl RegistryPackageVersion {
             && self.targets == other.targets
             && self.exports == other.exports
             && self.signer == other.signer
+            && self.signer_fingerprint == other.signer_fingerprint
             && self.published_at == other.published_at
             && self.signature == other.signature
     }
@@ -176,9 +194,27 @@ pub fn resolve_registry_package_root(
     project_root: &Path,
     source_url: &str,
     declaration: &ManifestPackage,
-) -> PrayResult<PathBuf> {
+    context: &PackageResolutionContext,
+) -> PrayResult<RegistryPackageResolution> {
+    if crate::ssh_client::is_pray_ssh_url(source_url) {
+        return resolve_ssh_registry_package_root(project_root, source_url, declaration, context);
+    }
+
     let metadata = fetch_registry_package_metadata(source_url, &declaration.name)?;
-    let selected = select_package_version(&metadata, &declaration.constraint)?;
+    let selected = select_package_version(
+        &metadata,
+        &declaration.constraint,
+        context.preferred_version.as_deref(),
+    )?;
+    let signer_fingerprint = lockfile_signer_fingerprint(&selected);
+    if let Some(vendored_root) =
+        try_vendored_package_root(project_root, &declaration.name, &selected.version)
+    {
+        return Ok(RegistryPackageResolution {
+            root: vendored_root,
+            signer_fingerprint,
+        });
+    }
     let cache_directory = registry_cache_directory(
         project_root,
         source_url,
@@ -187,7 +223,13 @@ pub fn resolve_registry_package_root(
     );
 
     if find_prayspec_file(&cache_directory).is_ok() {
-        return Ok(cache_directory);
+        return Ok(RegistryPackageResolution {
+            root: cache_directory,
+            signer_fingerprint,
+        });
+    }
+    if context.offline {
+        return Err(offline_package_error(&declaration.name, &selected.version));
     }
 
     if cache_directory.exists() {
@@ -209,7 +251,91 @@ pub fn resolve_registry_package_root(
         &artifact_bytes,
     )?;
 
-    Ok(cache_directory)
+    Ok(RegistryPackageResolution {
+        root: cache_directory,
+        signer_fingerprint,
+    })
+}
+
+fn resolve_ssh_registry_package_root(
+    project_root: &Path,
+    source_url: &str,
+    declaration: &ManifestPackage,
+    context: &PackageResolutionContext,
+) -> PrayResult<RegistryPackageResolution> {
+    use crate::ssh_client::with_pray_ssh_session;
+    use serde_json::json;
+
+    with_pray_ssh_session(source_url, |session| {
+        let metadata = fetch_ssh_registry_package_metadata(session, &declaration.name)?;
+        let selected = select_package_version(
+            &metadata,
+            &declaration.constraint,
+            context.preferred_version.as_deref(),
+        )?;
+        let signer_fingerprint = lockfile_signer_fingerprint(&selected);
+        if let Some(vendored_root) =
+            try_vendored_package_root(project_root, &declaration.name, &selected.version)
+        {
+            return Ok(RegistryPackageResolution {
+                root: vendored_root,
+                signer_fingerprint,
+            });
+        }
+        let cache_directory = registry_cache_directory(
+            project_root,
+            source_url,
+            &declaration.name,
+            &selected.version,
+        );
+
+        if find_prayspec_file(&cache_directory).is_ok() {
+            return Ok(RegistryPackageResolution {
+                root: cache_directory,
+                signer_fingerprint,
+            });
+        }
+        if context.offline {
+            return Err(offline_package_error(&declaration.name, &selected.version));
+        }
+
+        if cache_directory.exists() {
+            remove_path_if_exists(&cache_directory)?;
+        }
+        fs::create_dir_all(&cache_directory)?;
+
+        let artifact_bytes = session.call_bytes(
+            "artifact.get",
+            json!({
+                "path": selected.artifact,
+            }),
+        )?;
+        validate_and_unpack_registry_package(
+            &cache_directory,
+            declaration,
+            &selected,
+            &artifact_bytes,
+        )?;
+
+        Ok(RegistryPackageResolution {
+            root: cache_directory,
+            signer_fingerprint,
+        })
+    })
+}
+
+fn fetch_ssh_registry_package_metadata(
+    session: &mut crate::ssh_client::SshRpcSession,
+    package_name: &str,
+) -> PrayResult<RegistryPackageMetadata> {
+    use serde_json::json;
+
+    let metadata_path = format!("v1/packages/{package_name}.json");
+    let metadata_bytes = session.call_bytes("artifact.get", json!({ "path": metadata_path }))?;
+    serde_json::from_slice(&metadata_bytes).map_err(|error| PrayError::Parse {
+        kind: "registry metadata",
+        message: error.to_string(),
+    })
 }
 
 pub fn resolve_local_registry_package_root(
@@ -217,7 +343,8 @@ pub fn resolve_local_registry_package_root(
     source_key: &str,
     source_root: &Path,
     declaration: &ManifestPackage,
-) -> PrayResult<PathBuf> {
+    context: &PackageResolutionContext,
+) -> PrayResult<RegistryPackageResolution> {
     let metadata_path = source_root.join(format!("v1/packages/{}.json", declaration.name));
     let metadata_text = fs::read_to_string(&metadata_path).map_err(|error| {
         if error.kind() == std::io::ErrorKind::NotFound {
@@ -241,7 +368,20 @@ pub fn resolve_local_registry_package_root(
             kind: "registry metadata",
             message: error.to_string(),
         })?;
-    let selected = select_package_version(&metadata, &declaration.constraint)?;
+    let selected = select_package_version(
+        &metadata,
+        &declaration.constraint,
+        context.preferred_version.as_deref(),
+    )?;
+    let signer_fingerprint = lockfile_signer_fingerprint(&selected);
+    if let Some(vendored_root) =
+        try_vendored_package_root(project_root, &declaration.name, &selected.version)
+    {
+        return Ok(RegistryPackageResolution {
+            root: vendored_root,
+            signer_fingerprint,
+        });
+    }
     let cache_identifier = format!(
         "{}:{}:{}:{}",
         source_key,
@@ -260,7 +400,13 @@ pub fn resolve_local_registry_package_root(
     );
 
     if find_prayspec_file(&cache_directory).is_ok() {
-        return Ok(cache_directory);
+        return Ok(RegistryPackageResolution {
+            root: cache_directory,
+            signer_fingerprint,
+        });
+    }
+    if context.offline {
+        return Err(offline_package_error(&declaration.name, &selected.version));
     }
 
     if cache_directory.exists() {
@@ -276,7 +422,17 @@ pub fn resolve_local_registry_package_root(
         &artifact_bytes,
     )?;
 
-    Ok(cache_directory)
+    Ok(RegistryPackageResolution {
+        root: cache_directory,
+        signer_fingerprint,
+    })
+}
+
+pub fn registry_package_signing_identity(version: &RegistryPackageVersion) -> Option<String> {
+    crate::ssh_identity::package_signing_identity(
+        version.signer.as_deref(),
+        version.signer_fingerprint.as_deref(),
+    )
 }
 
 pub fn registry_artifact_signature(artifact_bytes: &[u8], tree_hash: &str, signer: &str) -> String {
@@ -290,6 +446,9 @@ pub fn registry_artifact_signature(artifact_bytes: &[u8], tree_hash: &str, signe
 }
 
 pub fn submit_confession(source_url: &str, confession: &ConfessionSubmission) -> PrayResult<()> {
+    if crate::ssh_client::is_pray_ssh_url(source_url) {
+        return submit_confession_ssh(source_url, confession);
+    }
     let endpoint = join_url(source_url, "v1/confessions");
     let payload =
         serde_json::to_vec(confession).map_err(|error| PrayError::Manifest(error.to_string()))?;
@@ -308,6 +467,9 @@ pub fn upload_registry_artifact(
     artifact_path: &str,
     bytes: &[u8],
 ) -> PrayResult<()> {
+    if crate::ssh_client::is_pray_ssh_url(source_url) {
+        return upload_registry_artifact_ssh(source_url, artifact_path, bytes);
+    }
     let endpoint = join_url(source_url, artifact_path);
     let response = http_put(&endpoint, "application/octet-stream", bytes)?;
     if response.status / 100 != 2 {
@@ -317,6 +479,42 @@ pub fn upload_registry_artifact(
         )));
     }
     Ok(())
+}
+
+fn submit_confession_ssh(source_url: &str, confession: &ConfessionSubmission) -> PrayResult<()> {
+    use crate::ssh_client::with_pray_ssh_session;
+    use serde_json::json;
+
+    with_pray_ssh_session(source_url, |session| {
+        session.call_json(
+            "confession.submit",
+            json!({
+                "confession": confession,
+            }),
+        )?;
+        Ok(())
+    })
+}
+
+fn upload_registry_artifact_ssh(
+    source_url: &str,
+    artifact_path: &str,
+    bytes: &[u8],
+) -> PrayResult<()> {
+    use crate::ssh_client::with_pray_ssh_session;
+    use base64::{engine::general_purpose::STANDARD, Engine as _};
+    use serde_json::json;
+
+    with_pray_ssh_session(source_url, |session| {
+        session.call_json(
+            "artifact.put",
+            json!({
+                "path": artifact_path,
+                "body": STANDARD.encode(bytes),
+            }),
+        )?;
+        Ok(())
+    })
 }
 
 fn fetch_registry_package_metadata(
@@ -462,13 +660,14 @@ fn validate_and_unpack_registry_package(
     }
 
     if let Some(expected_signature) = selected.signature.as_deref() {
-        let signer = selected.signer.as_deref().ok_or_else(|| {
+        let signing_identity = registry_package_signing_identity(selected).ok_or_else(|| {
             PrayError::Integrity(format!(
                 "package signature missing signer for {} {}",
                 declaration.name, selected.version
             ))
         })?;
-        let actual_signature = registry_artifact_signature(artifact_bytes, &tree_hash, signer);
+        let actual_signature =
+            registry_artifact_signature(artifact_bytes, &tree_hash, &signing_identity);
         if actual_signature != expected_signature {
             return Err(PrayError::Integrity(format!(
                 "package signature mismatch for {} {}",
@@ -478,6 +677,45 @@ fn validate_and_unpack_registry_package(
     }
 
     Ok(())
+}
+
+fn registry_cache_directory(
+    project_root: &Path,
+    source_url: &str,
+    package_name: &str,
+    version: &str,
+) -> PathBuf {
+    let source_key = sha256_prefixed(source_url.as_bytes())
+        .trim_start_matches("sha256:")
+        .chars()
+        .take(16)
+        .collect::<String>();
+    project_root
+        .join(".pray/cache/registry")
+        .join(source_key)
+        .join(package_name)
+        .join(version)
+}
+
+fn try_vendored_package_root(
+    project_root: &Path,
+    package_name: &str,
+    version: &str,
+) -> Option<PathBuf> {
+    let vendored = project_root
+        .join(".pray/vendor")
+        .join(package_name.replace('/', "-"))
+        .join(version);
+    if find_prayspec_file(&vendored).is_ok() {
+        return Some(vendored);
+    }
+    None
+}
+
+fn offline_package_error(package_name: &str, version: &str) -> PrayError {
+    PrayError::Resolution(format!(
+        "package {package_name} {version} is not cached locally and offline mode is enabled"
+    ))
 }
 
 fn read_local_registry_artifact_bytes(source_root: &Path, artifact: &str) -> PrayResult<Vec<u8>> {
@@ -508,7 +746,23 @@ fn read_local_registry_artifact_bytes(source_root: &Path, artifact: &str) -> Pra
 fn select_package_version(
     metadata: &RegistryPackageMetadata,
     constraint: &str,
+    preferred_version: Option<&str>,
 ) -> PrayResult<RegistryPackageVersion> {
+    if let Some(preferred_version) = preferred_version {
+        if let Some(version) = metadata
+            .versions
+            .iter()
+            .find(|version| version.version == preferred_version && !version.yanked)
+        {
+            if version_satisfies(&version.version, constraint)? {
+                return Ok(version.clone());
+            }
+            return Err(PrayError::Resolution(format!(
+                "locked version {preferred_version} for {} no longer satisfies constraint {constraint}",
+                metadata.name
+            )));
+        }
+    }
     let mut selected: Option<RegistryPackageVersion> = None;
     for version in &metadata.versions {
         if version.yanked {
@@ -528,6 +782,15 @@ fn select_package_version(
             metadata.name, constraint
         ))
     })
+}
+
+#[doc(hidden)]
+pub fn select_package_version_for_test(
+    metadata: &RegistryPackageMetadata,
+    constraint: &str,
+    preferred_version: Option<&str>,
+) -> PrayResult<RegistryPackageVersion> {
+    select_package_version(metadata, constraint, preferred_version)
 }
 
 fn version_satisfies(version: &str, constraint: &str) -> PrayResult<bool> {
@@ -577,24 +840,6 @@ fn ruby_pessimistic_to_semver(constraint: &str) -> PrayResult<String> {
         _ => format!("{}.{}.0", numbers[0], numbers[1] + 1),
     };
     Ok(format!(">={}, <{}", lower, upper))
-}
-
-fn registry_cache_directory(
-    project_root: &Path,
-    source_url: &str,
-    package_name: &str,
-    version: &str,
-) -> PathBuf {
-    let source_key = sha256_prefixed(source_url.as_bytes())
-        .trim_start_matches("sha256:")
-        .chars()
-        .take(16)
-        .collect::<String>();
-    project_root
-        .join(".pray/cache/registry")
-        .join(source_key)
-        .join(package_name)
-        .join(version)
 }
 
 fn unpack_praypkg(artifact_bytes: &[u8], output_directory: &Path) -> PrayResult<()> {
@@ -692,6 +937,23 @@ fn remove_path_if_exists(path: &Path) -> PrayResult<()> {
         }
         Err(error) if error.kind() == std::io::ErrorKind::NotFound => Ok(()),
         Err(error) => Err(error.into()),
+    }
+}
+
+pub fn fetch_optional_distribution_bytes(
+    source_url: &str,
+    relative_path: &str,
+) -> PrayResult<Option<Vec<u8>>> {
+    if !source_url.starts_with("http://") && !source_url.starts_with("https://") {
+        return Err(PrayError::Unsupported(format!(
+            "distribution fetch requires http or https source, got {source_url}"
+        )));
+    }
+    let url = join_url(source_url, relative_path);
+    match http_get(&url) {
+        Ok(bytes) => Ok(Some(bytes)),
+        Err(PrayError::Resolution(message)) if message.contains("404") => Ok(None),
+        Err(error) => Err(error),
     }
 }
 

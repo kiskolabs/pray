@@ -1,5 +1,6 @@
 use crate::{PrayError, PrayResult};
 use serde::{Deserialize, Serialize};
+use std::borrow::Cow;
 use std::collections::BTreeMap;
 
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
@@ -449,4 +450,53 @@ fn is_identifier_start(character: char) -> bool {
 
 fn is_identifier_continue(character: char) -> bool {
     character.is_ascii_alphanumeric() || matches!(character, '_' | '-' | '.' | '/')
+}
+
+pub fn prepare_parser_lines(text: &str) -> Vec<Cow<'_, str>> {
+    text.lines().map(prepare_parser_line).collect()
+}
+
+fn prepare_parser_line(line: &str) -> Cow<'_, str> {
+    trim_end_cow(strip_line_comment(line))
+}
+
+pub fn strip_line_comment(line: &str) -> Cow<'_, str> {
+    let mut quote: Option<char> = None;
+    let mut escaped = false;
+    for (index, character) in line.char_indices() {
+        if let Some(quote_char) = quote {
+            if escaped {
+                escaped = false;
+            } else if character == '\\' {
+                escaped = true;
+            } else if character == quote_char {
+                quote = None;
+            }
+            continue;
+        }
+        match character {
+            '"' | '\'' => quote = Some(character),
+            '#' => return Cow::Borrowed(&line[..index]),
+            _ => {}
+        }
+    }
+    Cow::Borrowed(line)
+}
+
+fn trim_end_cow<'a>(value: Cow<'a, str>) -> Cow<'a, str> {
+    match value {
+        Cow::Borrowed(slice) => {
+            let trimmed = slice.trim_end();
+            if trimmed.len() == slice.len() {
+                Cow::Borrowed(slice)
+            } else {
+                Cow::Owned(trimmed.to_string())
+            }
+        }
+        Cow::Owned(mut owned) => {
+            let trimmed_len = owned.trim_end().len();
+            owned.truncate(trimmed_len);
+            Cow::Owned(owned)
+        }
+    }
 }

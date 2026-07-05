@@ -400,13 +400,16 @@ fn sync_records_custom_revision_commands_after_successful_sync() {
 
     let commit_log_text = fs::read_to_string(&commit_log).expect("commit log");
     let push_log_text = fs::read_to_string(&push_log).expect("push log");
+    let downstream_path = downstream
+        .canonicalize()
+        .unwrap_or_else(|_| downstream.clone());
     assert_eq!(
         commit_log_text.trim(),
-        format!("commit:{}", downstream.display())
+        format!("commit:{}", downstream_path.display())
     );
     assert_eq!(
         push_log_text.trim(),
-        format!("push:{}", downstream.display())
+        format!("push:{}", downstream_path.display())
     );
 
     let _ = server.kill();

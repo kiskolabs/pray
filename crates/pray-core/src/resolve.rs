@@ -1,7 +1,10 @@
-use crate::hashing::sha256_prefixed;
+use crate::client_trust::{effective_trust_home, gate_git_source};
+use crate::hashing::{normalize_line_endings, sha256_prefixed};
+use crate::lockfile::Lockfile;
 use crate::manifest::{Manifest, ManifestPackage, ManifestSource};
 use crate::package_spec::{parse_package_spec, PackageSpec};
 use crate::registry::{resolve_local_registry_package_root, resolve_registry_package_root};
+use crate::resolve_context::{PackageResolutionContext, ResolveOptions};
 use crate::{PrayError, PrayResult};
 use semver::{Version, VersionReq};
 use std::collections::{BTreeMap, BTreeSet};
@@ -14,8 +17,11 @@ pub struct ResolvedProject {
     pub manifest_path: PathBuf,
     pub project_root: PathBuf,
     pub manifest: Manifest,
+    pub manifest_hash: String,
     pub packages: Vec<ResolvedPackage>,
     pub local_files: Vec<ResolvedLocalFile>,
+    pub source_revisions: BTreeMap<String, String>,
+    pub source_host_keys: BTreeMap<String, String>,
 }
 
 #[derive(Debug, Clone)]
@@ -28,6 +34,9 @@ pub struct ResolvedPackage {
     pub artifact: String,
     pub selected_exports: Vec<String>,
     pub source_checksum: String,
+    pub export_bodies: BTreeMap<String, String>,
+    pub skill_files: BTreeMap<String, Vec<String>>,
+    pub signer_fingerprint: Option<String>,
 }
 
 #[derive(Debug, Clone)]
@@ -40,7 +49,7 @@ pub struct ResolvedLocalFile {
 
 impl ResolvedProject {
     pub fn lockfile_hash(&self) -> PrayResult<String> {
-        self.manifest.manifest_hash()
+        Ok(self.manifest_hash.clone())
     }
 }
 
@@ -51,15 +60,48 @@ pub fn project_root_from_manifest(manifest_path: &Path) -> PathBuf {
     }
 }
 
+fn canonical_project_root(manifest_path: &Path) -> PrayResult<PathBuf> {
+    let root = project_root_from_manifest(manifest_path);
+    if root.is_absolute() {
+        return Ok(root);
+    }
+    let cwd = std::env::current_dir().map_err(|error| {
+        PrayError::Resolution(format!("failed to resolve project root from cwd: {error}"))
+    })?;
+    Ok(cwd.join(root))
+}
+
 pub fn resolve_project(manifest_path: &Path) -> PrayResult<ResolvedProject> {
-    let project_root = project_root_from_manifest(manifest_path);
+    resolve_project_with_options(manifest_path, &ResolveOptions::default())
+}
+
+pub fn resolve_project_with_options(
+    manifest_path: &Path,
+    options: &ResolveOptions,
+) -> PrayResult<ResolvedProject> {
+    let user_config = crate::config::load_user_config()?;
+    let project_root = canonical_project_root(manifest_path)?;
+    let lockfile_path = project_root.join("Prayfile.lock");
+    let lockfile_hints = crate::lockfile::read_lockfile(&lockfile_path).ok();
     let manifest_text = fs::read_to_string(manifest_path)?;
     let manifest = crate::manifest::parse_manifest(&manifest_text)?;
+    let manifest_hash = manifest.manifest_hash()?;
     let sources = source_map(&manifest.sources);
+    let git_sources =
+        prepare_git_sources(&project_root, &manifest.sources, lockfile_hints.as_ref())?;
+    let source_host_keys = prepare_pray_ssh_host_keys(&manifest.sources)?;
     let mut packages = Vec::new();
     let mut seen = BTreeSet::new();
     for declaration in &manifest.packages {
-        let package = resolve_package(&project_root, &sources, declaration)?;
+        let package = resolve_package(
+            &project_root,
+            &sources,
+            &git_sources,
+            &user_config,
+            declaration,
+            lockfile_hints.as_ref(),
+            options,
+        )?;
         if !seen.insert(package.declaration.name.clone()) {
             return Err(PrayError::Resolution(format!(
                 "duplicate package declaration: {}",
@@ -76,17 +118,141 @@ pub fn resolve_project(manifest_path: &Path) -> PrayResult<ResolvedProject> {
         manifest_path: manifest_path.to_path_buf(),
         project_root,
         manifest,
+        manifest_hash,
         packages,
         local_files,
+        source_revisions: git_sources
+            .into_iter()
+            .filter_map(|(name, checkout)| {
+                if checkout.revision.is_empty() {
+                    None
+                } else {
+                    Some((name, checkout.revision))
+                }
+            })
+            .collect(),
+        source_host_keys,
     })
+}
+
+#[derive(Debug, Clone)]
+struct GitSourceCheckout {
+    cache_directory: PathBuf,
+    revision: String,
+    subdir: Option<String>,
+}
+
+fn prepare_pray_ssh_host_keys(
+    sources: &[ManifestSource],
+) -> PrayResult<BTreeMap<String, String>> {
+    use crate::client_trust::{effective_trust_home, gate_pray_ssh_host};
+    use crate::ssh_client::parse_pray_ssh_url;
+
+    let home = effective_trust_home()?;
+    let mut host_keys = BTreeMap::new();
+    for source in sources {
+        if source.kind != "pray_ssh" {
+            continue;
+        }
+        let target = parse_pray_ssh_url(&source.url)?;
+        let fingerprint = gate_pray_ssh_host(&home, &source.url, &target.host, target.port)?;
+        if !fingerprint.is_empty() {
+            host_keys.insert(source.name.clone(), fingerprint);
+        }
+    }
+    Ok(host_keys)
+}
+
+fn prepare_git_sources(
+    project_root: &Path,
+    sources: &[ManifestSource],
+    lockfile: Option<&Lockfile>,
+) -> PrayResult<BTreeMap<String, GitSourceCheckout>> {
+    let mut git_sources = BTreeMap::new();
+    for source in sources {
+        if source.kind != "git" {
+            continue;
+        }
+        let clone_url = source.url.strip_prefix("git+").unwrap_or(&source.url);
+        let pinned_revision = pinned_revision_for_source(lockfile, &source.name);
+        if is_local_filesystem_source(clone_url) && local_git_repo_path(clone_url).is_none() {
+            if let Some(source_root) = local_git_source_root(clone_url) {
+                git_sources.insert(
+                    source.name.clone(),
+                    GitSourceCheckout {
+                        cache_directory: source_root,
+                        revision: String::new(),
+                        subdir: source.subdir.clone(),
+                    },
+                );
+            }
+            continue;
+        }
+        let (cache_directory, revision) = ensure_git_repository(
+            project_root,
+            clone_url,
+            false,
+            pinned_revision.as_deref(),
+            source.subdir.as_deref(),
+        )?;
+        git_sources.insert(
+            source.name.clone(),
+            GitSourceCheckout {
+                cache_directory,
+                revision,
+                subdir: source.subdir.clone(),
+            },
+        );
+    }
+    Ok(git_sources)
+}
+
+fn is_local_filesystem_source(clone_url: &str) -> bool {
+    clone_url.starts_with("file://") || Path::new(clone_url).is_absolute()
+}
+
+fn local_git_repo_path(clone_url: &str) -> Option<PathBuf> {
+    let path = if let Some(path) = clone_url.strip_prefix("file://") {
+        PathBuf::from(path)
+    } else {
+        PathBuf::from(clone_url)
+    };
+    if path.join(".git").is_dir() {
+        Some(path)
+    } else {
+        None
+    }
+}
+
+fn pinned_revision_for_source(lockfile: Option<&Lockfile>, source_name: &str) -> Option<String> {
+    lockfile?
+        .source
+        .iter()
+        .find(|source| source.name == source_name && source.kind == "git")
+        .and_then(|source| source.revision.clone())
 }
 
 fn resolve_package(
     project_root: &Path,
     sources: &BTreeMap<String, ManifestSource>,
+    git_sources: &BTreeMap<String, GitSourceCheckout>,
+    user_config: &crate::config::PrayConfig,
     declaration: &ManifestPackage,
+    lockfile: Option<&Lockfile>,
+    options: &ResolveOptions,
 ) -> PrayResult<ResolvedPackage> {
-    let root = resolve_package_root(project_root, sources, declaration)?;
+    let PackageRootResolution {
+        root,
+        signer_fingerprint,
+    } = resolve_package_root(
+        project_root,
+        sources,
+        git_sources,
+        user_config,
+        declaration,
+        lockfile,
+        options,
+    )?;
     let spec_path = find_prayspec_file(&root)?;
     let spec_text = fs::read_to_string(&spec_path)?;
     let spec = parse_package_spec(&spec_text)?.canonicalized();
@@ -103,7 +269,10 @@ fn resolve_package(
         )));
     }
     let selected_exports = select_exports(declaration, &spec)?;
-    let tree_hash = spec.tree_hash_for_root(&root)?;
+    let file_bytes = load_package_file_bytes(&root, &spec)?;
+    let tree_hash = PackageSpec::tree_hash_from_file_bytes(&file_bytes)?;
+    let export_bodies = load_export_bodies(&file_bytes, &spec, &selected_exports)?;
+    let skill_files = build_skill_file_index(&spec);
     let source_checksum = tree_hash.clone();
     Ok(ResolvedPackage {
         declaration: declaration.clone(),
@@ -117,30 +286,91 @@ fn resolve_package(
         ),
         selected_exports,
         source_checksum,
+        export_bodies,
+        skill_files,
+        signer_fingerprint,
     })
+}
+
+#[derive(Debug, Clone)]
+struct PackageRootResolution {
+    root: PathBuf,
+    signer_fingerprint: Option<String>,
 }
 
 fn resolve_package_root(
     project_root: &Path,
     sources: &BTreeMap<String, ManifestSource>,
+    git_sources: &BTreeMap<String, GitSourceCheckout>,
+    user_config: &crate::config::PrayConfig,
     declaration: &ManifestPackage,
-) -> PrayResult<PathBuf> {
+    lockfile: Option<&Lockfile>,
+    options: &ResolveOptions,
+) -> PrayResult<PackageRootResolution> {
+    if let Some(local_path) = user_config.local.package.get(&declaration.name) {
+        return Ok(PackageRootResolution {
+            root: project_root.join(local_path),
+            signer_fingerprint: None,
+        });
+    }
     if let Some(path) = &declaration.path {
-        return Ok(project_root.join(path));
+        return Ok(PackageRootResolution {
+            root: project_root.join(path),
+            signer_fingerprint: None,
+        });
     }
     if let Some(source_name) = &declaration.source {
         let source = sources
             .get(source_name)
             .ok_or_else(|| PrayError::Resolution(format!("unknown source: {source_name}")))?;
+        let context = PackageResolutionContext::from_lockfile(
+            lockfile,
+            &declaration.name,
+            &options.unlocked_packages,
+            options.offline,
+        );
+        if let Some(local_path) = user_config.local.source.get(source_name) {
+            let source_root = project_root.join(local_path);
+            let resolved = resolve_local_registry_package_root(
+                project_root,
+                &format!("local:{source_name}"),
+                &source_root,
+                declaration,
+                &context,
+            )?;
+            return Ok(PackageRootResolution {
+                root: resolved.root,
+                signer_fingerprint: resolved.signer_fingerprint,
+            });
+        }
         if source.kind == "path" {
             let slug = declaration.name.replace('/', "-");
-            return Ok(project_root.join(&source.url).join(slug));
+            return Ok(PackageRootResolution {
+                root: project_root.join(&source.url).join(slug),
+                signer_fingerprint: None,
+            });
         }
-        if source.kind == "registry" || source.kind == "static index" {
-            return resolve_registry_package_root(project_root, &source.url, declaration);
+        if source.kind == "registry" || source.kind == "static index" || source.kind == "pray_ssh" {
+            let resolved = resolve_registry_package_root(
+                project_root,
+                &source.url,
+                declaration,
+                &context,
+            )?;
+            return Ok(PackageRootResolution {
+                root: resolved.root,
+                signer_fingerprint: resolved.signer_fingerprint,
+            });
         }
         if source.kind == "git" {
-            return resolve_git_package_root(project_root, &source.url, declaration);
+            return resolve_git_package_root(
+                project_root,
+                source_name,
+                &source.url,
+                git_sources,
+                declaration,
+                &context,
+            );
         }
         return Err(PrayError::Unsupported(format!(
             "source kind {} not implemented yet",
@@ -153,37 +383,61 @@ fn resolve_package_root(
         ));
     }
     let slug = declaration.name.replace('/', "-");
-    Ok(project_root.join(slug))
+    Ok(PackageRootResolution {
+        root: project_root.join(slug),
+        signer_fingerprint: None,
+    })
 }
 
 fn resolve_git_package_root(
     project_root: &Path,
+    source_name: &str,
     source_url: &str,
+    git_sources: &BTreeMap<String, GitSourceCheckout>,
     declaration: &ManifestPackage,
-) -> PrayResult<PathBuf> {
+    context: &PackageResolutionContext,
+) -> PrayResult<PackageRootResolution> {
     let clone_url = source_url.strip_prefix("git+").unwrap_or(source_url);
+    if let Some(checkout) = git_sources.get(source_name) {
+        let distribution_root =
+            resolve_distribution_root(&checkout.cache_directory, checkout.subdir.as_deref())?;
+        let source_key = if checkout.revision.is_empty() {
+            clone_url.to_string()
+        } else {
+            format!("{}@{}", clone_url, checkout.revision)
+        };
+        let resolved = resolve_local_registry_package_root(
+            project_root,
+            &source_key,
+            &distribution_root,
+            declaration,
+            context,
+        )?;
+        return Ok(PackageRootResolution {
+            root: resolved.root,
+            signer_fingerprint: resolved.signer_fingerprint,
+        });
+    }
     if let Some(source_root) = local_git_source_root(clone_url) {
-        return resolve_local_registry_package_root(
+        let resolved = resolve_local_registry_package_root(
             project_root,
             clone_url,
             &source_root,
             declaration,
-        );
+            context,
+        )?;
+        return Ok(PackageRootResolution {
+            root: resolved.root,
+            signer_fingerprint: resolved.signer_fingerprint,
+        });
     }
-
-    let git_cache_directory = ensure_git_repository(project_root, clone_url, false)?;
-    let distribution_root = require_distribution_root(&git_cache_directory)?;
-    let source_key = format!("{}@clone", clone_url);
-    resolve_local_registry_package_root(
-        project_root,
-        &source_key,
-        &distribution_root,
-        declaration,
-    )
+    Err(PrayError::Resolution(format!(
+        "git source {source_name} was not prepared"
+    )))
 }
 
 pub fn refresh_git_sources(manifest_path: &Path) -> PrayResult<()> {
-    let project_root = project_root_from_manifest(manifest_path);
+    let project_root = canonical_project_root(manifest_path)?;
     let manifest_text = fs::read_to_string(manifest_path)?;
     let manifest = crate::manifest::parse_manifest(&manifest_text)?;
     for source in &manifest.sources {
@@ -191,10 +445,16 @@ pub fn refresh_git_sources(manifest_path: &Path) -> PrayResult<()> {
             continue;
         }
         let clone_url = source.url.strip_prefix("git+").unwrap_or(&source.url);
-        if local_git_source_root(clone_url).is_some() {
+        if is_local_filesystem_source(clone_url) && local_git_repo_path(clone_url).is_none() {
             continue;
         }
-        let _ = ensure_git_repository(&project_root, clone_url, true)?;
+        let _ = ensure_git_repository(
+            &project_root,
+            clone_url,
+            true,
+            None,
+            source.subdir.as_deref(),
+        )?;
     }
     Ok(())
 }
@@ -203,20 +463,25 @@ fn ensure_git_repository(
     project_root: &Path,
     clone_url: &str,
     refresh: bool,
-) -> PrayResult<PathBuf> {
+    pinned_revision: Option<&str>,
+    sparse_subdir: Option<&str>,
+) -> PrayResult<(PathBuf, String)> {
     let git_cache_directory = project_root
         .join(".pray/cache/git")
         .join(cache_key(clone_url));
 
     if git_cache_directory.join(".git").is_dir() {
-        if refresh {
+        if let Some(revision) = pinned_revision {
+            checkout_git_revision(&git_cache_directory, revision, refresh)?;
+        } else if refresh {
             run_git_success(&git_cache_directory, &["fetch", "--depth", "1", "origin"])?;
-            run_git_success(
-                &git_cache_directory,
-                &["reset", "--hard", "FETCH_HEAD"],
-            )?;
+            run_git_success(&git_cache_directory, &["reset", "--hard", "FETCH_HEAD"])?;
         }
-        return Ok(git_cache_directory);
+        if let Some(subdir) = sparse_subdir {
+            apply_sparse_checkout(&git_cache_directory, subdir)?;
+        }
+        let revision = git_head_revision(&git_cache_directory)?;
+        return finalize_git_repository(clone_url, &git_cache_directory, revision);
     }
 
     if git_cache_directory.exists() {
@@ -228,11 +493,181 @@ fn ensure_git_repository(
     let destination = git_cache_directory.to_str().ok_or_else(|| {
         PrayError::Resolution(format!("invalid git cache path: {:?}", git_cache_directory))
     })?;
+    if !seed_git_cache_from_global(clone_url, destination, project_root)? {
+        run_git_success(
+            project_root,
+            &["clone", "--depth", "1", clone_url, destination],
+        )?;
+        let _ = mirror_git_cache_to_global(clone_url, &git_cache_directory);
+    }
+    if let Some(revision) = pinned_revision {
+        checkout_git_revision(&git_cache_directory, revision, true)?;
+    }
+    if let Some(subdir) = sparse_subdir {
+        apply_sparse_checkout(&git_cache_directory, subdir)?;
+    }
+    let revision = git_head_revision(&git_cache_directory)?;
+    finalize_git_repository(clone_url, &git_cache_directory, revision)
+}
+
+fn global_cache_root() -> Option<PathBuf> {
+    if let Ok(path) = std::env::var("PRAY_CACHE") {
+        return Some(PathBuf::from(path));
+    }
+    if let Ok(home) = std::env::var("PRAY_HOME") {
+        return Some(PathBuf::from(home).join("cache"));
+    }
+    std::env::var_os("HOME").map(|home| PathBuf::from(home).join(".cache").join("pray"))
+}
+
+fn global_git_cache_directory(clone_url: &str) -> Option<PathBuf> {
+    global_cache_root().map(|root| root.join("git").join(cache_key(clone_url)))
+}
+
+fn global_git_cache_ready(global_cache: &Path) -> bool {
+    global_cache.join(".git").is_dir() || global_cache.join("HEAD").is_file()
+}
+
+fn seed_git_cache_from_global(
+    clone_url: &str,
+    destination: &str,
+    working_directory: &Path,
+) -> PrayResult<bool> {
+    let Some(global_cache) = global_git_cache_directory(clone_url) else {
+        return Ok(false);
+    };
+    if !global_git_cache_ready(&global_cache) {
+        return Ok(false);
+    }
+    let global_path = global_cache.to_str().ok_or_else(|| {
+        PrayError::Resolution(format!("invalid global git cache path: {:?}", global_cache))
+    })?;
     run_git_success(
-        project_root,
-        &["clone", "--depth", "1", clone_url, destination],
+        working_directory,
+        &["clone", "--depth", "1", "--quiet", global_path, destination],
     )?;
-    Ok(git_cache_directory)
+    Ok(true)
+}
+
+fn mirror_git_cache_to_global(clone_url: &str, project_cache: &Path) -> PrayResult<()> {
+    let Some(global_cache) = global_git_cache_directory(clone_url) else {
+        return Ok(());
+    };
+    if global_git_cache_ready(&global_cache) {
+        return Ok(());
+    }
+    let cache_parent = project_cache.parent().ok_or_else(|| {
+        PrayError::Resolution(format!(
+            "invalid project git cache path: {:?}",
+            project_cache
+        ))
+    })?;
+    let cache_name = project_cache
+        .file_name()
+        .and_then(|name| name.to_str())
+        .ok_or_else(|| {
+            PrayError::Resolution(format!(
+                "invalid project git cache path: {:?}",
+                project_cache
+            ))
+        })?;
+    if let Some(parent) = global_cache.parent() {
+        fs::create_dir_all(parent)?;
+    }
+    let destination = global_cache.to_str().ok_or_else(|| {
+        PrayError::Resolution(format!("invalid global git cache path: {:?}", global_cache))
+    })?;
+    if global_cache.exists() {
+        remove_path_if_exists(&global_cache)?;
+    }
+    run_git_success(
+        cache_parent,
+        &["clone", "--bare", "--quiet", cache_name, destination],
+    )?;
+    Ok(())
+}
+
+fn apply_sparse_checkout(repository: &Path, subdir: &str) -> PrayResult<()> {
+    run_git_success(repository, &["sparse-checkout", "init", "--cone"])?;
+    run_git_success(repository, &["sparse-checkout", "set", subdir])?;
+    Ok(())
+}
+
+fn resolve_distribution_root(repo_root: &Path, subdir: Option<&str>) -> PrayResult<PathBuf> {
+    if let Some(subdir) = subdir {
+        let path = repo_root.join(subdir);
+        if is_local_distribution_root(&path) {
+            return Ok(path);
+        }
+        return Err(PrayError::Resolution(format!(
+            "no pray distribution root at subdir {:?} in git source {:?}",
+            path, repo_root
+        )));
+    }
+    require_distribution_root(repo_root)
+}
+
+fn finalize_git_repository(
+    clone_url: &str,
+    git_cache_directory: &Path,
+    revision: String,
+) -> PrayResult<(PathBuf, String)> {
+    gate_git_source(&effective_trust_home()?, clone_url, git_cache_directory)?;
+    if crate::client_trust::env_truthy("PRAY_TRUST_IMPORT") {
+        let global_scope = crate::client_trust::env_truthy("PRAY_TRUST_GLOBAL");
+        crate::client_trust::prompt_import_signing_keys_for_source(
+            &effective_trust_home()?,
+            clone_url,
+            git_cache_directory,
+            global_scope,
+        )?;
+    }
+    Ok((git_cache_directory.to_path_buf(), revision))
+}
+
+pub fn git_source_cache_directory(project_root: &Path, clone_url: &str) -> PathBuf {
+    project_root
+        .join(".pray/cache/git")
+        .join(cache_key(clone_url))
+}
+
+fn checkout_git_revision(repository: &Path, revision: &str, allow_fetch: bool) -> PrayResult<()> {
+    if git_object_exists(repository, revision) {
+        run_git_success(repository, &["reset", "--hard", revision])?;
+        return Ok(());
+    }
+    if !allow_fetch {
+        return Err(PrayError::Resolution(format!(
+            "git source {:?} is locked to revision {revision}, but that commit is not available locally; rerun pray install without --locked to refresh the cache",
+            repository
+        )));
+    }
+    run_git_success(repository, &["fetch", "--depth", "1", "origin", revision])?;
+    if git_object_exists(repository, revision) {
+        run_git_success(repository, &["reset", "--hard", revision])?;
+        return Ok(());
+    }
+    run_git_success(repository, &["fetch", "origin", revision])?;
+    run_git_success(repository, &["reset", "--hard", revision])?;
+    Ok(())
+}
+
+fn git_object_exists(repository: &Path, object: &str) -> bool {
+    run_git_success(repository, &["cat-file", "-e", object]).is_ok()
+}
+
+fn git_head_revision(repository: &Path) -> PrayResult<String> {
+    let output = run_git_command(repository, &["rev-parse", "HEAD"])?;
+    if !output.status.success() {
+        return Err(command_error("git rev-parse HEAD", output));
+    }
+    let revision = String::from_utf8_lossy(&output.stdout).trim().to_string();
+    if revision.is_empty() {
+        return Err(PrayError::Resolution(
+            "git repository has no HEAD revision".to_string(),
+        ));
+    }
+    Ok(revision)
 }
 
 fn require_distribution_root(repo_root: &Path) -> PrayResult<PathBuf> {
@@ -363,7 +798,9 @@ fn resolve_local_file(
                 optional: true,
             });
         }
-        return Err(PrayError::Resolution(missing_local_embed_guidance(&declaration.path)));
+        return Err(PrayError::Resolution(missing_local_embed_guidance(
+            &declaration.path,
+        )));
     }
     Ok(ResolvedLocalFile {
         content: read_text(&path)?,
@@ -458,7 +895,87 @@ fn ruby_pessimistic_to_semver(constraint: &str) -> PrayResult<String> {
 
 fn read_text(path: &Path) -> PrayResult<String> {
     let text = fs::read_to_string(path)?;
-    Ok(crate::hashing::normalize_line_endings(&text))
+    Ok(normalize_line_endings(&text))
+}
+
+fn load_package_file_bytes(
+    root: &Path,
+    spec: &PackageSpec,
+) -> PrayResult<BTreeMap<String, Vec<u8>>> {
+    let mut file_bytes = BTreeMap::new();
+    for file in &spec.files {
+        let path = root.join(file);
+        if !path.exists() {
+            return Err(PrayError::Integrity(format!(
+                "package file missing: {}",
+                file
+            )));
+        }
+        if path.is_dir() {
+            return Err(PrayError::Integrity(format!(
+                "package file is a directory: {}",
+                file
+            )));
+        }
+        file_bytes.insert(file.clone(), fs::read(&path)?);
+    }
+    Ok(file_bytes)
+}
+
+fn load_export_bodies(
+    file_bytes: &BTreeMap<String, Vec<u8>>,
+    spec: &PackageSpec,
+    selected_exports: &[String],
+) -> PrayResult<BTreeMap<String, String>> {
+    let mut export_bodies = BTreeMap::new();
+    for export_name in selected_exports {
+        let entry = spec.exports.get(export_name).ok_or_else(|| {
+            PrayError::Resolution(format!(
+                "package {} is missing export {}",
+                spec.name, export_name
+            ))
+        })?;
+        let bytes = file_bytes.get(&entry.path).ok_or_else(|| {
+            PrayError::Integrity(format!(
+                "package file missing for export {}: {}",
+                export_name, entry.path
+            ))
+        })?;
+        let text = std::str::from_utf8(bytes).map_err(|error| {
+            PrayError::Integrity(format!(
+                "package file is not valid utf-8 for export {}: {}",
+                export_name, error
+            ))
+        })?;
+        export_bodies.insert(export_name.clone(), normalize_line_endings(text));
+    }
+    Ok(export_bodies)
+}
+
+fn build_skill_file_index(spec: &PackageSpec) -> BTreeMap<String, Vec<String>> {
+    let mut index = BTreeMap::new();
+    for (skill_name, skill) in &spec.skills {
+        let skill_prefix = skill.path.trim_end_matches('/');
+        let mut files = Vec::new();
+        for file in &spec.files {
+            if let Some(relative) = skill_relative_file(file, skill_prefix) {
+                files.push(relative);
+            }
+        }
+        if !files.is_empty() {
+            index.insert(skill_name.clone(), files);
+        }
+    }
+    index
+}
+
+fn skill_relative_file(file: &str, skill_prefix: &str) -> Option<String> {
+    let relative = file.strip_prefix(skill_prefix)?.trim_start_matches('/');
+    if relative.is_empty() || file == skill_prefix {
+        None
+    } else {
+        Some(relative.to_string())
+    }
 }
 
 #[cfg(test)]
@@ -481,10 +998,8 @@ mod tests {
 
     #[test]
     fn discover_distribution_root_finds_root_and_prayers_subdirectory() {
-        let workspace = std::env::temp_dir().join(format!(
-            "pray-discover-distribution-{}",
-            std::process::id()
-        ));
+        let workspace =
+            std::env::temp_dir().join(format!("pray-discover-distribution-{}", std::process::id()));
         let _ = fs::remove_dir_all(&workspace);
         let repo_root = workspace.join("repo");
         let prayers_root = repo_root.join("prayers");
@@ -497,19 +1012,14 @@ mod tests {
         );
 
         fs::remove_dir_all(repo_root.join("v1")).expect("remove root distribution");
-        assert_eq!(
-            discover_distribution_root(&repo_root),
-            Some(prayers_root)
-        );
+        assert_eq!(discover_distribution_root(&repo_root), Some(prayers_root));
         let _ = fs::remove_dir_all(&workspace);
     }
 
     #[test]
     fn discover_distribution_root_returns_none_without_registry_layout() {
-        let workspace = std::env::temp_dir().join(format!(
-            "pray-discover-missing-{}",
-            std::process::id()
-        ));
+        let workspace =
+            std::env::temp_dir().join(format!("pray-discover-missing-{}", std::process::id()));
         let _ = fs::remove_dir_all(&workspace);
         let repo_root = workspace.join("repo");
         fs::create_dir_all(&repo_root).expect("repo root");

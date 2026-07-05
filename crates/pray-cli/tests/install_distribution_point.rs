@@ -17,6 +17,16 @@ use support::{
     write_private_key_file, write_registry_client_fixture,
 };
 
+fn git_cache_repository(consumer_repo: &std::path::Path) -> PathBuf {
+    let cache_root = consumer_repo.join(".pray/cache/git");
+    let entry = fs::read_dir(&cache_root)
+        .expect("cache entries")
+        .next()
+        .expect("git cache directory")
+        .expect("cache entry");
+    entry.path()
+}
+
 fn assert_success(output: &Output, label: &str) {
     assert!(
         output.status.success(),
@@ -119,7 +129,148 @@ render mode: :managed, conflict: :fail, churn: :minimal
 
     let lockfile = fs::read_to_string(consumer_repo.join("Prayfile.lock")).expect("lockfile");
     assert!(lockfile.contains("sample/base"));
+    assert!(
+        lockfile.contains("revision ="),
+        "git source revision should be recorded in lockfile:\n{lockfile}"
+    );
     assert!(consumer_repo.join("INSTRUCTIONS.md").is_file());
+}
+
+#[test]
+fn install_keeps_locked_git_revision_when_distribution_moves_forward() {
+    let workspace = temporary_directory("pray-install-git-pin");
+    let source_repo = workspace.join("source");
+    let distribution_repo = workspace.join("distribution");
+    let prayers_root = distribution_repo.join("prayers");
+    let consumer_repo = workspace.join("consumer");
+    fs::create_dir_all(&source_repo).expect("source workspace");
+    fs::create_dir_all(&distribution_repo).expect("distribution workspace");
+    fs::create_dir_all(&consumer_repo).expect("consumer workspace");
+
+    create_add_fixture(&source_repo);
+    let add = run_pray(
+        &source_repo,
+        &["add", "sample/base", "--path", "packages/base"],
+    );
+    assert!(
+        add.status.success(),
+        "add failed: {}",
+        String::from_utf8_lossy(&add.stderr)
+    );
+
+    let publish = run_pray(
+        &source_repo,
+        &[
+            "publish",
+            "--root",
+            prayers_root.to_str().expect("distribution path"),
+        ],
+    );
+    assert!(
+        publish.status.success(),
+        "publish failed: {}",
+        String::from_utf8_lossy(&publish.stderr)
+    );
+
+    assert_success(
+        &git(&distribution_repo, &["init", "-b", "main"]),
+        "git init",
+    );
+    assert_success(
+        &git(&distribution_repo, &["config", "user.name", "Pray Test"]),
+        "git user.name",
+    );
+    assert_success(
+        &git(
+            &distribution_repo,
+            &["config", "user.email", "pray@example.com"],
+        ),
+        "git user.email",
+    );
+    assert_success(&git(&distribution_repo, &["add", "-A"]), "git add");
+    assert_success(
+        &git(
+            &distribution_repo,
+            &["commit", "-m", "initial distribution"],
+        ),
+        "git commit",
+    );
+
+    let initial_commit =
+        String::from_utf8_lossy(&git(&distribution_repo, &["rev-parse", "HEAD"]).stdout)
+            .trim()
+            .to_string();
+
+    fs::write(
+        consumer_repo.join("Prayfile"),
+        format!(
+            r#"
+prayfile "1"
+source "dist", "git+file://{distribution}"
+agent "sample/base", "~> 1.4", source: "dist"
+target :tool_a do
+  output "INSTRUCTIONS.md"
+end
+render mode: :managed, conflict: :fail, churn: :minimal
+"#,
+            distribution = distribution_repo.display()
+        ),
+    )
+    .expect("write consumer Prayfile");
+
+    let install = run_pray(&consumer_repo, &["install"]);
+    assert!(
+        install.status.success(),
+        "install failed: {}",
+        String::from_utf8_lossy(&install.stderr)
+    );
+
+    let lockfile = fs::read_to_string(consumer_repo.join("Prayfile.lock")).expect("lockfile");
+    assert!(
+        lockfile.contains(&initial_commit),
+        "lockfile should pin initial git revision:\n{lockfile}"
+    );
+
+    fs::write(
+        distribution_repo.join("prayers/marker.txt"),
+        "distribution moved forward",
+    )
+    .expect("write marker");
+    assert_success(&git(&distribution_repo, &["add", "-A"]), "git add forward");
+    assert_success(
+        &git(
+            &distribution_repo,
+            &["commit", "-m", "forward distribution"],
+        ),
+        "git commit forward",
+    );
+
+    let locked_install = run_pray(&consumer_repo, &["install", "--locked"]);
+    assert!(
+        locked_install.status.success(),
+        "locked install failed: {}",
+        String::from_utf8_lossy(&locked_install.stderr)
+    );
+
+    let lockfile_after = fs::read_to_string(consumer_repo.join("Prayfile.lock")).expect("lockfile");
+    assert!(
+        lockfile_after.contains(&initial_commit),
+        "locked install should keep the pinned revision:\n{lockfile_after}"
+    );
+
+    let cache_head = String::from_utf8_lossy(
+        &git(
+            &git_cache_repository(&consumer_repo),
+            &["rev-parse", "HEAD"],
+        )
+        .stdout,
+    )
+    .trim()
+    .to_string();
+    assert_eq!(
+        cache_head, initial_commit,
+        "git cache should remain on the locked revision after distribution moved forward"
+    );
 }
 
 #[test]

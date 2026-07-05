@@ -73,6 +73,28 @@ end
 }
 
 #[test]
+fn preserves_package_declaration_order() {
+    let manifest = parse_manifest(
+        r#"
+prayfile "1"
+agent "sample/zebra", "~> 1.0"
+agent "sample/alpha", "~> 1.0"
+agent "sample/middle", "~> 1.0"
+"#,
+    )
+    .expect("manifest parses");
+
+    assert_eq!(
+        manifest
+            .packages
+            .iter()
+            .map(|package| package.name.as_str())
+            .collect::<Vec<_>>(),
+        vec!["sample/zebra", "sample/alpha", "sample/middle"]
+    );
+}
+
+#[test]
 fn parses_git_source_keyword_form() {
     let manifest = parse_manifest(
         r#"
@@ -89,6 +111,39 @@ agent "amkisko/working-rules", "~> 1.0", source: "amkisko"
     assert_eq!(
         manifest.sources[0].url,
         "git+https://github.com/amkisko/prayers"
+    );
+}
+
+#[test]
+fn parses_git_source_subdir_keyword() {
+    let manifest = parse_manifest(
+        r#"
+prayfile "1"
+source "dist", git: "https://github.com/example/prayers", subdir: "prayers"
+"#,
+    )
+    .expect("manifest parses");
+
+    assert_eq!(manifest.sources[0].subdir.as_deref(), Some("prayers"));
+}
+
+#[test]
+fn parses_pray_ssh_source_url() {
+    let manifest = parse_manifest(
+        r#"
+prayfile "1"
+source "team", "pray+ssh://pray@prayers.internal:2222/var/lib/pray"
+agent "sample/base", "1.0.0", source: :team
+"#,
+    )
+    .expect("manifest parses");
+
+    assert_eq!(manifest.sources.len(), 1);
+    assert_eq!(manifest.sources[0].name, "team");
+    assert_eq!(manifest.sources[0].kind, "pray_ssh");
+    assert_eq!(
+        manifest.sources[0].url,
+        "pray+ssh://pray@prayers.internal:2222/var/lib/pray"
     );
 }
 

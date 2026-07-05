@@ -3,5 +3,6 @@ members = [
   "crates/pray-core",
   "crates/pray-cli",
   "crates/pray-transport",
+  "crates/pray-bench",
 ]
 resolver = "2"

@@ -82,6 +82,50 @@ end
 }
 
 #[test]
+fn unlock_refreshes_only_the_selected_package_version() {
+    let repo = temporary_directory("pray-unlock-selected");
+    create_tree_fixture(&repo);
+    assert!(run_pray(&repo, &["install"]).status.success());
+
+    fs::write(
+        repo.join("packages/base/sample-base.prayspec"),
+        r#"
+Package::Specification.new do |spec|
+  spec.name = "sample/base"
+  spec.version = "1.4.4"
+  spec.summary = "shared guidance"
+  spec.files = ["README.md", "exports/testing-basics.md"]
+  spec.exports = {
+    "testing-basics" => {
+      type: "fragment",
+      path: "exports/testing-basics.md",
+      summary: "Testing guidance"
+    }
+  }
+  spec.add_dependency "sample/common", "~> 1.0"
+end
+"#,
+    )
+    .expect("rewrite base prayspec");
+
+    let unlock = run_pray(&repo, &["unlock", "sample/base"]);
+    assert!(
+        unlock.status.success(),
+        "unlock failed: {}",
+        String::from_utf8_lossy(&unlock.stderr)
+    );
+    let stdout = String::from_utf8_lossy(&unlock.stdout);
+    assert!(stdout.contains("Unlocked sample/base"));
+
+    let lockfile = fs::read_to_string(repo.join("Prayfile.lock")).expect("lockfile exists");
+    assert!(lockfile.contains("sample/base"));
+    assert!(lockfile.contains("1.4.4"));
+    assert!(lockfile.contains("sample/common"));
+    assert!(lockfile.contains("1.0.0"));
+    assert!(!lockfile.contains("1.1.0"));
+}
+
+#[test]
 fn update_reports_dependent_packages_affected() {
     let repo = temporary_directory("pray-update-dependent");
     create_tree_fixture(&repo);

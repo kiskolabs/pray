@@ -1,9 +1,9 @@
-use crate::hashing::{normalize_line_endings, sha256_prefixed};
+use crate::hashing::{checksum_managed_body_line_refs, normalize_line_endings};
 use crate::lockfile::{Lockfile, ManagedSpanRecord};
 use crate::render::render_project;
 use crate::resolve::{missing_local_embed_guidance, ResolvedProject};
 use crate::{PrayError, PrayResult};
-use std::collections::{BTreeMap, BTreeSet};
+use std::collections::{BTreeMap, BTreeSet, HashSet};
 use std::fs;
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -46,7 +46,7 @@ pub fn verify_project(
     lockfile: &Lockfile,
     strict: bool,
 ) -> PrayResult<VerificationReport> {
-    let report = collect_verification_report(project, lockfile)?;
+    let (report, _) = collect_verification_report(project, lockfile)?;
     if report.is_clean() {
         return Ok(report);
     }
@@ -61,10 +61,10 @@ pub fn verify_project(
 fn collect_verification_report(
     project: &ResolvedProject,
     lockfile: &Lockfile,
-) -> PrayResult<VerificationReport> {
+) -> PrayResult<(VerificationReport, BTreeMap<String, String>)> {
     let mut report = VerificationReport::default();
-    let manifest_hash = project.manifest.manifest_hash()?;
-    if manifest_hash != lockfile.manifest_hash {
+    let mut rendered_targets = BTreeMap::new();
+    if project.manifest_hash != lockfile.manifest_hash {
         report.findings.push(VerificationFinding {
             kind: "verify_error".to_string(),
             message:
@@ -140,9 +140,9 @@ fn collect_verification_report(
             continue;
         }
         let text = fs::read_to_string(&absolute_path)?;
+        rendered_targets.insert(target_path.clone(), text.clone());
         let lines: Vec<&str> = text.lines().collect();
         let markers = marker_positions(&lines);
-        let marker_ids: BTreeSet<String> = markers.keys().cloned().collect();
         for span in &spans {
             match markers.get(&span.id) {
                 None => report.findings.push(VerificationFinding {
@@ -152,9 +152,8 @@ fn collect_verification_report(
                         target_path, span.id, span.package, span.export
                     ),
                 }),
-                Some((open_line, close_line, body)) => {
-                    let actual_checksum = sha256_prefixed(normalize_line_endings(body).as_bytes());
-                    if actual_checksum != span.ideal_checksum {
+                Some((open_line, close_line, checksum)) => {
+                    if checksum != &span.ideal_checksum {
                         report.findings.push(VerificationFinding {
                             kind: "custom_implementation".to_string(),
                             message: format!(
@@ -175,16 +174,8 @@ fn collect_verification_report(
                 }
             }
         }
-        for marker_id in marker_ids {
-            if !spans.iter().any(|span| span.id == marker_id) && marker_id != "0" {
-                report.findings.push(VerificationFinding {
-                    kind: "orphan_marker".to_string(),
-                    message: format!(
-                        "`{}` contains marker `{}` that is not tracked in `Prayfile.lock`. Remove the marker or run `pray install` to reconcile.",
-                        target_path, marker_id
-                    ),
-                });
-            }
+        for finding in find_orphan_marker_findings_from_markers(&spans, &markers, &target_path) {
+            report.findings.push(finding);
         }
     }
 
@@ -195,25 +186,59 @@ fn collect_verification_report(
         if !project.project_root.join(&local.path).exists() {
             report.findings.push(VerificationFinding {
                 kind: "verify_error".to_string(),
-                message: missing_local_embed_guidance(&local.path.to_string_lossy()),
+                message: missing_local_embed_guidance(local.path.to_string_lossy()),
             });
         }
     }
 
-    Ok(report)
+    Ok((report, rendered_targets))
+}
+
+pub fn find_orphan_marker_findings(
+    spans: &[&ManagedSpanRecord],
+    lines: &[&str],
+    target_path: &str,
+) -> Vec<VerificationFinding> {
+    let markers = marker_positions(lines);
+    find_orphan_marker_findings_from_markers(spans, &markers, target_path)
+}
+
+fn find_orphan_marker_findings_from_markers(
+    spans: &[&ManagedSpanRecord],
+    markers: &BTreeMap<String, (usize, usize, String)>,
+    target_path: &str,
+) -> Vec<VerificationFinding> {
+    let tracked_ids: HashSet<&str> = spans.iter().map(|span| span.id.as_str()).collect();
+    let mut findings = Vec::new();
+    for marker_id in markers.keys() {
+        if marker_id != "0" && !tracked_ids.contains(marker_id.as_str()) {
+            findings.push(VerificationFinding {
+                kind: "orphan_marker".to_string(),
+                message: format!(
+                    "`{}` contains marker `{}` that is not tracked in `Prayfile.lock`. Remove the marker or run `pray install` to reconcile.",
+                    target_path, marker_id
+                ),
+            });
+        }
+    }
+    findings
 }
 
 pub fn drift_project(
     project: &ResolvedProject,
     lockfile: &Lockfile,
 ) -> PrayResult<VerificationReport> {
-    let mut report = collect_verification_report(project, lockfile)?;
+    let (mut report, rendered_targets) = collect_verification_report(project, lockfile)?;
 
     let rendered = render_project(project)?;
     let lock_targets = lockfile_targets(lockfile);
     for target in rendered {
-        let on_disk = fs::read_to_string(project.project_root.join(&target.path))?;
-        if normalize_line_endings(&on_disk) != normalize_line_endings(&target.content) {
+        let normalized_fresh = normalize_line_endings(&target.content);
+        let on_disk = rendered_targets
+            .get(target.path.to_string_lossy().as_ref())
+            .map(|text| normalize_line_endings(text));
+        let matches = on_disk.as_ref() == Some(&normalized_fresh);
+        if !matches {
             report.findings.push(VerificationFinding {
                 kind: "renderer_drift".to_string(),
                 message: format!("{} differs from fresh render", target.path.display()),
@@ -236,44 +261,49 @@ pub fn drift_project(
 
 fn marker_positions(lines: &[&str]) -> BTreeMap<String, (usize, usize, String)> {
     let mut markers = BTreeMap::new();
-    let mut active: Option<(String, usize, Vec<String>)> = None;
+    let mut active: Option<(String, usize, Vec<&str>)> = None;
     for (index, line) in lines.iter().enumerate() {
-        if let Some(id) = parse_marker(line) {
-            if id == "0" {
-                continue;
+        match parse_marker(line) {
+            None => {
+                if let Some((_, _, body)) = active.as_mut() {
+                    body.push(line);
+                }
             }
-            match active.take() {
+            Some(ParsedMarker::Ignore) => {}
+            Some(ParsedMarker::Id(id)) => match active.take() {
                 None => {
-                    active = Some((id, index + 1, Vec::new()));
+                    active = Some((id.to_string(), index + 1, Vec::new()));
                 }
                 Some((open_id, open_line, body)) if open_id == id => {
-                    markers.insert(id, (open_line, index + 1, body.join("\n")));
+                    let checksum = checksum_managed_body_line_refs(&body);
+                    markers.insert(open_id, (open_line, index + 1, checksum));
                 }
                 Some(previous) => {
                     active = Some(previous);
                 }
-            }
-            continue;
-        }
-        if let Some((_, _, body)) = active.as_mut() {
-            body.push((*line).to_string());
+            },
         }
     }
     markers
 }
 
-fn parse_marker(line: &str) -> Option<String> {
+enum ParsedMarker<'a> {
+    Ignore,
+    Id(&'a str),
+}
+
+fn parse_marker(line: &str) -> Option<ParsedMarker<'_>> {
     let trimmed = line.trim();
     let remainder = trimmed.strip_prefix("<!-- pray:")?;
     let id = remainder.strip_suffix(" -->")?;
     if id == "0 ignore-comments" {
-        return Some("0".to_string());
+        return Some(ParsedMarker::Ignore);
     }
     if id
         .chars()
         .all(|character| character.is_ascii_lowercase() || character.is_ascii_digit())
     {
-        return Some(id.to_string());
+        return Some(ParsedMarker::Id(id));
     }
     None
 }

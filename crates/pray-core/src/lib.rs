@@ -1,4 +1,6 @@
 pub mod auth;
+pub mod client_trust;
+pub mod config;
 pub mod derived_metadata;
 pub mod error;
 pub mod hashing;
@@ -9,6 +11,11 @@ pub mod package_spec;
 pub mod registry;
 pub mod render;
 pub mod resolve;
+pub mod resolve_context;
+pub mod ssh_client;
+pub mod ssh_identity;
+pub mod ssh_publishers;
+pub mod ssh_rpc;
 pub mod trust;
 pub mod verify;
 

@@ -288,13 +288,15 @@ fn install_offline_accepts_explicit_local_paths() {
 }
 
 #[test]
-fn install_offline_rejects_derived_package_paths() {
+fn install_offline_accepts_derived_package_paths_when_files_exist() {
     let repo = temporary_directory("pray-install-offline-derived");
     create_derived_fixture(&repo);
 
     let offline = run_pray(&repo, &["install", "--offline"]);
-    assert!(!offline.status.success());
-    assert_eq!(offline.status.code(), Some(8));
-    let stderr = String::from_utf8_lossy(&offline.stderr);
-    assert!(stderr.contains("offline mode") || stderr.contains("unsupported feature"));
+    assert!(
+        offline.status.success(),
+        "offline install failed: {}",
+        String::from_utf8_lossy(&offline.stderr)
+    );
+    assert!(repo.join("INSTRUCTIONS.md").is_file());
 }

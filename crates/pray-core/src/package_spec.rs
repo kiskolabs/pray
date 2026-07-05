@@ -1,9 +1,11 @@
 use crate::hashing::sha256_prefixed;
 use crate::literal::{
-    find_top_level, is_balanced, parse_literal, parse_literal_map, split_top_level, LiteralValue,
+    find_top_level, is_balanced, parse_literal, parse_literal_map, prepare_parser_lines,
+    split_top_level, LiteralValue,
 };
 use crate::{PrayError, PrayResult};
 use serde::{Deserialize, Serialize};
+use std::borrow::Cow;
 use std::collections::BTreeMap;
 
 #[derive(Debug, Clone, Default, Serialize, Deserialize, PartialEq)]
@@ -70,7 +72,7 @@ impl PackageSpec {
     }
 
     pub fn tree_hash_for_root(&self, root: &std::path::Path) -> PrayResult<String> {
-        let mut entries = Vec::new();
+        let mut file_bytes = BTreeMap::new();
         for file in &self.files {
             let path = root.join(file);
             if !path.exists() {
@@ -85,8 +87,15 @@ impl PackageSpec {
                     file
                 )));
             }
-            let bytes = std::fs::read(&path)?;
-            entries.push((file.clone(), sha256_prefixed(&bytes)));
+            file_bytes.insert(file.clone(), std::fs::read(&path)?);
+        }
+        Self::tree_hash_from_file_bytes(&file_bytes)
+    }
+
+    pub fn tree_hash_from_file_bytes(file_bytes: &BTreeMap<String, Vec<u8>>) -> PrayResult<String> {
+        let mut entries = Vec::new();
+        for (path, bytes) in file_bytes {
+            entries.push((path.clone(), sha256_prefixed(bytes)));
         }
         entries.sort_by(|left, right| left.0.cmp(&right.0));
 
@@ -106,47 +115,18 @@ impl PackageSpec {
 }
 
 pub fn parse_package_spec(text: &str) -> PrayResult<PackageSpec> {
-    let lines = prepare_lines(text);
+    let lines = prepare_parser_lines(text);
     let mut parser = BlockParser::new(&lines);
     parser.parse_root()
 }
 
-fn prepare_lines(text: &str) -> Vec<String> {
-    text.lines()
-        .map(|line| strip_comment(line).trim_end().to_string())
-        .collect()
-}
-
-fn strip_comment(line: &str) -> String {
-    let mut quote: Option<char> = None;
-    let mut escaped = false;
-    for (index, character) in line.char_indices() {
-        if let Some(quote_char) = quote {
-            if escaped {
-                escaped = false;
-            } else if character == '\\' {
-                escaped = true;
-            } else if character == quote_char {
-                quote = None;
-            }
-            continue;
-        }
-        match character {
-            '"' | '\'' => quote = Some(character),
-            '#' => return line[..index].to_string(),
-            _ => {}
-        }
-    }
-    line.to_string()
-}
-
 struct BlockParser<'a> {
-    lines: &'a [String],
+    lines: &'a [Cow<'a, str>],
     cursor: usize,
 }
 
 impl<'a> BlockParser<'a> {
-    fn new(lines: &'a [String]) -> Self {
+    fn new(lines: &'a [Cow<'a, str>]) -> Self {
         Self { lines, cursor: 0 }
     }
 

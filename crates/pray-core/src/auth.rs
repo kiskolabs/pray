@@ -835,6 +835,15 @@ fn generate_session_token(email: &str, kind: &AuthSessionKind, timestamp: u64) -
     sha256_prefixed(payload.as_bytes())
 }
 
+pub fn ssh_public_key_fingerprint_text(public_key: &str) -> PrayResult<String> {
+    let (canonical, _) = parse_ssh_ed25519_public_key(public_key)?;
+    Ok(normalize_ssh_fingerprint(&ssh_key_fingerprint(&canonical)))
+}
+
+fn normalize_ssh_fingerprint(fingerprint: &str) -> String {
+    fingerprint.trim().to_ascii_uppercase()
+}
+
 fn ssh_key_fingerprint(public_key: &str) -> String {
     sha256_prefixed(public_key.as_bytes())
 }

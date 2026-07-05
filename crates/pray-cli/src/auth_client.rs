@@ -18,6 +18,8 @@ pub struct SessionFile {
     pub email: String,
     pub token: String,
     pub kind: String,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub signer_fingerprint: Option<String>,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
@@ -76,6 +78,7 @@ pub fn login_with_passkey(
             email: response.email,
             token: response.token,
             kind: "passkey".to_string(),
+            signer_fingerprint: None,
         },
     )
 }
@@ -111,8 +114,20 @@ pub fn login_with_ssh_agent(
             email: response.email,
             token: response.token,
             kind: "ssh_key".to_string(),
+            signer_fingerprint: Some(challenge.fingerprint),
         },
     )
+}
+
+pub fn current_signer_fingerprint(root: &Path) -> Option<String> {
+    let session_path = session_file_path(root);
+    let session = load_latest_session(&session_path).ok().flatten()?;
+    session
+        .signer_fingerprint
+        .as_deref()
+        .map(str::trim)
+        .filter(|value| !value.is_empty())
+        .map(str::to_string)
 }
 
 pub fn current_signer(root: &Path) -> Option<String> {
