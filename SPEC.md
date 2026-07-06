@@ -1004,36 +1004,39 @@ Supported export types:
 
 | Type | Description |
 |------|-------------|
-| fragment | Markdown/text fragment rendered into root files |
-| skill | Directory containing SKILL.md |
+| fragment | Text fragment rendered into a target output file |
+| file | Single file provisioned into a target folder |
+| folder | Directory tree provisioned into a target folder |
 | template | Reusable text artifact |
 | command | Tool-specific or generic command template |
 | rule | Tool-specific rule file |
-| asset | Static file used by skill/template |
+| asset | Static file used by a template or folder export |
 | bundle | Named collection of other exports |
+
+`skill` remains a legacy alias for `folder`.
 
 ---
 
-## 24. Skills
+## 24. Provisioned folders
 
-A skill export is a directory containing `SKILL.md`.
+A `folder` export is a directory tree copied deterministically into a target folder declared in the Prayfile.
 
-Optional: `assets/`, `templates/`, `examples/`
+A `file` export is a single file copied under `<target-folder>/<export-name>/`.
 
-Recommended SKILL.md structure:
+Example:
 
-```
-# Skill name
-## Purpose
-## When to use
-## Inputs
-## Process
-## Output
+```ruby
+target :agents do
+  output "AGENTS.md"
+  folder ".agents/skills"
+end
 ```
 
-Skill directories must be copied deterministically.
+`skills` in a target block is a legacy alias for `folder`.
 
-Two packages must not install the same skill path unless conflict policy allows it.
+Optional support files may live under `assets/`, `templates/`, or `examples/` inside the folder export.
+
+Two packages must not install the same folder path unless conflict policy allows it.
 
 ---
 

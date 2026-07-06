@@ -938,6 +938,9 @@ fn load_export_bodies(
                 spec.name, export_name
             ))
         })?;
+        if entry.kind != "fragment" {
+            continue;
+        }
         let bytes = file_bytes.get(&entry.path).ok_or_else(|| {
             PrayError::Integrity(format!(
                 "package file missing for export {}: {}",
@@ -957,19 +960,37 @@ fn load_export_bodies(
 
 fn build_skill_file_index(spec: &PackageSpec) -> BTreeMap<String, Vec<String>> {
     let mut index = BTreeMap::new();
-    for (skill_name, skill) in &spec.skills {
-        let skill_prefix = skill.path.trim_end_matches('/');
-        let mut files = Vec::new();
-        for file in &spec.files {
-            if let Some(relative) = skill_relative_file(file, skill_prefix) {
-                files.push(relative);
-            }
+    for (export_name, export) in &spec.exports {
+        if !matches!(export.kind.as_str(), "folder" | "skill") {
+            continue;
         }
+        let folder_prefix = export.path.trim_end_matches('/');
+        let files = indexed_files_under_prefix(&spec.files, folder_prefix);
+        if !files.is_empty() {
+            index.insert(export_name.clone(), files);
+        }
+    }
+    for (skill_name, skill) in &spec.skills {
+        if index.contains_key(skill_name) {
+            continue;
+        }
+        let skill_prefix = skill.path.trim_end_matches('/');
+        let files = indexed_files_under_prefix(&spec.files, skill_prefix);
         if !files.is_empty() {
             index.insert(skill_name.clone(), files);
         }
     }
     index
+}
+
+fn indexed_files_under_prefix(files: &[String], prefix: &str) -> Vec<String> {
+    let mut indexed = Vec::new();
+    for file in files {
+        if let Some(relative) = skill_relative_file(file, prefix) {
+            indexed.push(relative);
+        }
+    }
+    indexed
 }
 
 fn skill_relative_file(file: &str, skill_prefix: &str) -> Option<String> {

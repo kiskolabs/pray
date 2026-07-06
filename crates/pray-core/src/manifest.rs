@@ -327,10 +327,12 @@ fn parse_target_header(rest: &str) -> PrayResult<(ManifestTarget, bool)> {
         message: "target missing name".to_string(),
     })?)?;
     let outputs = keyword_array(&keywords, "output");
+    let mut folders = keyword_array(&keywords, "folder");
+    folders.extend(keyword_array(&keywords, "skills"));
     let target = ManifestTarget {
         name,
         outputs,
-        skills: keyword_array(&keywords, "skills"),
+        skills: folders,
         commands: keyword_array(&keywords, "commands"),
         rules: keyword_array(&keywords, "rules"),
         max_bytes: keywords
@@ -521,6 +523,10 @@ fn string_from_literal(input: &str) -> PrayResult<String> {
 fn apply_target_statement(target: &mut ManifestTarget, statement: String) -> PrayResult<()> {
     if let Some(rest) = statement.strip_prefix("output ") {
         target.outputs.push(string_from_literal(rest)?);
+        return Ok(());
+    }
+    if let Some(rest) = statement.strip_prefix("folder ") {
+        target.skills.push(string_from_literal(rest)?);
         return Ok(());
     }
     if let Some(rest) = statement.strip_prefix("skills ") {

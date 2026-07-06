@@ -65,9 +65,9 @@ fn materializes_package_skill_directories_into_target_skills_path() {
 prayfile "1"
 target :agents do
   output "INSTRUCTIONS.md"
-  skills ".agents/skills"
+  folder ".agents/skills"
 end
-agent "sample/audit-skill", path: "packages/audit-skill", exports: ["skill"]
+agent "sample/audit-skill", path: "packages/audit-skill", exports: ["audit"]
 render mode: :managed, conflict: :fail, churn: :minimal
 "#,
     )
@@ -84,14 +84,8 @@ Package::Specification.new do |spec|
     "skills/audit/details.md"
   ]
   spec.exports = {
-    "skill" => {
-      type: "skill",
-      path: "skills/audit/SKILL.md",
-      summary: "Audit skill entrypoint"
-    }
-  }
-  spec.skills = {
     "audit" => {
+      type: "folder",
       path: "skills/audit",
       summary: "Audit skill"
     }
@@ -125,6 +119,66 @@ end
     assert!(
         !rendered.contains("# Audit skill"),
         "skill exports must not be inlined into root target files when skills path is configured"
+    );
+}
+
+#[test]
+fn materializes_file_exports_into_target_folder() {
+    let repo = temporary_directory("pray-install-file-export");
+    fs::create_dir_all(repo.join("packages/sample-rule/rules")).expect("rule directory");
+    fs::write(
+        repo.join("Prayfile"),
+        r#"
+prayfile "1"
+target :agents do
+  output "INSTRUCTIONS.md"
+  folder ".agents/rules"
+end
+agent "sample/rule", path: "packages/sample-rule", exports: ["review-checklist"]
+render mode: :managed, conflict: :fail, churn: :minimal
+"#,
+    )
+    .expect("write Prayfile");
+    fs::write(
+        repo.join("packages/sample-rule/sample-rule.prayspec"),
+        r#"
+Package::Specification.new do |spec|
+  spec.name = "sample/rule"
+  spec.version = "1.0.0"
+  spec.summary = "Review checklist"
+  spec.files = ["rules/checklist.md"]
+  spec.exports = {
+    "review-checklist" => {
+      type: "file",
+      path: "rules/checklist.md",
+      summary: "Review checklist"
+    }
+  }
+end
+"#,
+    )
+    .expect("write prayspec");
+    fs::write(
+        repo.join("packages/sample-rule/rules/checklist.md"),
+        "# Review checklist\n",
+    )
+    .expect("write file export");
+
+    let install = run_pray(&repo, &["install"]);
+    assert!(
+        install.status.success(),
+        "install failed: {}",
+        String::from_utf8_lossy(&install.stderr)
+    );
+
+    assert!(repo
+        .join(".agents/rules/review-checklist/checklist.md")
+        .is_file());
+
+    let rendered = fs::read_to_string(repo.join("INSTRUCTIONS.md")).expect("rendered file");
+    assert!(
+        !rendered.contains("# Review checklist"),
+        "file exports must not be inlined into root target files"
     );
 }
 
@@ -214,7 +268,10 @@ fn installs_prayer_package_into_a_managed_skill_path() {
 
     let agents = fs::read_to_string(repo.join("AGENTS.md")).expect("rendered agents file");
     assert!(agents.contains("<!-- pray:"));
-    assert!(agents.contains("Prayer Publisher"));
+    assert!(
+        !agents.contains("Prayer Publisher"),
+        "skill exports must not be inlined into AGENTS.md when skills path is configured"
+    );
 
     let lockfile = fs::read_to_string(repo.join("Prayfile.lock")).expect("lockfile");
     assert!(lockfile.contains("prayer-publisher"));

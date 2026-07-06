@@ -138,7 +138,7 @@ pub fn create_prayer_install_fixture(repo: &Path) {
 prayfile "1"
 target :agents do
   output "AGENTS.md"
-  skills ".agents/skills"
+  folder ".agents/skills"
 end
 agent "prayer-publisher", path: "packages/prayer-publisher", exports: ["skill"]
 render mode: :managed, conflict: :fail, churn: :minimal
@@ -156,13 +156,7 @@ Package::Specification.new do |spec|
   spec.files = ["skills/prayer-publisher/SKILL.md"]
   spec.exports = {
     "skill" => {
-      type: "fragment",
-      path: "skills/prayer-publisher/SKILL.md",
-      summary: "Prayer publisher guidance"
-    }
-  }
-  spec.skills = {
-    "prayer-publisher" => {
+      type: "folder",
       path: "skills/prayer-publisher",
       summary: "Prayer publisher guidance"
     }

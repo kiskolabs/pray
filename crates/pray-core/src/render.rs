@@ -34,58 +34,140 @@ pub fn write_rendered_targets(
         }
         fs::write(path, &target.content)?;
     }
-    materialize_target_skills(project)?;
+    materialize_provisioned_exports(project)?;
     Ok(())
 }
 
-pub fn materialize_target_skills(project: &ResolvedProject) -> PrayResult<()> {
+pub fn materialize_provisioned_exports(project: &ResolvedProject) -> PrayResult<()> {
     for target in &project.manifest.targets {
-        for skills_root in &target.skills {
-            let destination_root = project.project_root.join(skills_root);
+        for folder_root in &target.skills {
+            let destination_root = project.project_root.join(folder_root);
             for package in &project.packages {
-                for (skill_name, skill) in &package.spec.skills {
-                    let skill_files = package.skill_files.get(skill_name).ok_or_else(|| {
-                        PrayError::Render(format!(
-                            "package {} has no indexed files for skill {}",
-                            package.declaration.name, skill_name
-                        ))
-                    })?;
-                    copy_skill_tree(
-                        &package.root.join(&skill.path),
-                        &destination_root.join(skill_name),
-                        skill_files,
-                    )?;
-                }
+                materialize_legacy_skill_trees(package, &destination_root)?;
+                materialize_selected_exports(package, &destination_root)?;
             }
         }
     }
     Ok(())
 }
 
-fn copy_skill_tree(
-    source_root: &Path,
+fn materialize_legacy_skill_trees(
+    package: &crate::resolve::ResolvedPackage,
     destination_root: &Path,
-    skill_files: &[String],
 ) -> PrayResult<()> {
+    for (skill_name, skill) in &package.spec.skills {
+        if legacy_skill_covered_by_export(package, skill) {
+            continue;
+        }
+        let skill_files = package.skill_files.get(skill_name).ok_or_else(|| {
+            PrayError::Render(format!(
+                "package {} has no indexed files for legacy skill {}",
+                package.declaration.name, skill_name
+            ))
+        })?;
+        copy_tree(
+            &package.root.join(&skill.path),
+            &destination_root.join(skill_name),
+            skill_files,
+        )?;
+    }
+    Ok(())
+}
+
+fn legacy_skill_covered_by_export(
+    package: &crate::resolve::ResolvedPackage,
+    skill: &crate::package_spec::PackageSkill,
+) -> bool {
+    package.spec.exports.iter().any(|(export_name, export)| {
+        package.selected_exports.contains(export_name)
+            && is_folder_export_kind(&export.kind)
+            && export.path.trim_end_matches('/') == skill.path.trim_end_matches('/')
+    })
+}
+
+fn materialize_selected_exports(
+    package: &crate::resolve::ResolvedPackage,
+    destination_root: &Path,
+) -> PrayResult<()> {
+    for export_name in &package.selected_exports {
+        let Some(export) = package.spec.exports.get(export_name) else {
+            continue;
+        };
+        match export.kind.as_str() {
+            "folder" | "skill" => {
+                let indexed_files = package.skill_files.get(export_name).ok_or_else(|| {
+                    PrayError::Render(format!(
+                        "package {} has no indexed files for folder export {}",
+                        package.declaration.name, export_name
+                    ))
+                })?;
+                let destination_name = folder_destination_name(export_name, &export.path);
+                copy_tree(
+                    &package.root.join(&export.path),
+                    &destination_root.join(destination_name),
+                    indexed_files,
+                )?;
+            }
+            "file" => {
+                let source = package.root.join(&export.path);
+                if !source.is_file() {
+                    return Err(PrayError::Render(format!(
+                        "file export source missing: {}",
+                        source.display()
+                    )));
+                }
+                let file_name = source
+                    .file_name()
+                    .map(|name| name.to_owned())
+                    .ok_or_else(|| {
+                        PrayError::Render(format!(
+                            "file export path has no file name: {}",
+                            export.path
+                        ))
+                    })?;
+                let destination = destination_root.join(export_name).join(file_name);
+                if let Some(parent) = destination.parent() {
+                    fs::create_dir_all(parent)?;
+                }
+                fs::copy(&source, &destination)?;
+            }
+            _ => {}
+        }
+    }
+    Ok(())
+}
+
+fn is_folder_export_kind(kind: &str) -> bool {
+    matches!(kind, "folder" | "skill")
+}
+
+fn folder_destination_name(export_name: &str, export_path: &str) -> String {
+    Path::new(export_path.trim_end_matches('/'))
+        .file_name()
+        .map(|name| name.to_string_lossy().to_string())
+        .unwrap_or_else(|| export_name.to_string())
+}
+
+fn copy_tree(source_root: &Path, destination_root: &Path, relative_files: &[String]) -> PrayResult<()> {
     if !source_root.is_dir() {
         return Err(PrayError::Render(format!(
-            "skill source directory missing: {}",
+            "folder source directory missing: {}",
             source_root.display()
         )));
     }
 
-    if skill_files.is_empty() {
+    if relative_files.is_empty() {
         return Err(PrayError::Render(format!(
-            "no skill files listed in package manifest for {}",
+            "no files listed in package manifest for {}",
             source_root.display()
         )));
     }
 
-    for relative in skill_files {
+    for relative in relative_files {
         let source = source_root.join(relative);
         if !source.is_file() {
             return Err(PrayError::Render(format!(
-                "skill file missing: {}",
+                "provisioned file missing: {}",
                 source.display()
             )));
         }
@@ -144,12 +226,16 @@ impl ContentBuilder {
     }
 }
 
-fn should_inline_export(package: &crate::resolve::ResolvedPackage, export_name: &str) -> bool {
+fn should_inline_export(
+    package: &crate::resolve::ResolvedPackage,
+    export_name: &str,
+    _target: &crate::manifest::ManifestTarget,
+) -> bool {
     package
         .spec
         .exports
         .get(export_name)
-        .is_none_or(|export| export.kind != "skill")
+        .is_none_or(|export| export.kind == "fragment")
 }
 
 fn render_target(
@@ -168,7 +254,7 @@ fn render_target(
         builder.append_line("# Agent context");
         builder.append_empty_line();
         builder.append_line(&format!(
-            "Do not edit managed blocks in `{output_name}` or skills under `.agents/`."
+            "Do not edit managed blocks in `{output_name}` or provisioned files under `.agents/`."
         ));
         builder.append_line("To change shared guidance, update `Prayfile` and run `pray install`.");
         builder.append_empty_line();
@@ -193,7 +279,7 @@ fn render_target(
     let mut managed_spans = Vec::new();
     for package in &project.packages {
         for export in &package.selected_exports {
-            if !should_inline_export(package, export) {
+            if !should_inline_export(package, export, target) {
                 continue;
             }
             let body = package.export_bodies.get(export).ok_or_else(|| {

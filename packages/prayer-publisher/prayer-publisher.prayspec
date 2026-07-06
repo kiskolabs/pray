@@ -5,13 +5,7 @@ Package::Specification.new do |spec|
   spec.files = ["skills/prayer-publisher/SKILL.md"]
   spec.exports = {
     "skill" => {
-      type: "fragment",
-      path: "skills/prayer-publisher/SKILL.md",
-      summary: "Prayer publisher guidance"
-    }
-  }
-  spec.skills = {
-    "prayer-publisher" => {
+      type: "folder",
       path: "skills/prayer-publisher",
       summary: "Prayer publisher guidance"
     }
