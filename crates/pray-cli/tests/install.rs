@@ -291,8 +291,128 @@ fn plan_reports_changes_without_writing_files() {
     assert!(!repo.join("Prayfile.lock").exists());
     assert!(!repo.join("INSTRUCTIONS.md").exists());
     let stdout = String::from_utf8_lossy(&plan.stdout);
+    assert!(stdout.contains("Plan"));
     assert!(stdout.contains("Prayfile.lock"));
     assert!(stdout.contains("INSTRUCTIONS.md"));
+}
+
+#[test]
+fn apply_reports_materialization_summary() {
+    let repo = temporary_directory("pray-apply-summary");
+    create_fixture(&repo);
+
+    let apply = run_pray(&repo, &["apply"]);
+    assert!(
+        apply.status.success(),
+        "apply failed: {}",
+        String::from_utf8_lossy(&apply.stderr)
+    );
+    let stdout = String::from_utf8_lossy(&apply.stdout);
+    assert!(stdout.contains("Applying"));
+    assert!(stdout.contains("sample/base"));
+    assert!(stdout.contains("Prayfile.lock created"));
+    assert!(stdout.contains("INSTRUCTIONS.md written"));
+    assert!(stdout.contains("Apply complete"));
+
+    let second_apply = run_pray(&repo, &["apply"]);
+    assert!(
+        second_apply.status.success(),
+        "second apply failed: {}",
+        String::from_utf8_lossy(&second_apply.stderr)
+    );
+    let second_stdout = String::from_utf8_lossy(&second_apply.stdout);
+    assert!(second_stdout.contains("everything up to date"));
+    assert!(second_stdout.contains("unchanged"));
+}
+
+#[test]
+fn install_reports_materialization_summary() {
+    let repo = temporary_directory("pray-install-summary");
+    create_fixture(&repo);
+
+    let install = run_pray(&repo, &["install"]);
+    assert!(
+        install.status.success(),
+        "install failed: {}",
+        String::from_utf8_lossy(&install.stderr)
+    );
+    let stdout = String::from_utf8_lossy(&install.stdout);
+    assert!(stdout.contains("Installing"));
+    assert!(stdout.contains("sample/base"));
+    assert!(stdout.contains("Prayfile.lock created"));
+    assert!(stdout.contains("INSTRUCTIONS.md written"));
+    assert!(stdout.contains("Install complete"));
+
+    let second_install = run_pray(&repo, &["install"]);
+    assert!(
+        second_install.status.success(),
+        "second install failed: {}",
+        String::from_utf8_lossy(&second_install.stderr)
+    );
+    let second_stdout = String::from_utf8_lossy(&second_install.stdout);
+    assert!(second_stdout.contains("everything up to date"));
+}
+
+#[test]
+fn install_reports_provisioned_skill_folder_changes() {
+    let repo = temporary_directory("pray-install-skill-summary");
+    fs::create_dir_all(repo.join("packages/audit-skill/skills/audit")).expect("skill tree");
+    fs::write(
+        repo.join("Prayfile"),
+        r#"
+prayfile "1"
+target :agents do
+  output "INSTRUCTIONS.md"
+  folder ".agents/skills"
+end
+agent "sample/audit-skill", path: "packages/audit-skill", exports: ["audit"]
+render mode: :managed, conflict: :fail, churn: :minimal
+"#,
+    )
+    .expect("write Prayfile");
+    fs::write(
+        repo.join("packages/audit-skill/audit-skill.prayspec"),
+        r#"
+Package::Specification.new do |spec|
+  spec.name = "sample/audit-skill"
+  spec.version = "1.0.0"
+  spec.summary = "Audit skill package"
+  spec.files = [
+    "skills/audit/SKILL.md",
+    "skills/audit/details.md"
+  ]
+  spec.exports = {
+    "audit" => {
+      type: "folder",
+      path: "skills/audit",
+      summary: "Audit skill"
+    }
+  }
+end
+"#,
+    )
+    .expect("write prayspec");
+    fs::write(
+        repo.join("packages/audit-skill/skills/audit/SKILL.md"),
+        "# Audit skill\n",
+    )
+    .expect("write skill");
+    fs::write(
+        repo.join("packages/audit-skill/skills/audit/details.md"),
+        "# Details\n",
+    )
+    .expect("write details");
+
+    let install = run_pray(&repo, &["install"]);
+    assert!(
+        install.status.success(),
+        "install failed: {}",
+        String::from_utf8_lossy(&install.stderr)
+    );
+    let stdout = String::from_utf8_lossy(&install.stdout);
+    assert!(stdout.contains(".agents/skills/audit/"));
+    assert!(stdout.contains("2 files"));
+    assert!(stdout.contains("provisioned file"));
 }
 
 #[test]

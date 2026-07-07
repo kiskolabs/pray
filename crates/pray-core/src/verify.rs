@@ -41,12 +41,20 @@ impl VerificationFinding {
     }
 }
 
+pub fn inspect_project(
+    project: &ResolvedProject,
+    lockfile: &Lockfile,
+) -> PrayResult<VerificationReport> {
+    let (report, _) = collect_verification_report(project, lockfile)?;
+    Ok(report)
+}
+
 pub fn verify_project(
     project: &ResolvedProject,
     lockfile: &Lockfile,
     strict: bool,
 ) -> PrayResult<VerificationReport> {
-    let (report, _) = collect_verification_report(project, lockfile)?;
+    let report = inspect_project(project, lockfile)?;
     if report.is_clean() {
         return Ok(report);
     }

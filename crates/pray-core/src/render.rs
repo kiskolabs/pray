@@ -38,22 +38,60 @@ pub fn write_rendered_targets(
     Ok(())
 }
 
-pub fn materialize_provisioned_exports(project: &ResolvedProject) -> PrayResult<()> {
+#[derive(Debug, Clone)]
+pub struct PlannedProvisionedFile {
+    pub path: PathBuf,
+    pub source: PathBuf,
+}
+
+pub fn planned_provisioned_files(project: &ResolvedProject) -> PrayResult<Vec<PlannedProvisionedFile>> {
+    let mut planned = Vec::new();
     for target in &project.manifest.targets {
         for folder_root in &target.skills {
             let destination_root = project.project_root.join(folder_root);
             for package in &project.packages {
-                materialize_legacy_skill_trees(package, &destination_root)?;
-                materialize_selected_exports(package, &destination_root)?;
+                collect_legacy_skill_files(
+                    project,
+                    package,
+                    &destination_root,
+                    &mut planned,
+                )?;
+                collect_selected_export_files(
+                    project,
+                    package,
+                    &destination_root,
+                    &mut planned,
+                )?;
             }
         }
+    }
+    planned.sort_by(|left, right| left.path.cmp(&right.path));
+    Ok(planned)
+}
+
+pub fn materialize_provisioned_exports(project: &ResolvedProject) -> PrayResult<()> {
+    for file in planned_provisioned_files(project)? {
+        let destination = project.project_root.join(&file.path);
+        if let Some(parent) = destination.parent() {
+            fs::create_dir_all(parent)?;
+        }
+        fs::copy(&file.source, &destination)?;
     }
     Ok(())
 }
 
-fn materialize_legacy_skill_trees(
+fn relative_project_path(project: &ResolvedProject, absolute: &Path) -> PathBuf {
+    absolute
+        .strip_prefix(&project.project_root)
+        .map(Path::to_path_buf)
+        .unwrap_or_else(|_| absolute.to_path_buf())
+}
+
+fn collect_legacy_skill_files(
+    project: &ResolvedProject,
     package: &crate::resolve::ResolvedPackage,
     destination_root: &Path,
+    planned: &mut Vec<PlannedProvisionedFile>,
 ) -> PrayResult<()> {
     for (skill_name, skill) in &package.spec.skills {
         if legacy_skill_covered_by_export(package, skill) {
@@ -65,10 +103,12 @@ fn materialize_legacy_skill_trees(
                 package.declaration.name, skill_name
             ))
         })?;
-        copy_tree(
+        collect_tree_files(
+            project,
             &package.root.join(&skill.path),
             &destination_root.join(skill_name),
             skill_files,
+            planned,
         )?;
     }
     Ok(())
@@ -85,9 +125,11 @@ fn legacy_skill_covered_by_export(
     })
 }
 
-fn materialize_selected_exports(
+fn collect_selected_export_files(
+    project: &ResolvedProject,
     package: &crate::resolve::ResolvedPackage,
     destination_root: &Path,
+    planned: &mut Vec<PlannedProvisionedFile>,
 ) -> PrayResult<()> {
     for export_name in &package.selected_exports {
         let Some(export) = package.spec.exports.get(export_name) else {
@@ -102,10 +144,12 @@ fn materialize_selected_exports(
                     ))
                 })?;
                 let destination_name = folder_destination_name(export_name, &export.path);
-                copy_tree(
+                collect_tree_files(
+                    project,
                     &package.root.join(&export.path),
                     &destination_root.join(destination_name),
                     indexed_files,
+                    planned,
                 )?;
             }
             "file" => {
@@ -126,10 +170,10 @@ fn materialize_selected_exports(
                         ))
                     })?;
                 let destination = destination_root.join(export_name).join(file_name);
-                if let Some(parent) = destination.parent() {
-                    fs::create_dir_all(parent)?;
-                }
-                fs::copy(&source, &destination)?;
+                planned.push(PlannedProvisionedFile {
+                    path: relative_project_path(project, &destination),
+                    source,
+                });
             }
             _ => {}
         }
@@ -148,7 +192,13 @@ fn folder_destination_name(export_name: &str, export_path: &str) -> String {
         .unwrap_or_else(|| export_name.to_string())
 }
 
-fn copy_tree(source_root: &Path, destination_root: &Path, relative_files: &[String]) -> PrayResult<()> {
+fn collect_tree_files(
+    project: &ResolvedProject,
+    source_root: &Path,
+    destination_root: &Path,
+    relative_files: &[String],
+    planned: &mut Vec<PlannedProvisionedFile>,
+) -> PrayResult<()> {
     if !source_root.is_dir() {
         return Err(PrayError::Render(format!(
             "folder source directory missing: {}",
@@ -172,10 +222,10 @@ fn copy_tree(source_root: &Path, destination_root: &Path, relative_files: &[Stri
             )));
         }
         let destination = destination_root.join(relative);
-        if let Some(parent) = destination.parent() {
-            fs::create_dir_all(parent)?;
-        }
-        fs::copy(&source, &destination)?;
+        planned.push(PlannedProvisionedFile {
+            path: relative_project_path(project, &destination),
+            source,
+        });
     }
 
     Ok(())

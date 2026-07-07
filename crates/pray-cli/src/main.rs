@@ -1,3 +1,4 @@
+mod apply_report;
 mod auth_client;
 mod revision;
 mod revision_backend;
@@ -5,6 +6,9 @@ mod server;
 mod server_stdio;
 mod trust_command;
 
+use apply_report::{
+    build_materialization_preview, print_materialization_report, MaterializationMode,
+};
 use auth_client::{
     current_signer as current_signer_from_session,
     current_signer_fingerprint as current_signer_fingerprint_from_session, login_with_passkey,
@@ -1012,6 +1016,24 @@ fn parse_confess_command(mut arguments: std::vec::IntoIter<String>) -> PrayResul
 }
 
 fn install_command(locked: bool, frozen: bool, offline: bool) -> PrayResult<()> {
+    let report_mode = if locked {
+        None
+    } else {
+        Some(MaterializationMode::Install)
+    };
+    materialize_command(locked, frozen, offline, report_mode)
+}
+
+fn apply_command() -> PrayResult<()> {
+    materialize_command(false, false, false, Some(MaterializationMode::Apply))
+}
+
+fn materialize_command(
+    locked: bool,
+    frozen: bool,
+    offline: bool,
+    report_mode: Option<MaterializationMode>,
+) -> PrayResult<()> {
     let options = ResolveOptions {
         offline,
         ..ResolveOptions::default()
@@ -1031,8 +1053,23 @@ fn install_command(locked: bool, frozen: bool, offline: bool) -> PrayResult<()> 
     }
 
     let lockfile = build_lockfile(&project, &rendered)?;
+    let previous_lockfile = read_lockfile(&lockfile_path).ok();
+    let preview = if report_mode.is_some() {
+        Some(build_materialization_preview(
+            &project,
+            &rendered,
+            &lockfile,
+            &lockfile_path,
+            previous_lockfile.as_ref(),
+        )?)
+    } else {
+        None
+    };
     write_lockfile_if_changed(&lockfile_path, &lockfile)?;
     write_rendered_targets(&project, &rendered)?;
+    if let (Some(preview), Some(mode)) = (preview, report_mode) {
+        print_materialization_report(&preview, mode);
+    }
     Ok(())
 }
 
@@ -1040,32 +1077,16 @@ fn plan_command() -> PrayResult<()> {
     let project = resolve_project(&manifest_path())?;
     let rendered = render_project(&project)?;
     let lockfile = build_lockfile(&project, &rendered)?;
-    let mut lines = Vec::new();
-
-    match read_lockfile(&lockfile_path()) {
-        Ok(existing) if lockfiles_equivalent(&lockfile, &existing) => {
-            lines.push("Prayfile.lock unchanged".to_string());
-        }
-        Ok(_) => lines.push("Prayfile.lock would be updated".to_string()),
-        Err(_) => lines.push("Prayfile.lock would be created".to_string()),
-    }
-
-    for target in &rendered {
-        let path = project.project_root.join(&target.path);
-        let status = match fs::read_to_string(&path) {
-            Ok(existing) if existing == target.content => "unchanged",
-            Ok(_) => "would be updated",
-            Err(_) => "would be written",
-        };
-        lines.push(format!("{} {status}", target.path.display()));
-    }
-
-    println!("{}", lines.join("\n"));
+    let previous_lockfile = read_lockfile(&lockfile_path()).ok();
+    let preview = build_materialization_preview(
+        &project,
+        &rendered,
+        &lockfile,
+        &lockfile_path(),
+        previous_lockfile.as_ref(),
+    )?;
+    print_materialization_report(&preview, MaterializationMode::Plan);
     Ok(())
-}
-
-fn apply_command() -> PrayResult<()> {
-    install_command(false, false, false)
 }
 
 fn clean_command() -> PrayResult<()> {
