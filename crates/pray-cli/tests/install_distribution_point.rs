@@ -436,6 +436,173 @@ render mode: :managed, conflict: :fail, churn: :minimal
 }
 
 #[test]
+fn remote_preview_reports_republished_artifact_without_mutating_lockfile() {
+    let workspace = temporary_directory("pray-remote-preview");
+    let source_repo = workspace.join("source");
+    let distribution_repo = workspace.join("distribution");
+    let prayers_root = distribution_repo.join("prayers");
+    let consumer_repo = workspace.join("consumer");
+    fs::create_dir_all(&source_repo).expect("source workspace");
+    fs::create_dir_all(&distribution_repo).expect("distribution workspace");
+    fs::create_dir_all(&consumer_repo).expect("consumer workspace");
+
+    create_add_fixture(&source_repo);
+    let add = run_pray(
+        &source_repo,
+        &["add", "sample/base", "--path", "packages/base"],
+    );
+    assert!(
+        add.status.success(),
+        "add failed: {}",
+        String::from_utf8_lossy(&add.stderr)
+    );
+
+    let publish = run_pray(
+        &source_repo,
+        &[
+            "publish",
+            "--root",
+            prayers_root.to_str().expect("distribution path"),
+        ],
+    );
+    assert!(
+        publish.status.success(),
+        "publish failed: {}",
+        String::from_utf8_lossy(&publish.stderr)
+    );
+
+    assert_success(
+        &git(&distribution_repo, &["init", "-b", "main"]),
+        "git init",
+    );
+    assert_success(
+        &git(&distribution_repo, &["config", "user.name", "Pray Test"]),
+        "git user.name",
+    );
+    assert_success(
+        &git(
+            &distribution_repo,
+            &["config", "user.email", "pray@example.com"],
+        ),
+        "git user.email",
+    );
+    assert_success(&git(&distribution_repo, &["add", "-A"]), "git add");
+    assert_success(
+        &git(
+            &distribution_repo,
+            &["commit", "-m", "initial distribution"],
+        ),
+        "git commit",
+    );
+
+    let initial_commit =
+        String::from_utf8_lossy(&git(&distribution_repo, &["rev-parse", "HEAD"]).stdout)
+            .trim()
+            .to_string();
+
+    fs::write(
+        consumer_repo.join("Prayfile"),
+        format!(
+            r#"
+prayfile "1"
+source "dist", "git+file://{distribution}"
+agent "sample/base", "~> 1.4", source: "dist"
+target :tool_a do
+  output "INSTRUCTIONS.md"
+end
+render mode: :managed, conflict: :fail, churn: :minimal
+"#,
+            distribution = distribution_repo.display()
+        ),
+    )
+    .expect("write consumer Prayfile");
+
+    let install = run_pray(&consumer_repo, &["install"]);
+    assert!(
+        install.status.success(),
+        "install failed: {}",
+        String::from_utf8_lossy(&install.stderr)
+    );
+
+    let initial_lockfile =
+        fs::read_to_string(consumer_repo.join("Prayfile.lock")).expect("lockfile");
+    assert!(initial_lockfile.contains(&initial_commit));
+
+    fs::write(
+        source_repo.join("packages/base/exports/testing-basics.md"),
+        "Updated testing guidance after republish\n",
+    )
+    .expect("rewrite export");
+    let republish = run_pray(
+        &source_repo,
+        &[
+            "publish",
+            "--root",
+            prayers_root.to_str().expect("distribution path"),
+        ],
+    );
+    assert!(
+        republish.status.success(),
+        "republish failed: {}",
+        String::from_utf8_lossy(&republish.stderr)
+    );
+    assert_success(
+        &git(&distribution_repo, &["add", "-A"]),
+        "git add republish",
+    );
+    assert_success(
+        &git(
+            &distribution_repo,
+            &["commit", "-m", "republish same version"],
+        ),
+        "git commit republish",
+    );
+
+    let outdated_remote = run_pray(&consumer_repo, &["outdated", "--remote"]);
+    assert!(
+        outdated_remote.status.success(),
+        "outdated --remote failed: {}",
+        String::from_utf8_lossy(&outdated_remote.stderr)
+    );
+    let outdated_stdout = String::from_utf8_lossy(&outdated_remote.stdout);
+    assert!(
+        outdated_stdout.contains("Remote update preview"),
+        "outdated --remote should preview remote changes:\n{outdated_stdout}"
+    );
+    assert!(
+        outdated_stdout.contains("Refreshed package sample/base")
+            || outdated_stdout.contains("Updated source dist revision"),
+        "outdated --remote should report upstream drift:\n{outdated_stdout}"
+    );
+
+    let dry_run = run_pray(&consumer_repo, &["update", "--dry-run"]);
+    assert!(
+        dry_run.status.success(),
+        "update --dry-run failed: {}",
+        String::from_utf8_lossy(&dry_run.stderr)
+    );
+    let dry_run_stdout = String::from_utf8_lossy(&dry_run.stdout);
+    assert!(
+        dry_run_stdout.contains("Remote update preview"),
+        "update --dry-run should preview remote changes:\n{dry_run_stdout}"
+    );
+
+    let lockfile_after_preview =
+        fs::read_to_string(consumer_repo.join("Prayfile.lock")).expect("lockfile");
+    assert_eq!(
+        initial_lockfile, lockfile_after_preview,
+        "remote preview commands must not mutate Prayfile.lock"
+    );
+
+    let instructions_after_preview =
+        fs::read_to_string(consumer_repo.join("INSTRUCTIONS.md")).expect("instructions");
+    assert!(
+        !instructions_after_preview.contains("Updated testing guidance after republish"),
+        "remote preview must not apply rendered output"
+    );
+}
+
+#[test]
 fn install_reuses_git_cache_on_second_run() {
     let workspace = temporary_directory("pray-install-git-cache");
     let source_repo = workspace.join("source");

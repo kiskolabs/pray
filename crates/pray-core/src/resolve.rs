@@ -350,12 +350,8 @@ fn resolve_package_root(
         let source = sources
             .get(source_name)
             .ok_or_else(|| PrayError::Resolution(format!("unknown source: {source_name}")))?;
-        let context = PackageResolutionContext::from_lockfile(
-            lockfile,
-            &declaration.name,
-            &options.unlocked_packages,
-            options.offline,
-        );
+        let context =
+            PackageResolutionContext::from_lockfile(lockfile, &declaration.name, options);
         if let Some(local_path) = user_config.local.source.get(source_name) {
             let source_root = project_root.join(local_path);
             let resolved = resolve_local_registry_package_root(

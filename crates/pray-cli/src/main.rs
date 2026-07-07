@@ -91,14 +91,14 @@ fn run(arguments: Vec<String>) -> PrayResult<()> {
             path,
         } => add_command(name, constraint, path),
         Command::Remove { name } => remove_command(name),
-        Command::Update { package, major } => update_command(package, major),
+        Command::Update { package, major, dry_run } => update_command(package, major, dry_run),
         Command::Unlock { package } => unlock_command(package),
         Command::Install {
             locked,
             frozen,
             offline,
         } => install_command(locked, frozen, offline, false),
-        Command::Plan => plan_command(),
+        Command::Plan { remote } => plan_command(remote),
         Command::Apply => apply_command(),
         Command::Render { check } => render_command(check),
         Command::Verify { strict } => verify_command(strict),
@@ -137,7 +137,7 @@ fn run(arguments: Vec<String>) -> PrayResult<()> {
             url,
         } => confess_command(package, from_lock, version, accepted, rejected, note, url),
         Command::List => list_command(),
-        Command::Outdated => outdated_command(),
+        Command::Outdated { remote } => outdated_command(remote),
         Command::Explain { package } => explain_command(package),
         Command::Vendor => vendor_command(),
         Command::Clean => clean_command(),
@@ -175,6 +175,7 @@ enum Command {
     Update {
         package: Option<String>,
         major: bool,
+        dry_run: bool,
     },
     Unlock {
         package: String,
@@ -182,7 +183,9 @@ enum Command {
     Render {
         check: bool,
     },
-    Plan,
+    Plan {
+        remote: bool,
+    },
     Apply,
     Verify {
         strict: bool,
@@ -220,7 +223,9 @@ enum Command {
         url: Option<String>,
     },
     List,
-    Outdated,
+    Outdated {
+        remote: bool,
+    },
     Explain {
         package: String,
     },
@@ -296,7 +301,7 @@ fn parse_command(arguments: Vec<String>) -> PrayResult<Command> {
         "update" => parse_update_command(iter),
         "unlock" => parse_unlock_command(iter),
         "render" => Ok(Command::Render { check }),
-        "plan" => Ok(Command::Plan),
+        "plan" => parse_plan_command(iter),
         "apply" => Ok(Command::Apply),
         "verify" => Ok(Command::Verify { strict }),
         "drift" => Ok(Command::Drift { semantic }),
@@ -307,7 +312,7 @@ fn parse_command(arguments: Vec<String>) -> PrayResult<Command> {
         "serve" => parse_serve_command(iter),
         "confess" => parse_confess_command(iter),
         "list" => Ok(Command::List),
-        "outdated" => Ok(Command::Outdated),
+        "outdated" => parse_outdated_command(iter),
         "explain" => parse_explain_command(iter),
         "vendor" => Ok(Command::Vendor),
         "clean" => Ok(Command::Clean),
@@ -488,11 +493,20 @@ fn remove_command(name: String) -> PrayResult<()> {
     install_command(false, false, false, false)
 }
 
-fn update_command(package: Option<String>, major: bool) -> PrayResult<()> {
+fn update_command(package: Option<String>, major: bool, dry_run: bool) -> PrayResult<()> {
     if major && package.is_none() {
         return Err(PrayError::Unsupported(
             "major updates require a package name".to_string(),
         ));
+    }
+
+    if dry_run {
+        if major {
+            return Err(PrayError::Unsupported(
+                "major updates are not supported with --dry-run".to_string(),
+            ));
+        }
+        return preview_remote_updates(package.as_deref());
     }
 
     let project = resolve_project(&manifest_path())?;
@@ -527,6 +541,7 @@ fn update_command(package: Option<String>, major: bool) -> PrayResult<()> {
         &merged_lockfile,
         package.as_deref(),
         &project,
+        "Update summary",
     )?;
     Ok(())
 }
@@ -660,9 +675,11 @@ fn parse_remove_command(arguments: std::vec::IntoIter<String>) -> PrayResult<Com
 fn parse_update_command(arguments: std::vec::IntoIter<String>) -> PrayResult<Command> {
     let mut package = None;
     let mut major = false;
+    let mut dry_run = false;
     for argument in arguments {
         match argument.as_str() {
             "--major" => major = true,
+            "--dry-run" => dry_run = true,
             other if other.starts_with("--") => {
                 return Err(PrayError::Unsupported(format!(
                     "unknown update flag: {other}"
@@ -679,7 +696,68 @@ fn parse_update_command(arguments: std::vec::IntoIter<String>) -> PrayResult<Com
             }
         }
     }
-    Ok(Command::Update { package, major })
+    Ok(Command::Update {
+        package,
+        major,
+        dry_run,
+    })
+}
+
+fn parse_plan_command(arguments: std::vec::IntoIter<String>) -> PrayResult<Command> {
+    let mut remote = false;
+    for argument in arguments {
+        match argument.as_str() {
+            "--remote" => remote = true,
+            other => {
+                return Err(PrayError::Unsupported(format!(
+                    "unknown plan flag: {other}"
+                )))
+            }
+        }
+    }
+    Ok(Command::Plan { remote })
+}
+
+fn parse_outdated_command(arguments: std::vec::IntoIter<String>) -> PrayResult<Command> {
+    let mut remote = false;
+    for argument in arguments {
+        match argument.as_str() {
+            "--remote" => remote = true,
+            other => {
+                return Err(PrayError::Unsupported(format!(
+                    "unknown outdated flag: {other}"
+                )))
+            }
+        }
+    }
+    Ok(Command::Outdated { remote })
+}
+
+fn remote_preview_options() -> ResolveOptions {
+    ResolveOptions {
+        refresh_source_revisions: true,
+        ignore_locked_versions: true,
+        ..ResolveOptions::default()
+    }
+}
+
+fn preview_remote_updates(selected_package: Option<&str>) -> PrayResult<()> {
+    let previous_lockfile = read_lockfile(&lockfile_path()).ok();
+    let project = resolve_project_with_options(&manifest_path(), &remote_preview_options())?;
+    let rendered = render_project(&project)?;
+    let updated_lockfile = build_lockfile(&project, &rendered)?;
+    if print_update_summary(
+        previous_lockfile.as_ref(),
+        &updated_lockfile,
+        selected_package,
+        &project,
+        "Remote update preview",
+    )? {
+        return Ok(());
+    }
+    println!("Outdated packages");
+    println!("All packages up to date");
+    Ok(())
 }
 
 fn parse_unlock_command(arguments: std::vec::IntoIter<String>) -> PrayResult<Command> {
@@ -1078,8 +1156,13 @@ fn materialize_command(
     Ok(())
 }
 
-fn plan_command() -> PrayResult<()> {
-    let project = resolve_project(&manifest_path())?;
+fn plan_command(remote: bool) -> PrayResult<()> {
+    let options = if remote {
+        remote_preview_options()
+    } else {
+        ResolveOptions::default()
+    };
+    let project = resolve_project_with_options(&manifest_path(), &options)?;
     let rendered = render_project(&project)?;
     let lockfile = build_lockfile(&project, &rendered)?;
     let previous_lockfile = read_lockfile(&lockfile_path()).ok();
@@ -1134,7 +1217,11 @@ fn list_command() -> PrayResult<()> {
     Ok(())
 }
 
-fn outdated_command() -> PrayResult<()> {
+fn outdated_command(remote: bool) -> PrayResult<()> {
+    if remote {
+        return preview_remote_updates(None);
+    }
+
     let project = resolve_project(&manifest_path())?;
     let lockfile = read_lockfile(&lockfile_path()).ok();
     let mut lines = vec!["Outdated packages".to_string()];
@@ -2686,7 +2773,8 @@ fn print_update_summary(
     updated: &Lockfile,
     selected_package: Option<&str>,
     project: &pray_core::resolve::ResolvedProject,
-) -> PrayResult<()> {
+    title: &str,
+) -> PrayResult<bool> {
     let previous_packages: std::collections::BTreeMap<&str, &LockedPackage> = previous
         .into_iter()
         .flat_map(|lockfile| lockfile.package.iter())
@@ -2823,10 +2911,10 @@ fn print_update_summary(
     }
 
     if lines.is_empty() {
-        return Ok(());
+        return Ok(false);
     }
 
-    println!("Update summary");
+    println!("{title}");
     for line in lines {
         println!("{line}");
     }
@@ -2837,7 +2925,7 @@ fn print_update_summary(
         }))
         .map_err(|error| PrayError::Manifest(error.to_string()))?
     );
-    Ok(())
+    Ok(true)
 }
 
 fn package_dependents(
@@ -3020,11 +3108,11 @@ fn print_help() {
     println!("  repo init");
     println!("  add <name> [constraint] [--path PATH]");
     println!("  remove <name>");
-    println!("  update [package] [--major]");
+    println!("  update [package] [--major] [--dry-run]");
     println!("  unlock <package>");
     println!("  install [--locked|--frozen|--offline]");
     println!("  render [--check]");
-    println!("  plan");
+    println!("  plan [--remote]");
     println!("  apply");
     println!("  verify [--strict]");
     println!("  drift [--semantic]");
@@ -3040,7 +3128,7 @@ fn print_help() {
         "  confess <package> | --from-lock SPAN_ID [--version VERSION] [--accepted|--rejected] [--note NOTE] [--url URL]"
     );
     println!("  list");
-    println!("  outdated");
+    println!("  outdated [--remote]");
     println!("  explain <package>");
     println!("  vendor");
     println!("  clean");

@@ -2,7 +2,7 @@ use pray_core::lockfile::{LockedPackage, Lockfile};
 use pray_core::registry::{
     select_package_version_for_test, RegistryPackageMetadata, RegistryPackageVersion,
 };
-use pray_core::resolve_context::PackageResolutionContext;
+use pray_core::resolve_context::{PackageResolutionContext, ResolveOptions};
 use std::collections::BTreeSet;
 
 #[test]
@@ -46,7 +46,8 @@ fn unlocked_packages_skip_locked_version_hints() {
         }],
         ..Lockfile::default()
     };
-    let context =
-        PackageResolutionContext::from_lockfile(Some(&lockfile), "sample/base", &unlocked, false);
+    let mut options = ResolveOptions::default();
+    options.unlocked_packages = unlocked;
+    let context = PackageResolutionContext::from_lockfile(Some(&lockfile), "sample/base", &options);
     assert!(context.preferred_version.is_none());
 }
