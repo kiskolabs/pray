@@ -494,11 +494,13 @@ fn ensure_git_repository(
         .join(cache_key(clone_url));
 
     if git_cache_directory.join(".git").is_dir() {
+        if refresh {
+            refresh_global_git_cache(clone_url)?;
+        }
         if let Some(revision) = pinned_revision {
-            checkout_git_revision(&git_cache_directory, revision, refresh)?;
+            checkout_git_revision(&git_cache_directory, clone_url, revision, refresh)?;
         } else if refresh {
-            run_git_success(&git_cache_directory, &["fetch", "--depth", "1", "origin"])?;
-            run_git_success(&git_cache_directory, &["reset", "--hard", "FETCH_HEAD"])?;
+            refresh_git_worktree(&git_cache_directory, clone_url)?;
         }
         if let Some(subdir) = sparse_subdir {
             apply_sparse_checkout(&git_cache_directory, subdir)?;
@@ -516,7 +518,9 @@ fn ensure_git_repository(
     let destination = git_cache_directory.to_str().ok_or_else(|| {
         PrayError::Resolution(format!("invalid git cache path: {:?}", git_cache_directory))
     })?;
-    if !seed_git_cache_from_global(clone_url, destination, project_root)? {
+    if seed_git_cache_from_global(clone_url, destination, project_root)? {
+        ensure_git_remote_origin(&git_cache_directory, clone_url)?;
+    } else {
         run_git_success(
             project_root,
             &["clone", "--depth", "1", clone_url, destination],
@@ -524,7 +528,7 @@ fn ensure_git_repository(
         let _ = mirror_git_cache_to_global(clone_url, &git_cache_directory);
     }
     if let Some(revision) = pinned_revision {
-        checkout_git_revision(&git_cache_directory, revision, true)?;
+        checkout_git_revision(&git_cache_directory, clone_url, revision, true)?;
     }
     if let Some(subdir) = sparse_subdir {
         apply_sparse_checkout(&git_cache_directory, subdir)?;
@@ -654,7 +658,40 @@ pub fn git_source_cache_directory(project_root: &Path, clone_url: &str) -> PathB
         .join(cache_key(clone_url))
 }
 
-fn checkout_git_revision(repository: &Path, revision: &str, allow_fetch: bool) -> PrayResult<()> {
+fn ensure_git_remote_origin(repository: &Path, clone_url: &str) -> PrayResult<()> {
+    if run_git_success(repository, &["remote", "get-url", "origin"]).is_ok() {
+        run_git_success(repository, &["remote", "set-url", "origin", clone_url])?;
+    } else {
+        run_git_success(repository, &["remote", "add", "origin", clone_url])?;
+    }
+    Ok(())
+}
+
+fn refresh_global_git_cache(clone_url: &str) -> PrayResult<()> {
+    let Some(global_cache) = global_git_cache_directory(clone_url) else {
+        return Ok(());
+    };
+    if !global_git_cache_ready(&global_cache) {
+        return Ok(());
+    }
+    ensure_git_remote_origin(&global_cache, clone_url)?;
+    run_git_success(&global_cache, &["fetch", "--depth", "1", "origin"])?;
+    Ok(())
+}
+
+fn refresh_git_worktree(repository: &Path, clone_url: &str) -> PrayResult<()> {
+    ensure_git_remote_origin(repository, clone_url)?;
+    run_git_success(repository, &["fetch", "--depth", "1", "origin"])?;
+    run_git_success(repository, &["reset", "--hard", "FETCH_HEAD"])?;
+    Ok(())
+}
+
+fn checkout_git_revision(
+    repository: &Path,
+    clone_url: &str,
+    revision: &str,
+    allow_fetch: bool,
+) -> PrayResult<()> {
     if git_object_exists(repository, revision) {
         run_git_success(repository, &["reset", "--hard", revision])?;
         return Ok(());
@@ -665,6 +702,7 @@ fn checkout_git_revision(repository: &Path, revision: &str, allow_fetch: bool) -
             repository
         )));
     }
+    ensure_git_remote_origin(repository, clone_url)?;
     run_git_success(repository, &["fetch", "--depth", "1", "origin", revision])?;
     if git_object_exists(repository, revision) {
         run_git_success(repository, &["reset", "--hard", revision])?;
