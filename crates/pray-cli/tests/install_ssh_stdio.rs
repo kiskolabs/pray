@@ -87,7 +87,7 @@ fn install_can_resolve_packages_from_pray_ssh_stdio_source() {
         consumer_repo.join("Prayfile"),
         r#"prayfile "1"
 source "team", "pray+ssh://pray@stdio-host"
-agent "sample/base", "1.0.0", source: :team
+agent "sample/base", "~> 1.4", source: :team
 "#,
     )
     .expect("consumer prayfile");
@@ -132,7 +132,7 @@ fn publish_to_pray_ssh_stdio_server_round_trips_install() {
         consumer_repo.join("Prayfile"),
         r#"prayfile "1"
 source "team", "pray+ssh://pray@stdio-host"
-agent "sample/base", "1.0.0", source: :team
+agent "sample/base", "~> 1.4", source: :team
 "#,
     )
     .expect("consumer prayfile");

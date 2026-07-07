@@ -24,6 +24,10 @@ pub struct ManifestSource {
     pub url: String,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub subdir: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub rev: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub tag: Option<String>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
@@ -309,12 +313,20 @@ fn parse_source(rest: &str) -> PrayResult<ManifestSource> {
         };
         (kind.to_string(), url)
     };
-    let subdir = keywords.get("subdir").map(string_from_value).transpose()?;
+    let subdir = keywords
+        .get("subdir")
+        .or_else(|| keywords.get("distribution"))
+        .map(string_from_value)
+        .transpose()?;
+    let rev = keywords.get("rev").map(string_from_value).transpose()?;
+    let tag = keywords.get("tag").map(string_from_value).transpose()?;
     Ok(ManifestSource {
         name,
         kind,
         url,
         subdir,
+        rev,
+        tag,
     })
 }
 
@@ -364,7 +376,7 @@ fn parse_package_decl(rest: &str) -> PrayResult<ManifestPackage> {
     }
     let name = string_from_value(&values[0])?;
     let constraint = if let Some(value) = values.get(1) {
-        string_from_value(value)?
+        crate::constraint::normalize_version_constraint(&string_from_value(value)?)
     } else {
         "*".to_string()
     };

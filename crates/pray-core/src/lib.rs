@@ -1,5 +1,6 @@
 pub mod auth;
 pub mod client_trust;
+pub mod constraint;
 pub mod config;
 pub mod derived_metadata;
 pub mod error;

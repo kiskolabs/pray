@@ -5,6 +5,8 @@ use std::collections::BTreeSet;
 pub struct ResolveOptions {
     pub offline: bool,
     pub unlocked_packages: BTreeSet<String>,
+    /// When true, git sources fetch remote HEAD instead of the revision pinned in Prayfile.lock.
+    pub refresh_source_revisions: bool,
 }
 
 #[derive(Debug, Clone, Default, PartialEq, Eq)]

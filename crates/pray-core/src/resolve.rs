@@ -1,4 +1,5 @@
 use crate::client_trust::{effective_trust_home, gate_git_source};
+use crate::constraint::version_satisfies;
 use crate::hashing::{normalize_line_endings, sha256_prefixed};
 use crate::lockfile::Lockfile;
 use crate::manifest::{Manifest, ManifestPackage, ManifestSource};
@@ -6,7 +7,6 @@ use crate::package_spec::{parse_package_spec, PackageSpec};
 use crate::registry::{resolve_local_registry_package_root, resolve_registry_package_root};
 use crate::resolve_context::{PackageResolutionContext, ResolveOptions};
 use crate::{PrayError, PrayResult};
-use semver::{Version, VersionReq};
 use std::collections::{BTreeMap, BTreeSet};
 use std::fs;
 use std::path::{Path, PathBuf};
@@ -88,8 +88,12 @@ pub fn resolve_project_with_options(
     let manifest = crate::manifest::parse_manifest(&manifest_text)?;
     let manifest_hash = manifest.manifest_hash()?;
     let sources = source_map(&manifest.sources);
-    let git_sources =
-        prepare_git_sources(&project_root, &manifest.sources, lockfile_hints.as_ref())?;
+    let git_sources = prepare_git_sources(
+        &project_root,
+        &manifest.sources,
+        lockfile_hints.as_ref(),
+        options,
+    )?;
     let source_host_keys = prepare_pray_ssh_host_keys(&manifest.sources)?;
     let mut packages = Vec::new();
     let mut seen = BTreeSet::new();
@@ -168,6 +172,7 @@ fn prepare_git_sources(
     project_root: &Path,
     sources: &[ManifestSource],
     lockfile: Option<&Lockfile>,
+    options: &ResolveOptions,
 ) -> PrayResult<BTreeMap<String, GitSourceCheckout>> {
     let mut git_sources = BTreeMap::new();
     for source in sources {
@@ -175,7 +180,12 @@ fn prepare_git_sources(
             continue;
         }
         let clone_url = source.url.strip_prefix("git+").unwrap_or(&source.url);
-        let pinned_revision = pinned_revision_for_source(lockfile, &source.name);
+        let pinned_revision = if options.refresh_source_revisions {
+            None
+        } else {
+            pinned_revision_for_source(lockfile, source)
+        };
+        let refresh = options.refresh_source_revisions;
         if is_local_filesystem_source(clone_url) && local_git_repo_path(clone_url).is_none() {
             if let Some(source_root) = local_git_source_root(clone_url) {
                 git_sources.insert(
@@ -192,7 +202,7 @@ fn prepare_git_sources(
         let (cache_directory, revision) = ensure_git_repository(
             project_root,
             clone_url,
-            false,
+            refresh,
             pinned_revision.as_deref(),
             source.subdir.as_deref(),
         )?;
@@ -225,12 +235,28 @@ fn local_git_repo_path(clone_url: &str) -> Option<PathBuf> {
     }
 }
 
-fn pinned_revision_for_source(lockfile: Option<&Lockfile>, source_name: &str) -> Option<String> {
-    lockfile?
-        .source
-        .iter()
-        .find(|source| source.name == source_name && source.kind == "git")
-        .and_then(|source| source.revision.clone())
+fn pinned_revision_for_source(
+    lockfile: Option<&Lockfile>,
+    source: &ManifestSource,
+) -> Option<String> {
+    if let Some(revision) = lockfile
+        .and_then(|lockfile| {
+            lockfile
+                .source
+                .iter()
+                .find(|entry| entry.name == source.name && entry.kind == "git")
+        })
+        .and_then(|entry| entry.revision.clone())
+    {
+        return Some(revision);
+    }
+    if source.kind != "git" {
+        return None;
+    }
+    source
+        .rev
+        .clone()
+        .or_else(|| source.tag.clone())
 }
 
 fn resolve_package(
@@ -855,45 +881,6 @@ fn select_exports(declaration: &ManifestPackage, spec: &PackageSpec) -> PrayResu
         }
     }
     Ok(declaration.exports.clone())
-}
-
-fn version_satisfies(version: &str, constraint: &str) -> PrayResult<bool> {
-    if constraint.trim().is_empty() || constraint.trim() == "*" {
-        return Ok(true);
-    }
-    let version =
-        Version::parse(version).map_err(|error| PrayError::Resolution(error.to_string()))?;
-    let req = if constraint.trim_start().starts_with("~>") {
-        VersionReq::parse(&ruby_pessimistic_to_semver(constraint)?)
-            .map_err(|error| PrayError::Resolution(error.to_string()))?
-    } else {
-        VersionReq::parse(constraint.trim())
-            .map_err(|error| PrayError::Resolution(error.to_string()))?
-    };
-    Ok(req.matches(&version))
-}
-
-fn ruby_pessimistic_to_semver(constraint: &str) -> PrayResult<String> {
-    let text = constraint.trim().trim_start_matches("~>").trim();
-    let parts: Vec<&str> = text.split('.').collect();
-    if parts.is_empty() || parts.len() > 3 {
-        return Err(PrayError::Resolution(format!(
-            "unsupported Ruby pessimistic constraint: {constraint}"
-        )));
-    }
-    let mut numbers = [0u64; 3];
-    for (index, part) in parts.iter().enumerate() {
-        numbers[index] = part
-            .parse::<u64>()
-            .map_err(|error| PrayError::Resolution(error.to_string()))?;
-    }
-    let lower = format!("{}.{}.{}", numbers[0], numbers[1], numbers[2]);
-    let upper = match parts.len() {
-        1 => format!("{}.0.0", numbers[0] + 1),
-        2 => format!("{}.{}.0", numbers[0], numbers[1] + 1),
-        _ => format!("{}.{}.0", numbers[0], numbers[1] + 1),
-    };
-    Ok(format!(">={}, <{}", lower, upper))
 }
 
 fn read_text(path: &Path) -> PrayResult<String> {

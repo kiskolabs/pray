@@ -19,7 +19,8 @@ use pray_core::client_trust::prepare_ephemeral_home;
 use pray_core::derived_metadata::derive_registry_derived_metadata_from_archive_bytes;
 use pray_core::hashing::{normalize_line_endings, sha256_prefixed};
 use pray_core::lockfile::{
-    lockfiles_equivalent, read_lockfile, write_lockfile, write_lockfile_if_changed, Lockfile,
+    lockfiles_equivalent, read_lockfile, write_lockfile, write_lockfile_if_changed, LockedPackage,
+    Lockfile,
 };
 use pray_core::manifest::parse_manifest;
 use pray_core::registry::{
@@ -28,9 +29,7 @@ use pray_core::registry::{
     RegistryPackageVersion,
 };
 use pray_core::render::{render_project, write_rendered_targets};
-use pray_core::resolve::{
-    refresh_git_sources, resolve_project, resolve_project_with_options, ResolvedProject,
-};
+use pray_core::resolve::{resolve_project, resolve_project_with_options, ResolvedProject};
 use pray_core::resolve_context::ResolveOptions;
 use pray_core::ssh_identity::{active_ssh_user_fingerprint, signing_identity};
 use pray_core::trust::{write_registry_trust_settings, RegistryTrustSettings};
@@ -98,7 +97,7 @@ fn run(arguments: Vec<String>) -> PrayResult<()> {
             locked,
             frozen,
             offline,
-        } => install_command(locked, frozen, offline),
+        } => install_command(locked, frozen, offline, false),
         Command::Plan => plan_command(),
         Command::Apply => apply_command(),
         Command::Render { check } => render_command(check),
@@ -486,7 +485,7 @@ fn remove_command(name: String) -> PrayResult<()> {
         manifest_path,
         remove_manifest_statement(&manifest_text, &name),
     )?;
-    install_command(false, false, false)
+    install_command(false, false, false, false)
 }
 
 fn update_command(package: Option<String>, major: bool) -> PrayResult<()> {
@@ -511,8 +510,7 @@ fn update_command(package: Option<String>, major: bool) -> PrayResult<()> {
     }
 
     let previous_lockfile = read_lockfile(&lockfile_path()).ok();
-    refresh_git_sources(&manifest_path())?;
-    install_command(false, false, false)?;
+    install_command(false, false, false, true)?;
     let updated_lockfile = read_lockfile(&lockfile_path())?;
     let merged_lockfile = if let (Some(previous_lockfile), Some(package_name)) =
         (previous_lockfile.as_ref(), package.as_deref())
@@ -1015,17 +1013,22 @@ fn parse_confess_command(mut arguments: std::vec::IntoIter<String>) -> PrayResul
     })
 }
 
-fn install_command(locked: bool, frozen: bool, offline: bool) -> PrayResult<()> {
+fn install_command(
+    locked: bool,
+    frozen: bool,
+    offline: bool,
+    refresh_source_revisions: bool,
+) -> PrayResult<()> {
     let report_mode = if locked {
         None
     } else {
         Some(MaterializationMode::Install)
     };
-    materialize_command(locked, frozen, offline, report_mode)
+    materialize_command(locked, frozen, offline, report_mode, refresh_source_revisions)
 }
 
 fn apply_command() -> PrayResult<()> {
-    materialize_command(false, false, false, Some(MaterializationMode::Apply))
+    materialize_command(false, false, false, Some(MaterializationMode::Apply), false)
 }
 
 fn materialize_command(
@@ -1033,9 +1036,11 @@ fn materialize_command(
     frozen: bool,
     offline: bool,
     report_mode: Option<MaterializationMode>,
+    refresh_source_revisions: bool,
 ) -> PrayResult<()> {
     let options = ResolveOptions {
         offline,
+        refresh_source_revisions,
         ..ResolveOptions::default()
     };
     let project = resolve_project_with_options(&manifest_path(), &options)?;
@@ -2670,7 +2675,7 @@ fn merge_selected_package_update(
             .iter()
             .find(|locked_package| locked_package.name == package.name)
         {
-            *package = previous_package.clone();
+            package.version = previous_package.version.clone();
         }
     }
     merged
@@ -2682,10 +2687,10 @@ fn print_update_summary(
     selected_package: Option<&str>,
     project: &pray_core::resolve::ResolvedProject,
 ) -> PrayResult<()> {
-    let previous_versions: std::collections::BTreeMap<&str, &str> = previous
+    let previous_packages: std::collections::BTreeMap<&str, &LockedPackage> = previous
         .into_iter()
         .flat_map(|lockfile| lockfile.package.iter())
-        .map(|package| (package.name.as_str(), package.version.as_str()))
+        .map(|package| (package.name.as_str(), package))
         .collect();
     let package_sources: std::collections::BTreeMap<&str, String> = project
         .packages
@@ -2716,20 +2721,43 @@ fn print_update_summary(
 
     let mut lines = Vec::new();
     let mut structured_updates = Vec::new();
+
+    if let Some(previous) = previous {
+        for source in &updated.source {
+            let previous_revision = previous
+                .source
+                .iter()
+                .find(|locked_source| locked_source.name == source.name)
+                .and_then(|locked_source| locked_source.revision.as_deref());
+            let updated_revision = source.revision.as_deref();
+            if previous_revision != updated_revision {
+                lines.push(format!(
+                    "Updated source {} revision {} -> {}",
+                    source.name,
+                    previous_revision.unwrap_or("none"),
+                    updated_revision.unwrap_or("none")
+                ));
+            }
+        }
+    }
+
     for package in &updated.package {
         if let Some(selected_package) = selected_package {
             if package.name != selected_package {
                 continue;
             }
         }
-        let Some(previous_version) = previous_versions.get(package.name.as_str()) else {
+        let Some(previous_package) = previous_packages.get(package.name.as_str()) else {
             lines.push(format!(
                 "Updated package {} (new) -> {}",
                 package.name, package.version
             ));
             continue;
         };
-        if *previous_version == package.version {
+        let version_changed = previous_package.version != package.version;
+        let artifact_changed = previous_package.artifact_hash != package.artifact_hash;
+        let tree_changed = previous_package.tree_hash != package.tree_hash;
+        if !version_changed && !artifact_changed && !tree_changed {
             continue;
         }
 
@@ -2737,12 +2765,7 @@ fn print_update_summary(
             .get(package.name.as_str())
             .cloned()
             .unwrap_or_else(|| "unknown".to_string());
-        let exports = updated
-            .package
-            .iter()
-            .find(|locked_package| locked_package.name == package.name)
-            .map(|locked_package| locked_package.exports.clone())
-            .unwrap_or_default();
+        let exports = package.exports.clone();
         let targets = package_targets
             .get(package.name.as_str())
             .cloned()
@@ -2759,10 +2782,17 @@ fn print_update_summary(
             .collect();
         let dependents = package_dependents(project, package.name.as_str());
 
-        lines.push(format!(
-            "Updated package {} {} -> {}",
-            package.name, previous_version, package.version
-        ));
+        if version_changed {
+            lines.push(format!(
+                "Updated package {} {} -> {}",
+                package.name, previous_package.version, package.version
+            ));
+        } else {
+            lines.push(format!(
+                "Refreshed package {} at {} (registry content changed)",
+                package.name, package.version
+            ));
+        }
         lines.push(format!("  source: {source}"));
         lines.push(format!("  exports affected: {}", join_or_none(&exports)));
         lines.push(format!("  targets affected: {}", join_or_none(&targets)));
@@ -2779,8 +2809,10 @@ fn print_update_summary(
         lines.push("  warnings: none".to_string());
         structured_updates.push(serde_json::json!({
             "name": package.name,
-            "from_version": previous_version,
+            "from_version": previous_package.version,
             "to_version": package.version,
+            "artifact_hash_changed": artifact_changed,
+            "tree_hash_changed": tree_changed,
             "source": source,
             "exports_affected": exports,
             "targets_affected": targets,

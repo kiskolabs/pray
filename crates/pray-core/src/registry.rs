@@ -1,10 +1,11 @@
+use crate::constraint::version_satisfies;
 use crate::derived_metadata::RegistryDerivedMetadata;
 use crate::hashing::sha256_prefixed;
 use crate::manifest::ManifestPackage;
 use crate::package_spec::parse_package_spec;
 use crate::resolve_context::PackageResolutionContext;
 use crate::{PrayError, PrayResult};
-use semver::{Version, VersionReq};
+use semver::Version;
 use serde::{Deserialize, Serialize};
 use std::collections::BTreeSet;
 use std::fs;
@@ -222,11 +223,10 @@ pub fn resolve_registry_package_root(
         &selected.version,
     );
 
-    if find_prayspec_file(&cache_directory).is_ok() {
-        return Ok(RegistryPackageResolution {
-            root: cache_directory,
-            signer_fingerprint,
-        });
+    if let Some(cached) =
+        try_reuse_cached_registry_package(&cache_directory, &selected, signer_fingerprint.clone())?
+    {
+        return Ok(cached);
     }
     if context.offline {
         return Err(offline_package_error(&declaration.name, &selected.version));
@@ -289,11 +289,10 @@ fn resolve_ssh_registry_package_root(
             &selected.version,
         );
 
-        if find_prayspec_file(&cache_directory).is_ok() {
-            return Ok(RegistryPackageResolution {
-                root: cache_directory,
-                signer_fingerprint,
-            });
+        if let Some(cached) =
+            try_reuse_cached_registry_package(&cache_directory, &selected, signer_fingerprint.clone())?
+        {
+            return Ok(cached);
         }
         if context.offline {
             return Err(offline_package_error(&declaration.name, &selected.version));
@@ -399,11 +398,10 @@ pub fn resolve_local_registry_package_root(
         &selected.version,
     );
 
-    if find_prayspec_file(&cache_directory).is_ok() {
-        return Ok(RegistryPackageResolution {
-            root: cache_directory,
-            signer_fingerprint,
-        });
+    if let Some(cached) =
+        try_reuse_cached_registry_package(&cache_directory, &selected, signer_fingerprint.clone())?
+    {
+        return Ok(cached);
     }
     if context.offline {
         return Err(offline_package_error(&declaration.name, &selected.version));
@@ -615,6 +613,39 @@ fn download_torrent_piece(sources: &[String], piece: &TorrentPieceRange) -> Pray
     )))
 }
 
+fn registry_cache_matches_selected(
+    cache_directory: &Path,
+    selected: &RegistryPackageVersion,
+) -> PrayResult<bool> {
+    let spec_path = find_prayspec_file(cache_directory)?;
+    let spec_text = fs::read_to_string(&spec_path)?;
+    let spec = parse_package_spec(&spec_text)?.canonicalized();
+    if spec.version != selected.version {
+        return Ok(false);
+    }
+    let tree_hash = spec.tree_hash_for_root(cache_directory)?;
+    if let Some(expected_tree_hash) = selected.tree_hash.as_deref() {
+        return Ok(tree_hash == expected_tree_hash);
+    }
+    Ok(true)
+}
+
+fn try_reuse_cached_registry_package(
+    cache_directory: &Path,
+    selected: &RegistryPackageVersion,
+    signer_fingerprint: Option<String>,
+) -> PrayResult<Option<RegistryPackageResolution>> {
+    if find_prayspec_file(cache_directory).is_ok()
+        && registry_cache_matches_selected(cache_directory, selected)?
+    {
+        return Ok(Some(RegistryPackageResolution {
+            root: cache_directory.to_path_buf(),
+            signer_fingerprint,
+        }));
+    }
+    Ok(None)
+}
+
 fn validate_and_unpack_registry_package(
     cache_directory: &Path,
     declaration: &ManifestPackage,
@@ -793,22 +824,6 @@ pub fn select_package_version_for_test(
     select_package_version(metadata, constraint, preferred_version)
 }
 
-fn version_satisfies(version: &str, constraint: &str) -> PrayResult<bool> {
-    if constraint.trim().is_empty() || constraint.trim() == "*" {
-        return Ok(true);
-    }
-    let version =
-        Version::parse(version).map_err(|error| PrayError::Resolution(error.to_string()))?;
-    let req = if constraint.trim_start().starts_with("~>") {
-        VersionReq::parse(&ruby_pessimistic_to_semver(constraint)?)
-            .map_err(|error| PrayError::Resolution(error.to_string()))?
-    } else {
-        VersionReq::parse(constraint.trim())
-            .map_err(|error| PrayError::Resolution(error.to_string()))?
-    };
-    Ok(req.matches(&version))
-}
-
 fn compare_versions(left: &str, right: &str) -> PrayResult<i32> {
     let left = Version::parse(left).map_err(|error| PrayError::Resolution(error.to_string()))?;
     let right = Version::parse(right).map_err(|error| PrayError::Resolution(error.to_string()))?;
@@ -817,29 +832,6 @@ fn compare_versions(left: &str, right: &str) -> PrayResult<i32> {
         std::cmp::Ordering::Equal => 0,
         std::cmp::Ordering::Greater => 1,
     })
-}
-
-fn ruby_pessimistic_to_semver(constraint: &str) -> PrayResult<String> {
-    let text = constraint.trim().trim_start_matches("~>").trim();
-    let parts: Vec<&str> = text.split('.').collect();
-    if parts.is_empty() || parts.len() > 3 {
-        return Err(PrayError::Resolution(format!(
-            "unsupported Ruby pessimistic constraint: {constraint}"
-        )));
-    }
-    let mut numbers = [0u64; 3];
-    for (index, part) in parts.iter().enumerate() {
-        numbers[index] = part
-            .parse::<u64>()
-            .map_err(|error| PrayError::Resolution(error.to_string()))?;
-    }
-    let lower = format!("{}.{}.{}", numbers[0], numbers[1], numbers[2]);
-    let upper = match parts.len() {
-        1 => format!("{}.0.0", numbers[0] + 1),
-        2 => format!("{}.{}.0", numbers[0], numbers[1] + 1),
-        _ => format!("{}.{}.0", numbers[0], numbers[1] + 1),
-    };
-    Ok(format!(">={}, <{}", lower, upper))
 }
 
 fn unpack_praypkg(artifact_bytes: &[u8], output_directory: &Path) -> PrayResult<()> {

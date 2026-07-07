@@ -153,6 +153,8 @@ mod tests {
                 kind: "git".to_string(),
                 url: "git+https://example.com/dist.git".to_string(),
                 subdir: None,
+                rev: None,
+                tag: None,
             }],
             &[],
             &[],

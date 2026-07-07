@@ -128,6 +128,49 @@ source "dist", git: "https://github.com/example/prayers", subdir: "prayers"
 }
 
 #[test]
+fn parses_git_source_distribution_alias() {
+    let manifest = parse_manifest(
+        r#"
+prayfile "1"
+source "amkisko", git: "https://github.com/amkisko/prayers", distribution: "prayers/v1"
+"#,
+    )
+    .expect("manifest parses");
+
+    assert_eq!(manifest.sources[0].subdir.as_deref(), Some("prayers/v1"));
+}
+
+#[test]
+fn parses_git_source_rev_and_tag() {
+    let manifest = parse_manifest(
+        r#"
+prayfile "1"
+source "pinned", git: "https://github.com/example/prayers", rev: "abc123def456"
+source "tagged", git: "https://github.com/example/prayers", tag: "v1.0.0"
+"#,
+    )
+    .expect("manifest parses");
+
+    assert_eq!(manifest.sources[0].rev.as_deref(), Some("abc123def456"));
+    assert_eq!(manifest.sources[0].tag, None);
+    assert_eq!(manifest.sources[1].tag.as_deref(), Some("v1.0.0"));
+    assert_eq!(manifest.sources[1].rev, None);
+}
+
+#[test]
+fn bare_package_version_is_exact_pin() {
+    let manifest = parse_manifest(
+        r#"
+prayfile "1"
+agent "sample/base", "1.0.0"
+"#,
+    )
+    .expect("manifest parses");
+
+    assert_eq!(manifest.packages[0].constraint, "=1.0.0");
+}
+
+#[test]
 fn parses_pray_ssh_source_url() {
     let manifest = parse_manifest(
         r#"
