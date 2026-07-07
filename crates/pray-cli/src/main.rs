@@ -144,6 +144,7 @@ fn run(arguments: Vec<String>) -> PrayResult<()> {
         Command::Tree => tree_command(),
         Command::Sync { root, peers } => sync_command(root, peers),
         Command::Trust { arguments } => trust_command::run_trust_command(arguments),
+        Command::Version => version_command(),
     };
 
     if let Some(home) = ephemeral_home {
@@ -239,6 +240,7 @@ enum Command {
     Trust {
         arguments: Vec<String>,
     },
+    Version,
 }
 
 fn parse_command(arguments: Vec<String>) -> PrayResult<Command> {
@@ -326,6 +328,7 @@ fn parse_command(arguments: Vec<String>) -> PrayResult<Command> {
             print_help();
             std::process::exit(0);
         }
+        "version" | "-V" | "--version" => Ok(Command::Version),
         other => Err(PrayError::Unsupported(format!("unknown command: {other}"))),
     }
 }
@@ -349,6 +352,15 @@ fn parse_namespaced_init_command(
         ))),
         None => Err(PrayError::Unsupported(format!("{namespace} requires init"))),
     }
+}
+
+fn version_command() -> PrayResult<()> {
+    println!(
+        "{} {}",
+        env!("CARGO_PKG_NAME"),
+        env!("CARGO_PKG_VERSION")
+    );
+    Ok(())
 }
 
 fn manifest_command() -> PrayResult<()> {
@@ -3102,6 +3114,7 @@ fn parse_explain_command(mut arguments: std::vec::IntoIter<String>) -> PrayResul
 
 fn print_help() {
     println!("pray <command>");
+    println!("  version | -V | --version");
     println!("  manifest");
     println!("  init [--targets tool_a,tool_b]");
     println!("  prayer init");
