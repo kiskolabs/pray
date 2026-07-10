@@ -179,11 +179,9 @@ fn lockfile_change_status(path: &Path, lockfile: &Lockfile) -> PrayResult<Lockfi
     if !path.exists() {
         return Ok(LockfileChange::Created);
     }
-    let existing = pray_core::lockfile::read_lockfile(path)?;
-    if lockfiles_equivalent(lockfile, &existing) {
-        Ok(LockfileChange::Unchanged)
-    } else {
-        Ok(LockfileChange::Updated)
+    match pray_core::lockfile::read_lockfile(path) {
+        Ok(existing) if lockfiles_equivalent(lockfile, &existing) => Ok(LockfileChange::Unchanged),
+        Ok(_) | Err(_) => Ok(LockfileChange::Updated),
     }
 }
 

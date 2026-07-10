@@ -171,6 +171,25 @@ agent "sample/base", "1.0.0"
 }
 
 #[test]
+fn package_declaration_round_trips_through_formatter() {
+    let manifest = parse_manifest(
+        r#"
+prayfile "1"
+agent "sample/base", "~> 1.0", source: "amkisko", exports: ["testing-basics", "security-basics"]
+"#,
+    )
+    .expect("manifest parses");
+
+    let formatted = pray_core::manifest::format_package_declaration(&manifest.packages[0]);
+    assert_eq!(
+        formatted,
+        r#"agent "sample/base", "~> 1.0", source: "amkisko", exports: ["testing-basics", "security-basics"]"#
+    );
+    let reparsed = parse_manifest(&format!("prayfile \"1\"\n{formatted}\n")).expect("reparses");
+    assert_eq!(reparsed.packages[0], manifest.packages[0]);
+}
+
+#[test]
 fn parses_pray_ssh_source_url() {
     let manifest = parse_manifest(
         r#"

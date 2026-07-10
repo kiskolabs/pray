@@ -53,6 +53,7 @@ impl BenchProject {
         write_rendered_targets(&project, &rendered)?;
         let lockfile = build_lockfile(
             project.lockfile_hash()?,
+            &project.project_root,
             &project.manifest.sources,
             &project.manifest.targets,
             &rendered,

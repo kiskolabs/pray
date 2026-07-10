@@ -1,6 +1,7 @@
 use pray_core::lockfile::{LockedPackage, Lockfile};
 use pray_core::registry::{
-    select_package_version_for_test, RegistryPackageMetadata, RegistryPackageVersion,
+    highest_registry_version, select_package_version_for_test, RegistryPackageMetadata,
+    RegistryPackageVersion,
 };
 use pray_core::resolve_context::{PackageResolutionContext, ResolveOptions};
 use std::collections::BTreeSet;
@@ -25,6 +26,53 @@ fn preferred_version_is_used_when_it_satisfies_constraint() {
     let selected = select_package_version_for_test(&metadata, "~> 1.4", Some("1.4.3"))
         .expect("select version");
     assert_eq!(selected.version, "1.4.3");
+}
+
+#[test]
+fn preferred_version_falls_back_when_constraint_no_longer_matches_lock() {
+    let metadata = RegistryPackageMetadata {
+        name: "sample/base".to_string(),
+        versions: vec![
+            RegistryPackageVersion {
+                version: "1.4.3".to_string(),
+                artifact: "a".to_string(),
+                ..RegistryPackageVersion::default()
+            },
+            RegistryPackageVersion {
+                version: "2.0.0".to_string(),
+                artifact: "b".to_string(),
+                ..RegistryPackageVersion::default()
+            },
+        ],
+    };
+    let selected = select_package_version_for_test(&metadata, "~> 2.0", Some("1.4.3"))
+        .expect("select version");
+    assert_eq!(selected.version, "2.0.0");
+}
+
+#[test]
+fn highest_registry_version_reports_latest_even_when_constraint_caps_lower() {
+    let metadata = RegistryPackageMetadata {
+        name: "amkisko/working-rules".to_string(),
+        versions: vec![
+            RegistryPackageVersion {
+                version: "1.0.0".to_string(),
+                artifact: "a".to_string(),
+                ..RegistryPackageVersion::default()
+            },
+            RegistryPackageVersion {
+                version: "2.0.0".to_string(),
+                artifact: "b".to_string(),
+                ..RegistryPackageVersion::default()
+            },
+        ],
+    };
+    let selected = select_package_version_for_test(&metadata, "~> 1.0", None).expect("select");
+    assert_eq!(selected.version, "1.0.0");
+    let latest = highest_registry_version(&metadata)
+        .expect("latest")
+        .expect("version");
+    assert_eq!(latest.version, "2.0.0");
 }
 
 #[test]

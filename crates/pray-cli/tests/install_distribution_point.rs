@@ -436,6 +436,169 @@ render mode: :managed, conflict: :fail, churn: :minimal
 }
 
 #[test]
+fn update_latest_rewrites_manifest_constraint_for_registry_major() {
+    let workspace = temporary_directory("pray-update-latest-major");
+    let source_repo = workspace.join("source");
+    let distribution_repo = workspace.join("distribution");
+    let prayers_root = distribution_repo.join("prayers");
+    let consumer_repo = workspace.join("consumer");
+    fs::create_dir_all(&source_repo).expect("source workspace");
+    fs::create_dir_all(&distribution_repo).expect("distribution workspace");
+    fs::create_dir_all(&consumer_repo).expect("consumer workspace");
+
+    create_add_fixture(&source_repo);
+    let add = run_pray(
+        &source_repo,
+        &["add", "sample/base", "--path", "packages/base"],
+    );
+    assert!(
+        add.status.success(),
+        "add failed: {}",
+        String::from_utf8_lossy(&add.stderr)
+    );
+
+    let publish = run_pray(
+        &source_repo,
+        &[
+            "publish",
+            "--root",
+            prayers_root.to_str().expect("distribution path"),
+        ],
+    );
+    assert!(
+        publish.status.success(),
+        "publish failed: {}",
+        String::from_utf8_lossy(&publish.stderr)
+    );
+
+    assert_success(
+        &git(&distribution_repo, &["init", "-b", "main"]),
+        "git init",
+    );
+    assert_success(
+        &git(&distribution_repo, &["config", "user.name", "Pray Test"]),
+        "git user.name",
+    );
+    assert_success(
+        &git(
+            &distribution_repo,
+            &["config", "user.email", "pray@example.com"],
+        ),
+        "git user.email",
+    );
+    assert_success(&git(&distribution_repo, &["add", "-A"]), "git add");
+    assert_success(
+        &git(
+            &distribution_repo,
+            &["commit", "-m", "initial distribution"],
+        ),
+        "git commit",
+    );
+
+    fs::write(
+        consumer_repo.join("Prayfile"),
+        format!(
+            r#"
+prayfile "1"
+source "dist", "git+file://{distribution}"
+agent "sample/base", "~> 1.4", source: "dist"
+target :tool_a do
+  output "INSTRUCTIONS.md"
+end
+render mode: :managed, conflict: :fail, churn: :minimal
+"#,
+            distribution = distribution_repo.display()
+        ),
+    )
+    .expect("write consumer Prayfile");
+
+    let install = run_pray(&consumer_repo, &["install"]);
+    assert!(
+        install.status.success(),
+        "install failed: {}",
+        String::from_utf8_lossy(&install.stderr)
+    );
+
+    let initial_lockfile =
+        fs::read_to_string(consumer_repo.join("Prayfile.lock")).expect("lockfile");
+    assert!(initial_lockfile.contains("1.4.3"));
+
+    fs::write(
+        source_repo.join("packages/base/sample-base.prayspec"),
+        r#"
+Package::Specification.new do |spec|
+  spec.name = "sample/base"
+  spec.version = "2.0.0"
+  spec.summary = "shared guidance"
+  spec.files = ["README.md", "exports/testing-basics.md"]
+  spec.exports = {
+    "testing-basics" => {
+      type: "fragment",
+      path: "exports/testing-basics.md",
+      summary: "Testing guidance"
+    }
+  }
+end
+"#,
+    )
+    .expect("rewrite prayspec for major");
+    let publish_major = run_pray(
+        &source_repo,
+        &[
+            "publish",
+            "--root",
+            prayers_root.to_str().expect("distribution path"),
+        ],
+    );
+    assert!(
+        publish_major.status.success(),
+        "major publish failed: {}",
+        String::from_utf8_lossy(&publish_major.stderr)
+    );
+    assert_success(
+        &git(&distribution_repo, &["add", "-A"]),
+        "git add major publish",
+    );
+    assert_success(
+        &git(
+            &distribution_repo,
+            &["commit", "-m", "publish major version"],
+        ),
+        "git commit major publish",
+    );
+
+    let update_latest = run_pray(&consumer_repo, &["update", "--latest"]);
+    if !update_latest.status.success() {
+        let stderr = String::from_utf8_lossy(&update_latest.stderr);
+        let stdout = String::from_utf8_lossy(&update_latest.stdout);
+        let prayfile = fs::read_to_string(consumer_repo.join("Prayfile")).unwrap_or_default();
+        panic!(
+            "update --latest failed: stderr={stderr}\nstdout={stdout}\nprayfile={prayfile}"
+        );
+    }
+    let stdout = String::from_utf8_lossy(&update_latest.stdout);
+    assert!(
+        stdout.contains("Prayfile: sample/base constraint ~> 1.4 -> ~> 2.0"),
+        "expected manifest rewrite summary:\n{stdout}"
+    );
+    assert!(
+        stdout.contains("sample/base 1.4.3 -> 2.0.0"),
+        "expected lockfile version bump:\n{stdout}"
+    );
+
+    let prayfile = fs::read_to_string(consumer_repo.join("Prayfile")).expect("prayfile");
+    assert!(
+        prayfile.contains("~> 2.0"),
+        "Prayfile should admit the major line:\n{prayfile}"
+    );
+    let lockfile = fs::read_to_string(consumer_repo.join("Prayfile.lock")).expect("lockfile");
+    assert!(
+        lockfile.contains("2.0.0"),
+        "lockfile should pin the registry latest:\n{lockfile}"
+    );
+}
+
+#[test]
 fn remote_preview_reports_republished_artifact_without_mutating_lockfile() {
     let workspace = temporary_directory("pray-remote-preview");
     let source_repo = workspace.join("source");
