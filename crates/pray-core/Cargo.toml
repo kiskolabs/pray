@@ -15,3 +15,6 @@ rusqlite = { version = "0.32", features = ["bundled"] }
 tar = "0.4"
 toml = "0.8"
 zstd = "0.13"
+
+[dev-dependencies]
+jsonschema = "0.29"
