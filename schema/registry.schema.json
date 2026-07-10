@@ -1,0 +1,163 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://pray.dev/schema/registry.schema.json",
+  "title": "Pray registry package metadata",
+  "description": "JSON document served at registry package metadata endpoints.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["name", "versions"],
+  "properties": {
+    "name": {
+      "type": "string",
+      "minLength": 1
+    },
+    "versions": {
+      "type": "array",
+      "items": {
+        "$ref": "#/$defs/registryPackageVersion"
+      }
+    }
+  },
+  "$defs": {
+    "sha256Digest": {
+      "type": "string",
+      "pattern": "^sha256:[0-9a-f]{64}$"
+    },
+    "registryPackageVersion": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["version", "artifact"],
+      "properties": {
+        "version": {
+          "type": "string",
+          "minLength": 1
+        },
+        "artifact": {
+          "type": "string",
+          "minLength": 1
+        },
+        "artifact_hash": {
+          "$ref": "#/$defs/sha256Digest"
+        },
+        "tree_hash": {
+          "$ref": "#/$defs/sha256Digest"
+        },
+        "yanked": {
+          "type": "boolean"
+        },
+        "targets": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "minLength": 1
+          }
+        },
+        "exports": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "minLength": 1
+          }
+        },
+        "signer": {
+          "type": ["string", "null"],
+          "minLength": 1
+        },
+        "signer_fingerprint": {
+          "type": ["string", "null"],
+          "minLength": 1
+        },
+        "published_at": {
+          "type": ["string", "null"],
+          "minLength": 1
+        },
+        "signature": {
+          "type": ["string", "null"],
+          "minLength": 1
+        },
+        "derived_metadata": {
+          "oneOf": [
+            {
+              "$ref": "#/$defs/registryDerivedMetadata"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        }
+      }
+    },
+    "registryDerivedMetadata": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "summary": {
+          "type": "string"
+        },
+        "topics": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "minLength": 1
+          }
+        },
+        "categories": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "minLength": 1
+          }
+        },
+        "possible_effects": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "minLength": 1
+          }
+        },
+        "possible_side_effects": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "minLength": 1
+          }
+        },
+        "embeddings": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/registryDerivedEmbedding"
+          }
+        },
+        "file_count": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "character_count": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "token_count": {
+          "type": "integer",
+          "minimum": 0
+        }
+      }
+    },
+    "registryDerivedEmbedding": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["model", "vector"],
+      "properties": {
+        "model": {
+          "type": "string",
+          "minLength": 1
+        },
+        "vector": {
+          "type": "array",
+          "items": {
+            "type": "integer"
+          }
+        }
+      }
+    }
+  }
+}

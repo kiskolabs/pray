@@ -1,0 +1,253 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://pray.dev/schema/manifest.schema.json",
+  "title": "Pray canonical manifest",
+  "description": "Language-neutral manifest model produced by compiling a Prayfile. Meaning is defined on this model, not on Prayfile formatting.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "prayfile_version",
+    "sources",
+    "targets",
+    "packages",
+    "local",
+    "render"
+  ],
+  "properties": {
+    "prayfile_version": {
+      "type": "string",
+      "minLength": 1
+    },
+    "sources": {
+      "type": "array",
+      "items": {
+        "$ref": "#/$defs/manifestSource"
+      }
+    },
+    "targets": {
+      "type": "array",
+      "items": {
+        "$ref": "#/$defs/manifestTarget"
+      }
+    },
+    "packages": {
+      "type": "array",
+      "items": {
+        "$ref": "#/$defs/manifestPackage"
+      }
+    },
+    "local": {
+      "type": "array",
+      "items": {
+        "$ref": "#/$defs/manifestLocal"
+      }
+    },
+    "render": {
+      "$ref": "#/$defs/renderPolicy"
+    }
+  },
+  "$defs": {
+    "manifestSource": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["name", "kind", "url"],
+      "properties": {
+        "name": {
+          "type": "string",
+          "minLength": 1
+        },
+        "kind": {
+          "type": "string",
+          "minLength": 1
+        },
+        "url": {
+          "type": "string",
+          "minLength": 1
+        },
+        "subdir": {
+          "type": "string",
+          "minLength": 1
+        },
+        "rev": {
+          "type": "string",
+          "minLength": 1
+        },
+        "tag": {
+          "type": "string",
+          "minLength": 1
+        }
+      }
+    },
+    "manifestTarget": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["name", "outputs", "skills", "commands", "rules"],
+      "properties": {
+        "name": {
+          "type": "string",
+          "minLength": 1
+        },
+        "outputs": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "minLength": 1
+          }
+        },
+        "skills": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "minLength": 1
+          }
+        },
+        "commands": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "minLength": 1
+          }
+        },
+        "rules": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "minLength": 1
+          }
+        },
+        "max_bytes": {
+          "type": ["integer", "null"],
+          "minimum": 1
+        }
+      }
+    },
+    "manifestPackage": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "name",
+        "constraint",
+        "exports",
+        "targets",
+        "features",
+        "optional"
+      ],
+      "properties": {
+        "name": {
+          "type": "string",
+          "minLength": 1
+        },
+        "constraint": {
+          "type": "string",
+          "minLength": 1
+        },
+        "source": {
+          "type": ["string", "null"],
+          "minLength": 1
+        },
+        "exports": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "minLength": 1
+          }
+        },
+        "targets": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "minLength": 1
+          }
+        },
+        "features": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "minLength": 1
+          }
+        },
+        "optional": {
+          "type": "boolean"
+        },
+        "path": {
+          "type": ["string", "null"],
+          "minLength": 1
+        },
+        "git": {
+          "type": ["string", "null"],
+          "minLength": 1
+        },
+        "tag": {
+          "type": ["string", "null"],
+          "minLength": 1
+        },
+        "rev": {
+          "type": ["string", "null"],
+          "minLength": 1
+        },
+        "tarball": {
+          "type": ["string", "null"],
+          "minLength": 1
+        },
+        "oci": {
+          "type": ["string", "null"],
+          "minLength": 1
+        }
+      }
+    },
+    "manifestLocal": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["path", "position", "optional"],
+      "properties": {
+        "path": {
+          "type": "string",
+          "minLength": 1
+        },
+        "position": {
+          "type": "string",
+          "minLength": 1
+        },
+        "optional": {
+          "type": "boolean"
+        }
+      }
+    },
+    "renderPolicy": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "mode",
+        "conflict",
+        "churn",
+        "header",
+        "section_markers",
+        "line_endings"
+      ],
+      "properties": {
+        "mode": {
+          "type": "string",
+          "minLength": 1
+        },
+        "conflict": {
+          "type": "string",
+          "minLength": 1
+        },
+        "churn": {
+          "type": "string",
+          "minLength": 1
+        },
+        "header": {
+          "type": "boolean"
+        },
+        "section_markers": {
+          "type": "boolean"
+        },
+        "line_endings": {
+          "type": "string",
+          "enum": ["lf", "crlf"]
+        }
+      }
+    }
+  }
+}
