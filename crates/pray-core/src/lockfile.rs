@@ -3,7 +3,7 @@ use crate::render::RenderedTarget;
 use crate::{PrayError, PrayResult};
 use serde::{Deserialize, Serialize};
 use std::fs;
-use std::path::Path;
+use std::path::{Component, Path, PathBuf};
 
 #[derive(Debug, Clone, Default, Serialize, Deserialize, PartialEq)]
 pub struct Lockfile {
@@ -134,10 +134,78 @@ pub fn read_lockfile(path: &Path) -> PrayResult<Lockfile> {
     Ok(lockfile)
 }
 
+pub fn relative_lockfile_path(project_root: &Path, path: &Path) -> String {
+    let absolute = if path.is_absolute() {
+        path.to_path_buf()
+    } else {
+        project_root.join(path)
+    };
+    let normalized_root = lexical_normalize_path(project_root);
+    let normalized_absolute = lexical_normalize_path(&absolute);
+    let relative = normalized_absolute
+        .strip_prefix(&normalized_root)
+        .map(Path::to_path_buf)
+        .unwrap_or_else(|_| {
+            if path.is_absolute() {
+                path.to_path_buf()
+            } else {
+                lexical_normalize_path(path)
+            }
+        });
+    format_relative_lockfile_path(&relative)
+}
+
+fn format_relative_lockfile_path(relative: &Path) -> String {
+    let text = relative.to_string_lossy().replace('\\', "/");
+    if text == "." || text.starts_with("./") {
+        text
+    } else {
+        format!("./{text}")
+    }
+}
+
+fn lexical_normalize_path(path: &Path) -> PathBuf {
+    let mut normalized = PathBuf::new();
+    for component in path.components() {
+        match component {
+            Component::Prefix(prefix) => normalized.push(prefix.as_os_str()),
+            Component::RootDir => normalized.push(std::path::MAIN_SEPARATOR_STR),
+            Component::CurDir => {}
+            Component::ParentDir => {
+                let _ = normalized.pop();
+            }
+            Component::Normal(segment) => normalized.push(segment),
+        }
+    }
+    normalized
+}
+
+fn normalize_lockfile_artifact(
+    project_root: &Path,
+    artifact: &str,
+    package_root: &Path,
+) -> String {
+    if let Some(path_text) = artifact.strip_prefix("path:") {
+        let path = Path::new(path_text);
+        let relative = if path.is_absolute() {
+            relative_lockfile_path(project_root, path)
+        } else {
+            relative_lockfile_path(project_root, package_root)
+        };
+        format!("path:{relative}")
+    } else {
+        artifact.to_string()
+    }
+}
+
 #[cfg(test)]
 mod tests {
-    use super::{build_lockfile, lockfiles_equivalent, LockSource, LockedPackage, Lockfile};
+    use super::{
+        build_lockfile, lockfiles_equivalent, normalize_lockfile_artifact, relative_lockfile_path,
+        LockSource, LockedPackage, Lockfile,
+    };
     use std::collections::BTreeMap;
+    use std::path::Path;
 
     #[test]
     fn build_lockfile_records_git_source_revision() {
@@ -148,6 +216,7 @@ mod tests {
         );
         let lockfile = build_lockfile(
             "sha256:manifest".to_string(),
+            Path::new("."),
             &[crate::manifest::ManifestSource {
                 name: "dist".to_string(),
                 kind: "git".to_string(),
@@ -196,10 +265,42 @@ mod tests {
         right.package.reverse();
         assert!(lockfiles_equivalent(&left.canonicalized(), &right));
     }
+    #[test]
+    fn relative_lockfile_path_strips_absolute_project_prefix() {
+        let project_root = Path::new("/tmp/project");
+        let package_root = Path::new("/tmp/project/./packages/base");
+        assert_eq!(
+            relative_lockfile_path(project_root, package_root),
+            "./packages/base"
+        );
+    }
+
+    #[test]
+    fn normalize_lockfile_artifact_relativizes_path_artifacts() {
+        let project_root = Path::new("/tmp/project");
+        let package_root = Path::new("/tmp/project/packages/base");
+        assert_eq!(
+            normalize_lockfile_artifact(
+                project_root,
+                "path:/tmp/project/./packages/base",
+                package_root,
+            ),
+            "path:./packages/base"
+        );
+        assert_eq!(
+            normalize_lockfile_artifact(
+                project_root,
+                "v1/artifacts/sample/base/1.0.0/package.praypkg",
+                package_root,
+            ),
+            "v1/artifacts/sample/base/1.0.0/package.praypkg"
+        );
+    }
 }
 
 pub fn build_lockfile(
     manifest_hash: String,
+    project_root: &Path,
     manifest_sources: &[crate::manifest::ManifestSource],
     manifest_targets: &[crate::manifest::ManifestTarget],
     rendered: &[RenderedTarget],
@@ -228,10 +329,14 @@ pub fn build_lockfile(
                 name: package.declaration.name.clone(),
                 version: package.spec.version.clone(),
                 source: package.declaration.source.clone(),
-                path: package.root.to_string_lossy().to_string(),
+                path: relative_lockfile_path(project_root, &package.root),
                 tree_hash: package.tree_hash.clone(),
                 artifact_hash: package.artifact_hash.clone(),
-                artifact: package.artifact.clone(),
+                artifact: normalize_lockfile_artifact(
+                    project_root,
+                    &package.artifact,
+                    &package.root,
+                ),
                 exports: package.selected_exports.clone(),
                 dependencies: package
                     .spec

@@ -17,6 +17,8 @@ use std::path::{Path, PathBuf};
 pub struct RegistryPackageResolution {
     pub root: PathBuf,
     pub signer_fingerprint: Option<String>,
+    /// Highest non-yanked version published in registry metadata, regardless of Prayfile constraint.
+    pub registry_latest_version: Option<String>,
 }
 
 pub fn lockfile_signer_fingerprint(version: &RegistryPackageVersion) -> Option<String> {
@@ -202,6 +204,7 @@ pub fn resolve_registry_package_root(
     }
 
     let metadata = fetch_registry_package_metadata(source_url, &declaration.name)?;
+    let registry_latest_version = registry_latest_version_label(&metadata);
     let selected = select_package_version(
         &metadata,
         &declaration.constraint,
@@ -214,6 +217,7 @@ pub fn resolve_registry_package_root(
         return Ok(RegistryPackageResolution {
             root: vendored_root,
             signer_fingerprint,
+            registry_latest_version,
         });
     }
     let cache_directory = registry_cache_directory(
@@ -223,9 +227,10 @@ pub fn resolve_registry_package_root(
         &selected.version,
     );
 
-    if let Some(cached) =
+    if let Some(mut cached) =
         try_reuse_cached_registry_package(&cache_directory, &selected, signer_fingerprint.clone())?
     {
+        cached.registry_latest_version = registry_latest_version.clone();
         return Ok(cached);
     }
     if context.offline {
@@ -254,6 +259,7 @@ pub fn resolve_registry_package_root(
     Ok(RegistryPackageResolution {
         root: cache_directory,
         signer_fingerprint,
+        registry_latest_version,
     })
 }
 
@@ -268,6 +274,7 @@ fn resolve_ssh_registry_package_root(
 
     with_pray_ssh_session(source_url, |session| {
         let metadata = fetch_ssh_registry_package_metadata(session, &declaration.name)?;
+        let registry_latest_version = registry_latest_version_label(&metadata);
         let selected = select_package_version(
             &metadata,
             &declaration.constraint,
@@ -280,6 +287,7 @@ fn resolve_ssh_registry_package_root(
             return Ok(RegistryPackageResolution {
                 root: vendored_root,
                 signer_fingerprint,
+                registry_latest_version,
             });
         }
         let cache_directory = registry_cache_directory(
@@ -289,9 +297,10 @@ fn resolve_ssh_registry_package_root(
             &selected.version,
         );
 
-        if let Some(cached) =
+        if let Some(mut cached) =
             try_reuse_cached_registry_package(&cache_directory, &selected, signer_fingerprint.clone())?
         {
+            cached.registry_latest_version = registry_latest_version.clone();
             return Ok(cached);
         }
         if context.offline {
@@ -319,6 +328,7 @@ fn resolve_ssh_registry_package_root(
         Ok(RegistryPackageResolution {
             root: cache_directory,
             signer_fingerprint,
+            registry_latest_version,
         })
     })
 }
@@ -367,6 +377,7 @@ pub fn resolve_local_registry_package_root(
             kind: "registry metadata",
             message: error.to_string(),
         })?;
+    let registry_latest_version = registry_latest_version_label(&metadata);
     let selected = select_package_version(
         &metadata,
         &declaration.constraint,
@@ -379,6 +390,7 @@ pub fn resolve_local_registry_package_root(
         return Ok(RegistryPackageResolution {
             root: vendored_root,
             signer_fingerprint,
+            registry_latest_version,
         });
     }
     let cache_identifier = format!(
@@ -398,9 +410,10 @@ pub fn resolve_local_registry_package_root(
         &selected.version,
     );
 
-    if let Some(cached) =
+    if let Some(mut cached) =
         try_reuse_cached_registry_package(&cache_directory, &selected, signer_fingerprint.clone())?
     {
+        cached.registry_latest_version = registry_latest_version.clone();
         return Ok(cached);
     }
     if context.offline {
@@ -423,6 +436,7 @@ pub fn resolve_local_registry_package_root(
     Ok(RegistryPackageResolution {
         root: cache_directory,
         signer_fingerprint,
+        registry_latest_version,
     })
 }
 
@@ -641,6 +655,7 @@ fn try_reuse_cached_registry_package(
         return Ok(Some(RegistryPackageResolution {
             root: cache_directory.to_path_buf(),
             signer_fingerprint,
+            registry_latest_version: None,
         }));
     }
     Ok(None)
@@ -774,6 +789,35 @@ fn read_local_registry_artifact_bytes(source_root: &Path, artifact: &str) -> Pra
     })
 }
 
+pub fn highest_registry_version(
+    metadata: &RegistryPackageMetadata,
+) -> PrayResult<Option<RegistryPackageVersion>> {
+    let mut selected: Option<RegistryPackageVersion> = None;
+    for version in &metadata.versions {
+        if version.yanked {
+            continue;
+        }
+        match &selected {
+            Some(existing) if compare_versions(&version.version, &existing.version)? <= 0 => {}
+            _ => selected = Some(version.clone()),
+        }
+    }
+    Ok(selected)
+}
+
+pub fn registry_latest_version_label(
+    metadata: &RegistryPackageMetadata,
+) -> Option<String> {
+    highest_registry_version(metadata)
+        .ok()
+        .flatten()
+        .map(|version| version.version)
+}
+
+pub fn version_is_greater_than(left: &str, right: &str) -> PrayResult<bool> {
+    Ok(compare_versions(left, right)? > 0)
+}
+
 fn select_package_version(
     metadata: &RegistryPackageMetadata,
     constraint: &str,
@@ -788,10 +832,7 @@ fn select_package_version(
             if version_satisfies(&version.version, constraint)? {
                 return Ok(version.clone());
             }
-            return Err(PrayError::Resolution(format!(
-                "locked version {preferred_version} for {} no longer satisfies constraint {constraint}",
-                metadata.name
-            )));
+            // Prayfile constraint changed; fall through to the highest satisfying version.
         }
     }
     let mut selected: Option<RegistryPackageVersion> = None;

@@ -2,12 +2,12 @@
 
 # Agent context
 
-Do not edit managed blocks in `INSTRUCTIONS.md` or skills under `.agents/`.
+Do not edit managed blocks in `INSTRUCTIONS.md` or provisioned files under `.agents/`.
 To change shared guidance, update `Prayfile` and run `pray install`.
 
 ## Additional instructions
 
-### ./.agents/project.md
+### .agents/project.md
 Keep pull requests small and reviewable.
 Prefer explicit recovery steps when a rendered file changes unexpectedly.
 

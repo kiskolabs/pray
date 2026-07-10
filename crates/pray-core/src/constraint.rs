@@ -42,6 +42,40 @@ pub fn version_satisfies(version: &str, constraint: &str) -> PrayResult<bool> {
     Ok(req.matches(&version))
 }
 
+/// Builds a Ruby pessimistic constraint (`~>`) that allows the given release line.
+pub fn pessimistic_constraint_for_version(version: &str) -> PrayResult<String> {
+    let parsed =
+        Version::parse(version).map_err(|error| PrayError::Resolution(error.to_string()))?;
+    if parsed.minor == 0 && parsed.patch == 0 {
+        Ok(format!("~> {}.0", parsed.major))
+    } else {
+        Ok(format!("~> {}.{}", parsed.major, parsed.minor))
+    }
+}
+
+/// Derives a Prayfile constraint that admits `latest_version`, preserving operator style.
+pub fn latest_constraint_for_package(
+    current_constraint: &str,
+    latest_version: &str,
+) -> PrayResult<String> {
+    let normalized = normalize_version_constraint(current_constraint);
+    if normalized == "*" {
+        return Ok("*".to_string());
+    }
+    if normalized.starts_with("~") {
+        return pessimistic_constraint_for_version(latest_version);
+    }
+    if normalized.starts_with('^') {
+        let parsed =
+            Version::parse(latest_version).map_err(|error| PrayError::Resolution(error.to_string()))?;
+        return Ok(format!("^{}.{}", parsed.major, parsed.minor));
+    }
+    if normalized.starts_with('=') || Version::parse(current_constraint.trim()).is_ok() {
+        return Ok(format!("={latest_version}"));
+    }
+    pessimistic_constraint_for_version(latest_version)
+}
+
 fn ruby_pessimistic_to_semver(constraint: &str) -> PrayResult<String> {
     let text = constraint.trim().trim_start_matches("~>").trim();
     let parts: Vec<&str> = text.split('.').collect();
@@ -88,5 +122,34 @@ mod tests {
         assert!(version_satisfies("1.0.0", "1.0.0").expect("matches"));
         assert!(!version_satisfies("1.0.1", "1.0.0").expect("does not match"));
         assert!(version_satisfies("1.0.1", "~> 1.0").expect("pessimistic matches"));
+    }
+
+    #[test]
+    fn pessimistic_constraint_uses_major_minor_line() {
+        assert_eq!(
+            pessimistic_constraint_for_version("2.0.1").expect("constraint"),
+            "~> 2.0"
+        );
+        assert_eq!(
+            pessimistic_constraint_for_version("1.4.3").expect("constraint"),
+            "~> 1.4"
+        );
+        assert!(version_satisfies("2.0.0", "~> 2.0").expect("matches"));
+    }
+
+    #[test]
+    fn latest_constraint_preserves_operator_family() {
+        assert_eq!(
+            latest_constraint_for_package("~> 1.0", "2.0.0").expect("constraint"),
+            "~> 2.0"
+        );
+        assert_eq!(
+            latest_constraint_for_package("1.0.0", "2.0.0").expect("constraint"),
+            "=2.0.0"
+        );
+        assert_eq!(
+            latest_constraint_for_package("^1.0", "2.1.0").expect("constraint"),
+            "^2.1"
+        );
     }
 }

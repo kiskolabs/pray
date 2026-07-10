@@ -37,6 +37,8 @@ pub struct ResolvedPackage {
     pub export_bodies: BTreeMap<String, String>,
     pub skill_files: BTreeMap<String, Vec<String>>,
     pub signer_fingerprint: Option<String>,
+    /// Highest non-yanked version in registry metadata when the package came from a registry source.
+    pub registry_latest_version: Option<String>,
 }
 
 #[derive(Debug, Clone)]
@@ -97,8 +99,9 @@ pub fn resolve_project_with_options(
     let source_host_keys = prepare_pray_ssh_host_keys(&manifest.sources)?;
     let mut packages = Vec::new();
     let mut seen = BTreeSet::new();
+    let mut resolution_errors = Vec::new();
     for declaration in &manifest.packages {
-        let package = resolve_package(
+        match resolve_package(
             &project_root,
             &sources,
             &git_sources,
@@ -106,18 +109,35 @@ pub fn resolve_project_with_options(
             declaration,
             lockfile_hints.as_ref(),
             options,
-        )?;
-        if !seen.insert(package.declaration.name.clone()) {
-            return Err(PrayError::Resolution(format!(
-                "duplicate package declaration: {}",
-                package.declaration.name
-            )));
+        ) {
+            Ok(package) => {
+                if !seen.insert(package.declaration.name.clone()) {
+                    return Err(PrayError::Resolution(format!(
+                        "duplicate package declaration: {}",
+                        package.declaration.name
+                    )));
+                }
+                packages.push(package);
+            }
+            Err(error) => resolution_errors.push(format!(
+                "{}: {error}",
+                declaration.name
+            )),
         }
-        packages.push(package);
+    }
+    if !resolution_errors.is_empty() {
+        return Err(PrayError::Resolution(resolution_errors.join("\n")));
     }
     let mut local_files = Vec::new();
+    let mut local_errors = Vec::new();
     for local in &manifest.local {
-        local_files.push(resolve_local_file(&project_root, local)?);
+        match resolve_local_file(&project_root, local) {
+            Ok(resolved) => local_files.push(resolved),
+            Err(error) => local_errors.push(format!("local {}: {error}", local.path)),
+        }
+    }
+    if !local_errors.is_empty() {
+        return Err(PrayError::Resolution(local_errors.join("\n")));
     }
     Ok(ResolvedProject {
         manifest_path: manifest_path.to_path_buf(),
@@ -271,6 +291,7 @@ fn resolve_package(
     let PackageRootResolution {
         root,
         signer_fingerprint,
+        registry_latest_version,
     } = resolve_package_root(
         project_root,
         sources,
@@ -316,6 +337,7 @@ fn resolve_package(
         export_bodies,
         skill_files,
         signer_fingerprint,
+        registry_latest_version,
     })
 }
 
@@ -323,6 +345,7 @@ fn resolve_package(
 struct PackageRootResolution {
     root: PathBuf,
     signer_fingerprint: Option<String>,
+    registry_latest_version: Option<String>,
 }
 
 fn resolve_package_root(
@@ -338,12 +361,14 @@ fn resolve_package_root(
         return Ok(PackageRootResolution {
             root: project_root.join(local_path),
             signer_fingerprint: None,
+            registry_latest_version: None,
         });
     }
     if let Some(path) = &declaration.path {
         return Ok(PackageRootResolution {
             root: project_root.join(path),
             signer_fingerprint: None,
+            registry_latest_version: None,
         });
     }
     if let Some(source_name) = &declaration.source {
@@ -364,6 +389,7 @@ fn resolve_package_root(
             return Ok(PackageRootResolution {
                 root: resolved.root,
                 signer_fingerprint: resolved.signer_fingerprint,
+                registry_latest_version: resolved.registry_latest_version,
             });
         }
         if source.kind == "path" {
@@ -371,6 +397,7 @@ fn resolve_package_root(
             return Ok(PackageRootResolution {
                 root: project_root.join(&source.url).join(slug),
                 signer_fingerprint: None,
+                registry_latest_version: None,
             });
         }
         if source.kind == "registry" || source.kind == "static index" || source.kind == "pray_ssh" {
@@ -383,6 +410,7 @@ fn resolve_package_root(
             return Ok(PackageRootResolution {
                 root: resolved.root,
                 signer_fingerprint: resolved.signer_fingerprint,
+                registry_latest_version: resolved.registry_latest_version,
             });
         }
         if source.kind == "git" {
@@ -409,6 +437,7 @@ fn resolve_package_root(
     Ok(PackageRootResolution {
         root: project_root.join(slug),
         signer_fingerprint: None,
+        registry_latest_version: None,
     })
 }
 
@@ -439,6 +468,7 @@ fn resolve_git_package_root(
         return Ok(PackageRootResolution {
             root: resolved.root,
             signer_fingerprint: resolved.signer_fingerprint,
+            registry_latest_version: resolved.registry_latest_version,
         });
     }
     if let Some(source_root) = local_git_source_root(clone_url) {
@@ -452,6 +482,7 @@ fn resolve_git_package_root(
         return Ok(PackageRootResolution {
             root: resolved.root,
             signer_fingerprint: resolved.signer_fingerprint,
+            registry_latest_version: resolved.registry_latest_version,
         });
     }
     Err(PrayError::Resolution(format!(

@@ -253,6 +253,21 @@ fn install_locked_rejects_lockfile_drift() {
 }
 
 #[test]
+fn install_lockfile_uses_project_relative_paths() {
+    let repo = temporary_directory("pray-install-lockfile-paths");
+    create_fixture(&repo);
+    assert!(run_pray(&repo, &["install"]).status.success());
+
+    let lockfile = fs::read_to_string(repo.join("Prayfile.lock")).expect("lockfile");
+    assert!(
+        !lockfile.contains("/Users/"),
+        "lockfile must not contain absolute paths: {lockfile}"
+    );
+    assert!(lockfile.contains(r#"path = "./packages/base""#));
+    assert!(lockfile.contains(r#"artifact = "path:./packages/base""#));
+}
+
+#[test]
 fn install_frozen_rejects_stale_rendered_output() {
     let repo = temporary_directory("pray-install-frozen");
     create_fixture(&repo);
@@ -261,7 +276,7 @@ fn install_frozen_rejects_stale_rendered_output() {
     let rendered_path = repo.join("INSTRUCTIONS.md");
     let rendered = fs::read_to_string(&rendered_path).expect("rendered file exists");
     let rendered = rendered.replace(
-        "Do not edit managed blocks in `INSTRUCTIONS.md` or skills under `.agents/`.",
+        "Do not edit managed blocks in `INSTRUCTIONS.md` or provisioned files under `.agents/`.",
         "Managed blocks stay read-only.",
     );
     fs::write(&rendered_path, rendered).expect("rendered file rewritten");
@@ -299,4 +314,33 @@ fn install_offline_accepts_derived_package_paths_when_files_exist() {
         String::from_utf8_lossy(&offline.stderr)
     );
     assert!(repo.join("INSTRUCTIONS.md").is_file());
+}
+
+#[test]
+fn install_reports_all_package_resolution_errors() {
+    let repo = temporary_directory("pray-install-multi-error");
+    fs::write(
+        repo.join("Prayfile"),
+        r#"
+prayfile "1"
+target :tool_a do
+  output "INSTRUCTIONS.md"
+end
+agent "missing/one", "~> 1.0", path: "packages/one"
+agent "missing/two", "~> 1.0", path: "packages/two"
+render mode: :managed, conflict: :fail, churn: :minimal
+"#,
+    )
+    .expect("write Prayfile");
+
+    fs::create_dir_all(repo.join("packages/one")).expect("one directory");
+    fs::create_dir_all(repo.join("packages/two")).expect("two directory");
+
+    let install = run_pray(&repo, &["install"]);
+    assert!(!install.status.success());
+    assert_eq!(install.status.code(), Some(3));
+    let stderr = String::from_utf8_lossy(&install.stderr);
+    assert!(stderr.contains("missing/one:"));
+    assert!(stderr.contains("missing/two:"));
+    assert!(stderr.contains("no prayspec file found"));
 }
