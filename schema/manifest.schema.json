@@ -1,6 +1,6 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
-  "$id": "https://pray.dev/schema/manifest.schema.json",
+  "$id": "https://raw.githubusercontent.com/kiskolabs/pray/main/schema/manifest.schema.json",
   "title": "Pray canonical manifest",
   "description": "Language-neutral manifest model produced by compiling a Prayfile. Meaning is defined on this model, not on Prayfile formatting.",
   "type": "object",

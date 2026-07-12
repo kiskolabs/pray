@@ -1,6 +1,6 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
-  "$id": "https://pray.dev/schema/lockfile.schema.json",
+  "$id": "https://raw.githubusercontent.com/kiskolabs/pray/main/schema/lockfile.schema.json",
   "title": "Prayfile.lock",
   "description": "JSON representation of a Prayfile.lock document. On disk the format is TOML; serde maps the same field names and nesting.",
   "type": "object",
