@@ -1,6 +1,6 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
-  "$id": "https://pray.dev/schema/registry.schema.json",
+  "$id": "https://raw.githubusercontent.com/kiskolabs/pray/main/schema/registry.schema.json",
   "title": "Pray registry package metadata",
   "description": "JSON document served at registry package metadata endpoints.",
   "type": "object",

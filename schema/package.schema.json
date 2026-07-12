@@ -1,6 +1,6 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
-  "$id": "https://pray.dev/schema/package.schema.json",
+  "$id": "https://raw.githubusercontent.com/kiskolabs/pray/main/schema/package.schema.json",
   "title": "Pray package specification",
   "description": "Canonical JSON model for a parsed prayspec package declaration.",
   "type": "object",
