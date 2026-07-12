@@ -76,6 +76,54 @@ pub fn build_materialization_preview(
     })
 }
 
+pub fn materialization_preview_to_json(
+    preview: &MaterializationPreview,
+    mode: MaterializationMode,
+) -> serde_json::Value {
+    serde_json::json!({
+        "mode": mode.heading().to_lowercase(),
+        "packages": preview.package_lines,
+        "lockfile": lockfile_change_label(preview.lockfile),
+        "targets": preview
+            .targets
+            .iter()
+            .map(|(path, change)| {
+                serde_json::json!({
+                    "path": path,
+                    "change": target_change_label(*change),
+                })
+            })
+            .collect::<Vec<_>>(),
+        "provisioned": preview
+            .provisioned
+            .iter()
+            .map(|(path, change)| {
+                serde_json::json!({
+                    "path": path,
+                    "change": target_change_label(*change),
+                })
+            })
+            .collect::<Vec<_>>(),
+        "warnings": preview.warnings,
+    })
+}
+
+fn lockfile_change_label(change: LockfileChange) -> &'static str {
+    match change {
+        LockfileChange::Unchanged => "unchanged",
+        LockfileChange::Updated => "updated",
+        LockfileChange::Created => "created",
+    }
+}
+
+fn target_change_label(change: TargetChange) -> &'static str {
+    match change {
+        TargetChange::Unchanged => "unchanged",
+        TargetChange::Updated => "updated",
+        TargetChange::Written => "written",
+    }
+}
+
 pub fn print_materialization_report(
     preview: &MaterializationPreview,
     mode: MaterializationMode,

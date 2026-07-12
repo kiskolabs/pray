@@ -493,6 +493,7 @@ end
     assert!(stdout.contains("targets affected: tool_a"));
     assert!(stdout.contains("rendered files affected: INSTRUCTIONS.md"));
     assert!(stdout.contains("warnings: none"));
+    assert!(!stdout.contains("\"updated_packages\""));
     let lockfile = fs::read_to_string(repo.join("Prayfile.lock")).expect("lockfile exists");
     assert!(lockfile.contains("1.4.4"));
 
