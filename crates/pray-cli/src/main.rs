@@ -7,7 +7,8 @@ mod server_stdio;
 mod trust_command;
 
 use apply_report::{
-    build_materialization_preview, print_materialization_report, MaterializationMode,
+    build_materialization_preview, materialization_preview_to_json, print_materialization_report,
+    MaterializationMode, MaterializationPreview,
 };
 use auth_client::{
     current_signer as current_signer_from_session,
@@ -97,16 +98,25 @@ fn run(arguments: Vec<String>) -> PrayResult<()> {
             major,
             latest,
             dry_run,
-        } => update_command(package, major, latest, dry_run),
+            json,
+        } => update_command(package, major, latest, dry_run, json),
         Command::Unlock { package } => unlock_command(package),
         Command::Install {
             locked,
             frozen,
             offline,
-        } => install_command(locked, frozen, ResolveOptions {
-            offline,
-            ..ResolveOptions::default()
-        }),
+        } => {
+            install_command(
+                locked,
+                frozen,
+                ResolveOptions {
+                    offline,
+                    ..ResolveOptions::default()
+                },
+                false,
+            )?;
+            Ok(())
+        }
         Command::Plan { remote } => plan_command(remote),
         Command::Apply => apply_command(),
         Command::Render { check } => render_command(check),
@@ -187,6 +197,7 @@ enum Command {
         major: bool,
         latest: bool,
         dry_run: bool,
+        json: bool,
     },
     Unlock {
         package: String,
@@ -512,7 +523,8 @@ fn remove_command(name: String) -> PrayResult<()> {
         manifest_path,
         remove_manifest_statement(&manifest_text, &name),
     )?;
-    install_command(false, false, ResolveOptions::default())
+    install_command(false, false, ResolveOptions::default(), false)?;
+    Ok(())
 }
 
 fn update_command(
@@ -520,6 +532,7 @@ fn update_command(
     major: bool,
     latest: bool,
     dry_run: bool,
+    json: bool,
 ) -> PrayResult<()> {
     if major && latest {
         return Err(PrayError::Unsupported(
@@ -537,7 +550,7 @@ fn update_command(
                 "major updates are not supported with --dry-run".to_string(),
             ));
         }
-        return update_latest_command(package);
+        return update_latest_command(package, json);
     }
     if latest {
         if dry_run {
@@ -545,69 +558,17 @@ fn update_command(
                 "--latest is not supported with --dry-run".to_string(),
             ));
         }
-        return update_latest_command(package);
+        return update_latest_command(package, json);
     }
 
     if dry_run {
-        return preview_remote_updates(package.as_deref());
+        return preview_remote_updates(package.as_deref(), json);
     }
 
-    if let Some(package_name) = &package {
-        let manifest_text = fs::read_to_string(manifest_path())?;
-        let manifest = parse_manifest(&manifest_text)?;
-        if !manifest
-            .packages
-            .iter()
-            .any(|declaration| declaration.name == *package_name)
-        {
-            return Err(PrayError::Manifest(format!(
-                "package {package_name} not found"
-            )));
-        }
-    }
-
-    let previous_lockfile = read_lockfile(&lockfile_path()).ok();
-    let mut resolve_options = ResolveOptions {
-        refresh_source_revisions: true,
-        ..ResolveOptions::default()
-    };
-    if let Some(package_name) = &package {
-        resolve_options
-            .unlocked_packages
-            .insert(package_name.clone());
-    } else {
-        resolve_options.ignore_locked_versions = true;
-    }
-    install_command(false, false, resolve_options.clone())?;
-    let updated_lockfile = read_lockfile(&lockfile_path())?;
-    let refreshed_project =
-        resolve_project_with_options(&manifest_path(), &resolve_options)?;
-    let merged_lockfile = if let (Some(previous_lockfile), Some(package_name)) =
-        (previous_lockfile.as_ref(), package.as_deref())
-    {
-        merge_selected_package_update(previous_lockfile, &updated_lockfile, package_name)
-    } else {
-        updated_lockfile
-    };
-    if package.is_some() {
-        write_lockfile(&lockfile_path(), &merged_lockfile)?;
-    }
-    let update_reported = print_update_summary(
-        previous_lockfile.as_ref(),
-        &merged_lockfile,
-        package.as_deref(),
-        &refreshed_project,
-        "Update summary",
-    )?;
-    let _ = print_constraint_blocked_packages(
-        &refreshed_project,
-        "Update summary",
-        !update_reported,
-    )?;
-    Ok(())
+    update_command_with_manifest_constraints(package, json, Vec::new())
 }
 
-fn update_latest_command(package: Option<String>) -> PrayResult<()> {
+fn update_latest_command(package: Option<String>, json: bool) -> PrayResult<()> {
     let manifest_path = manifest_path();
     let manifest_text = fs::read_to_string(&manifest_path)?;
     let preview_options = constraint_preview_options();
@@ -663,19 +624,125 @@ fn update_latest_command(package: Option<String>) -> PrayResult<()> {
         ));
     }
 
+    let manifest_constraint_updates: Vec<serde_json::Value> = manifest_updates
+        .iter()
+        .map(
+            |(name, previous_constraint, new_constraint, registry_latest_version)| {
+                serde_json::json!({
+                    "name": name,
+                    "from_constraint": previous_constraint,
+                    "to_constraint": new_constraint,
+                    "registry_latest_version": registry_latest_version,
+                })
+            },
+        )
+        .collect();
+
     if manifest_updates.is_empty() {
+        if json {
+            let current_lockfile = read_lockfile(&lockfile_path()).unwrap_or_default();
+            print_update_json_report(
+                &manifest_constraint_updates,
+                None,
+                None,
+                &current_lockfile,
+                package.as_deref(),
+                &project,
+            )?;
+            return Ok(());
+        }
         println!("All package constraints already allow registry latest versions");
     } else {
-        for (name, previous_constraint, new_constraint, registry_latest_version) in &manifest_updates
-        {
-            println!(
-                "Prayfile: {name} constraint {previous_constraint} -> {new_constraint} (registry latest {registry_latest_version})"
-            );
+        if !json {
+            for (name, previous_constraint, new_constraint, registry_latest_version) in
+                &manifest_updates
+            {
+                println!(
+                    "Prayfile: {name} constraint {previous_constraint} -> {new_constraint} (registry latest {registry_latest_version})"
+                );
+            }
         }
         fs::write(&manifest_path, updated_text)?;
     }
 
-    update_command(package, false, false, false)
+    update_command_with_manifest_constraints(
+        package,
+        json,
+        manifest_constraint_updates,
+    )
+}
+
+fn update_command_with_manifest_constraints(
+    package: Option<String>,
+    json: bool,
+    manifest_constraint_updates: Vec<serde_json::Value>,
+) -> PrayResult<()> {
+    let manifest_path = manifest_path();
+    if let Some(package_name) = &package {
+        let manifest_text = fs::read_to_string(&manifest_path)?;
+        let manifest = parse_manifest(&manifest_text)?;
+        if !manifest
+            .packages
+            .iter()
+            .any(|declaration| declaration.name == *package_name)
+        {
+            return Err(PrayError::Manifest(format!(
+                "package {package_name} not found"
+            )));
+        }
+    }
+
+    let previous_lockfile = read_lockfile(&lockfile_path()).ok();
+    let mut resolve_options = ResolveOptions {
+        refresh_source_revisions: true,
+        ..ResolveOptions::default()
+    };
+    if let Some(package_name) = &package {
+        resolve_options
+            .unlocked_packages
+            .insert(package_name.clone());
+    } else {
+        resolve_options.ignore_locked_versions = true;
+    }
+    let install_preview =
+        install_command(false, false, resolve_options.clone(), json)?;
+    let updated_lockfile = read_lockfile(&lockfile_path())?;
+    let refreshed_project =
+        resolve_project_with_options(&manifest_path, &resolve_options)?;
+    let merged_lockfile = if let (Some(previous_lockfile), Some(package_name)) =
+        (previous_lockfile.as_ref(), package.as_deref())
+    {
+        merge_selected_package_update(previous_lockfile, &updated_lockfile, package_name)
+    } else {
+        updated_lockfile
+    };
+    if package.is_some() {
+        write_lockfile(&lockfile_path(), &merged_lockfile)?;
+    }
+    if json {
+        print_update_json_report(
+            &manifest_constraint_updates,
+            install_preview.as_ref(),
+            previous_lockfile.as_ref(),
+            &merged_lockfile,
+            package.as_deref(),
+            &refreshed_project,
+        )?;
+        return Ok(());
+    }
+    let update_reported = print_update_summary(
+        previous_lockfile.as_ref(),
+        &merged_lockfile,
+        package.as_deref(),
+        &refreshed_project,
+        "Update summary",
+    )?;
+    let _ = print_constraint_blocked_packages(
+        &refreshed_project,
+        "Update summary",
+        !update_reported,
+    )?;
+    Ok(())
 }
 
 fn unlock_command(package: String) -> PrayResult<()> {
@@ -809,11 +876,13 @@ fn parse_update_command(arguments: std::vec::IntoIter<String>) -> PrayResult<Com
     let mut major = false;
     let mut latest = false;
     let mut dry_run = false;
+    let mut json = false;
     for argument in arguments {
         match argument.as_str() {
             "--major" => major = true,
             "--latest" => latest = true,
             "--dry-run" => dry_run = true,
+            "--json" => json = true,
             other if other.starts_with("--") => {
                 return Err(PrayError::Unsupported(format!(
                     "unknown update flag: {other}"
@@ -835,6 +904,7 @@ fn parse_update_command(arguments: std::vec::IntoIter<String>) -> PrayResult<Com
         major,
         latest,
         dry_run,
+        json,
     })
 }
 
@@ -884,7 +954,12 @@ fn remote_preview_options() -> ResolveOptions {
     }
 }
 
-fn preview_remote_updates(selected_package: Option<&str>) -> PrayResult<()> {
+fn preview_remote_updates(selected_package: Option<&str>, json: bool) -> PrayResult<()> {
+    if json {
+        return Err(PrayError::Unsupported(
+            "--json is not supported with --dry-run".to_string(),
+        ));
+    }
     let previous_lockfile = read_lockfile(&lockfile_path()).ok();
     let project = resolve_project_with_options(&manifest_path(), &remote_preview_options())?;
     let rendered = render_project(&project)?;
@@ -1242,17 +1317,25 @@ fn install_command(
     locked: bool,
     frozen: bool,
     resolve_options: ResolveOptions,
-) -> PrayResult<()> {
+    silent_report: bool,
+) -> PrayResult<Option<MaterializationPreview>> {
     let report_mode = if locked {
         None
     } else {
         Some(MaterializationMode::Install)
     };
-    materialize_command(locked, frozen, report_mode, resolve_options)
+    materialize_command(locked, frozen, report_mode, resolve_options, silent_report)
 }
 
 fn apply_command() -> PrayResult<()> {
-    materialize_command(false, false, Some(MaterializationMode::Apply), ResolveOptions::default())
+    materialize_command(
+        false,
+        false,
+        Some(MaterializationMode::Apply),
+        ResolveOptions::default(),
+        false,
+    )?;
+    Ok(())
 }
 
 fn materialize_command(
@@ -1260,7 +1343,8 @@ fn materialize_command(
     frozen: bool,
     report_mode: Option<MaterializationMode>,
     resolve_options: ResolveOptions,
-) -> PrayResult<()> {
+    silent_report: bool,
+) -> PrayResult<Option<MaterializationPreview>> {
     let project = resolve_project_with_options(&manifest_path(), &resolve_options)?;
     let rendered = render_project(&project)?;
     let lockfile_path = lockfile_path();
@@ -1269,10 +1353,10 @@ fn materialize_command(
         ensure_lockfile_current(&project, &rendered, &lockfile)?;
         if frozen {
             ensure_rendered_outputs_current(&project, &rendered)?;
-            return Ok(());
+            return Ok(None);
         }
         write_rendered_targets(&project, &rendered)?;
-        return Ok(());
+        return Ok(None);
     }
 
     let lockfile = build_lockfile(&project, &rendered)?;
@@ -1290,10 +1374,12 @@ fn materialize_command(
     };
     write_lockfile_if_changed(&lockfile_path, &lockfile)?;
     write_rendered_targets(&project, &rendered)?;
-    if let (Some(preview), Some(mode)) = (preview, report_mode) {
-        print_materialization_report(&preview, mode);
+    if !silent_report {
+        if let (Some(preview), Some(mode)) = (&preview, report_mode) {
+            print_materialization_report(preview, mode);
+        }
     }
-    Ok(())
+    Ok(preview)
 }
 
 fn plan_command(remote: bool) -> PrayResult<()> {
@@ -1359,7 +1445,7 @@ fn list_command() -> PrayResult<()> {
 
 fn outdated_command(remote: bool) -> PrayResult<()> {
     if remote {
-        return preview_remote_updates(None);
+        return preview_remote_updates(None, false);
     }
 
     let previous_lockfile = read_lockfile(&lockfile_path()).ok();
@@ -2909,6 +2995,33 @@ fn merge_selected_package_update(
     merged
 }
 
+fn constraint_blocked_packages_json(project: &ResolvedProject) -> PrayResult<Vec<serde_json::Value>> {
+    let mut packages = Vec::new();
+    for package in &project.packages {
+        let Some(registry_latest_version) = &package.registry_latest_version else {
+            continue;
+        };
+        if registry_latest_version == &package.spec.version {
+            continue;
+        }
+        if version_is_greater_than(registry_latest_version, &package.spec.version)? {
+            packages.push(serde_json::json!({
+                "name": package.declaration.name,
+                "resolved_version": package.spec.version,
+                "registry_latest_version": registry_latest_version,
+                "constraint": package.declaration.constraint,
+            }));
+        }
+    }
+    packages.sort_by(|left, right| {
+        left["name"]
+            .as_str()
+            .unwrap_or_default()
+            .cmp(right["name"].as_str().unwrap_or_default())
+    });
+    Ok(packages)
+}
+
 fn constraint_blocked_package_lines(project: &ResolvedProject) -> PrayResult<Vec<String>> {
     let mut lines = Vec::new();
     for package in &project.packages {
@@ -2957,6 +3070,66 @@ fn print_update_summary(
     project: &pray_core::resolve::ResolvedProject,
     title: &str,
 ) -> PrayResult<bool> {
+    let report = build_update_summary(previous, updated, selected_package, project)?;
+    if report.lines.is_empty() {
+        return Ok(false);
+    }
+
+    println!("{title}");
+    for line in report.lines {
+        println!("{line}");
+    }
+    Ok(true)
+}
+
+fn print_update_json_report(
+    manifest_constraint_updates: &[serde_json::Value],
+    install_preview: Option<&MaterializationPreview>,
+    previous: Option<&Lockfile>,
+    updated: &Lockfile,
+    selected_package: Option<&str>,
+    project: &ResolvedProject,
+) -> PrayResult<()> {
+    let summary = build_update_summary(previous, updated, selected_package, project)?;
+    let constraint_blocked_packages = constraint_blocked_packages_json(project)?;
+    let status = if manifest_constraint_updates.is_empty()
+        && summary.updated_packages.is_empty()
+        && install_preview.is_none()
+        && constraint_blocked_packages.is_empty()
+    {
+        "up_to_date"
+    } else {
+        "updated"
+    };
+    let mut output = serde_json::json!({
+        "status": status,
+        "manifest_constraint_updates": manifest_constraint_updates,
+        "updated_packages": summary.updated_packages,
+        "constraint_blocked_packages": constraint_blocked_packages,
+    });
+    if let Some(preview) = install_preview {
+        output["install"] =
+            materialization_preview_to_json(preview, MaterializationMode::Install);
+    }
+    println!(
+        "{}",
+        serde_json::to_string_pretty(&output)
+            .map_err(|error| PrayError::Manifest(error.to_string()))?
+    );
+    Ok(())
+}
+
+struct UpdateSummaryReport {
+    lines: Vec<String>,
+    updated_packages: Vec<serde_json::Value>,
+}
+
+fn build_update_summary(
+    previous: Option<&Lockfile>,
+    updated: &Lockfile,
+    selected_package: Option<&str>,
+    project: &pray_core::resolve::ResolvedProject,
+) -> PrayResult<UpdateSummaryReport> {
     let previous_packages: std::collections::BTreeMap<&str, &LockedPackage> = previous
         .into_iter()
         .flat_map(|lockfile| lockfile.package.iter())
@@ -3092,22 +3265,10 @@ fn print_update_summary(
         }));
     }
 
-    if lines.is_empty() {
-        return Ok(false);
-    }
-
-    println!("{title}");
-    for line in lines {
-        println!("{line}");
-    }
-    println!(
-        "{}",
-        serde_json::to_string_pretty(&serde_json::json!({
-            "updated_packages": structured_updates,
-        }))
-        .map_err(|error| PrayError::Manifest(error.to_string()))?
-    );
-    Ok(true)
+    Ok(UpdateSummaryReport {
+        lines,
+        updated_packages: structured_updates,
+    })
 }
 
 fn package_dependents(
@@ -3284,7 +3445,7 @@ fn print_help() {
     println!("  repo init");
     println!("  add <name> [constraint] [--path PATH]");
     println!("  remove <name>");
-    println!("  update [package] [--major] [--latest] [--dry-run]");
+    println!("  update [package] [--major] [--latest] [--dry-run] [--json]");
     println!("  unlock <package>");
     println!("  install [--locked|--frozen|--offline]");
     println!("  render [--check]");

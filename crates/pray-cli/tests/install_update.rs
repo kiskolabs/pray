@@ -151,17 +151,20 @@ end
     )
     .expect("rewrite common prayspec");
 
-    let update = run_pray(&repo, &["update", "sample/common"]);
+    let update = run_pray(&repo, &["update", "--json", "sample/common"]);
     assert!(
         update.status.success(),
         "update failed: {}",
         String::from_utf8_lossy(&update.stderr)
     );
     let stdout = String::from_utf8_lossy(&update.stdout);
-    assert!(stdout.contains("sample/common 1.0.0 -> 1.1.0"));
-    assert!(stdout.contains("dependent packages affected: sample/base"));
     assert!(stdout.contains("\"updated_packages\""));
     assert!(stdout.contains("\"dependent_packages_affected\""));
+    assert!(stdout.contains("sample/common"));
+    assert!(stdout.contains("1.0.0"));
+    assert!(stdout.contains("1.1.0"));
+    assert!(!stdout.contains("Update summary"));
+    assert!(!stdout.contains("Installing"));
 
     let lockfile = fs::read_to_string(repo.join("Prayfile.lock")).expect("lockfile exists");
     assert!(lockfile.contains("sample/common"));
