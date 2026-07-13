@@ -8,14 +8,51 @@ It lets projects declare shared instructions, policies, memories, templates, rev
 
 The goal is simple: treat pre-inference input as a dependency.
 
-**Status:** Active development toward a production-ready v0.1 release.
 The specification and the `pray` reference CLI evolve together. `SPEC.md` defines the current contracts.
+
+**Website:** [pray.kisko.dev](https://pray.kisko.dev)
 
 ## Install `pray`
 
 The canonical GitHub repository is `kiskolabs/pray`.
 
-Install the reference CLI as a system-wide binary with Cargo:
+### npm (Node.js)
+
+Install the TypeScript reference CLI from npm:
+
+```sh
+npm install -g pray-cli
+```
+
+Or run without a global install:
+
+```sh
+npx pray-cli install
+```
+
+The npm package lives in `npmjs/pray-cli` and implements Prayfile parsing, registry and git resolution, lockfile generation, rendering, verification, publish, and serve.
+
+### RubyGems (Ruby)
+
+Install the Ruby reference CLI:
+
+```sh
+gem install pray-cli
+```
+
+Or from this repository:
+
+```sh
+cd rubygems/pray-cli
+bundle install
+bundle exec pray version
+```
+
+The gem lives in `rubygems/pray-cli` and provides the same core workflow: parse `Prayfile`, resolve local and registry packages, write `Prayfile.lock`, render targets, and verify drift.
+
+### Cargo (Rust)
+
+Install the Rust reference CLI as a system-wide binary with Cargo:
 
 ```sh
 cargo install --git https://github.com/kiskolabs/pray --locked pray
