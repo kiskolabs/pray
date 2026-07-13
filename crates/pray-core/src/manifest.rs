@@ -6,6 +6,9 @@ use crate::{PrayError, PrayResult};
 use serde::{Deserialize, Serialize};
 use std::borrow::Cow;
 use std::collections::BTreeMap;
+use std::fs;
+use std::io;
+use std::path::Path;
 
 #[derive(Debug, Clone, Default, Serialize, Deserialize, PartialEq)]
 pub struct Manifest {
@@ -114,6 +117,19 @@ impl Manifest {
             .map_err(|error| PrayError::Manifest(error.to_string()))?;
         Ok(sha256_prefixed(&bytes))
     }
+}
+
+pub fn read_manifest_text(manifest_path: &Path) -> PrayResult<String> {
+    fs::read_to_string(manifest_path).map_err(|error| {
+        if error.kind() == io::ErrorKind::NotFound {
+            PrayError::Manifest(format!(
+                "missing {}; run pray init to create one",
+                manifest_path.display()
+            ))
+        } else {
+            PrayError::Io(error)
+        }
+    })
 }
 
 pub fn parse_manifest(text: &str) -> PrayResult<Manifest> {

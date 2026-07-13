@@ -6,6 +6,18 @@ use std::fs;
 use support::{create_add_fixture, create_tree_fixture, run_pray, temporary_directory};
 
 #[test]
+fn update_reports_missing_prayfile_with_recovery_guidance() {
+    let repo = temporary_directory("pray-update-missing-prayfile");
+
+    let update = run_pray(&repo, &["update"]);
+    assert!(!update.status.success());
+    assert_eq!(update.status.code(), Some(1));
+    let stderr = String::from_utf8_lossy(&update.stderr);
+    assert!(stderr.contains("manifest error: missing Prayfile"));
+    assert!(stderr.contains("pray init"));
+}
+
+#[test]
 fn update_rejects_unknown_package_selection() {
     let repo = temporary_directory("pray-update-unknown");
     create_add_fixture(&repo);

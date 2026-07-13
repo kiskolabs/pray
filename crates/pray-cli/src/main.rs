@@ -24,7 +24,7 @@ use pray_core::lockfile::{
     lockfiles_equivalent, read_lockfile, write_lockfile, write_lockfile_if_changed, LockedPackage,
     Lockfile,
 };
-use pray_core::manifest::{parse_manifest, replace_package_declaration};
+use pray_core::manifest::{parse_manifest, read_manifest_text, replace_package_declaration};
 use pray_core::registry::{
     registry_artifact_signature, registry_package_signing_identity, submit_confession,
     upload_registry_artifact, version_is_greater_than, ConfessionSubmission, RegistryIndex,
@@ -484,7 +484,7 @@ fn repo_distribution_root(root: &Path) -> PathBuf {
 
 fn add_command(name: String, constraint: Option<String>, path: Option<String>) -> PrayResult<()> {
     let manifest_path = manifest_path();
-    let manifest_text = fs::read_to_string(&manifest_path)?;
+    let manifest_text = read_manifest_text(&manifest_path)?;
     let manifest = parse_manifest(&manifest_text)?;
     if manifest.packages.iter().any(|package| package.name == name) {
         return Err(PrayError::Manifest(format!(
@@ -513,7 +513,7 @@ fn add_command(name: String, constraint: Option<String>, path: Option<String>) -
 
 fn remove_command(name: String) -> PrayResult<()> {
     let manifest_path = manifest_path();
-    let manifest_text = fs::read_to_string(&manifest_path)?;
+    let manifest_text = read_manifest_text(&manifest_path)?;
     let manifest = parse_manifest(&manifest_text)?;
     if !manifest.packages.iter().any(|package| package.name == name) {
         return Err(PrayError::Manifest(format!("package {name} not found")));
@@ -570,7 +570,7 @@ fn update_command(
 
 fn update_latest_command(package: Option<String>, json: bool) -> PrayResult<()> {
     let manifest_path = manifest_path();
-    let manifest_text = fs::read_to_string(&manifest_path)?;
+    let manifest_text = read_manifest_text(&manifest_path)?;
     let preview_options = constraint_preview_options();
     let project = resolve_project_with_options(&manifest_path, &preview_options)?;
 
@@ -679,7 +679,7 @@ fn update_command_with_manifest_constraints(
 ) -> PrayResult<()> {
     let manifest_path = manifest_path();
     if let Some(package_name) = &package {
-        let manifest_text = fs::read_to_string(&manifest_path)?;
+        let manifest_text = read_manifest_text(&manifest_path)?;
         let manifest = parse_manifest(&manifest_text)?;
         if !manifest
             .packages
@@ -2839,7 +2839,7 @@ fn build_lockfile(
 }
 
 fn load_manifest() -> PrayResult<pray_core::manifest::Manifest> {
-    let text = fs::read_to_string(manifest_path())?;
+    let text = read_manifest_text(&manifest_path())?;
     parse_manifest(&text)
 }
 

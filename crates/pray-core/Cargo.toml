@@ -1,8 +1,12 @@
 [package]
 name = "pray-core"
-version = "0.1.0"
-edition = "2021"
-license = "MIT"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+authors.workspace = true
+repository.workspace = true
+homepage.workspace = true
+description = "Core library for Prayfile parsing, resolution, lockfiles, and registry artifacts"
 
 [dependencies]
 serde = { version = "1", features = ["derive"] }
