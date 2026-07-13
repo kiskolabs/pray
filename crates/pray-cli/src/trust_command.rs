@@ -284,8 +284,8 @@ fn trust_check_command(mut arguments: std::vec::IntoIter<String>) -> PrayResult<
 fn fetch_compromised_feed(source: Option<&str>) -> PrayResult<(String, String)> {
     let url = source.unwrap_or(DEFAULT_COMPROMISED_KEYS_SOURCE);
     if url.starts_with("http://") || url.starts_with("https://") {
-        let response = ureq::get(url)
-            .set(
+        let mut response = ureq::get(url)
+            .header(
                 "User-Agent",
                 concat!(env!("CARGO_PKG_NAME"), "/", env!("CARGO_PKG_VERSION")),
             )
@@ -294,10 +294,14 @@ fn fetch_compromised_feed(source: Option<&str>) -> PrayResult<(String, String)> 
                 PrayError::Unsupported(format!("HTTP request failed for {url}: {error}"))
             })?;
         let status = response.status();
-        let body = response.into_string().unwrap_or_default();
-        if !(200..300).contains(&status) {
+        let body = response
+            .body_mut()
+            .read_to_string()
+            .unwrap_or_default();
+        if !status.is_success() {
             return Err(PrayError::Unsupported(format!(
-                "compromised-key source returned HTTP {status}"
+                "compromised-key source returned HTTP {}",
+                status.as_u16()
             )));
         }
         return Ok((url.to_string(), body));
