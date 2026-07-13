@@ -86,7 +86,7 @@ pub fn resolve_project_with_options(
     let project_root = canonical_project_root(manifest_path)?;
     let lockfile_path = project_root.join("Prayfile.lock");
     let lockfile_hints = crate::lockfile::read_lockfile(&lockfile_path).ok();
-    let manifest_text = fs::read_to_string(manifest_path)?;
+    let manifest_text = crate::manifest::read_manifest_text(manifest_path)?;
     let manifest = crate::manifest::parse_manifest(&manifest_text)?;
     let manifest_hash = manifest.manifest_hash()?;
     let sources = source_map(&manifest.sources);
@@ -492,7 +492,7 @@ fn resolve_git_package_root(
 
 pub fn refresh_git_sources(manifest_path: &Path) -> PrayResult<()> {
     let project_root = canonical_project_root(manifest_path)?;
-    let manifest_text = fs::read_to_string(manifest_path)?;
+    let manifest_text = crate::manifest::read_manifest_text(manifest_path)?;
     let manifest = crate::manifest::parse_manifest(&manifest_text)?;
     for source in &manifest.sources {
         if source.kind != "git" {
