@@ -1,0 +1,48 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+jobs:
+  rust:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+      - name: Run Rust tests
+        run: cargo test --workspace
+
+  ruby:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: ruby/setup-ruby@v1
+        with:
+          ruby-version: "3.3"
+          bundler-cache: true
+          working-directory: rubygems/pray-cli
+      - name: Install archive tools
+        run: sudo apt-get update && sudo apt-get install -y zstd
+      - name: Run Ruby tests
+        working-directory: rubygems/pray-cli
+        run: bundle exec rspec
+
+  npm:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+          cache: npm
+          cache-dependency-path: npmjs/pray-cli/package-lock.json
+      - name: Install archive tools
+        run: sudo apt-get update && sudo apt-get install -y zstd
+      - name: Run npm tests
+        working-directory: npmjs/pray-cli
+        run: npm test
+      - name: Run npm lint
+        working-directory: npmjs/pray-cli
+        run: npm run lint
