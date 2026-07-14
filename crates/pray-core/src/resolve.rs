@@ -22,6 +22,7 @@ pub struct ResolvedProject {
     pub local_files: Vec<ResolvedLocalFile>,
     pub source_revisions: BTreeMap<String, String>,
     pub source_host_keys: BTreeMap<String, String>,
+    pub environment: Option<String>,
 }
 
 #[derive(Debug, Clone)]
@@ -78,20 +79,56 @@ pub fn resolve_project(manifest_path: &Path) -> PrayResult<ResolvedProject> {
     resolve_project_with_options(manifest_path, &ResolveOptions::default())
 }
 
+pub fn resolve_project_with_git_refresh_fallback(
+    manifest_path: &Path,
+    options: &ResolveOptions,
+    allow_git_refresh_fallback: bool,
+) -> PrayResult<ResolvedProject> {
+    match resolve_project_with_options(manifest_path, options) {
+        Ok(project) => Ok(project),
+        Err(PrayError::Resolution(message))
+            if allow_git_refresh_fallback
+                && !options.offline
+                && !options.refresh_source_revisions
+                && resolution_may_benefit_from_git_source_refresh(&message) =>
+        {
+            let refreshed_options = ResolveOptions {
+                refresh_source_revisions: true,
+                ..options.clone()
+            };
+            resolve_project_with_options(manifest_path, &refreshed_options)
+        }
+        Err(error) => Err(error),
+    }
+}
+
+fn resolution_may_benefit_from_git_source_refresh(message: &str) -> bool {
+    message.contains("no registry version")
+}
+
 pub fn resolve_project_with_options(
     manifest_path: &Path,
     options: &ResolveOptions,
 ) -> PrayResult<ResolvedProject> {
-    let user_config = crate::config::load_user_config()?;
     let project_root = canonical_project_root(manifest_path)?;
+    resolve_project_in_context(manifest_path, &project_root, options)
+}
+
+pub fn resolve_project_in_context(
+    manifest_path: &Path,
+    project_root: &Path,
+    options: &ResolveOptions,
+) -> PrayResult<ResolvedProject> {
+    let user_config = crate::config::load_user_config()?;
     let lockfile_path = project_root.join("Prayfile.lock");
     let lockfile_hints = crate::lockfile::read_lockfile(&lockfile_path).ok();
     let manifest_text = crate::manifest::read_manifest_text(manifest_path)?;
     let manifest = crate::manifest::parse_manifest(&manifest_text)?;
+    crate::environment::validate_environment(&manifest, options.environment.as_deref())?;
     let manifest_hash = manifest.manifest_hash()?;
     let sources = source_map(&manifest.sources);
     let git_sources = prepare_git_sources(
-        &project_root,
+        project_root,
         &manifest.sources,
         lockfile_hints.as_ref(),
         options,
@@ -102,7 +139,7 @@ pub fn resolve_project_with_options(
     let mut resolution_errors = Vec::new();
     for declaration in &manifest.packages {
         match resolve_package(
-            &project_root,
+            project_root,
             &sources,
             &git_sources,
             &user_config,
@@ -119,10 +156,7 @@ pub fn resolve_project_with_options(
                 }
                 packages.push(package);
             }
-            Err(error) => resolution_errors.push(format!(
-                "{}: {error}",
-                declaration.name
-            )),
+            Err(error) => resolution_errors.push(format!("{}: {error}", declaration.name)),
         }
     }
     if !resolution_errors.is_empty() {
@@ -131,7 +165,7 @@ pub fn resolve_project_with_options(
     let mut local_files = Vec::new();
     let mut local_errors = Vec::new();
     for local in &manifest.local {
-        match resolve_local_file(&project_root, local) {
+        match resolve_local_file(project_root, local) {
             Ok(resolved) => local_files.push(resolved),
             Err(error) => local_errors.push(format!("local {}: {error}", local.path)),
         }
@@ -141,7 +175,7 @@ pub fn resolve_project_with_options(
     }
     Ok(ResolvedProject {
         manifest_path: manifest_path.to_path_buf(),
-        project_root,
+        project_root: project_root.to_path_buf(),
         manifest,
         manifest_hash,
         packages,
@@ -157,6 +191,7 @@ pub fn resolve_project_with_options(
             })
             .collect(),
         source_host_keys,
+        environment: options.environment.clone(),
     })
 }
 
@@ -167,9 +202,7 @@ struct GitSourceCheckout {
     subdir: Option<String>,
 }
 
-fn prepare_pray_ssh_host_keys(
-    sources: &[ManifestSource],
-) -> PrayResult<BTreeMap<String, String>> {
+fn prepare_pray_ssh_host_keys(sources: &[ManifestSource]) -> PrayResult<BTreeMap<String, String>> {
     use crate::client_trust::{effective_trust_home, gate_pray_ssh_host};
     use crate::ssh_client::parse_pray_ssh_url;
 
@@ -273,10 +306,7 @@ fn pinned_revision_for_source(
     if source.kind != "git" {
         return None;
     }
-    source
-        .rev
-        .clone()
-        .or_else(|| source.tag.clone())
+    source.rev.clone().or_else(|| source.tag.clone())
 }
 
 fn resolve_package(
@@ -375,8 +405,7 @@ fn resolve_package_root(
         let source = sources
             .get(source_name)
             .ok_or_else(|| PrayError::Resolution(format!("unknown source: {source_name}")))?;
-        let context =
-            PackageResolutionContext::from_lockfile(lockfile, &declaration.name, options);
+        let context = PackageResolutionContext::from_lockfile(lockfile, &declaration.name, options);
         if let Some(local_path) = user_config.local.source.get(source_name) {
             let source_root = project_root.join(local_path);
             let resolved = resolve_local_registry_package_root(
@@ -401,12 +430,8 @@ fn resolve_package_root(
             });
         }
         if source.kind == "registry" || source.kind == "static index" || source.kind == "pray_ssh" {
-            let resolved = resolve_registry_package_root(
-                project_root,
-                &source.url,
-                declaration,
-                &context,
-            )?;
+            let resolved =
+                resolve_registry_package_root(project_root, &source.url, declaration, &context)?;
             return Ok(PackageRootResolution {
                 root: resolved.root,
                 signer_fingerprint: resolved.signer_fingerprint,

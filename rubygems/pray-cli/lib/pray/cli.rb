@@ -3,7 +3,10 @@
 require "fileutils"
 require "set"
 
+require_relative "invocation"
 require_relative "cli/parse"
+require_relative "cli/help"
+require_relative "cli/suggest"
 require_relative "cli/helpers"
 require_relative "cli/commands/init"
 require_relative "cli/commands/workflow"
@@ -18,8 +21,52 @@ module Pray
     LOCKFILE_PATH = "Prayfile.lock"
 
     def run(arguments)
+      arguments = arguments.dup
+      if arguments.delete("--no-input")
+        ENV["PRAY_NO_INPUT"] = "1"
+      end
+      arguments = Invocation.initialize(arguments)
+      return if maybe_print_help(arguments)
+
       command = parse_command(arguments)
       dispatch(command)
+    end
+
+    def maybe_print_help(arguments)
+      if arguments.empty?
+        Help.print_concise_help
+        return true
+      end
+
+      if arguments.length == 1 && %w[help -h --help].include?(arguments[0])
+        Help.print_concise_help
+        return true
+      end
+
+      if arguments[0] == "help"
+        target = arguments[1] || ""
+        if target.empty? || %w[-h --help].include?(target)
+          Help.print_concise_help
+          return true
+        end
+        return true if Help.print_command_help(target)
+
+        raise Error.usage(Suggest.unknown_command_message(target))
+      end
+
+      help_position = arguments.index { |argument| %w[--help -h].include?(argument) }
+      if help_position
+        if help_position.zero?
+          Help.print_concise_help
+          return true
+        end
+        command = arguments[0]
+        return true if Help.print_command_help(command)
+
+        raise Error.usage("unknown command: #{command}")
+      end
+
+      false
     end
 
     def dispatch(command)
@@ -52,7 +99,6 @@ module Pray
       in [:trust_list] then trust_list_command
       in [:trust_show, source_url] then trust_show_command(source_url)
       in [:version] then version_command
-      in [:help] then help_command
       end
     end
 

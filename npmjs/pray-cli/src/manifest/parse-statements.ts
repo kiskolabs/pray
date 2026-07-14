@@ -104,11 +104,20 @@ export function parseTargetHeader(rest: string): {
   };
 }
 
-export function parseGroupHeader(rest: string): { name: string; isBlock: boolean } {
+export function parseGroupHeader(rest: string): {
+  groups: string[];
+  isBlock: boolean;
+} {
   const isBlock = rest.trimEnd().endsWith("do");
   const header = isBlock ? rest.trimEnd().slice(0, -2).trim() : rest.trim();
   const { values } = parseCall(header);
-  return { name: requirePositionalString(values, 0, PARSE_CONTEXT), isBlock };
+  if (values.length === 0) {
+    throw PrayError.parse(PARSE_CONTEXT, "group missing name");
+  }
+  return {
+    groups: values.map((value) => stringFromValue(value, PARSE_CONTEXT)),
+    isBlock,
+  };
 }
 
 export function parsePackageDecl(rest: string): ManifestPackage {
@@ -131,6 +140,7 @@ export function parsePackageDecl(rest: string): ManifestPackage {
     exports: keywordArray(keywords, "exports"),
     targets: keywordArray(keywords, "targets"),
     features: keywordArray(keywords, "features"),
+    groups: [],
     optional: keywords.has("optional")
       ? literalAsBool(keywordValue(keywords, "optional", PARSE_CONTEXT)) ?? false
       : false,

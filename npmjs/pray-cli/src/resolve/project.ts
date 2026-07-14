@@ -1,7 +1,9 @@
 import { existsSync, readFileSync } from "node:fs";
 import { join, resolve } from "node:path";
 import { versionSatisfies } from "../constraint.js";
+import { validateEnvironment } from "../environment.js";
 import { PrayError } from "../errors.js";
+import { activeInvocationContext } from "../project-context/runtime.js";
 import { normalizeLineEndings } from "../hashing.js";
 import { prepareGitSources } from "../git/sources.js";
 import { readLockfile } from "../lockfile/index.js";
@@ -43,6 +45,9 @@ export async function resolveProject(
     ? readLockfile(lockfilePath)
     : undefined;
   const manifest = parseManifest(readManifestText(manifestPath));
+  const environment =
+    options.environment ?? activeInvocationContext()?.environment;
+  validateEnvironment(manifest, environment);
   const manifestHashValue = manifestHash(manifest);
   const sources = sourceMap(manifest.sources);
   const gitSources = prepareGitSources(
@@ -112,7 +117,39 @@ export async function resolveProject(
     localFiles,
     sourceRevisions,
     sourceHostKeys: new Map(),
+    ...(environment ? { environment } : {}),
   };
+}
+
+export async function resolveProjectWithGitRefreshFallback(
+  manifestPath: string,
+  options: ResolveOptions = defaultResolveOptions(),
+  allowGitRefreshFallback = false,
+): Promise<ResolvedProject> {
+  try {
+    return await resolveProject(manifestPath, options);
+  } catch (error) {
+    if (
+      allowGitRefreshFallback &&
+      !options.offline &&
+      !options.refreshSourceRevisions &&
+      resolutionMayBenefitFromGitSourceRefresh(error)
+    ) {
+      return resolveProject(manifestPath, {
+        ...options,
+        refreshSourceRevisions: true,
+      });
+    }
+    throw error;
+  }
+}
+
+function resolutionMayBenefitFromGitSourceRefresh(error: unknown): boolean {
+  return (
+    error instanceof PrayError &&
+    error.kind === "resolution" &&
+    error.message.includes("no registry version")
+  );
 }
 
 function canonicalProjectRoot(manifestPath: string): string {

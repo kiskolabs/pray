@@ -261,7 +261,10 @@ fn installs_prayer_package_into_a_managed_skill_path() {
     );
 
     let materialized_skill = repo.join(".agents/skills/prayer-publisher/SKILL.md");
-    assert!(materialized_skill.is_file(), "materialized skill file missing");
+    assert!(
+        materialized_skill.is_file(),
+        "materialized skill file missing"
+    );
 
     let skill_text = fs::read_to_string(&materialized_skill).expect("materialized skill text");
     assert!(skill_text.contains("Prayer Publisher"));

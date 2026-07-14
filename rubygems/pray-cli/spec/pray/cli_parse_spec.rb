@@ -4,8 +4,9 @@ require "spec_helper"
 
 RSpec.describe Pray::CLI do
   describe ".parse_command" do
-    it "defaults to help when no command is given" do
-      expect(described_class.parse_command([])).to eq([:help])
+    it "requires a command when none is given" do
+      expect { described_class.parse_command([]) }
+        .to raise_error(Pray::Error, /pray requires a command/)
     end
 
     it "parses install flags" do
@@ -26,9 +27,9 @@ RSpec.describe Pray::CLI do
       )
     end
 
-    it "rejects unknown commands" do
+    it "rejects unknown commands with usage errors" do
       expect { described_class.parse_command(["not-a-command"]) }
-        .to raise_error(Pray::Error, /unknown command/)
+        .to raise_error(Pray::Error, /usage error:.*unknown command/)
     end
 
     it "parses trust subcommands" do

@@ -12,7 +12,7 @@ module Pray
 
     def exit_code
       case category
-      when :parse then 2
+      when :parse, :usage then 2
       when :manifest, :io then 1
       when :resolution then 3
       when :integrity then 4
@@ -26,6 +26,7 @@ module Pray
     def to_s
       prefix = case category
                when :parse then "#{@parse_kind} parse error"
+               when :usage then "usage error"
                when :manifest then "manifest error"
                when :resolution then "resolution error"
                when :integrity then "integrity error"
@@ -48,6 +49,7 @@ module Pray
     def self.render(message) = new(:render, message)
     def self.verify(message) = new(:verify, message)
     def self.unsupported(message) = new(:unsupported, message)
+    def self.usage(message) = new(:usage, message)
     def self.io(error) = new(:io, error.message)
   end
 end

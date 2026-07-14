@@ -14,8 +14,9 @@ module Pray
         "spec = #{format_string(lockfile.spec)}",
         "generated_by = #{format_string(lockfile.generated_by)}",
         "manifest_hash = #{format_string(lockfile.manifest_hash)}",
-        ""
       ]
+      lines << "environment = #{format_string(lockfile.environment)}" if lockfile.environment
+      lines << ""
 
       lockfile.source.each { |entry| append_section(lines, format_source(entry)) }
       lockfile.package.each { |entry| append_section(lines, format_package(entry)) }

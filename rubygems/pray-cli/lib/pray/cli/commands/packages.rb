@@ -34,7 +34,7 @@ module Pray
     end
 
     def list_command
-      project = Resolve.resolve_project(manifest_path)
+      project = resolve_current_project
       lines = ["Package list"]
       project.packages.each do |package|
         lines << "#{package.declaration.name} #{package.spec.version} source=#{package_source_summary(package)} exports=#{format_list(package.selected_exports)}"
@@ -43,7 +43,7 @@ module Pray
     end
 
     def tree_command
-      project = Resolve.resolve_project(manifest_path)
+      project = resolve_current_project
       package_map = project.packages.to_h { |package| [package.declaration.name, package] }
       lines = ["Dependency tree"]
       project.packages.each do |package|
@@ -53,7 +53,7 @@ module Pray
     end
 
     def package_command
-      project = Resolve.resolve_project(manifest_path)
+      project = resolve_current_project
       project.packages.each do |package|
         output_path = Archive.package_archive_path(package.declaration.name, package.spec.version)
         Archive.write_package_archive(package, output_path)
@@ -63,7 +63,7 @@ module Pray
     def explain_command(name)
       raise Error.resolution("explain requires a package name") unless name
 
-      project = Resolve.resolve_project(manifest_path)
+      project = resolve_current_project
       package = project.packages.find { |entry| entry.declaration.name == name }
       raise Error.resolution("package #{name} not found") unless package
 
@@ -94,7 +94,7 @@ module Pray
 
     def outdated_command(_arguments)
       previous_lockfile = File.exist?(lockfile_path) ? Pray.read_lockfile(lockfile_path) : nil
-      project = Resolve.resolve_project(manifest_path)
+      project = resolve_current_project
       rendered = Render.render_project(project)
       latest_lockfile = build_lockfile(project, rendered)
       if previous_lockfile && Pray.lockfiles_equivalent?(latest_lockfile, previous_lockfile)

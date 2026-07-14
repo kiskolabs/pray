@@ -3,7 +3,7 @@
 module Pray
   ResolvedProject = Struct.new(
     :manifest_path, :project_root, :manifest, :manifest_hash, :packages,
-    :local_files, :source_revisions, :source_host_keys,
+    :local_files, :source_revisions, :source_host_keys, :environment,
     keyword_init: true
   ) do
     def lockfile_hash
@@ -38,20 +38,30 @@ module Pray
       File.expand_path(root)
     end
 
-    def resolve_project(manifest_path, offline: false, refresh: false)
-      user_config = Config.load_user_config
+    def resolve_project(manifest_path, offline: false, refresh: false, environment: nil)
+      options = ResolveOptions.new(offline: offline, refresh: refresh, environment: environment)
+      resolve_project_with_options(manifest_path, options)
+    end
+
+    def resolve_project_with_options(manifest_path, options = ResolveOptions.new)
       project_root = canonical_project_root(manifest_path)
+      resolve_project_in_context(manifest_path, project_root, options)
+    end
+
+    def resolve_project_in_context(manifest_path, project_root, options = ResolveOptions.new)
+      user_config = Config.load_user_config
       lockfile_path = File.join(project_root, "Prayfile.lock")
       lockfile_hints = File.exist?(lockfile_path) ? Pray.read_lockfile(lockfile_path) : nil
       manifest_text = Pray.read_manifest_text(manifest_path)
       manifest = Pray.parse_manifest(manifest_text)
+      Environment.validate_environment(manifest, options.environment)
       manifest_hash = manifest.manifest_hash
       sources = source_map(manifest.sources)
       git_sources = GitSources.prepare_git_sources(
         project_root,
         manifest.sources,
         lockfile_hints,
-        refresh: refresh
+        refresh: options.refresh || options.refresh_source_revisions
       )
       source_revisions = git_sources.transform_values(&:revision)
       source_host_keys = Trust.prepare_source_host_keys(manifest.sources)
@@ -68,7 +78,7 @@ module Pray
             user_config,
             declaration,
             lockfile_hints,
-            offline: offline
+            offline: options.offline
           )
           if seen[package.declaration.name]
             raise Error.resolution("duplicate package declaration: #{package.declaration.name}")
@@ -101,8 +111,34 @@ module Pray
         packages: packages,
         local_files: local_files,
         source_revisions: source_revisions,
-        source_host_keys: source_host_keys
+        source_host_keys: source_host_keys,
+        environment: options.environment
       )
+    end
+
+    def resolve_project_with_git_refresh_fallback(
+      manifest_path,
+      offline: false,
+      refresh: false,
+      allow_git_refresh_fallback: false,
+      environment: nil
+    )
+      options = ResolveOptions.new(offline: offline, refresh: refresh, environment: environment)
+      resolve_project_with_options(manifest_path, options)
+    rescue Error => error
+      if allow_git_refresh_fallback &&
+         !offline &&
+         !refresh &&
+         resolution_may_benefit_from_git_source_refresh?(error)
+        refreshed = ResolveOptions.new(offline: offline, refresh: true, environment: environment)
+        resolve_project_with_options(manifest_path, refreshed)
+      else
+        raise
+      end
+    end
+
+    def resolution_may_benefit_from_git_source_refresh?(error)
+      error.category == :resolution && error.message.include?("no registry version")
     end
 
     def missing_local_embed_guidance(path)

@@ -8,7 +8,9 @@ import {
 } from "../lockfile/paths.js";
 import { manifestToJson } from "../manifest/types.js";
 import { renderProject, writeRenderedTargets } from "../render/project.js";
-import { defaultResolveOptions, resolveProject } from "../resolve/project.js";
+import { defaultResolveOptions } from "../resolve/context.js";
+import { resolveCurrentProjectWithGitRefreshFallback } from "./invocation.js";
+import { resolveProject } from "../resolve/project.js";
 
 export interface MaterializeOptions {
   manifestPath?: string;
@@ -28,15 +30,19 @@ export async function materializeProject(
     );
   }
 
-  const project = await resolveProject(manifestPath, {
-    ...defaultResolveOptions(),
-    offline: options.offline ?? false,
-    refreshSourceRevisions: options.refreshSourceRevisions ?? false,
-  });
+  const project = await resolveCurrentProjectWithGitRefreshFallback(
+    {
+      ...defaultResolveOptions(),
+      offline: options.offline ?? false,
+      refreshSourceRevisions: options.refreshSourceRevisions ?? false,
+    },
+    !options.locked && !options.frozen,
+  );
   const rendered = renderProject(project);
   const lockfilePath = defaultLockfilePath(project.projectRoot);
   const nextLockfile = buildLockfile({
     manifestHash: project.manifestHash,
+    ...(project.environment ? { environment: project.environment } : {}),
     projectRoot: project.projectRoot,
     manifestSources: project.manifest.sources,
     manifestTargets: project.manifest.targets,
@@ -74,7 +80,7 @@ export async function materializeProject(
 }
 
 export async function printManifest(manifestPath = defaultManifestPath()): Promise<void> {
-  const project = await resolveProject(manifestPath);
+  const project = await resolveProject(manifestPath, defaultResolveOptions());
   process.stdout.write(
     `${JSON.stringify(manifestToJson(project.manifest), null, 2)}\n`,
   );

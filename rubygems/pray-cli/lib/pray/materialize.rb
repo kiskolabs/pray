@@ -11,20 +11,38 @@ module Pray
       offline: false,
       refresh: false
     )
-      manifest_path = File.expand_path(manifest_path || default_manifest_path)
+      context = Invocation.invocation_context
+      manifest_path = File.expand_path(manifest_path || context.manifest_path)
       unless File.exist?(manifest_path)
         raise Error.manifest("missing #{manifest_path}")
       end
 
-      project = Resolve.resolve_project(
-        manifest_path,
+      project_root = context.project_root
+      options = ResolveOptions.new(
         offline: offline,
-        refresh: refresh
+        refresh: refresh,
+        environment: context.environment
       )
+      allow_git_refresh_fallback = !locked && !frozen
+      project = begin
+        Resolve.resolve_project_in_context(manifest_path, project_root, options)
+      rescue Error => error
+        if allow_git_refresh_fallback &&
+           !offline &&
+           !refresh &&
+           Resolve.resolution_may_benefit_from_git_source_refresh?(error)
+          refreshed = options.dup
+          refreshed.refresh = true
+          Resolve.resolve_project_in_context(manifest_path, project_root, refreshed)
+        else
+          raise
+        end
+      end
       rendered = Render.render_project(project)
       lockfile_path = default_lockfile_path(project.project_root)
       next_lockfile = LockfileIO.build_lockfile(
         project.manifest_hash,
+        project.environment,
         project.project_root,
         project.manifest.sources,
         project.manifest.targets,

@@ -297,9 +297,11 @@ fn resolve_ssh_registry_package_root(
             &selected.version,
         );
 
-        if let Some(mut cached) =
-            try_reuse_cached_registry_package(&cache_directory, &selected, signer_fingerprint.clone())?
-        {
+        if let Some(mut cached) = try_reuse_cached_registry_package(
+            &cache_directory,
+            &selected,
+            signer_fingerprint.clone(),
+        )? {
             cached.registry_latest_version = registry_latest_version.clone();
             return Ok(cached);
         }
@@ -805,9 +807,7 @@ pub fn highest_registry_version(
     Ok(selected)
 }
 
-pub fn registry_latest_version_label(
-    metadata: &RegistryPackageMetadata,
-) -> Option<String> {
+pub fn registry_latest_version_label(metadata: &RegistryPackageMetadata) -> Option<String> {
     highest_registry_version(metadata)
         .ok()
         .flatten()

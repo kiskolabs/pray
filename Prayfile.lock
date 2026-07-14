@@ -1,7 +1,7 @@
 prayfile_lock = "1"
 spec = "0.1"
-generated_by = "pray 0.1.0"
-manifest_hash = "sha256:4d5743b815c3872aa82ebb0bb70e2b15344b28ca16ee6a83572791741979975e"
+generated_by = "pray 1.0.0"
+manifest_hash = "sha256:3d9c55d099cd9c863994ce3d0a7bb576503ca367ad0c31fd933e2b87dff3f1fd"
 
 [[source]]
 name = "amkisko"

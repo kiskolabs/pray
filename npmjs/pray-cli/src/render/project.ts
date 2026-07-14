@@ -1,5 +1,6 @@
 import { copyFileSync, existsSync, mkdirSync, writeFileSync } from "node:fs";
 import { basename, resolve } from "node:path";
+import { packageMatchesEnvironment } from "../environment.js";
 import { PrayError } from "../errors.js";
 import {
   checksumManagedSpanContent,
@@ -72,6 +73,14 @@ function renderTarget(
 
   const managedSpans: ManagedSpanRecord[] = [];
   for (const packageEntry of project.packages) {
+    if (
+      !packageMatchesEnvironment(
+        packageEntry.declaration.groups,
+        project.environment,
+      )
+    ) {
+      continue;
+    }
     for (const exportName of packageEntry.selectedExports) {
       if (!shouldInlineExport(packageEntry, exportName)) {
         continue;
@@ -141,6 +150,14 @@ function plannedProvisionedFiles(
     for (const folderRoot of target.skills) {
       const destinationRoot = resolve(project.projectRoot, folderRoot);
       for (const packageEntry of project.packages) {
+        if (
+          !packageMatchesEnvironment(
+            packageEntry.declaration.groups,
+            project.environment,
+          )
+        ) {
+          continue;
+        }
         collectSelectedExportFiles(
           project,
           packageEntry,

@@ -121,8 +121,11 @@ export function serializeLockfileText(lockfile: Lockfile): string {
     `spec = ${formatString(canonical.spec)}`,
     `generated_by = ${formatString(canonical.generated_by)}`,
     `manifest_hash = ${formatString(canonical.manifest_hash)}`,
-    "",
   ];
+  if (canonical.environment !== undefined) {
+    lines.push(`environment = ${formatString(canonical.environment)}`);
+  }
+  lines.push("");
 
   for (const source of canonical.source) {
     appendSection(lines, formatSource(source));

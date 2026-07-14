@@ -1,14 +1,18 @@
 pub mod auth;
+pub mod cli_suggest;
 pub mod client_trust;
-pub mod constraint;
 pub mod config;
+pub mod constraint;
 pub mod derived_metadata;
+pub mod dotenv;
+pub mod environment;
 pub mod error;
 pub mod hashing;
 pub mod literal;
 pub mod lockfile;
 pub mod manifest;
 pub mod package_spec;
+pub mod project_context;
 pub mod registry;
 pub mod render;
 pub mod resolve;
@@ -17,6 +21,7 @@ pub mod ssh_client;
 pub mod ssh_identity;
 pub mod ssh_publishers;
 pub mod ssh_rpc;
+pub mod terminal;
 pub mod trust;
 pub mod verify;
 

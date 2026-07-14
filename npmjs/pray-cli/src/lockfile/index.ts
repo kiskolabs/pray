@@ -69,6 +69,7 @@ export function lockfileHash(lockfile: Lockfile): string {
 
 export function buildLockfile(input: {
   manifestHash: string;
+  environment?: string;
   projectRoot: string;
   manifestSources: ManifestSource[];
   manifestTargets: ManifestTarget[];
@@ -84,6 +85,7 @@ export function buildLockfile(input: {
     spec: "0.1",
     generated_by: GENERATED_BY,
     manifest_hash: input.manifestHash,
+    ...(input.environment ? { environment: input.environment } : {}),
     source: input.manifestSources.map(
       (source): LockSource => ({
         name: source.name,

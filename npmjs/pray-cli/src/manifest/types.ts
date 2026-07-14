@@ -42,6 +42,7 @@ export interface ManifestPackage {
   exports: string[];
   targets: string[];
   features: string[];
+  groups: string[];
   optional: boolean;
   path?: string;
   git?: string;
@@ -131,6 +132,7 @@ export function manifestToJson(manifest: Manifest): Record<string, unknown> {
       exports: packageEntry.exports,
       targets: packageEntry.targets,
       features: packageEntry.features,
+      groups: packageEntry.groups,
       optional: packageEntry.optional,
       ...(packageEntry.path ? { path: packageEntry.path } : {}),
       ...(packageEntry.git ? { git: packageEntry.git } : {}),

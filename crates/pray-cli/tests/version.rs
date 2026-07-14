@@ -21,11 +21,7 @@ fn version_command_prints_package_version() {
             String::from_utf8_lossy(&output.stderr)
         );
         assert_eq!(
-            format!(
-                "{} {}\n",
-                env!("CARGO_PKG_NAME"),
-                env!("CARGO_PKG_VERSION")
-            ),
+            format!("{} {}\n", env!("CARGO_PKG_NAME"), env!("CARGO_PKG_VERSION")),
             String::from_utf8_lossy(&output.stdout)
         );
     }

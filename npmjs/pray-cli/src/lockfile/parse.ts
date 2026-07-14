@@ -24,6 +24,7 @@ export function parseLockfileValue(value: unknown): Lockfile {
     spec: requireString(record.spec, "spec", CONTEXT),
     generated_by: requireString(record.generated_by, "generated_by", CONTEXT),
     manifest_hash: requireString(record.manifest_hash, "manifest_hash", CONTEXT),
+    environment: optionalString(record.environment, "environment", CONTEXT),
     source: parseLockSources(record.source),
     package: parseLockedPackages(record.package),
     target: parseLockedTargets(record.target),

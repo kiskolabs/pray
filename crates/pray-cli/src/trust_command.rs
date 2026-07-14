@@ -1,6 +1,6 @@
 use pray_core::client_trust::{
-    add_allowed_signing_key, check_compromised_keys, effective_trust_home,
-    import_registry_trust, import_signing_keys_from_repository, list_policy, parse_compromised_feed,
+    add_allowed_signing_key, check_compromised_keys, effective_trust_home, import_registry_trust,
+    import_signing_keys_from_repository, list_policy, parse_compromised_feed,
     remove_allowed_signing_key, set_allow, set_require_signed_commit, show_policy_toml,
     TrustListScope, DEFAULT_COMPROMISED_KEYS_SOURCE,
 };
@@ -35,10 +35,10 @@ fn trust_home() -> PrayResult<PathBuf> {
     effective_trust_home()
 }
 
-fn trust_list_command(mut arguments: std::vec::IntoIter<String>) -> PrayResult<()> {
+fn trust_list_command(arguments: std::vec::IntoIter<String>) -> PrayResult<()> {
     let mut scope = TrustListScope::All;
     let mut source_filter: Option<String> = None;
-    while let Some(argument) = arguments.next() {
+    for argument in arguments {
         match argument.as_str() {
             "--global" => scope = TrustListScope::Global,
             "--local" => scope = TrustListScope::Local,
@@ -294,10 +294,7 @@ fn fetch_compromised_feed(source: Option<&str>) -> PrayResult<(String, String)> 
                 PrayError::Unsupported(format!("HTTP request failed for {url}: {error}"))
             })?;
         let status = response.status();
-        let body = response
-            .body_mut()
-            .read_to_string()
-            .unwrap_or_default();
+        let body = response.body_mut().read_to_string().unwrap_or_default();
         if !status.is_success() {
             return Err(PrayError::Unsupported(format!(
                 "compromised-key source returned HTTP {}",

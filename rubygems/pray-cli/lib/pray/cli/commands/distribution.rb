@@ -3,7 +3,7 @@
 module Pray
   module CLI
     def publish_command(roots:, servers:)
-      project = Resolve.resolve_project(manifest_path)
+      project = resolve_current_project
       roots.each { |root| Publish.publish_to_root(project, root) }
       servers.each { |server| Publish.publish_to_server(project, server) }
     end

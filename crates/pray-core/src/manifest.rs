@@ -51,6 +51,7 @@ pub struct ManifestPackage {
     pub exports: Vec<String>,
     pub targets: Vec<String>,
     pub features: Vec<String>,
+    pub groups: Vec<String>,
     pub optional: bool,
     pub path: Option<String>,
     pub git: Option<String>,
@@ -122,9 +123,12 @@ impl Manifest {
 pub fn read_manifest_text(manifest_path: &Path) -> PrayResult<String> {
     fs::read_to_string(manifest_path).map_err(|error| {
         if error.kind() == io::ErrorKind::NotFound {
+            let manifest_label = manifest_path
+                .file_name()
+                .and_then(|name| name.to_str())
+                .unwrap_or("Prayfile");
             PrayError::Manifest(format!(
-                "missing {}; run pray init to create one",
-                manifest_path.display()
+                "missing {manifest_label}; run pray init to create one"
             ))
         } else {
             PrayError::Io(error)
@@ -141,11 +145,16 @@ pub fn parse_manifest(text: &str) -> PrayResult<Manifest> {
 struct BlockParser<'a> {
     lines: &'a [Cow<'a, str>],
     cursor: usize,
+    group_stack: Vec<Vec<String>>,
 }
 
 impl<'a> BlockParser<'a> {
     fn new(lines: &'a [Cow<'a, str>]) -> Self {
-        Self { lines, cursor: 0 }
+        Self {
+            lines,
+            cursor: 0,
+            group_stack: Vec::new(),
+        }
     }
 
     fn parse_root(&mut self) -> PrayResult<Manifest> {
@@ -163,29 +172,6 @@ impl<'a> BlockParser<'a> {
             return Err(PrayError::Manifest("missing prayfile version".to_string()));
         }
         Ok(manifest)
-    }
-
-    fn parse_nested(&mut self, manifest: &mut Manifest, stop_on_end: bool) -> PrayResult<()> {
-        while let Some(statement) = self.next_statement()? {
-            if statement == "end" {
-                if stop_on_end {
-                    return Ok(());
-                }
-                return Err(PrayError::Parse {
-                    kind: "manifest",
-                    message: "unexpected 'end'".to_string(),
-                });
-            }
-            self.apply_statement(manifest, statement, true)?;
-        }
-        if stop_on_end {
-            Err(PrayError::Parse {
-                kind: "manifest",
-                message: "missing 'end'".to_string(),
-            })
-        } else {
-            Ok(())
-        }
     }
 
     fn apply_statement(
@@ -218,14 +204,28 @@ impl<'a> BlockParser<'a> {
             return Ok(());
         }
         if let Some(rest) = statement.strip_prefix("group ") {
-            let (_group_name, is_block) = parse_group_header(rest)?;
-            if is_block {
-                self.parse_nested(manifest, true)?;
+            let (group_names, is_block) = parse_group_header(rest)?;
+            if !is_block {
+                return Err(PrayError::Parse {
+                    kind: "manifest",
+                    message: "group must use a block".to_string(),
+                });
             }
+            if !self.group_stack.is_empty() {
+                return Err(PrayError::Parse {
+                    kind: "manifest",
+                    message: "nested group blocks are not supported".to_string(),
+                });
+            }
+            self.group_stack.push(group_names);
+            self.parse_group_block(manifest)?;
+            self.group_stack.pop();
             return Ok(());
         }
         if let Some(rest) = statement.strip_prefix("agent ") {
-            manifest.packages.push(parse_package_decl(rest)?);
+            manifest
+                .packages
+                .push(self.parse_package_with_groups(rest)?);
             return Ok(());
         }
         if let Some(rest) = statement.strip_prefix("local ") {
@@ -240,6 +240,42 @@ impl<'a> BlockParser<'a> {
             kind: "manifest",
             message: format!("unrecognized statement: {statement}"),
         })
+    }
+
+    fn parse_group_block(&mut self, manifest: &mut Manifest) -> PrayResult<()> {
+        while let Some(statement) = self.next_statement()? {
+            if statement == "end" {
+                return Ok(());
+            }
+            if let Some(rest) = statement.strip_prefix("agent ") {
+                manifest
+                    .packages
+                    .push(self.parse_package_with_groups(rest)?);
+                continue;
+            }
+            if let Some(rest) = statement.strip_prefix("package ") {
+                manifest
+                    .packages
+                    .push(self.parse_package_with_groups(rest)?);
+                continue;
+            }
+            return Err(PrayError::Parse {
+                kind: "manifest",
+                message: format!(
+                    "group blocks only support agent or package declarations: {statement}"
+                ),
+            });
+        }
+        Err(PrayError::Parse {
+            kind: "manifest",
+            message: "missing 'end' for group block".to_string(),
+        })
+    }
+
+    fn parse_package_with_groups(&self, rest: &str) -> PrayResult<ManifestPackage> {
+        let mut package = parse_package_decl(rest)?;
+        package.groups = self.group_stack.last().cloned().unwrap_or_default();
+        Ok(package)
     }
 
     fn parse_target_block(
@@ -371,15 +407,21 @@ fn parse_target_header(rest: &str) -> PrayResult<(ManifestTarget, bool)> {
     Ok((target, is_block))
 }
 
-fn parse_group_header(rest: &str) -> PrayResult<(String, bool)> {
+fn parse_group_header(rest: &str) -> PrayResult<(Vec<String>, bool)> {
     let is_block = rest.trim_end().ends_with("do");
     let header = rest.trim_end_matches("do").trim();
     let (values, _) = parse_call(header)?;
-    let name = string_from_value(values.first().ok_or_else(|| PrayError::Parse {
-        kind: "manifest",
-        message: "group missing name".to_string(),
-    })?)?;
-    Ok((name, is_block))
+    if values.is_empty() {
+        return Err(PrayError::Parse {
+            kind: "manifest",
+            message: "group missing name".to_string(),
+        });
+    }
+    let names = values
+        .iter()
+        .map(string_from_value)
+        .collect::<PrayResult<Vec<_>>>()?;
+    Ok((names, is_block))
 }
 
 fn parse_package_decl(rest: &str) -> PrayResult<ManifestPackage> {
@@ -406,6 +448,7 @@ fn parse_package_decl(rest: &str) -> PrayResult<ManifestPackage> {
         exports: keyword_array(&keywords, "exports"),
         targets: keyword_array(&keywords, "targets"),
         features: keyword_array(&keywords, "features"),
+        groups: Vec::new(),
         optional: keywords
             .get("optional")
             .and_then(|value| value.as_bool())

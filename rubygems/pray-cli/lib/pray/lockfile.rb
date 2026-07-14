@@ -24,13 +24,13 @@ module Pray
   )
 
   Lockfile = Struct.new(
-    :prayfile_lock, :spec, :generated_by, :manifest_hash, :source, :package,
+    :prayfile_lock, :spec, :generated_by, :manifest_hash, :environment, :source, :package,
     :target, :managed_span,
     keyword_init: true
   ) do
     def initialize(
       prayfile_lock: "1", spec: "0.1", generated_by: Pray::GENERATED_BY,
-      manifest_hash: "", source: [], package: [], target: [], managed_span: []
+      manifest_hash: "", environment: nil, source: [], package: [], target: [], managed_span: []
     )
       super
     end
@@ -150,9 +150,10 @@ module Pray
       left.equivalent_to?(right)
     end
 
-    def build_lockfile(manifest_hash, project_root, manifest_sources, manifest_targets, rendered, packages, source_revisions, source_host_keys)
+    def build_lockfile(manifest_hash, environment, project_root, manifest_sources, manifest_targets, rendered, packages, source_revisions, source_host_keys)
       Lockfile.new(
         manifest_hash: manifest_hash,
+        environment: environment,
         source: manifest_sources.map do |source|
           LockSource.new(
             name: source.name,
@@ -187,6 +188,7 @@ module Pray
         spec: data["spec"],
         generated_by: data["generated_by"],
         manifest_hash: data["manifest_hash"],
+        environment: data["environment"],
         source: Array(data["source"]).map do |entry|
           LockSource.new(
             name: entry["name"],

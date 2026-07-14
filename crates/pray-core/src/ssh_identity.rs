@@ -50,9 +50,7 @@ pub fn package_signing_identity(
 
 pub fn looks_like_ssh_fingerprint(value: &str) -> bool {
     let upper = normalize_identity(value);
-    upper.starts_with("SHA256:")
-        || upper.starts_with("SHA512:")
-        || upper.starts_with("MD5:")
+    upper.starts_with("SHA256:") || upper.starts_with("SHA512:") || upper.starts_with("MD5:")
 }
 
 pub fn fingerprint_matches_allowed(identity: &str, allowed: &[String]) -> bool {

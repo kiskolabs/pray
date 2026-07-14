@@ -772,6 +772,17 @@ pray vendor
 pray clean
 ```
 
+Select a project root, manifest path, or render environment before any subcommand:
+
+```sh
+pray --path /path/to/project --env development install
+pray --path /path/to/project --file-path configs/Prayfile plan
+```
+
+Equivalent environment variables are `PRAY_PATH`, `PRAY_FILE_PATH`, and `PRAY_ENV`. The reference CLI also reads those keys from the project `.env` without overriding process values already set.
+
+Group blocks in `Prayfile` assign environment names to packages. Ungrouped packages always render. With no environment selected, only ungrouped packages render. With `--env development`, ungrouped packages plus packages in the `development` group render. Resolution and locking still include every declared package.
+
 ## Package storage modes
 
 Prayfile supports several storage modes.

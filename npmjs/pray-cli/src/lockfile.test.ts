@@ -80,6 +80,19 @@ managed_span = []
     );
   });
 
+  it("serializes optional environment field", () => {
+    const lockfile = buildLockfile({
+      manifestHash: "sha256:abc",
+      environment: "development",
+      projectRoot: "/tmp/project",
+      manifestSources: [],
+      manifestTargets: [],
+      rendered: [],
+      packages: [],
+    });
+    assert.match(serializeLockfile(lockfile), /environment = "development"/);
+  });
+
   it("detects lockfile changes", () => {
     const left = buildLockfile({
       manifestHash: "sha256:abc",

@@ -1,6 +1,7 @@
 export type PrayErrorKind =
   | "manifest"
   | "parse"
+  | "usage"
   | "resolution"
   | "integrity"
   | "render"
@@ -21,12 +22,32 @@ export class PrayError extends Error {
 
   exitCode(): number {
     switch (this.kind) {
-      case "verify":
+      case "usage":
+      case "parse":
         return 2;
-      case "unsupported":
+      case "resolution":
         return 3;
+      case "integrity":
+        return 4;
+      case "render":
+        return 5;
+      case "verify":
+        return 6;
+      case "unsupported":
+        return 8;
       default:
         return 1;
+    }
+  }
+
+  toString(): string {
+    switch (this.kind) {
+      case "usage":
+        return `usage error: ${this.message}`;
+      case "unsupported":
+        return `unsupported feature: ${this.message}`;
+      default:
+        return this.message;
     }
   }
 
@@ -60,5 +81,9 @@ export class PrayError extends Error {
 
   static unsupported(message: string): PrayError {
     return new PrayError("unsupported", message);
+  }
+
+  static usage(message: string): PrayError {
+    return new PrayError("usage", message);
   }
 }
