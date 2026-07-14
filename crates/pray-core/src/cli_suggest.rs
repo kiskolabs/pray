@@ -1,8 +1,8 @@
 pub const TOP_LEVEL_COMMANDS: &[&str] = &[
     "add", "apply", "clean", "confess", "drift", "explain", "format", "help", "init", "install",
     "list", "login", "manifest", "outdated", "package", "plan", "prayer", "publish", "remove",
-    "render", "repo", "serve", "sync", "tree", "trust", "unlock", "update", "vendor", "verify",
-    "version",
+    "render", "repo", "serve", "sync", "tree", "trust", "unlock", "update", "upgrade", "vendor",
+    "verify", "version",
 ];
 
 pub fn unknown_command_message(command: &str) -> String {

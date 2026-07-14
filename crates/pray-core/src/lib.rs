@@ -1,3 +1,4 @@
+pub mod cli_release;
 pub mod auth;
 pub mod cli_suggest;
 pub mod client_trust;

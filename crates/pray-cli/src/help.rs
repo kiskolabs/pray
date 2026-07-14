@@ -118,6 +118,7 @@ const META_COMMANDS: &[&str] = &[
     "repo init                              scaffold a distribution root",
     "manifest                               print canonical Prayfile JSON",
     "package                                build a distributable prayer archive",
+    "upgrade                                install the latest pray CLI release",
     "version | -V | --version",
 ];
 
@@ -171,6 +172,11 @@ fn command_help_text(command: &str) -> Option<&'static str> {
         "serve" => Some(
             "serve — run a local registry server\n\n\
              Usage: pray serve [--root PATH] [--host HOST] [--port PORT] [--stdio]",
+        ),
+        "upgrade" => Some(
+            "upgrade — install the latest pray CLI release\n\n\
+             Usage: pray upgrade\n\n\
+             Runs `cargo install --git https://github.com/kiskolabs/pray --locked pray`.",
         ),
         _ => None,
     }
