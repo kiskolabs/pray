@@ -42,4 +42,5 @@ Gem::Specification.new do |spec|
   spec.add_dependency "toml-rb", "~> 4.0"
 
   spec.add_development_dependency "rspec", "~> 3.13"
+  spec.add_development_dependency "capybara", "~> 3.40"
 end

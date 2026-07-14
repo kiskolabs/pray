@@ -40,6 +40,9 @@ jobs:
           cache-dependency-path: npmjs/pray-cli/package-lock.json
       - name: Install archive tools
         run: sudo apt-get update && sudo apt-get install -y zstd
+      - name: Install npm dependencies
+        working-directory: npmjs/pray-cli
+        run: npm ci
       - name: Run npm tests
         working-directory: npmjs/pray-cli
         run: npm test
