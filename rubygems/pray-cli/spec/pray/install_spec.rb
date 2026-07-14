@@ -32,7 +32,7 @@ RSpec.describe "pray install" do
 
     lockfile = Pray.read_lockfile(File.join(workspace, "Prayfile.lock"))
     expect(lockfile.manifest_hash).to eq(manifest.manifest_hash)
-    expect(lockfile.generated_by).to eq("pray 1.0.0")
+    expect(lockfile.generated_by).to eq("pray 1.1.0")
   end
 
   it "installs, renders, and verifies the simple-project example" do

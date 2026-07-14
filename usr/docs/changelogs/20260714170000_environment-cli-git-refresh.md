@@ -20,7 +20,7 @@ SPEC.md, README.md, and JSON schemas updated for groups, environment fields, and
 
 ## Next
 
-Bump package versions to 1.1.0 on release. Run full CI matrix after merge.
+Run full CI matrix after merge.
 
 ## Source
 

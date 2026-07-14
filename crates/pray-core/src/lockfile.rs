@@ -312,7 +312,7 @@ pub fn build_lockfile(
     Lockfile {
         prayfile_lock: "1".to_string(),
         spec: "0.1".to_string(),
-        generated_by: "pray 1.0.0".to_string(),
+        generated_by: "pray 1.1.0".to_string(),
         manifest_hash,
         environment,
         source: manifest_sources
