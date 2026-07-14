@@ -1,3 +1,4 @@
+use crate::environment::package_matches_environment;
 use crate::hashing::{checksum_managed_span_content, marker_id};
 use crate::lockfile::ManagedSpanRecord;
 use crate::resolve::ResolvedProject;
@@ -44,24 +45,22 @@ pub struct PlannedProvisionedFile {
     pub source: PathBuf,
 }
 
-pub fn planned_provisioned_files(project: &ResolvedProject) -> PrayResult<Vec<PlannedProvisionedFile>> {
+pub fn planned_provisioned_files(
+    project: &ResolvedProject,
+) -> PrayResult<Vec<PlannedProvisionedFile>> {
     let mut planned = Vec::new();
     for target in &project.manifest.targets {
         for folder_root in &target.skills {
             let destination_root = project.project_root.join(folder_root);
             for package in &project.packages {
-                collect_legacy_skill_files(
-                    project,
-                    package,
-                    &destination_root,
-                    &mut planned,
-                )?;
-                collect_selected_export_files(
-                    project,
-                    package,
-                    &destination_root,
-                    &mut planned,
-                )?;
+                if !package_matches_environment(
+                    &package.declaration.groups,
+                    project.environment.as_deref(),
+                ) {
+                    continue;
+                }
+                collect_legacy_skill_files(project, package, &destination_root, &mut planned)?;
+                collect_selected_export_files(project, package, &destination_root, &mut planned)?;
             }
         }
     }
@@ -160,15 +159,16 @@ fn collect_selected_export_files(
                         source.display()
                     )));
                 }
-                let file_name = source
-                    .file_name()
-                    .map(|name| name.to_owned())
-                    .ok_or_else(|| {
-                        PrayError::Render(format!(
-                            "file export path has no file name: {}",
-                            export.path
-                        ))
-                    })?;
+                let file_name =
+                    source
+                        .file_name()
+                        .map(|name| name.to_owned())
+                        .ok_or_else(|| {
+                            PrayError::Render(format!(
+                                "file export path has no file name: {}",
+                                export.path
+                            ))
+                        })?;
                 let destination = destination_root.join(export_name).join(file_name);
                 planned.push(PlannedProvisionedFile {
                     path: relative_project_path(project, &destination),
@@ -328,6 +328,10 @@ fn render_target(
 
     let mut managed_spans = Vec::new();
     for package in &project.packages {
+        if !package_matches_environment(&package.declaration.groups, project.environment.as_deref())
+        {
+            continue;
+        }
         for export in &package.selected_exports {
             if !should_inline_export(package, export, target) {
                 continue;

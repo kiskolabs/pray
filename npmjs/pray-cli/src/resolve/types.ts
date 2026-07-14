@@ -34,4 +34,5 @@ export interface ResolvedProject {
   localFiles: ResolvedLocalFile[];
   sourceRevisions: Map<string, string>;
   sourceHostKeys: Map<string, string>;
+  environment?: string;
 }

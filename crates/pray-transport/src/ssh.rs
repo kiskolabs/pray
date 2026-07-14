@@ -5,6 +5,12 @@ use serde_json::json;
 
 pub struct SshTransport;
 
+impl Default for SshTransport {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 impl SshTransport {
     pub fn new() -> Self {
         Self

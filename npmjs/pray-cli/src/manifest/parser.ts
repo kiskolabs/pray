@@ -20,6 +20,7 @@ export function parseManifestText(text: string): Manifest {
 
 class BlockParser {
   private readonly reader: StatementReader;
+  private readonly groupStack: string[][] = [];
 
   constructor(lines: string[]) {
     this.reader = new StatementReader(lines);
@@ -82,14 +83,22 @@ class BlockParser {
       return;
     }
     if (statement.startsWith("group ")) {
-      const { isBlock } = parseGroupHeader(statement.slice("group ".length));
-      if (isBlock) {
-        this.parseNested(manifest, true);
+      const { groups, isBlock } = parseGroupHeader(statement.slice("group ".length));
+      if (!isBlock) {
+        throw PrayError.parse("manifest", "group must use a block");
       }
+      if (this.groupStack.length > 0) {
+        throw PrayError.parse("manifest", "nested group blocks are not supported");
+      }
+      this.groupStack.push(groups);
+      this.parseGroupBlock(manifest);
+      this.groupStack.pop();
       return;
     }
     if (statement.startsWith("agent ")) {
-      manifest.packages.push(parsePackageDecl(statement.slice("agent ".length)));
+      manifest.packages.push(
+        this.parsePackageWithGroups(statement.slice("agent ".length)),
+      );
       return;
     }
     if (statement.startsWith("local ")) {
@@ -103,23 +112,41 @@ class BlockParser {
     throw PrayError.parse("manifest", `unrecognized statement: ${statement}`);
   }
 
-  private parseNested(manifest: Manifest, stopOnEnd: boolean): void {
+  private parseGroupBlock(manifest: Manifest): void {
     while (true) {
       const statement = this.reader.nextStatement();
       if (statement === undefined) {
-        if (stopOnEnd) {
-          throw PrayError.parse("manifest", "missing 'end'");
-        }
-        return;
+        throw PrayError.parse("manifest", "missing 'end' for group block");
       }
       if (statement === "end") {
-        if (stopOnEnd) {
-          return;
-        }
-        throw PrayError.parse("manifest", "unexpected 'end'");
+        return;
       }
-      this.applyStatement(manifest, statement, true);
+      if (statement.startsWith("group ")) {
+        throw PrayError.parse("manifest", "nested group blocks are not supported");
+      }
+      if (statement.startsWith("agent ")) {
+        manifest.packages.push(
+          this.parsePackageWithGroups(statement.slice("agent ".length)),
+        );
+        continue;
+      }
+      if (statement.startsWith("package ")) {
+        manifest.packages.push(
+          this.parsePackageWithGroups(statement.slice("package ".length)),
+        );
+        continue;
+      }
+      throw PrayError.parse(
+        "manifest",
+        `group blocks only support agent or package declarations: ${statement}`,
+      );
     }
+  }
+
+  private parsePackageWithGroups(rest: string) {
+    const packageEntry = parsePackageDecl(rest);
+    packageEntry.groups = [...(this.groupStack[this.groupStack.length - 1] ?? [])];
+    return packageEntry;
   }
 
   private parseTargetBlock(manifest: Manifest, targetIndex: number): void {

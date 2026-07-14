@@ -57,11 +57,7 @@ pub fn build_materialization_preview(
     let provisioned = planned_provisioned_files(project)?
         .into_iter()
         .map(|file| {
-            let change = provisioned_change_status(
-                &project.project_root,
-                &file.path,
-                &file.source,
-            );
+            let change = provisioned_change_status(&project.project_root, &file.path, &file.source);
             (file.path, change)
         })
         .collect();
@@ -124,10 +120,7 @@ fn target_change_label(change: TargetChange) -> &'static str {
     }
 }
 
-pub fn print_materialization_report(
-    preview: &MaterializationPreview,
-    mode: MaterializationMode,
-) {
+pub fn print_materialization_report(preview: &MaterializationPreview, mode: MaterializationMode) {
     println!("{}...", mode.heading());
 
     for line in &preview.package_lines {
@@ -276,7 +269,8 @@ fn grouped_provisioned_lines(
         let mut next = index + 1;
         while next < provisioned.len() {
             let (next_path, next_change) = &provisioned[next];
-            if next_path.parent() != Some(parent.as_path()) || *next_change == TargetChange::Unchanged
+            if next_path.parent() != Some(parent.as_path())
+                || *next_change == TargetChange::Unchanged
             {
                 break;
             }
@@ -297,10 +291,7 @@ fn grouped_provisioned_lines(
             } else {
                 format!("{}/", parent.display())
             };
-            lines.push(format!(
-                "{folder} {verb} ({} files)",
-                grouped.len()
-            ));
+            lines.push(format!("{folder} {verb} ({} files)", grouped.len()));
         }
         index = next;
     }
@@ -332,9 +323,11 @@ fn pre_apply_warnings(
             continue;
         }
         if let Ok(existing) = fs::read_to_string(&path) {
-            if existing != target.content && !warnings.iter().any(|warning| {
-                warning.contains(target.path.to_string_lossy().as_ref())
-            }) {
+            if existing != target.content
+                && !warnings
+                    .iter()
+                    .any(|warning| warning.contains(target.path.to_string_lossy().as_ref()))
+            {
                 warnings.push(format!(
                     "{} has local edits outside tracked managed spans and will be overwritten",
                     target.path.display()
@@ -363,18 +356,16 @@ fn warning_applies_to_materialization(
     };
 
     match finding.kind.as_str() {
-        "custom_implementation" | "removed_prayer" | "position_drift" | "orphan_marker" => {
-            finding
-                .message
-                .split('`')
-                .nth(1)
-                .is_some_and(|target_path| changes_target(target_path) || will_render(target_path))
-        }
+        "custom_implementation" | "removed_prayer" | "position_drift" | "orphan_marker" => finding
+            .message
+            .split('`')
+            .nth(1)
+            .is_some_and(|target_path| changes_target(target_path) || will_render(target_path)),
         "renderer_drift" => finding
             .message
             .split_whitespace()
             .next()
-            .is_some_and(|target_path| changes_target(target_path)),
+            .is_some_and(changes_target),
         _ => false,
     }
 }
@@ -453,11 +444,7 @@ fn summary_footer(preview: &MaterializationPreview, mode: MaterializationMode) -
         parts.push(format!(
             "{} warning{}",
             preview.warnings.len(),
-            if preview.warnings.len() == 1 {
-                ""
-            } else {
-                "s"
-            }
+            if preview.warnings.len() == 1 { "" } else { "s" }
         ));
     }
 
@@ -492,7 +479,9 @@ mod tests {
             warnings: Vec::new(),
         };
 
-        assert!(summary_footer(&preview, MaterializationMode::Apply).contains("everything up to date"));
+        assert!(
+            summary_footer(&preview, MaterializationMode::Apply).contains("everything up to date")
+        );
     }
 
     #[test]

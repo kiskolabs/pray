@@ -15,7 +15,7 @@ module Pray
     end
 
     def render_command(flags)
-      project = Resolve.resolve_project(manifest_path)
+      project = resolve_current_project
       rendered = Render.render_project(project)
       if flags[:check]
         ensure_rendered_outputs_current(project, rendered)
@@ -25,15 +25,15 @@ module Pray
     end
 
     def verify_command(flags)
-      project = Resolve.resolve_project(manifest_path)
-      lockfile = ensure_existing_lockfile(File.join(project.project_root, LOCKFILE_PATH))
+      project = resolve_current_project
+      lockfile = ensure_existing_lockfile(lockfile_path)
       report = Verify.verify_project(project, lockfile, strict: flags[:strict])
       puts format_verification_report(report) unless report.clean?
     end
 
     def drift_command(flags)
-      project = Resolve.resolve_project(manifest_path)
-      lockfile = ensure_existing_lockfile(File.join(project.project_root, LOCKFILE_PATH))
+      project = resolve_current_project
+      lockfile = ensure_existing_lockfile(lockfile_path)
       report = if flags[:semantic]
                  Verify.inspect_project(project, lockfile)
                else
@@ -54,7 +54,10 @@ module Pray
     end
 
     def plan_command(_arguments)
-      project = Resolve.resolve_project(manifest_path)
+      project = Invocation.resolve_current_project_with_git_refresh_fallback(
+        ResolveOptions.new,
+        allow_git_refresh_fallback: true
+      )
       rendered = Render.render_project(project)
       lockfile = build_lockfile(project, rendered)
       previous_lockfile = File.exist?(lockfile_path) ? Pray.read_lockfile(lockfile_path) : nil
@@ -79,7 +82,7 @@ module Pray
     def unlock_command(name)
       raise Error.manifest("unlock requires a package name") unless name
 
-      project = Resolve.resolve_project(manifest_path)
+      project = resolve_current_project
       unless project.manifest.packages.any? { |entry| entry.name == name }
         raise Error.manifest("package #{name} not found")
       end

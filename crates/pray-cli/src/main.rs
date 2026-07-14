@@ -1,5 +1,7 @@
 mod apply_report;
 mod auth_client;
+mod help;
+mod invocation;
 mod revision;
 mod revision_backend;
 mod server;
@@ -16,6 +18,7 @@ use auth_client::{
     login_with_ssh_agent,
 };
 use pray_core::auth::RegistryAuthStore;
+use pray_core::cli_suggest::unknown_command_message;
 use pray_core::client_trust::prepare_ephemeral_home;
 use pray_core::constraint::{latest_constraint_for_package, version_satisfies};
 use pray_core::derived_metadata::derive_registry_derived_metadata_from_archive_bytes;
@@ -31,7 +34,7 @@ use pray_core::registry::{
     RegistryPackageMetadata, RegistryPackageVersion,
 };
 use pray_core::render::{render_project, write_rendered_targets};
-use pray_core::resolve::{resolve_project, resolve_project_with_options, ResolvedProject};
+use pray_core::resolve::ResolvedProject;
 use pray_core::resolve_context::ResolveOptions;
 use pray_core::ssh_identity::{active_ssh_user_fingerprint, signing_identity};
 use pray_core::trust::{write_registry_trust_settings, RegistryTrustSettings};
@@ -64,10 +67,23 @@ fn run(arguments: Vec<String>) -> PrayResult<()> {
     let ephemeral = arguments.iter().any(|argument| argument == "--rm");
     let trust_import = arguments.iter().any(|argument| argument == "--trust");
     let trust_global = arguments.iter().any(|argument| argument == "--global");
+    let no_input = arguments.iter().any(|argument| argument == "--no-input");
     let filtered: Vec<String> = arguments
         .into_iter()
-        .filter(|argument| argument != "--rm" && argument != "--trust" && argument != "--global")
+        .filter(|argument| {
+            argument != "--rm"
+                && argument != "--trust"
+                && argument != "--global"
+                && argument != "--no-input"
+        })
         .collect();
+    let filtered = invocation::initialize(filtered)?;
+    if no_input {
+        std::env::set_var("PRAY_NO_INPUT", "1");
+    }
+    if let Some(()) = maybe_print_help(&filtered)? {
+        return Ok(());
+    }
     let ephemeral_home = if ephemeral {
         Some(prepare_ephemeral_home()?)
     } else {
@@ -172,6 +188,47 @@ fn run(arguments: Vec<String>) -> PrayResult<()> {
     result
 }
 
+fn maybe_print_help(arguments: &[String]) -> PrayResult<Option<()>> {
+    if arguments.is_empty() {
+        help::print_concise_help();
+        return Ok(Some(()));
+    }
+
+    if arguments.len() == 1 && matches!(arguments[0].as_str(), "help" | "-h" | "--help") {
+        help::print_concise_help();
+        return Ok(Some(()));
+    }
+
+    if arguments[0] == "help" {
+        let target = arguments.get(1).map(String::as_str).unwrap_or("");
+        if matches!(target, "" | "-h" | "--help") {
+            help::print_concise_help();
+            return Ok(Some(()));
+        }
+        if help::print_command_help(target) {
+            return Ok(Some(()));
+        }
+        return Err(PrayError::Usage(unknown_command_message(target)));
+    }
+
+    if let Some(position) = arguments
+        .iter()
+        .position(|argument| argument == "--help" || argument == "-h")
+    {
+        if position == 0 {
+            help::print_concise_help();
+            return Ok(Some(()));
+        }
+        let command = &arguments[0];
+        if help::print_command_help(command) {
+            return Ok(Some(()));
+        }
+        return Err(PrayError::Usage(format!("unknown command: {command}")));
+    }
+
+    Ok(None)
+}
+
 enum Command {
     Manifest,
     Init {
@@ -269,7 +326,9 @@ fn parse_command(arguments: Vec<String>) -> PrayResult<Command> {
     let strict = arguments.iter().any(|argument| argument == "--strict");
     let semantic = arguments.iter().any(|argument| argument == "--semantic");
     let mut iter = arguments.into_iter();
-    let command = iter.next().unwrap_or_else(|| "help".to_string());
+    let command = iter
+        .next()
+        .ok_or_else(|| PrayError::Usage("pray requires a command; run pray --help".to_string()))?;
     match command.as_str() {
         "manifest" => Ok(Command::Manifest),
         "init" => {
@@ -345,12 +404,8 @@ fn parse_command(arguments: Vec<String>) -> PrayResult<Command> {
             let arguments: Vec<String> = iter.collect();
             Ok(Command::Trust { arguments })
         }
-        "help" | "-h" | "--help" => {
-            print_help();
-            std::process::exit(0);
-        }
         "version" | "-V" | "--version" => Ok(Command::Version),
-        other => Err(PrayError::Unsupported(format!("unknown command: {other}"))),
+        other => Err(PrayError::Usage(unknown_command_message(other))),
     }
 }
 
@@ -376,11 +431,7 @@ fn parse_namespaced_init_command(
 }
 
 fn version_command() -> PrayResult<()> {
-    println!(
-        "{} {}",
-        env!("CARGO_PKG_NAME"),
-        env!("CARGO_PKG_VERSION")
-    );
+    println!("{} {}", env!("CARGO_PKG_NAME"), env!("CARGO_PKG_VERSION"));
     Ok(())
 }
 
@@ -665,11 +716,7 @@ fn update_latest_command(package: Option<String>, json: bool) -> PrayResult<()> 
         fs::write(&manifest_path, updated_text)?;
     }
 
-    update_command_with_manifest_constraints(
-        package,
-        json,
-        manifest_constraint_updates,
-    )
+    update_command_with_manifest_constraints(package, json, manifest_constraint_updates)
 }
 
 fn update_command_with_manifest_constraints(
@@ -678,8 +725,8 @@ fn update_command_with_manifest_constraints(
     manifest_constraint_updates: Vec<serde_json::Value>,
 ) -> PrayResult<()> {
     let manifest_path = manifest_path();
+    let manifest_text = read_manifest_text(&manifest_path)?;
     if let Some(package_name) = &package {
-        let manifest_text = read_manifest_text(&manifest_path)?;
         let manifest = parse_manifest(&manifest_text)?;
         if !manifest
             .packages
@@ -704,11 +751,9 @@ fn update_command_with_manifest_constraints(
     } else {
         resolve_options.ignore_locked_versions = true;
     }
-    let install_preview =
-        install_command(false, false, resolve_options.clone(), json)?;
+    let install_preview = install_command(false, false, resolve_options.clone(), json)?;
     let updated_lockfile = read_lockfile(&lockfile_path())?;
-    let refreshed_project =
-        resolve_project_with_options(&manifest_path, &resolve_options)?;
+    let refreshed_project = resolve_project_with_options(&manifest_path, &resolve_options)?;
     let merged_lockfile = if let (Some(previous_lockfile), Some(package_name)) =
         (previous_lockfile.as_ref(), package.as_deref())
     {
@@ -737,11 +782,8 @@ fn update_command_with_manifest_constraints(
         &refreshed_project,
         "Update summary",
     )?;
-    let _ = print_constraint_blocked_packages(
-        &refreshed_project,
-        "Update summary",
-        !update_reported,
-    )?;
+    let _ =
+        print_constraint_blocked_packages(&refreshed_project, "Update summary", !update_reported)?;
     Ok(())
 }
 
@@ -1338,6 +1380,14 @@ fn apply_command() -> PrayResult<()> {
     Ok(())
 }
 
+fn resolve_project_for_materialization(
+    resolve_options: &ResolveOptions,
+    locked: bool,
+    frozen: bool,
+) -> PrayResult<ResolvedProject> {
+    resolve_project_with_git_refresh_fallback(&manifest_path(), resolve_options, !locked && !frozen)
+}
+
 fn materialize_command(
     locked: bool,
     frozen: bool,
@@ -1345,7 +1395,7 @@ fn materialize_command(
     resolve_options: ResolveOptions,
     silent_report: bool,
 ) -> PrayResult<Option<MaterializationPreview>> {
-    let project = resolve_project_with_options(&manifest_path(), &resolve_options)?;
+    let project = resolve_project_for_materialization(&resolve_options, locked, frozen)?;
     let rendered = render_project(&project)?;
     let lockfile_path = lockfile_path();
     if locked {
@@ -1388,7 +1438,11 @@ fn plan_command(remote: bool) -> PrayResult<()> {
     } else {
         ResolveOptions::default()
     };
-    let project = resolve_project_with_options(&manifest_path(), &options)?;
+    let project = if remote {
+        resolve_project_with_options(&manifest_path(), &options)?
+    } else {
+        resolve_project_for_materialization(&options, false, false)?
+    };
     let rendered = render_project(&project)?;
     let lockfile = build_lockfile(&project, &rendered)?;
     let previous_lockfile = read_lockfile(&lockfile_path()).ok();
@@ -2828,6 +2882,7 @@ fn build_lockfile(
 ) -> PrayResult<Lockfile> {
     Ok(pray_core::lockfile::build_lockfile(
         project.lockfile_hash()?,
+        project.environment.clone(),
         &project.project_root,
         &project.manifest.sources,
         &project.manifest.targets,
@@ -2838,21 +2893,55 @@ fn build_lockfile(
     ))
 }
 
-fn load_manifest() -> PrayResult<pray_core::manifest::Manifest> {
-    let text = read_manifest_text(&manifest_path())?;
-    parse_manifest(&text)
-}
-
-fn workspace_root() -> PathBuf {
-    pray_core::resolve::project_root_from_manifest(&manifest_path())
-}
-
 fn manifest_path() -> PathBuf {
-    PathBuf::from("Prayfile")
+    invocation::manifest_path()
 }
 
 fn lockfile_path() -> PathBuf {
-    PathBuf::from("Prayfile.lock")
+    invocation::lockfile_path()
+}
+
+fn workspace_root() -> PathBuf {
+    invocation::project_root()
+}
+
+fn resolve_project_with_options(
+    _manifest_path: &Path,
+    options: &ResolveOptions,
+) -> PrayResult<ResolvedProject> {
+    invocation::resolve_current_project(options)
+}
+
+fn resolve_project(_manifest_path: &Path) -> PrayResult<ResolvedProject> {
+    invocation::resolve_current_project(&ResolveOptions::default())
+}
+
+fn resolve_project_with_git_refresh_fallback(
+    _manifest_path: &Path,
+    options: &ResolveOptions,
+    allow_git_refresh_fallback: bool,
+) -> PrayResult<ResolvedProject> {
+    match invocation::resolve_current_project(options) {
+        Ok(project) => Ok(project),
+        Err(PrayError::Resolution(message))
+            if allow_git_refresh_fallback
+                && !options.offline
+                && !options.refresh_source_revisions
+                && message.contains("no registry version") =>
+        {
+            let refreshed_options = ResolveOptions {
+                refresh_source_revisions: true,
+                ..options.clone()
+            };
+            invocation::resolve_current_project(&refreshed_options)
+        }
+        Err(error) => Err(error),
+    }
+}
+
+fn load_manifest() -> PrayResult<pray_core::manifest::Manifest> {
+    let text = read_manifest_text(&manifest_path())?;
+    parse_manifest(&text)
 }
 
 fn default_output_for_target(target: &str) -> String {
@@ -2995,7 +3084,9 @@ fn merge_selected_package_update(
     merged
 }
 
-fn constraint_blocked_packages_json(project: &ResolvedProject) -> PrayResult<Vec<serde_json::Value>> {
+fn constraint_blocked_packages_json(
+    project: &ResolvedProject,
+) -> PrayResult<Vec<serde_json::Value>> {
     let mut packages = Vec::new();
     for package in &project.packages {
         let Some(registry_latest_version) = &package.registry_latest_version else {
@@ -3108,8 +3199,7 @@ fn print_update_json_report(
         "constraint_blocked_packages": constraint_blocked_packages,
     });
     if let Some(preview) = install_preview {
-        output["install"] =
-            materialization_preview_to_json(preview, MaterializationMode::Install);
+        output["install"] = materialization_preview_to_json(preview, MaterializationMode::Install);
     }
     println!(
         "{}",
@@ -3434,40 +3524,4 @@ fn parse_explain_command(mut arguments: std::vec::IntoIter<String>) -> PrayResul
         )));
     }
     Ok(Command::Explain { package })
-}
-
-fn print_help() {
-    println!("pray <command>");
-    println!("  version | -V | --version");
-    println!("  manifest");
-    println!("  init [--targets tool_a,tool_b]");
-    println!("  prayer init");
-    println!("  repo init");
-    println!("  add <name> [constraint] [--path PATH]");
-    println!("  remove <name>");
-    println!("  update [package] [--major] [--latest] [--dry-run] [--json]");
-    println!("  unlock <package>");
-    println!("  install [--locked|--frozen|--offline]");
-    println!("  render [--check]");
-    println!("  plan [--remote]");
-    println!("  apply");
-    println!("  verify [--strict]");
-    println!("  drift [--semantic]");
-    println!("  format");
-    println!("  package");
-    println!("  publish --root PATH [--server URL ...]");
-    println!("  login --server URL --email EMAIL [--credential-id ID --passkey-key PATH | --public-key PATH --ssh-agent]");
-    println!("  serve [--root PATH] [--host HOST] [--port PORT]");
-    println!("  sync [--root PATH] [--peer URL ...]");
-    println!("  trust list|show|add-key|remove-key|set-signed|set-allow|import-repo|import-registry|check");
-    println!("  Global flags: --rm (ephemeral home), --trust [--global] (install/update)");
-    println!(
-        "  confess <package> | --from-lock SPAN_ID [--version VERSION] [--accepted|--rejected] [--note NOTE] [--url URL]"
-    );
-    println!("  list");
-    println!("  outdated [--remote]");
-    println!("  explain <package>");
-    println!("  vendor");
-    println!("  clean");
-    println!("  tree");
 }

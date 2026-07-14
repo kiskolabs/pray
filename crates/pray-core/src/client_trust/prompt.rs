@@ -1,6 +1,7 @@
 use std::io::{IsTerminal, Write};
 use std::path::Path;
 
+use crate::terminal::no_input_requested;
 use crate::{PrayError, PrayResult};
 
 use super::enforce::{env_truthy, signer_matches_allowed};
@@ -39,6 +40,12 @@ pub fn prompt_import_signing_keys_for_source(
     if missing.is_empty() {
         eprintln!("[pray][trust] signer key already trusted for {source_url}");
         return Ok(());
+    }
+
+    if no_input_requested() {
+        return Err(PrayError::Usage(format!(
+            "--trust requires interactive consent; remove --no-input or run in a terminal for {source_url}"
+        )));
     }
 
     if !std::io::stdin().is_terminal() || !std::io::stderr().is_terminal() {
@@ -102,6 +109,12 @@ pub fn prompt_untrusted_source_consent(
             "[pray][trust] auto-consent enabled via PRAY_TRUST_ASSUME_YES for untrusted source {source_url}"
         );
         return Ok(());
+    }
+
+    if no_input_requested() {
+        return Err(PrayError::Usage(format!(
+            "untrusted source requires interactive consent; remove --no-input to continue with {source_url}"
+        )));
     }
 
     if !std::io::stdin().is_terminal() || !std::io::stderr().is_terminal() {

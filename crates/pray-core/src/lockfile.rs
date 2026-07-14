@@ -11,6 +11,8 @@ pub struct Lockfile {
     pub spec: String,
     pub generated_by: String,
     pub manifest_hash: String,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub environment: Option<String>,
     pub source: Vec<LockSource>,
     pub package: Vec<LockedPackage>,
     pub target: Vec<LockedTarget>,
@@ -180,11 +182,7 @@ fn lexical_normalize_path(path: &Path) -> PathBuf {
     normalized
 }
 
-fn normalize_lockfile_artifact(
-    project_root: &Path,
-    artifact: &str,
-    package_root: &Path,
-) -> String {
+fn normalize_lockfile_artifact(project_root: &Path, artifact: &str, package_root: &Path) -> String {
     if let Some(path_text) = artifact.strip_prefix("path:") {
         let path = Path::new(path_text);
         let relative = if path.is_absolute() {
@@ -216,6 +214,7 @@ mod tests {
         );
         let lockfile = build_lockfile(
             "sha256:manifest".to_string(),
+            None,
             Path::new("."),
             &[crate::manifest::ManifestSource {
                 name: "dist".to_string(),
@@ -298,8 +297,10 @@ mod tests {
     }
 }
 
+#[allow(clippy::too_many_arguments)]
 pub fn build_lockfile(
     manifest_hash: String,
+    environment: Option<String>,
     project_root: &Path,
     manifest_sources: &[crate::manifest::ManifestSource],
     manifest_targets: &[crate::manifest::ManifestTarget],
@@ -313,6 +314,7 @@ pub fn build_lockfile(
         spec: "0.1".to_string(),
         generated_by: "pray 1.0.0".to_string(),
         manifest_hash,
+        environment,
         source: manifest_sources
             .iter()
             .map(|source| LockSource {

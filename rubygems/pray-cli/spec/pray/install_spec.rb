@@ -24,7 +24,7 @@ RSpec.describe "pray install" do
   it "installs on a copy of simple-project with matching manifest hash" do
     manifest = Pray.parse_manifest(File.read(File.join(workspace, "Prayfile")))
     expect(manifest.manifest_hash).to eq(
-      "sha256:340c8fc15fa0196aadea58a50834d4f726698fb74a4967cdc340e3e653950326"
+      "sha256:25b1ca9becbb58d2b4e1b173231689dd76b94e358c490f829c9190b9431d244b"
     )
 
     _stdout, stderr, status = run_pray(workspace, ["install"])

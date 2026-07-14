@@ -11,6 +11,7 @@ pub enum PrayError {
     Integrity(String),
     Render(String),
     Verify(String),
+    Usage(String),
     Unsupported(String),
     Io(io::Error),
 }
@@ -24,6 +25,7 @@ impl PrayError {
             Self::Integrity(_) => 4,
             Self::Render(_) => 5,
             Self::Verify(_) => 6,
+            Self::Usage(_) => 2,
             Self::Unsupported(_) => 8,
             Self::Io(_) => 1,
         }
@@ -39,6 +41,7 @@ impl Display for PrayError {
             Self::Integrity(message) => write!(f, "integrity error: {}", message),
             Self::Render(message) => write!(f, "render error: {}", message),
             Self::Verify(message) => write!(f, "verify error: {}", message),
+            Self::Usage(message) => write!(f, "usage error: {}", message),
             Self::Unsupported(message) => write!(f, "unsupported feature: {}", message),
             Self::Io(error) => write!(f, "I/O error: {error}"),
         }

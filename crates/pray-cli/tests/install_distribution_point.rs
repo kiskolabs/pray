@@ -572,9 +572,7 @@ end
         let stderr = String::from_utf8_lossy(&update_latest.stderr);
         let stdout = String::from_utf8_lossy(&update_latest.stdout);
         let prayfile = fs::read_to_string(consumer_repo.join("Prayfile")).unwrap_or_default();
-        panic!(
-            "update --latest failed: stderr={stderr}\nstdout={stdout}\nprayfile={prayfile}"
-        );
+        panic!("update --latest failed: stderr={stderr}\nstdout={stdout}\nprayfile={prayfile}");
     }
     let stdout = String::from_utf8_lossy(&update_latest.stdout);
     assert!(

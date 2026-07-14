@@ -66,8 +66,8 @@ pub fn latest_constraint_for_package(
         return pessimistic_constraint_for_version(latest_version);
     }
     if normalized.starts_with('^') {
-        let parsed =
-            Version::parse(latest_version).map_err(|error| PrayError::Resolution(error.to_string()))?;
+        let parsed = Version::parse(latest_version)
+            .map_err(|error| PrayError::Resolution(error.to_string()))?;
         return Ok(format!("^{}.{}", parsed.major, parsed.minor));
     }
     if normalized.starts_with('=') || Version::parse(current_constraint.trim()).is_ok() {

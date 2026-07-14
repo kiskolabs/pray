@@ -30,12 +30,12 @@ module Pray
   end
 
   ManifestPackage = Struct.new(
-    :name, :constraint, :source, :exports, :targets, :features, :optional,
+    :name, :constraint, :source, :exports, :targets, :features, :groups, :optional,
     :path, :git, :tag, :rev, :tarball, :oci,
     keyword_init: true
   ) do
     def initialize(
-      name:, constraint: "*", source: nil, exports: [], targets: [], features: [],
+      name:, constraint: "*", source: nil, exports: [], targets: [], features: [], groups: [],
       optional: false, path: nil, git: nil, tag: nil, rev: nil, tarball: nil, oci: nil
     )
       super
@@ -131,6 +131,7 @@ module Pray
       def initialize(lines)
         @lines = lines
         @cursor = 0
+        @group_stack = []
       end
 
       def parse_root
@@ -168,10 +169,17 @@ module Pray
           manifest.targets << target
           parse_target_block(manifest, manifest.targets.length - 1) if is_block
         when /\Agroup (.+)\z/
-          _, is_block = parse_group_header(Regexp.last_match(1))
-          parse_nested(manifest, stop_on_end: true) if is_block
+          group_names, is_block = parse_group_header(Regexp.last_match(1))
+          raise Error.parse("manifest", "group must use a block") unless is_block
+          if @group_stack.any?
+            raise Error.parse("manifest", "nested group blocks are not supported")
+          end
+
+          @group_stack.push(group_names)
+          parse_group_block(manifest)
+          @group_stack.pop
         when /\Aagent (.+)\z/
-          manifest.packages << parse_package_decl(Regexp.last_match(1))
+          manifest.packages << parse_package_with_groups(Regexp.last_match(1))
         when /\Alocal (.+)\z/
           manifest.local << parse_local_decl(Regexp.last_match(1))
         when /\Arender (.+)\z/
@@ -179,6 +187,31 @@ module Pray
         else
           raise Error.parse("manifest", "unrecognized statement: #{statement}")
         end
+      end
+
+      def parse_group_block(manifest)
+        while (statement = next_statement)
+          return if statement == "end"
+          if (match = statement.match(/\Aagent (.+)\z/))
+            manifest.packages << parse_package_with_groups(match[1])
+          elsif (match = statement.match(/\Apackage (.+)\z/))
+            manifest.packages << parse_package_with_groups(match[1])
+          elsif statement.match(/\Agroup (.+)\z/)
+            raise Error.parse("manifest", "nested group blocks are not supported")
+          else
+            raise Error.parse(
+              "manifest",
+              "group blocks only support agent or package declarations: #{statement}"
+            )
+          end
+        end
+        raise Error.parse("manifest", "missing 'end' for group block")
+      end
+
+      def parse_package_with_groups(rest)
+        package = parse_package_decl(rest)
+        package.groups = @group_stack.last&.dup || []
+        package
       end
 
       def parse_target_block(manifest, target_index)
@@ -318,7 +351,10 @@ module Pray
         is_block = rest.rstrip.end_with?("do")
         header = rest.sub(/\s*do\z/, "").strip
         values, = parse_call(header)
-        [string_from_value(values.first), is_block]
+        raise Error.parse("manifest", "group missing name") if values.empty?
+
+        names = values.map { |value| string_from_value(value) }
+        [names, is_block]
       end
 
       def parse_package_decl(rest)

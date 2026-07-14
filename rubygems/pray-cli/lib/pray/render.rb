@@ -45,6 +45,8 @@ module Pray
         target.skills.each do |folder_root|
           destination_root = File.join(project.project_root, folder_root)
           project.packages.each do |package|
+            next unless Environment.package_matches_environment?(package.declaration.groups, project.environment)
+
             collect_legacy_skill_files(project, package, destination_root, planned)
             collect_selected_export_files(project, package, destination_root, planned)
           end
@@ -85,6 +87,8 @@ module Pray
 
       managed_spans = []
       project.packages.each do |package|
+        next unless Environment.package_matches_environment?(package.declaration.groups, project.environment)
+
         package.selected_exports.each do |export|
           next unless should_inline_export?(package, export)
 

@@ -23,7 +23,9 @@ module Pray
       end
       arguments.reject! { |argument| %w[--locked --frozen --offline].include?(argument) }
 
-      command = arguments.shift || "help"
+      command = arguments.shift
+      raise Error.usage("pray requires a command; run pray --help") unless command
+
       case command
       when "manifest" then [:manifest]
       when "init"
@@ -67,9 +69,8 @@ module Pray
       when "sync" then [:unsupported, "sync"]
       when "trust" then parse_trust_command(arguments)
       when "version", "-V", "--version" then [:version]
-      when "help", "-h", "--help" then [:help]
       else
-        raise Error.unsupported("unknown command: #{command}")
+        raise Error.usage(Suggest.unknown_command_message(command))
       end
     end
 

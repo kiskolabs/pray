@@ -43,6 +43,7 @@ export function addPackageToManifest(
     exports: [],
     targets: [],
     features: [],
+    groups: [],
     optional: false,
     ...(options.path ? { path: options.path } : {}),
     ...(options.source ? { source: options.source } : {}),

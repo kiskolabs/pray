@@ -5,6 +5,7 @@ export interface ResolveOptions {
   refreshSourceRevisions: boolean;
   ignoreLockedVersions: boolean;
   unlockedPackages: Set<string>;
+  environment?: string;
 }
 
 export const defaultResolveOptions = (): ResolveOptions => ({

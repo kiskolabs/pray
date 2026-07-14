@@ -66,13 +66,13 @@ module GitDistributionFixture
     end
   end
 
-  def write_consumer_prayfile(consumer_repo, distribution_repo)
+  def write_consumer_prayfile(consumer_repo, distribution_repo, constraint: "~> 1.4")
     File.write(
       File.join(consumer_repo, "Prayfile"),
       <<~PRAYFILE
         prayfile "1"
         source "dist", "git+file://#{distribution_repo}"
-        agent "sample/base", "~> 1.4", source: "dist"
+        agent "sample/base", "#{constraint}", source: "dist"
         target :tool_a do
           output "INSTRUCTIONS.md"
         end

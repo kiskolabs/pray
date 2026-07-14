@@ -4,8 +4,21 @@ require "fileutils"
 
 module Pray
   module CLI
-    def manifest_path = MANIFEST_PATH
-    def lockfile_path = LOCKFILE_PATH
+    def manifest_path
+      Invocation.manifest_path
+    end
+
+    def lockfile_path
+      Invocation.lockfile_path
+    end
+
+    def project_root
+      Invocation.project_root
+    end
+
+    def resolve_current_project(options = ResolveOptions.new)
+      Invocation.resolve_current_project(options)
+    end
 
     def default_output_for_target(target)
       case target
@@ -18,6 +31,7 @@ module Pray
     def build_lockfile(project, rendered)
       LockfileIO.build_lockfile(
         project.manifest_hash,
+        project.environment,
         project.project_root,
         project.manifest.sources,
         project.manifest.targets,

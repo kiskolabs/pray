@@ -704,16 +704,26 @@ oci: "..."
 
 ### group
 
-Groups dependencies.
+Groups package declarations for environment-aware rendering.
 
 ```manifest
-group :webapp do
+group :development, :test do
   agent "sample/webapp", "~> 2.1"
   agent "sample/ui-kit", "~> 1.0"
 end
 ```
 
-Groups are organizational unless explicitly connected to targets or features.
+Rules:
+
+- A group block must use `do ... end` and may list multiple environment names separated by commas.
+- Only `agent` or `package` declarations are allowed inside a group block.
+- Nested group blocks are rejected.
+- Packages outside any group always render.
+- When no render environment is selected, only ungrouped packages render.
+- When `PRAY_ENV` or `--env` / `--environment` selects a name, ungrouped packages plus packages whose `groups` include that name render.
+- Unknown environment names fail with the available group names.
+- Group membership is part of the canonical manifest and manifest hash.
+- Package resolution and lock entries remain complete for every declared package regardless of the selected environment; only rendered managed spans and provisioned files are filtered.
 
 ### local
 
@@ -2531,7 +2541,18 @@ PRAY_CACHE
 PRAY_CONFIG
 PRAY_NO_COLOR
 PRAY_OFFLINE
+PRAY_PATH
+PRAY_FILE_PATH
+PRAY_ENV
 ```
+
+`PRAY_PATH`, `PRAY_FILE_PATH`, and `PRAY_ENV` select the project root, manifest path, and render environment. Equivalent CLI flags are `--path`, `--file-path`, and `--env` / `--environment`. Precedence is CLI option, process environment, project `.env`, then defaults.
+
+The reference CLI loads one `.env` file from the selected project root hint and reads only `PRAY_PATH`, `PRAY_FILE_PATH`, and `PRAY_ENV` from it without overriding values already set in the process environment.
+
+`--path` owns the project root, `Prayfile.lock`, and rendered outputs. A relative `--file-path` resolves under that root. For `pray add`, place the global project `--path` before the subcommand; `add --path PACKAGE_PATH` remains the package source path.
+
+`PRAY_ENV` and its CLI equivalents affect rendering and provisioning only. They must not change which packages are resolved or locked.
 
 They may affect local behavior. They must not silently change package resolution.
 

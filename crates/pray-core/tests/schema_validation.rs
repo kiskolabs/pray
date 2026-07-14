@@ -96,8 +96,14 @@ fn registry_metadata_validates_against_registry_schema() {
         versions: vec![RegistryPackageVersion {
             version: "1.0.0".to_string(),
             artifact: "v1/artifacts/sample/base/1.0.0/package.praypkg".to_string(),
-            artifact_hash: Some("sha256:0000000000000000000000000000000000000000000000000000000000000000".to_string()),
-            tree_hash: Some("sha256:1111111111111111111111111111111111111111111111111111111111111111".to_string()),
+            artifact_hash: Some(
+                "sha256:0000000000000000000000000000000000000000000000000000000000000000"
+                    .to_string(),
+            ),
+            tree_hash: Some(
+                "sha256:1111111111111111111111111111111111111111111111111111111111111111"
+                    .to_string(),
+            ),
             yanked: false,
             targets: vec!["tool_a".to_string()],
             exports: vec!["testing-basics".to_string()],

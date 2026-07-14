@@ -31,17 +31,13 @@ pub fn run_server(root: PathBuf, host: String, port: u16) -> PrayResult<()> {
     let listener = TcpListener::bind((host.as_str(), port))?;
     println!("Serving {} on http://{}:{}", root.display(), host, port);
     for connection in listener.incoming() {
-        match connection {
-            Ok(stream) => {
-                let root = root.clone();
-                thread::spawn(move || {
-                    if let Err(error) = handle_connection(root, stream) {
-                        eprintln!("serve error: {error}");
-                    }
-                });
+        let stream = connection?;
+        let root = root.clone();
+        thread::spawn(move || {
+            if let Err(error) = handle_connection(root, stream) {
+                eprintln!("serve error: {error}");
             }
-            Err(error) => return Err(error.into()),
-        }
+        });
     }
     Ok(())
 }
@@ -1350,20 +1346,6 @@ fn http_response_to_rpc(id: &str, response: Response) -> RpcResponse {
             content_type: response.content_type,
             body_encoding: None,
             body,
-        }
-    } else if response
-        .content_type
-        .starts_with("application/octet-stream")
-        || response.content_type.starts_with("text/")
-    {
-        use base64::{engine::general_purpose::STANDARD, Engine as _};
-        RpcResponse {
-            spec: SSH_RPC_SPEC.to_string(),
-            id: id.to_string(),
-            status: response.status,
-            content_type: response.content_type,
-            body_encoding: Some("base64".to_string()),
-            body: serde_json::Value::String(STANDARD.encode(&response.body)),
         }
     } else {
         use base64::{engine::general_purpose::STANDARD, Engine as _};

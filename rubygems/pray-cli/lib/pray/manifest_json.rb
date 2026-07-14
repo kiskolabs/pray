@@ -50,6 +50,7 @@ module Pray
         "exports" => package.exports,
         "targets" => package.targets,
         "features" => package.features,
+        "groups" => package.groups,
         "optional" => package.optional,
         "path" => package.path,
         "git" => package.git,

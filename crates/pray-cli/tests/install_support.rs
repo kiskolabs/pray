@@ -14,6 +14,9 @@ pub fn run_pray(repo: &Path, arguments: &[&str]) -> std::process::Output {
     Command::new(env!("CARGO_BIN_EXE_pray"))
         .args(arguments)
         .current_dir(repo)
+        .env_remove("PRAY_PATH")
+        .env_remove("PRAY_FILE_PATH")
+        .env_remove("PRAY_ENV")
         .output()
         .expect("run pray")
 }
@@ -83,6 +86,82 @@ end
         "Security guidance\n",
     )
     .expect("write export");
+    fs::write(repo.join(".agents/project.md"), "Local guidance\n").expect("write local");
+}
+
+pub fn create_grouped_fixture(repo: &Path) {
+    fs::create_dir_all(repo.join("packages/base/exports")).expect("fixture directories");
+    fs::create_dir_all(repo.join("packages/dev-only/exports")).expect("fixture directories");
+    fs::create_dir_all(repo.join(".agents")).expect("local directories");
+
+    fs::write(
+        repo.join("Prayfile"),
+        r#"
+prayfile "1"
+target :tool_a do
+  output "INSTRUCTIONS.md"
+end
+agent "sample/base", "~> 1.4", path: "packages/base"
+group :development, :test do
+  agent "sample/dev-only", "~> 1.0", path: "packages/dev-only"
+end
+local ".agents/project.md"
+render mode: :managed, conflict: :fail, churn: :minimal
+"#,
+    )
+    .expect("write Prayfile");
+
+    fs::write(
+        repo.join("packages/base/sample-base.prayspec"),
+        r#"
+Package::Specification.new do |spec|
+  spec.name = "sample/base"
+  spec.version = "1.4.3"
+  spec.summary = "shared guidance"
+  spec.files = ["README.md", "exports/testing-basics.md"]
+  spec.exports = {
+    "testing-basics" => {
+      type: "fragment",
+      path: "exports/testing-basics.md",
+      summary: "Testing guidance"
+    }
+  }
+end
+"#,
+    )
+    .expect("write prayspec");
+
+    fs::write(
+        repo.join("packages/dev-only/dev-only.prayspec"),
+        r#"
+Package::Specification.new do |spec|
+  spec.name = "sample/dev-only"
+  spec.version = "1.0.0"
+  spec.summary = "development guidance"
+  spec.files = ["exports/dev-note.md"]
+  spec.exports = {
+    "dev-note" => {
+      type: "fragment",
+      path: "exports/dev-note.md",
+      summary: "Development guidance"
+    }
+  }
+end
+"#,
+    )
+    .expect("write dev prayspec");
+
+    fs::write(repo.join("packages/base/README.md"), "package readme\n").expect("write readme");
+    fs::write(
+        repo.join("packages/base/exports/testing-basics.md"),
+        "Testing guidance\n",
+    )
+    .expect("write export");
+    fs::write(
+        repo.join("packages/dev-only/exports/dev-note.md"),
+        "Development guidance\n",
+    )
+    .expect("write dev export");
     fs::write(repo.join(".agents/project.md"), "Local guidance\n").expect("write local");
 }
 

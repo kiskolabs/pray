@@ -73,10 +73,7 @@ pub fn fetch_ssh_publishers(source_url: &str) -> PrayResult<Option<SshPublisherC
     if is_pray_ssh_url(source_url) {
         return with_pray_ssh_session(source_url, |session| {
             use serde_json::json;
-            match session.call_bytes(
-                "artifact.get",
-                json!({ "path": "v1/ssh_publishers.json" }),
-            ) {
+            match session.call_bytes("artifact.get", json!({ "path": "v1/ssh_publishers.json" })) {
                 Ok(bytes) => {
                     let config: SshPublisherConfig =
                         serde_json::from_slice(&bytes).map_err(|error| PrayError::Parse {
@@ -148,14 +145,10 @@ mod tests {
 
     #[test]
     fn import_registry_reads_local_publishers_file() {
-        let home = std::env::temp_dir().join(format!(
-            "pray-import-registry-home-{}",
-            std::process::id()
-        ));
-        let root = std::env::temp_dir().join(format!(
-            "pray-import-registry-root-{}",
-            std::process::id()
-        ));
+        let home =
+            std::env::temp_dir().join(format!("pray-import-registry-home-{}", std::process::id()));
+        let root =
+            std::env::temp_dir().join(format!("pray-import-registry-root-{}", std::process::id()));
         let _ = fs::remove_dir_all(&home);
         let _ = fs::remove_dir_all(&root);
         fs::create_dir_all(root.join("v1")).expect("v1");

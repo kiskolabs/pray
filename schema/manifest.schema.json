@@ -130,6 +130,7 @@
         "exports",
         "targets",
         "features",
+        "groups",
         "optional"
       ],
       "properties": {
@@ -160,6 +161,13 @@
           }
         },
         "features": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "minLength": 1
+          }
+        },
+        "groups": {
           "type": "array",
           "items": {
             "type": "string",

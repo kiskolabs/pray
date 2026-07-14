@@ -30,6 +30,55 @@ render mode: :managed,
     assert.equal(manifest.render.mode, "managed");
   });
 
+  it("parses group blocks as render selectors", () => {
+    const manifest = parseManifest(`
+prayfile "1"
+group :development, :test do
+  agent "sample/dev", "*"
+end
+agent "sample/shared", "*"
+`);
+
+    assert.deepEqual(manifest.packages[0]?.groups, ["development", "test"]);
+    assert.equal(manifest.packages[0]?.name, "sample/dev");
+    assert.deepEqual(manifest.packages[1]?.groups, []);
+    assert.equal(manifest.packages[1]?.name, "sample/shared");
+  });
+
+  it("rejects nested group blocks", () => {
+    assert.throws(
+      () =>
+        parseManifest(`
+prayfile "1"
+group :development do
+  group :test do
+    agent "sample/dev", "*"
+  end
+end
+`),
+      (error: unknown) =>
+        error instanceof PrayError &&
+        error.kind === "parse" &&
+        error.message.includes("nested group blocks are not supported"),
+    );
+  });
+
+  it("rejects non-package statements inside group blocks", () => {
+    assert.throws(
+      () =>
+        parseManifest(`
+prayfile "1"
+group :development do
+  source "default", "https://agents.example.com"
+end
+`),
+      (error: unknown) =>
+        error instanceof PrayError &&
+        error.kind === "parse" &&
+        error.message.includes("group blocks only support agent or package"),
+    );
+  });
+
   it("parses minimal package spec example", () => {
     const packageSpec = parsePackageSpec(`
 Package::Specification.new do |spec|

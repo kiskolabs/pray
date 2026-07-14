@@ -9,6 +9,8 @@ pub struct ResolveOptions {
     pub refresh_source_revisions: bool,
     /// When true, resolve against registry constraints instead of versions pinned in Prayfile.lock.
     pub ignore_locked_versions: bool,
+    /// Selected render environment; does not change package resolution.
+    pub environment: Option<String>,
 }
 
 #[derive(Debug, Clone, Default, PartialEq, Eq)]
@@ -23,19 +25,18 @@ impl PackageResolutionContext {
         package_name: &str,
         options: &ResolveOptions,
     ) -> Self {
-        let preferred_version = if options.ignore_locked_versions
-            || options.unlocked_packages.contains(package_name)
-        {
-            None
-        } else {
-            lockfile.and_then(|lockfile| {
-                lockfile
-                    .package
-                    .iter()
-                    .find(|package| package.name == package_name)
-                    .map(|package| package.version.clone())
-            })
-        };
+        let preferred_version =
+            if options.ignore_locked_versions || options.unlocked_packages.contains(package_name) {
+                None
+            } else {
+                lockfile.and_then(|lockfile| {
+                    lockfile
+                        .package
+                        .iter()
+                        .find(|package| package.name == package_name)
+                        .map(|package| package.version.clone())
+                })
+            };
         Self {
             preferred_version,
             offline: options.offline,

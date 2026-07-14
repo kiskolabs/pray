@@ -34,6 +34,11 @@
     "manifest_hash": {
       "$ref": "#/$defs/sha256Digest"
     },
+    "environment": {
+      "type": ["string", "null"],
+      "minLength": 1,
+      "description": "Selected render environment recorded when the lockfile was generated."
+    },
     "source": {
       "type": "array",
       "items": {

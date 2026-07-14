@@ -1,4 +1,5 @@
 import { relative, resolve } from "node:path";
+import { activeInvocationContext } from "../project-context/runtime.js";
 
 export function relativeLockfilePath(projectRoot: string, targetPath: string): string {
   const absolute = resolve(projectRoot, targetPath);
@@ -52,7 +53,19 @@ export function projectRootFromManifest(manifestPath: string): string {
 }
 
 export function defaultManifestPath(workingDirectory = process.cwd()): string {
+  const active = activeInvocationContext();
+  if (active) {
+    return active.manifestPath;
+  }
   return resolve(workingDirectory, "Prayfile");
+}
+
+export function defaultProjectRoot(workingDirectory = process.cwd()): string {
+  const active = activeInvocationContext();
+  if (active) {
+    return active.projectRoot;
+  }
+  return projectRootFromManifest(defaultManifestPath(workingDirectory));
 }
 
 export function defaultLockfilePath(projectRoot: string): string {

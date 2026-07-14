@@ -130,6 +130,7 @@ pub fn trusted_keys_by_scope(home: &Path) -> PrayResult<BTreeMap<String, BTreeSe
     Ok(output)
 }
 
+#[allow(clippy::type_complexity)]
 pub fn check_compromised_keys(
     home: &Path,
     entries: &[CompromisedKeyEntry],

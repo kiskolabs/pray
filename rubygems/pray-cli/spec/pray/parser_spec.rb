@@ -173,7 +173,45 @@ RSpec.describe "Pray parser" do
     prayfile = File.read(File.expand_path("../../../../examples/simple-project/Prayfile", __dir__))
     manifest = Pray.parse_manifest(prayfile)
     expect(manifest.manifest_hash).to eq(
-      "sha256:340c8fc15fa0196aadea58a50834d4f726698fb74a4967cdc340e3e653950326"
+      "sha256:25b1ca9becbb58d2b4e1b173231689dd76b94e358c490f829c9190b9431d244b"
     )
+  end
+
+  it "parses group blocks and attaches groups to packages" do
+    manifest = Pray.parse_manifest(<<~PRAYFILE)
+      prayfile "1"
+      group "development", "test" do
+        agent "sample/dev", "~> 1.0"
+      end
+      agent "sample/base", "~> 1.0"
+    PRAYFILE
+
+    expect(manifest.packages.map(&:name)).to eq(%w[sample/dev sample/base])
+    expect(manifest.packages[0].groups).to eq(%w[development test])
+    expect(manifest.packages[1].groups).to eq([])
+  end
+
+  it "rejects nested group blocks" do
+    expect do
+      Pray.parse_manifest(<<~PRAYFILE)
+        prayfile "1"
+        group "development" do
+          group "test" do
+            agent "sample/dev", "~> 1.0"
+          end
+        end
+      PRAYFILE
+    end.to raise_error(Pray::Error, /nested group blocks are not supported/)
+  end
+
+  it "rejects non-package statements inside group blocks" do
+    expect do
+      Pray.parse_manifest(<<~PRAYFILE)
+        prayfile "1"
+        group "development" do
+          source "default", "https://agents.example.com"
+        end
+      PRAYFILE
+    end.to raise_error(Pray::Error, /group blocks only support agent or package declarations/)
   end
 end

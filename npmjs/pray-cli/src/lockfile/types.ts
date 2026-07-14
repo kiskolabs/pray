@@ -41,6 +41,7 @@ export interface Lockfile {
   spec: string;
   generated_by: string;
   manifest_hash: string;
+  environment?: string;
   source: LockSource[];
   package: LockedPackage[];
   target: LockedTarget[];
