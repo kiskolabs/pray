@@ -1,5 +1,6 @@
 mod apply_report;
 mod auth_client;
+mod cli_release;
 mod help;
 mod invocation;
 mod revision;
@@ -98,7 +99,7 @@ fn run(arguments: Vec<String>) -> PrayResult<()> {
         ));
     }
 
-    let result = match parse_command(filtered)? {
+    let result = match parse_command(filtered.clone())? {
         Command::Manifest => manifest_command(),
         Command::Init { targets } => init_command(targets),
         Command::PrayerInit => prayer_init_command(),
@@ -179,8 +180,13 @@ fn run(arguments: Vec<String>) -> PrayResult<()> {
         Command::Tree => tree_command(),
         Command::Sync { root, peers } => sync_command(root, peers),
         Command::Trust { arguments } => trust_command::run_trust_command(arguments),
+        Command::Upgrade => cli_release::upgrade_command(),
         Command::Version => version_command(),
     };
+
+    if result.is_ok() {
+        cli_release::maybe_print_upgrade_notice(&filtered);
+    }
 
     if let Some(home) = ephemeral_home {
         let _ = fs::remove_dir_all(home);
@@ -318,6 +324,7 @@ enum Command {
     Trust {
         arguments: Vec<String>,
     },
+    Upgrade,
     Version,
 }
 
@@ -404,6 +411,7 @@ fn parse_command(arguments: Vec<String>) -> PrayResult<Command> {
             let arguments: Vec<String> = iter.collect();
             Ok(Command::Trust { arguments })
         }
+        "upgrade" => Ok(Command::Upgrade),
         "version" | "-V" | "--version" => Ok(Command::Version),
         other => Err(PrayError::Usage(unknown_command_message(other))),
     }
