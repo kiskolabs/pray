@@ -4,7 +4,7 @@ require "fileutils"
 require "pathname"
 
 module Pray
-  RenderedTarget = Struct.new(:path, :content, :managed_spans, keyword_init: true) do
+  RenderedTarget = Struct.new(:path, :content, :managed_spans) do
     def initialize(path:, content:, managed_spans: [])
       super
     end
@@ -55,7 +55,7 @@ module Pray
       planned.sort_by(&:path)
     end
 
-    PlannedProvisionedFile = Struct.new(:path, :source, keyword_init: true)
+    PlannedProvisionedFile = Struct.new(:path, :source)
 
     def render_target(project, target, output)
       builder = ContentBuilder.new

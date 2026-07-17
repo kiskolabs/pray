@@ -56,7 +56,7 @@ module Pray
     end
 
     def repo_distribution_root(root)
-      File.basename(root) == "prayers" ? root : File.join(root, "prayers")
+      (File.basename(root) == "prayers") ? root : File.join(root, "prayers")
     end
   end
 end

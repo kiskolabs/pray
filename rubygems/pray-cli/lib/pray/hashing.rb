@@ -16,7 +16,7 @@ module Pray
     end
 
     def prefixed_hex_digest(digest_bytes)
-      "sha256:#{digest_bytes.unpack1('H*')}"
+      "sha256:#{digest_bytes.unpack1("H*")}"
     end
 
     def marker_id(seed)
@@ -49,10 +49,10 @@ module Pray
     end
 
     def update_line_endings_normalized(digest, line)
-      if line.include?("\r")
-        digest << normalize_line_endings(line)
+      digest << if line.include?("\r")
+        normalize_line_endings(line)
       else
-        digest << line
+        line
       end
     end
   end

@@ -59,7 +59,10 @@ function runGit(directory: string, ...argumentsList: string[]): string {
   return result.stdout ?? "";
 }
 
-function initDistributionRepo(distributionRepo: string, prayersRoot: string): void {
+function initDistributionRepo(
+  distributionRepo: string,
+  prayersRoot: string,
+): void {
   mkdirSync(prayersRoot, { recursive: true });
   runGit(distributionRepo, "init", "-b", "main");
   runGit(distributionRepo, "config", "user.name", "Pray Test");
@@ -124,7 +127,10 @@ describe("git distribution install", () => {
       process.chdir(consumerRepo);
       assert.equal(await runCli(["install"]), 0);
 
-      const lockfile = readFileSync(join(consumerRepo, "Prayfile.lock"), "utf8");
+      const lockfile = readFileSync(
+        join(consumerRepo, "Prayfile.lock"),
+        "utf8",
+      );
       assert.match(lockfile, /sample\/base/);
       assert.match(lockfile, /revision = "/);
       assert.match(
@@ -154,7 +160,11 @@ describe("git distribution install", () => {
       assert.equal(await runCli(["publish", "--root", prayersRoot]), 0);
       initDistributionRepo(distributionRepo, prayersRoot);
 
-      const initialRevision = runGit(distributionRepo, "rev-parse", "HEAD").trim();
+      const initialRevision = runGit(
+        distributionRepo,
+        "rev-parse",
+        "HEAD",
+      ).trim();
       writeConsumerPrayfile(consumerRepo, distributionRepo);
 
       process.chdir(consumerRepo);
@@ -173,7 +183,10 @@ describe("git distribution install", () => {
 
       assert.equal(await runCli(["install", "--locked"]), 0);
 
-      const lockfile = readFileSync(join(consumerRepo, "Prayfile.lock"), "utf8");
+      const lockfile = readFileSync(
+        join(consumerRepo, "Prayfile.lock"),
+        "utf8",
+      );
       assert.ok(lockfile.includes(initialRevision));
     });
   });
@@ -212,11 +225,18 @@ describe("git distribution install", () => {
       );
       runGit(distributionRepo, "add", "-A");
       runGit(distributionRepo, "commit", "-m", "advance distribution");
-      const advancedRevision = runGit(distributionRepo, "rev-parse", "HEAD").trim();
+      const advancedRevision = runGit(
+        distributionRepo,
+        "rev-parse",
+        "HEAD",
+      ).trim();
 
       assert.equal(await runCli(["update"]), 0);
 
-      const lockfile = readFileSync(join(consumerRepo, "Prayfile.lock"), "utf8");
+      const lockfile = readFileSync(
+        join(consumerRepo, "Prayfile.lock"),
+        "utf8",
+      );
       assert.ok(lockfile.includes(advancedRevision));
     });
   });

@@ -1,12 +1,12 @@
 # frozen_string_literal: true
 
 module Pray
-  VerificationFinding = Struct.new(:kind, :message, keyword_init: true) do
+  VerificationFinding = Struct.new(:kind, :message) do
     def warning? = kind == "orphan_marker"
     def error? = !warning?
   end
 
-  VerificationReport = Struct.new(:findings, keyword_init: true) do
+  VerificationReport = Struct.new(:findings) do
     def initialize(findings: [])
       super
     end

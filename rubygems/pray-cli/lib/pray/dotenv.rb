@@ -10,7 +10,7 @@ module Pray
 
       text = File.read(path)
       parse_dotenv_text(text)
-    rescue StandardError
+    rescue
       {}
     end
 

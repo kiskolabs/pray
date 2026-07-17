@@ -144,12 +144,7 @@ fn sync_crawls_discovered_peers_and_persists_them() {
         .as_array()
         .expect("peer array")
         .iter()
-        .map(|peer| {
-            peer["url"]
-                .as_str()
-                .expect("peer url")
-                .to_string()
-        })
+        .map(|peer| peer["url"].as_str().expect("peer url").to_string())
         .collect::<std::collections::BTreeSet<_>>();
     assert_eq!(peer_urls.len(), 2);
     assert!(peer_urls.contains(&seed_url));

@@ -30,7 +30,7 @@ module Pray
       return if known_groups.include?(environment)
 
       raise Error.resolution(
-        "unknown environment #{environment}; available groups are #{known_groups.join(', ')}"
+        "unknown environment #{environment}; available groups are #{known_groups.join(", ")}"
       )
     end
 

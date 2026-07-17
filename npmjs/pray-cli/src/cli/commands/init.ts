@@ -9,7 +9,8 @@ export function runInit(argumentsList: string[]): void {
     throw PrayError.manifest("Prayfile already exists");
   }
   const targetIndex = argumentsList.indexOf("--targets");
-  const targetsArgument = targetIndex >= 0 ? argumentsList[targetIndex + 1] : undefined;
+  const targetsArgument =
+    targetIndex >= 0 ? argumentsList[targetIndex + 1] : undefined;
   const targets = targetsArgument ?? "tool_a";
   const targetNames = targets.split(",").map((name) => name.trim());
   const targetBlocks = targetNames

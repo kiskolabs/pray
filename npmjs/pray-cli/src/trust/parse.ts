@@ -24,9 +24,7 @@ function parseTrustRules(value: unknown): TrustRule[] {
   if (!Array.isArray(value)) {
     throw PrayError.parse(CONTEXT, "rules must be an array");
   }
-  return value.map((entry, index) =>
-    parseTrustRule(entry, `rules[${index}]`),
-  );
+  return value.map((entry, index) => parseTrustRule(entry, `rules[${index}]`));
 }
 
 function parseTrustRule(value: unknown, context: string): TrustRule {

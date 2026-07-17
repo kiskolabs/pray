@@ -3,9 +3,9 @@ import { join } from "node:path";
 import { unpackPraypkg } from "../archive/praypkg.js";
 import { PrayError } from "../errors.js";
 import { sha256Prefixed } from "../hashing.js";
+import { httpGet, joinUrl } from "../http/client.js";
 import { fetchPackageMetadata } from "../registry/index.js";
 import type { RegistryPackageMetadata } from "../registry/types.js";
-import { httpGet, joinUrl } from "../http/client.js";
 
 export interface SyncSummary {
   peers: string[];
@@ -38,7 +38,10 @@ export async function syncDistributionRoot(
         continue;
       }
       const artifactBytes = await httpGet(joinUrl(peer, latest.artifact));
-      if (latest.artifactHash && sha256Prefixed(artifactBytes) !== latest.artifactHash) {
+      if (
+        latest.artifactHash &&
+        sha256Prefixed(artifactBytes) !== latest.artifactHash
+      ) {
         throw PrayError.integrity(`artifact hash mismatch for ${packageName}`);
       }
       const cacheDirectory = join(
@@ -54,28 +57,33 @@ export async function syncDistributionRoot(
         join(distributionRoot, "v1", "packages", `${packageName}.json`),
         packageMetadata,
       );
-      mkdirSync(join(distributionRoot, latest.artifact, ".."), { recursive: true });
-      writeFileSync(
-        join(distributionRoot, latest.artifact),
-        artifactBytes,
-      );
+      mkdirSync(join(distributionRoot, latest.artifact, ".."), {
+        recursive: true,
+      });
+      writeFileSync(join(distributionRoot, latest.artifact), artifactBytes);
       syncedPackages.add(packageName);
     }
   }
 
   writeFileSync(
     join(distributionRoot, "v1", "index.json"),
-    `${JSON.stringify({
-      spec: "prayfile-distribution-1",
-      packages: [...syncedPackages].sort(),
-    }, null, 2)}\n`,
+    `${JSON.stringify(
+      {
+        spec: "prayfile-distribution-1",
+        packages: [...syncedPackages].sort(),
+      },
+      null,
+      2,
+    )}\n`,
     "utf8",
   );
 
   return { peers: [...visited], packages: [...syncedPackages].sort() };
 }
 
-async function fetchPackageIndex(peer: string): Promise<{ packages: string[] }> {
+async function fetchPackageIndex(
+  peer: string,
+): Promise<{ packages: string[] }> {
   const text = await httpGet(joinUrl(peer, "v1/index.json")).then((buffer) =>
     buffer.toString("utf8"),
   );
@@ -90,22 +98,26 @@ function writeRegistryPackageMetadataLocal(
   mkdirSync(join(path, ".."), { recursive: true });
   writeFileSync(
     path,
-    `${JSON.stringify({
-      name: metadata.name,
-      versions: metadata.versions.map((entry) => ({
-        version: entry.version,
-        artifact: entry.artifact,
-        artifact_hash: entry.artifactHash,
-        tree_hash: entry.treeHash,
-        yanked: entry.yanked,
-        targets: entry.targets,
-        exports: entry.exports,
-        signer: entry.signer,
-        signer_fingerprint: entry.signerFingerprint,
-        published_at: entry.publishedAt,
-        signature: entry.signature,
-      })),
-    }, null, 2)}\n`,
+    `${JSON.stringify(
+      {
+        name: metadata.name,
+        versions: metadata.versions.map((entry) => ({
+          version: entry.version,
+          artifact: entry.artifact,
+          artifact_hash: entry.artifactHash,
+          tree_hash: entry.treeHash,
+          yanked: entry.yanked,
+          targets: entry.targets,
+          exports: entry.exports,
+          signer: entry.signer,
+          signer_fingerprint: entry.signerFingerprint,
+          published_at: entry.publishedAt,
+          signature: entry.signature,
+        })),
+      },
+      null,
+      2,
+    )}\n`,
     "utf8",
   );
 }

@@ -65,9 +65,7 @@ managed_span = []
       import.meta.dirname,
       "../../../examples/simple-project/Prayfile.lock",
     );
-    const parsed = parseLockfileValue(
-      parse(readFileSync(fixturePath, "utf8")),
-    );
+    const parsed = parseLockfileValue(parse(readFileSync(fixturePath, "utf8")));
     const reordered: Lockfile = {
       ...parsed,
       package: [...parsed.package].reverse(),

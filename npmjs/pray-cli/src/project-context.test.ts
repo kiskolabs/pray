@@ -3,13 +3,13 @@ import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { afterEach, beforeEach, describe, it } from "node:test";
+import { parseDotenvText } from "./project-context/dotenv.js";
 import {
   ENV_ENVIRONMENT,
   ENV_MANIFEST_PATH,
   ENV_PROJECT_PATH,
   projectInvocationContextFromOptions,
 } from "./project-context/index.js";
-import { parseDotenvText } from "./project-context/dotenv.js";
 
 describe("project context", () => {
   const previousEnvironment: Record<string, string | undefined> = {};

@@ -4,9 +4,7 @@ import { PrayError } from "../errors.js";
 import { sha256Prefixed } from "../hashing.js";
 import type { PackageSpec } from "./types.js";
 
-export function treeHashFromFileBytes(
-  fileBytes: Map<string, Buffer>,
-): string {
+export function treeHashFromFileBytes(fileBytes: Map<string, Buffer>): string {
   const entries = [...fileBytes.entries()]
     .map(([path, bytes]) => [path, sha256Prefixed(bytes)] as const)
     .sort(([left], [right]) => left.localeCompare(right));

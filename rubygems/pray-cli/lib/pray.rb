@@ -1,7 +1,5 @@
 # frozen_string_literal: true
 
-require "set"
-
 require_relative "pray/version"
 require_relative "pray/error"
 require_relative "pray/literal"
@@ -31,9 +29,9 @@ require_relative "pray/materialize"
 
 class << Pray
   public :parse_manifest, :read_manifest_text, :format_package_declaration, :replace_package_declaration,
-         :parse_package_spec, :parse_lockfile, :read_lockfile, :serialize_lockfile, :lockfile_hash,
-         :write_lockfile, :write_lockfile_if_changed, :lockfiles_equivalent?, :build_lockfile,
-         :resolve_project, :render_project, :materialize_project,
-         :inspect_project, :verify_project, :drift_project,
-         :default_manifest_path, :default_lockfile_path, :project_root_from_manifest
+    :parse_package_spec, :parse_lockfile, :read_lockfile, :serialize_lockfile, :lockfile_hash,
+    :write_lockfile, :write_lockfile_if_changed, :lockfiles_equivalent?, :build_lockfile,
+    :resolve_project, :render_project, :materialize_project,
+    :inspect_project, :verify_project, :drift_project,
+    :default_manifest_path, :default_lockfile_path, :project_root_from_manifest
 end

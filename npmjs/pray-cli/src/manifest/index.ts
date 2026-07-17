@@ -1,18 +1,18 @@
 import { readFileSync } from "node:fs";
 import { PrayError } from "../errors.js";
 import { sha256Prefixed } from "../hashing.js";
+import { parseManifestText } from "./parser.js";
 import {
   canonicalManifest,
   defaultRenderPolicy,
-  manifestToJson,
   type Manifest,
   type ManifestLocal,
   type ManifestPackage,
   type ManifestSource,
   type ManifestTarget,
+  manifestToJson,
   type RenderPolicy,
 } from "./types.js";
-import { parseManifestText } from "./parser.js";
 
 export function readManifestText(manifestPath: string): string {
   try {
@@ -38,14 +38,13 @@ export function parseManifest(text: string): Manifest {
 }
 
 export function manifestHash(manifest: Manifest): string {
-  const bytes = Buffer.from(
-    JSON.stringify(manifestToJson(manifest)),
-    "utf8",
-  );
+  const bytes = Buffer.from(JSON.stringify(manifestToJson(manifest)), "utf8");
   return sha256Prefixed(bytes);
 }
 
-export function formatPackageDeclaration(packageEntry: ManifestPackage): string {
+export function formatPackageDeclaration(
+  packageEntry: ManifestPackage,
+): string {
   const parts = [`agent "${packageEntry.name}"`];
   if (packageEntry.constraint !== "*") {
     parts.push(`"${packageEntry.constraint}"`);

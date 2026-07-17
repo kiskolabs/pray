@@ -104,12 +104,11 @@ fn read_cached_latest_version() -> PrayResult<Option<String>> {
         return Ok(None);
     }
     let text = fs::read_to_string(&cache_path)?;
-    let cache: VersionCheckCache = serde_json::from_str(&text).map_err(|error| {
-        PrayError::Parse {
+    let cache: VersionCheckCache =
+        serde_json::from_str(&text).map_err(|error| PrayError::Parse {
             kind: "cli-version-check",
             message: format!("{}: {error}", cache_path.display()),
-        }
-    })?;
+        })?;
     let now = unix_timestamp()?;
     if now.saturating_sub(cache.checked_at) > version_check_ttl_seconds() {
         return Ok(None);
@@ -162,7 +161,9 @@ fn http_get(url: &str) -> PrayResult<String> {
             concat!(env!("CARGO_PKG_NAME"), "/", env!("CARGO_PKG_VERSION")),
         )
         .call()
-        .map_err(|error| PrayError::Unsupported(format!("HTTP request failed for {url}: {error}")))?;
+        .map_err(|error| {
+            PrayError::Unsupported(format!("HTTP request failed for {url}: {error}"))
+        })?;
     let status = response.status();
     let body = response.body_mut().read_to_string().unwrap_or_default();
     if !status.is_success() {

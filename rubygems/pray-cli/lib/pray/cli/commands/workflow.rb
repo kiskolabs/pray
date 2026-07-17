@@ -35,10 +35,10 @@ module Pray
       project = resolve_current_project
       lockfile = ensure_existing_lockfile(lockfile_path)
       report = if flags[:semantic]
-                 Verify.inspect_project(project, lockfile)
-               else
-                 Verify.drift_project(project, lockfile)
-               end
+        Verify.inspect_project(project, lockfile)
+      else
+        Verify.drift_project(project, lockfile)
+      end
       puts format_drift_report(report) unless report.clean?
     end
 
@@ -76,7 +76,7 @@ module Pray
           raise Error.manifest("package #{package} not found")
         end
       end
-      install_command({ locked: false, frozen: false, offline: offline, refresh: true })
+      install_command({locked: false, frozen: false, offline: offline, refresh: true})
     end
 
     def unlock_command(name)

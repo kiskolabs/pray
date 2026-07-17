@@ -3,17 +3,17 @@ import { parse } from "smol-toml";
 import { PrayError } from "../errors.js";
 import { sha256Prefixed } from "../hashing.js";
 import type { ManifestSource, ManifestTarget } from "../manifest/types.js";
-import type { ResolvedPackage } from "../resolve/types.js";
 import type { RenderedTarget } from "../render/types.js";
+import type { ResolvedPackage } from "../resolve/types.js";
+import { parseLockfileValue } from "./parse.js";
+import { normalizeLockfileArtifact, relativeLockfilePath } from "./paths.js";
+import { serializeLockfileText } from "./serialize.js";
 import {
   canonicalLockfile,
   GENERATED_BY,
   type Lockfile,
   type LockSource,
 } from "./types.js";
-import { parseLockfileValue } from "./parse.js";
-import { normalizeLockfileArtifact, relativeLockfilePath } from "./paths.js";
-import { serializeLockfileText } from "./serialize.js";
 
 export function parseLockfile(text: string): Lockfile {
   try {

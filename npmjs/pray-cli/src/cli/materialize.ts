@@ -1,16 +1,18 @@
 import { existsSync } from "node:fs";
 import { resolve } from "node:path";
 import { PrayError } from "../errors.js";
-import { buildLockfile, lockfilesEquivalent, readLockfile, writeLockfileIfChanged } from "../lockfile/index.js";
 import {
-  defaultLockfilePath,
-  defaultManifestPath,
-} from "../lockfile/paths.js";
+  buildLockfile,
+  lockfilesEquivalent,
+  readLockfile,
+  writeLockfileIfChanged,
+} from "../lockfile/index.js";
+import { defaultLockfilePath, defaultManifestPath } from "../lockfile/paths.js";
 import { manifestToJson } from "../manifest/types.js";
 import { renderProject, writeRenderedTargets } from "../render/project.js";
 import { defaultResolveOptions } from "../resolve/context.js";
-import { resolveCurrentProjectWithGitRefreshFallback } from "./invocation.js";
 import { resolveProject } from "../resolve/project.js";
+import { resolveCurrentProjectWithGitRefreshFallback } from "./invocation.js";
 
 export interface MaterializeOptions {
   manifestPath?: string;
@@ -79,7 +81,9 @@ export async function materializeProject(
   writeRenderedTargets(project, rendered);
 }
 
-export async function printManifest(manifestPath = defaultManifestPath()): Promise<void> {
+export async function printManifest(
+  manifestPath = defaultManifestPath(),
+): Promise<void> {
   const project = await resolveProject(manifestPath, defaultResolveOptions());
   process.stdout.write(
     `${JSON.stringify(manifestToJson(project.manifest), null, 2)}\n`,

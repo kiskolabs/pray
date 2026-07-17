@@ -4,10 +4,10 @@ import { tmpdir } from "node:os";
 import { join, resolve } from "node:path";
 import { describe, it } from "node:test";
 import { materializeProject } from "./cli/materialize.js";
-import { defaultLockfilePath } from "./lockfile/paths.js";
 import { readLockfile } from "./lockfile/index.js";
-import { verifyProject } from "./verify/project.js";
+import { defaultLockfilePath } from "./lockfile/paths.js";
 import { resolveProject } from "./resolve/project.js";
+import { verifyProject } from "./verify/project.js";
 
 describe("install integration", () => {
   it("installs and verifies simple-project fixture", async () => {

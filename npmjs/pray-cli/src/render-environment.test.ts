@@ -1,8 +1,8 @@
 import assert from "node:assert/strict";
 import { describe, it } from "node:test";
-import { renderProject } from "./render/project.js";
 import type { ManifestPackage } from "./manifest/types.js";
 import type { PackageSpec } from "./package-spec/types.js";
+import { renderProject } from "./render/project.js";
 import type { ResolvedPackage, ResolvedProject } from "./resolve/types.js";
 
 function resolvedPackage(

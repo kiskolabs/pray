@@ -27,7 +27,11 @@ export async function submitConfession(
     throw PrayError.manifest("Prayfile.lock is required for confess");
   }
   const lockfile = readLockfile(lockfilePath);
-  const submission = buildConfessionSubmission(project.manifestHash, lockfile, options);
+  const submission = buildConfessionSubmission(
+    project.manifestHash,
+    lockfile,
+    options,
+  );
   const serverUrl = options.url ?? defaultDistributionUrl(project);
   await httpPost(
     joinUrl(serverUrl, "v1/confessions"),
@@ -47,7 +51,9 @@ function buildConfessionSubmission(
     : undefined;
   const packageName = options.packageName ?? span?.package;
   if (!packageName) {
-    throw PrayError.manifest("confess requires a package name or --from-lock span id");
+    throw PrayError.manifest(
+      "confess requires a package name or --from-lock span id",
+    );
   }
   const locked = lockfile.package.find((entry) => entry.name === packageName);
   const accepted = options.accepted ?? !options.rejected;
@@ -71,7 +77,9 @@ function defaultDistributionUrl(
 ): string {
   const source = project.manifest.sources[0];
   if (!source || source.kind !== "registry") {
-    throw PrayError.unsupported("confess requires --url or a registry source in Prayfile");
+    throw PrayError.unsupported(
+      "confess requires --url or a registry source in Prayfile",
+    );
   }
   return source.url;
 }

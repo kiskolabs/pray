@@ -1,7 +1,11 @@
 import assert from "node:assert/strict";
 import { describe, it } from "node:test";
-import { conciseHelpText, commandHelpText, maybePrintHelp } from "./help.js";
-import { unknownCommandMessage, suggestCommand, TOP_LEVEL_COMMANDS } from "./suggest.js";
+import { commandHelpText, conciseHelpText, maybePrintHelp } from "./help.js";
+import {
+  suggestCommand,
+  TOP_LEVEL_COMMANDS,
+  unknownCommandMessage,
+} from "./suggest.js";
 
 describe("help", () => {
   it("includes product description and help hint", () => {

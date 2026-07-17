@@ -74,7 +74,9 @@ class BlockParser {
       if (!allowTarget && !statement.endsWith(" do")) {
         throw PrayError.parse("manifest", "target must use a block");
       }
-      const { target, isBlock } = parseTargetHeader(statement.slice("target ".length));
+      const { target, isBlock } = parseTargetHeader(
+        statement.slice("target ".length),
+      );
       manifest.targets.push(target);
       if (isBlock) {
         const index = manifest.targets.length - 1;
@@ -83,12 +85,17 @@ class BlockParser {
       return;
     }
     if (statement.startsWith("group ")) {
-      const { groups, isBlock } = parseGroupHeader(statement.slice("group ".length));
+      const { groups, isBlock } = parseGroupHeader(
+        statement.slice("group ".length),
+      );
       if (!isBlock) {
         throw PrayError.parse("manifest", "group must use a block");
       }
       if (this.groupStack.length > 0) {
-        throw PrayError.parse("manifest", "nested group blocks are not supported");
+        throw PrayError.parse(
+          "manifest",
+          "nested group blocks are not supported",
+        );
       }
       this.groupStack.push(groups);
       this.parseGroupBlock(manifest);
@@ -122,7 +129,10 @@ class BlockParser {
         return;
       }
       if (statement.startsWith("group ")) {
-        throw PrayError.parse("manifest", "nested group blocks are not supported");
+        throw PrayError.parse(
+          "manifest",
+          "nested group blocks are not supported",
+        );
       }
       if (statement.startsWith("agent ")) {
         manifest.packages.push(
@@ -145,7 +155,9 @@ class BlockParser {
 
   private parsePackageWithGroups(rest: string) {
     const packageEntry = parsePackageDecl(rest);
-    packageEntry.groups = [...(this.groupStack[this.groupStack.length - 1] ?? [])];
+    packageEntry.groups = [
+      ...(this.groupStack[this.groupStack.length - 1] ?? []),
+    ];
     return packageEntry;
   }
 

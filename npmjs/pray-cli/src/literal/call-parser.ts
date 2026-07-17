@@ -1,11 +1,7 @@
 import { PrayError } from "../errors.js";
 import { parseLiteral } from "./parser.js";
 import { findTopLevel, splitTopLevel } from "./split.js";
-import {
-  literalAsArray,
-  literalAsString,
-  type LiteralValue,
-} from "./types.js";
+import { type LiteralValue, literalAsArray, literalAsString } from "./types.js";
 
 export interface ParsedCall {
   values: LiteralValue[];
@@ -31,7 +27,10 @@ function parseKeywordSegment(
 ): { key: string; value: LiteralValue } | undefined {
   const arrowIndex = findTopLevel(segment, "=>");
   if (arrowIndex !== undefined) {
-    const key = stringFromLiteral(segment.slice(0, arrowIndex).trim(), "literal");
+    const key = stringFromLiteral(
+      segment.slice(0, arrowIndex).trim(),
+      "literal",
+    );
     const value = parseLiteral(segment.slice(arrowIndex + 2).trim());
     return { key, value };
   }
@@ -84,7 +83,10 @@ export function requirePositionalString(
 ): string {
   const value = values[index];
   if (value === undefined) {
-    throw PrayError.parse(context, `missing positional argument at index ${index}`);
+    throw PrayError.parse(
+      context,
+      `missing positional argument at index ${index}`,
+    );
   }
   return stringFromValue(value, context);
 }

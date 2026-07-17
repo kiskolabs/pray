@@ -1,5 +1,8 @@
 import { existsSync, readFileSync, writeFileSync } from "node:fs";
-import { writePackageArchive, packageArchivePath } from "../../archive/praypkg.js";
+import {
+  packageArchivePath,
+  writePackageArchive,
+} from "../../archive/praypkg.js";
 import { normalizeLineEndings } from "../../hashing.js";
 import { readLockfile } from "../../lockfile/index.js";
 import {

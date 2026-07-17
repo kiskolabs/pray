@@ -11,8 +11,6 @@ description = "HTTP, federation, and transport adapters for pray distribution po
 [dependencies]
 async-trait = "0.1"
 anyhow = "1"
-chrono = { version = "0.4", features = ["serde"] }
-hex = "0.4"
 pray-core = { path = "../pray-core" }
 reqwest = { version = "0.13", features = ["json"] }
 serde = { version = "1", features = ["derive"] }

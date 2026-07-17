@@ -70,7 +70,10 @@ function levenshteinDistance(left: string, right: string): number {
     return leftLength;
   }
 
-  let previousRow = Array.from({ length: rightLength + 1 }, (_, index) => index);
+  let previousRow = Array.from(
+    { length: rightLength + 1 },
+    (_, index) => index,
+  );
   let currentRow = Array.from({ length: rightLength + 1 }, () => 0);
 
   for (let leftIndex = 0; leftIndex < leftLength; leftIndex += 1) {
@@ -85,7 +88,11 @@ function levenshteinDistance(left: string, right: string): number {
       const deleteCost = (previousRow[rightIndex + 1] ?? 0) + 1;
       const insertCost = (currentRow[rightIndex] ?? 0) + 1;
       const substituteCost = (previousRow[rightIndex] ?? 0) + substitutionCost;
-      currentRow[rightIndex + 1] = Math.min(deleteCost, insertCost, substituteCost);
+      currentRow[rightIndex + 1] = Math.min(
+        deleteCost,
+        insertCost,
+        substituteCost,
+      );
     }
     [previousRow, currentRow] = [currentRow, previousRow];
   }

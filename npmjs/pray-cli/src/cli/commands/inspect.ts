@@ -1,6 +1,10 @@
 import { existsSync } from "node:fs";
 import { PrayError } from "../../errors.js";
-import { buildLockfile, lockfilesEquivalent, readLockfile } from "../../lockfile/index.js";
+import {
+  buildLockfile,
+  lockfilesEquivalent,
+  readLockfile,
+} from "../../lockfile/index.js";
 import {
   defaultLockfilePath,
   defaultManifestPath,
@@ -22,7 +26,9 @@ export async function runList(): Promise<void> {
 
 export async function runOutdated(): Promise<void> {
   const lockfilePath = defaultLockfilePath(process.cwd());
-  const previous = existsSync(lockfilePath) ? readLockfile(lockfilePath) : undefined;
+  const previous = existsSync(lockfilePath)
+    ? readLockfile(lockfilePath)
+    : undefined;
   const project = await resolveProject(defaultManifestPath());
   const rendered = renderProject(project);
   const latest = buildLockfile({
@@ -64,8 +70,12 @@ export async function runExplain(name: string | undefined): Promise<void> {
     throw PrayError.resolution(`package ${name} not found`);
   }
   const lockfilePath = defaultLockfilePath(project.projectRoot);
-  const lockfile = existsSync(lockfilePath) ? readLockfile(lockfilePath) : undefined;
-  const lockfilePackage = lockfile?.package.find((entry) => entry.name === name);
+  const lockfile = existsSync(lockfilePath)
+    ? readLockfile(lockfilePath)
+    : undefined;
+  const lockfilePackage = lockfile?.package.find(
+    (entry) => entry.name === name,
+  );
   const lines = [
     "Package explanation",
     `name: ${packageEntry.declaration.name}`,

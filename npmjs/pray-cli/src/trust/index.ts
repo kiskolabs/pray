@@ -61,8 +61,9 @@ export function addSigningKey(fingerprint: string): void {
 
 export function removeSigningKey(fingerprint: string): void {
   const policy = loadTrustPolicy();
-  policy.default.allowed_signing_keys = (policy.default.allowed_signing_keys ?? [])
-    .filter((key) => key !== fingerprint);
+  policy.default.allowed_signing_keys = (
+    policy.default.allowed_signing_keys ?? []
+  ).filter((key) => key !== fingerprint);
   policy.rules = policy.rules.map((rule) => ({
     ...rule,
     allowed_signing_keys: rule.allowed_signing_keys?.filter(
@@ -129,8 +130,12 @@ export function runTrustCommand(argumentsList: string[]): void {
       return;
     case "import-repo":
     case "import-registry":
-      throw PrayError.unsupported(`${subcommand} is not implemented yet in pray-cli typescript`);
+      throw PrayError.unsupported(
+        `${subcommand} is not implemented yet in pray-cli typescript`,
+      );
     default:
-      throw PrayError.unsupported(`unknown trust subcommand: ${subcommand ?? "(none)"}`);
+      throw PrayError.unsupported(
+        `unknown trust subcommand: ${subcommand ?? "(none)"}`,
+      );
   }
 }

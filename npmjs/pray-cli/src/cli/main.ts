@@ -10,24 +10,24 @@ import { runTrustCommand } from "../trust/index.js";
 import { cleanProjectCaches, vendorProject } from "../vendor/index.js";
 import { driftProject, verifyProject } from "../verify/project.js";
 import {
-  initializeInvocation,
-  lockfilePath,
-  resolveCurrentProject,
-  resolveCurrentProjectWithGitRefreshFallback,
-} from "./invocation.js";
-import {
   runConfess,
   runPublish,
   runServe,
   runSync,
 } from "./commands/distribution.js";
-import { runExplain, runList, runOutdated } from "./commands/inspect.js";
 import { runInit, runPrayerInit } from "./commands/init.js";
+import { runExplain, runList, runOutdated } from "./commands/inspect.js";
 import { runAdd, runRemove, runUnlock } from "./commands/packages.js";
 import { runFormat, runPackage } from "./commands/workspace.js";
 import { conciseHelpText, maybePrintHelp } from "./help.js";
-import { unknownCommandMessage } from "./suggest.js";
+import {
+  initializeInvocation,
+  lockfilePath,
+  resolveCurrentProject,
+  resolveCurrentProjectWithGitRefreshFallback,
+} from "./invocation.js";
 import { materializeProject, printManifest } from "./materialize.js";
+import { unknownCommandMessage } from "./suggest.js";
 
 export async function runCli(argumentsList: string[]): Promise<number> {
   try {
@@ -52,7 +52,9 @@ export async function runCli(argumentsList: string[]): Promise<number> {
     }
     if (
       helpResult === "not_help" &&
-      filteredArguments.some((argument) => argument === "--help" || argument === "-h")
+      filteredArguments.some(
+        (argument) => argument === "--help" || argument === "-h",
+      )
     ) {
       throw PrayError.usage(`unknown command: ${filteredArguments[0] ?? ""}`);
     }

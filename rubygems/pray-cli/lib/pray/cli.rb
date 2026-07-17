@@ -1,7 +1,6 @@
 # frozen_string_literal: true
 
 require "fileutils"
-require "set"
 
 require_relative "invocation"
 require_relative "cli/parse"
@@ -82,7 +81,7 @@ module Pray
       in [:unlock, name] then unlock_command(name)
       in [:render, flags] then render_command(flags)
       in [:plan, arguments] then plan_command(arguments)
-      in [:apply] then install_command({ locked: false, frozen: false, offline: false })
+      in [:apply] then install_command({locked: false, frozen: false, offline: false})
       in [:verify, flags] then verify_command(flags)
       in [:drift, flags] then drift_command(flags)
       in [:format] then format_command

@@ -18,7 +18,7 @@ module Pray
       end
 
       def suggest_command(input, candidates)
-        maximum_distance = input.length <= 3 ? 1 : 2
+        maximum_distance = (input.length <= 3) ? 1 : 2
         candidates
           .map { |candidate| [candidate, levenshtein_distance(input, candidate)] }
           .select { |(_, distance)| distance <= maximum_distance }
@@ -40,7 +40,7 @@ module Pray
         left_chars.each_with_index do |left_character, left_index|
           current_row[0] = left_index + 1
           right_chars.each_with_index do |right_character, right_index|
-            substitution_cost = left_character == right_character ? 0 : 1
+            substitution_cost = (left_character == right_character) ? 0 : 1
             current_row[right_index + 1] = [
               previous_row[right_index + 1] + 1,
               current_row[right_index] + 1,

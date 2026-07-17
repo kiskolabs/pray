@@ -94,10 +94,11 @@ export function canonicalManifest(manifest: Manifest): Manifest {
     targets: [...manifest.targets].sort((left, right) =>
       left.name.localeCompare(right.name),
     ),
-    packages: [...manifest.packages].sort((left, right) =>
-      left.name.localeCompare(right.name) ||
-      (left.source ?? "").localeCompare(right.source ?? "") ||
-      left.constraint.localeCompare(right.constraint),
+    packages: [...manifest.packages].sort(
+      (left, right) =>
+        left.name.localeCompare(right.name) ||
+        (left.source ?? "").localeCompare(right.source ?? "") ||
+        left.constraint.localeCompare(right.constraint),
     ),
     local: [...manifest.local].sort((left, right) =>
       left.path.localeCompare(right.path),

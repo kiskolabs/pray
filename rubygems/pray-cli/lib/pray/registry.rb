@@ -10,28 +10,26 @@ require_relative "path_safety"
 module Pray
   RegistryPackageVersion = Struct.new(
     :version, :artifact, :artifact_hash, :tree_hash, :yanked, :targets, :exports,
-    :signer, :signer_fingerprint, :published_at, :signature,
-    keyword_init: true
+    :signer, :signer_fingerprint, :published_at, :signature
   ) do
     def initialize(
       artifact_hash: nil, tree_hash: nil, yanked: false, targets: [], exports: [],
       signer: nil, signer_fingerprint: nil, published_at: nil, signature: nil, **kwargs
     )
       super(**kwargs, artifact_hash: artifact_hash, tree_hash: tree_hash, yanked: yanked,
-            targets: targets, exports: exports, signer: signer,
-            signer_fingerprint: signer_fingerprint, published_at: published_at, signature: signature)
+                      targets: targets, exports: exports, signer: signer,
+                      signer_fingerprint: signer_fingerprint, published_at: published_at, signature: signature)
     end
   end
 
-  RegistryPackageMetadata = Struct.new(:name, :versions, keyword_init: true) do
+  RegistryPackageMetadata = Struct.new(:name, :versions) do
     def initialize(name: nil, versions: [])
-      super(name: name, versions: versions)
+      super
     end
   end
 
   RegistryPackageResolution = Struct.new(
-    :root, :signer_fingerprint, :registry_latest_version,
-    keyword_init: true
+    :root, :signer_fingerprint, :registry_latest_version
   )
 
   module Registry

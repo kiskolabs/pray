@@ -49,10 +49,11 @@ export function canonicalPackageSpec(spec: PackageSpec): PackageSpec {
     files: [...spec.files].sort(),
     authors: [...spec.authors].sort(),
     targets: [...spec.targets].sort(),
-    dependencies: [...spec.dependencies].sort((left, right) =>
-      left.name.localeCompare(right.name) ||
-      left.constraint.localeCompare(right.constraint) ||
-      Number(left.optional) - Number(right.optional),
+    dependencies: [...spec.dependencies].sort(
+      (left, right) =>
+        left.name.localeCompare(right.name) ||
+        left.constraint.localeCompare(right.constraint) ||
+        Number(left.optional) - Number(right.optional),
     ),
   };
 }

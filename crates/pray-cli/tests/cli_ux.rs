@@ -14,7 +14,7 @@ fn run_pray(arguments: &[&str]) -> std::process::Output {
 fn bare_invocation_prints_concise_help() {
     let cases: Vec<&[&str]> = vec![&[], &["--help"], &["-h"], &["help"]];
     for arguments in cases {
-        let output = run_pray(&arguments);
+        let output = run_pray(arguments);
         assert!(
             output.status.success(),
             "pray {:?} failed: {}",
@@ -36,7 +36,7 @@ fn per_command_help_for_install() {
         &["install", "-h"],
     ];
     for arguments in cases {
-        let output = run_pray(&arguments);
+        let output = run_pray(arguments);
         assert!(
             output.status.success(),
             "pray {:?} failed: {}",

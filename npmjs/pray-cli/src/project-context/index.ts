@@ -1,24 +1,23 @@
 import { realpathSync } from "node:fs";
 import { isAbsolute, resolve } from "node:path";
 import { loadDotenvVariables } from "./dotenv.js";
+import type {
+  ProjectInvocationContext,
+  ProjectInvocationOptions,
+} from "./types.js";
 
-export { setActiveInvocationContext, activeInvocationContext } from "./runtime.js";
+export {
+  activeInvocationContext,
+  setActiveInvocationContext,
+} from "./runtime.js";
+export type {
+  ProjectInvocationContext,
+  ProjectInvocationOptions,
+} from "./types.js";
 
 export const ENV_PROJECT_PATH = "PRAY_PATH";
 export const ENV_MANIFEST_PATH = "PRAY_FILE_PATH";
 export const ENV_ENVIRONMENT = "PRAY_ENV";
-
-export interface ProjectInvocationContext {
-  projectRoot: string;
-  manifestPath: string;
-  environment?: string;
-}
-
-export interface ProjectInvocationOptions {
-  projectRoot?: string;
-  manifestPath?: string;
-  environment?: string;
-}
 
 export function projectInvocationContextFromOptions(
   options: ProjectInvocationOptions = {},
@@ -55,7 +54,9 @@ export function projectInvocationContextFromCurrentDirectory(): ProjectInvocatio
   return projectInvocationContextFromOptions();
 }
 
-export function lockfilePathForContext(context: ProjectInvocationContext): string {
+export function lockfilePathForContext(
+  context: ProjectInvocationContext,
+): string {
   return resolve(context.projectRoot, "Prayfile.lock");
 }
 

@@ -206,10 +206,7 @@ fn publish_rejects_git_push_when_remote_has_advanced() {
     );
     assert_success(&publish, "pray publish");
     assert_success(
-        &git(
-            &remote,
-            &["symbolic-ref", "HEAD", "refs/heads/main"],
-        ),
+        &git(&remote, &["symbolic-ref", "HEAD", "refs/heads/main"]),
         "bare default branch",
     );
 
@@ -354,12 +351,12 @@ fn sync_records_custom_revision_commands_after_successful_sync() {
     let push_script = workspace.join("push.sh");
     fs::write(
         &commit_script,
-        format!("#!/bin/sh\nprintf 'commit:%s\\n' \"$PWD\" >> \"$1\"\n",),
+        "#!/bin/sh\nprintf 'commit:%s\\n' \"$PWD\" >> \"$1\"\n",
     )
     .expect("write commit script");
     fs::write(
         &push_script,
-        format!("#!/bin/sh\nprintf 'push:%s\\n' \"$PWD\" >> \"$1\"\n",),
+        "#!/bin/sh\nprintf 'push:%s\\n' \"$PWD\" >> \"$1\"\n",
     )
     .expect("write push script");
     write_revision_config(

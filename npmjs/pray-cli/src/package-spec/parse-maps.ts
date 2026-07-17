@@ -8,10 +8,10 @@ import {
 } from "../literal/call-parser.js";
 import { parseLiteral, parseLiteralMap } from "../literal/parser.js";
 import {
+  type LiteralValue,
   literalAsArray,
   literalAsBool,
   literalAsString,
-  type LiteralValue,
 } from "../literal/types.js";
 import type {
   PackageDependency,
@@ -22,15 +22,17 @@ import type {
 
 const PARSE_CONTEXT = "prayspec";
 
-export function parseDependency(rest: string, optional: boolean): PackageDependency {
+export function parseDependency(
+  rest: string,
+  optional: boolean,
+): PackageDependency {
   const { values, keywords } = parseCall(rest);
   return {
     name: requirePositionalString(values, 0, PARSE_CONTEXT),
-    constraint: values[1]
-      ? stringFromValue(values[1], PARSE_CONTEXT)
-      : "*",
+    constraint: values[1] ? stringFromValue(values[1], PARSE_CONTEXT) : "*",
     optional: keywords.has("optional")
-      ? literalAsBool(keywordValue(keywords, "optional", PARSE_CONTEXT)) ?? optional
+      ? (literalAsBool(keywordValue(keywords, "optional", PARSE_CONTEXT)) ??
+        optional)
       : optional,
   };
 }
@@ -130,7 +132,10 @@ function literalAsMap(
   return value.kind === "map" ? value.value : undefined;
 }
 
-function mapString(map: Map<string, LiteralValue>, key: string): string | undefined {
+function mapString(
+  map: Map<string, LiteralValue>,
+  key: string,
+): string | undefined {
   const value = map.get(key);
   return value ? literalAsString(value) : undefined;
 }

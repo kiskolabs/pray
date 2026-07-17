@@ -188,7 +188,10 @@ function collectSelectedExportFiles(
           `package ${packageEntry.declaration.name} has no indexed files for folder export ${exportName}`,
         );
       }
-      const destinationName = folderDestinationName(exportName, exportEntry.path);
+      const destinationName = folderDestinationName(
+        exportName,
+        exportEntry.path,
+      );
       collectTreeFiles(
         project,
         resolve(packageEntry.root, exportEntry.path),
@@ -217,7 +220,9 @@ function collectTreeFiles(
     throw PrayError.render(`folder source directory missing: ${sourceRoot}`);
   }
   if (relativeFiles.length === 0) {
-    throw PrayError.render(`no files listed in package manifest for ${sourceRoot}`);
+    throw PrayError.render(
+      `no files listed in package manifest for ${sourceRoot}`,
+    );
   }
   for (const relative of relativeFiles) {
     const source = resolve(sourceRoot, relative);
@@ -232,7 +237,10 @@ function collectTreeFiles(
   }
 }
 
-function relativeProjectPath(projectRoot: string, absolutePath: string): string {
+function relativeProjectPath(
+  projectRoot: string,
+  absolutePath: string,
+): string {
   return absolutePath
     .slice(projectRoot.length)
     .replace(/^[/\\]/, "")

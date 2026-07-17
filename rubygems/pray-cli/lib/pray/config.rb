@@ -4,13 +4,13 @@ require "toml-rb"
 
 module Pray
   module Config
-    PrayConfig = Struct.new(:local, keyword_init: true) do
+    PrayConfig = Struct.new(:local) do
       def initialize(local: PrayLocalConfig.new)
         super
       end
     end
 
-    PrayLocalConfig = Struct.new(:package, :source, keyword_init: true) do
+    PrayLocalConfig = Struct.new(:package, :source) do
       def initialize(package: {}, source: {})
         super
       end

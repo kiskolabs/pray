@@ -1,7 +1,10 @@
 import { writeFileSync } from "node:fs";
 import { PrayError } from "../errors.js";
-import { parseManifest, readManifestText } from "../manifest/index.js";
-import { formatPackageDeclaration } from "../manifest/index.js";
+import {
+  formatPackageDeclaration,
+  parseManifest,
+  readManifestText,
+} from "../manifest/index.js";
 import type { ManifestPackage } from "../manifest/types.js";
 
 export function insertManifestStatement(
@@ -9,7 +12,9 @@ export function insertManifestStatement(
   statement: string,
 ): string {
   const lines = manifestText.split(/\r?\n/);
-  const versionIndex = lines.findIndex((line) => line.trim().startsWith("prayfile "));
+  const versionIndex = lines.findIndex((line) =>
+    line.trim().startsWith("prayfile "),
+  );
   const insertAt = versionIndex >= 0 ? versionIndex + 1 : 0;
   lines.splice(insertAt, 0, statement);
   return `${lines.join("\n").replace(/\n*$/, "")}\n`;
@@ -64,5 +69,9 @@ export function removePackageFromManifest(
   if (!manifest.packages.some((packageEntry) => packageEntry.name === name)) {
     throw PrayError.manifest(`package ${name} not found`);
   }
-  writeFileSync(manifestPath, removeManifestStatement(manifestText, name), "utf8");
+  writeFileSync(
+    manifestPath,
+    removeManifestStatement(manifestText, name),
+    "utf8",
+  );
 }

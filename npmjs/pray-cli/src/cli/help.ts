@@ -72,10 +72,8 @@ const COMMAND_HELP: Record<string, string> = {
     "trust — manage client trust policy for remote sources\n\n" +
     "Usage: pray trust <subcommand>\n\n" +
     "Subcommands: list, show, add-key, remove-key, set-signed, set-allow, import-repo, import-registry, check",
-  init:
-    "init — create a starter Prayfile\n\nUsage: pray init [--targets tool_a,tool_b]",
-  add:
-    "add — declare a package in Prayfile\n\nUsage: pray add <name> [constraint] [--path PATH]",
+  init: "init — create a starter Prayfile\n\nUsage: pray init [--targets tool_a,tool_b]",
+  add: "add — declare a package in Prayfile\n\nUsage: pray add <name> [constraint] [--path PATH]",
   publish:
     "publish — upload packages to a registry or local root\n\n" +
     "Usage: pray publish --root PATH [--server URL ...]",

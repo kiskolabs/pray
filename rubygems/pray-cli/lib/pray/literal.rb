@@ -2,13 +2,13 @@
 
 module Pray
   module Literal
-    LiteralValue = Struct.new(:kind, :value, keyword_init: true) do
+    LiteralValue = Struct.new(:kind, :value) do
       def string? = kind == :string || kind == :symbol
       def as_string = string? ? value : nil
-      def as_bool = kind == :bool ? value : nil
-      def as_integer = kind == :integer ? value : nil
-      def as_array = kind == :array ? value : nil
-      def as_map = kind == :map ? value : nil
+      def as_bool = (kind == :bool) ? value : nil
+      def as_integer = (kind == :integer) ? value : nil
+      def as_array = (kind == :array) ? value : nil
+      def as_map = (kind == :map) ? value : nil
     end
 
     module_function
@@ -225,13 +225,13 @@ module Pray
         while (character = next_character)
           if escaped
             output << case character
-                      when "n" then "\n"
-                      when "r" then "\r"
-                      when "t" then "\t"
-                      when "\\" then "\\"
-                      when "\"", "'" then character
-                      else character
-                      end
+            when "n" then "\n"
+            when "r" then "\r"
+            when "t" then "\t"
+            when "\\" then "\\"
+            when "\"", "'" then character
+            else character
+            end
             escaped = false
             next
           end

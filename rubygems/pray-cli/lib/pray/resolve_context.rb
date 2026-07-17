@@ -1,12 +1,9 @@
 # frozen_string_literal: true
 
-require "set"
-
 module Pray
   ResolveOptions = Struct.new(
     :offline, :refresh, :unlocked_packages, :refresh_source_revisions,
-    :ignore_locked_versions, :environment,
-    keyword_init: true
+    :ignore_locked_versions, :environment
   ) do
     def initialize(
       offline: false,

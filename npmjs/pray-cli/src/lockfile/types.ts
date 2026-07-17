@@ -54,18 +54,20 @@ export function canonicalLockfile(lockfile: Lockfile): Lockfile {
     source: [...lockfile.source].sort((left, right) =>
       left.name.localeCompare(right.name),
     ),
-    package: [...lockfile.package].sort((left, right) =>
-      left.name.localeCompare(right.name) ||
-      (left.source ?? "").localeCompare(right.source ?? "") ||
-      left.version.localeCompare(right.version),
+    package: [...lockfile.package].sort(
+      (left, right) =>
+        left.name.localeCompare(right.name) ||
+        (left.source ?? "").localeCompare(right.source ?? "") ||
+        left.version.localeCompare(right.version),
     ),
     target: [...lockfile.target].sort((left, right) =>
       left.name.localeCompare(right.name),
     ),
-    managed_span: [...lockfile.managed_span].sort((left, right) =>
-      left.target.localeCompare(right.target) ||
-      left.open_line - right.open_line ||
-      left.id.localeCompare(right.id),
+    managed_span: [...lockfile.managed_span].sort(
+      (left, right) =>
+        left.target.localeCompare(right.target) ||
+        left.open_line - right.open_line ||
+        left.id.localeCompare(right.id),
     ),
   };
 }

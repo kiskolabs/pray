@@ -3,12 +3,9 @@ import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { afterEach, beforeEach, describe, it } from "node:test";
-import { initializeInvocation } from "./invocation.js";
-import {
-  ENV_ENVIRONMENT,
-  ENV_PROJECT_PATH,
-} from "../project-context/index.js";
+import { ENV_ENVIRONMENT, ENV_PROJECT_PATH } from "../project-context/index.js";
 import { setActiveInvocationContext } from "../project-context/runtime.js";
+import { initializeInvocation } from "./invocation.js";
 
 describe("cli invocation", () => {
   const previousEnvironment: Record<string, string | undefined> = {};

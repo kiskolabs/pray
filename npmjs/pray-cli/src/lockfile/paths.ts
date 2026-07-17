@@ -1,7 +1,10 @@
 import { relative, resolve } from "node:path";
 import { activeInvocationContext } from "../project-context/runtime.js";
 
-export function relativeLockfilePath(projectRoot: string, targetPath: string): string {
+export function relativeLockfilePath(
+  projectRoot: string,
+  targetPath: string,
+): string {
   const absolute = resolve(projectRoot, targetPath);
   const normalizedRoot = lexicalNormalizePath(resolve(projectRoot));
   const normalizedAbsolute = lexicalNormalizePath(absolute);
@@ -72,6 +75,9 @@ export function defaultLockfilePath(projectRoot: string): string {
   return resolve(projectRoot, "Prayfile.lock");
 }
 
-export function relativeProjectPath(projectRoot: string, absolutePath: string): string {
+export function relativeProjectPath(
+  projectRoot: string,
+  absolutePath: string,
+): string {
   return relative(projectRoot, absolutePath).replace(/\\/g, "/");
 }

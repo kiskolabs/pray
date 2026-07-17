@@ -94,8 +94,10 @@ fn unlocked_packages_skip_locked_version_hints() {
         }],
         ..Lockfile::default()
     };
-    let mut options = ResolveOptions::default();
-    options.unlocked_packages = unlocked;
+    let options = ResolveOptions {
+        unlocked_packages: unlocked,
+        ..ResolveOptions::default()
+    };
     let context = PackageResolutionContext::from_lockfile(Some(&lockfile), "sample/base", &options);
     assert!(context.preferred_version.is_none());
 }

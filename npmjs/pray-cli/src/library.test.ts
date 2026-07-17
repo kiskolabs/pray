@@ -91,7 +91,9 @@ managed_span = []
     );
 
     assert.equal(
-      report.findings.some((finding) => finding.message.includes("Prayfile changed")),
+      report.findings.some((finding) =>
+        finding.message.includes("Prayfile changed"),
+      ),
       true,
     );
   });

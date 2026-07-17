@@ -28,9 +28,9 @@ module Pray
         Resolve.resolve_project_in_context(manifest_path, project_root, options)
       rescue Error => error
         if allow_git_refresh_fallback &&
-           !offline &&
-           !refresh &&
-           Resolve.resolution_may_benefit_from_git_source_refresh?(error)
+            !offline &&
+            !refresh &&
+            Resolve.resolution_may_benefit_from_git_source_refresh?(error)
           refreshed = options.dup
           refreshed.refresh = true
           Resolve.resolve_project_in_context(manifest_path, project_root, refreshed)

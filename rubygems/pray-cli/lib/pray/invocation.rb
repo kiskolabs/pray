@@ -47,9 +47,9 @@ module Pray
       resolve_current_project(options)
     rescue Error => error
       if allow_git_refresh_fallback &&
-         !options.offline &&
-         !options.refresh &&
-         Resolve.resolution_may_benefit_from_git_source_refresh?(error)
+          !options.offline &&
+          !options.refresh &&
+          Resolve.resolution_may_benefit_from_git_source_refresh?(error)
         refreshed = options.dup
         refreshed.refresh = true
         resolve_current_project(refreshed)

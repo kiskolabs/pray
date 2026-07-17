@@ -1,4 +1,4 @@
-import type { ProjectInvocationContext } from "./index.js";
+import type { ProjectInvocationContext } from "./types.js";
 
 let activeContext: ProjectInvocationContext | undefined;
 
@@ -8,6 +8,8 @@ export function setActiveInvocationContext(
   activeContext = context;
 }
 
-export function activeInvocationContext(): ProjectInvocationContext | undefined {
+export function activeInvocationContext():
+  | ProjectInvocationContext
+  | undefined {
   return activeContext;
 }

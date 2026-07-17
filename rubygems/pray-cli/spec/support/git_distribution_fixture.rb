@@ -10,7 +10,7 @@ module GitDistributionFixture
     FileUtils.mkdir_p(File.join(repo, "packages/base/exports"))
     File.write(
       File.join(repo, "Prayfile"),
-      <<~PRAYFILE,
+      <<~PRAYFILE
         prayfile "1"
         target :tool_a do
           output "INSTRUCTIONS.md"
@@ -20,7 +20,7 @@ module GitDistributionFixture
     )
     File.write(
       File.join(repo, "packages/base/sample-base.prayspec"),
-      <<~PRAYSPEC,
+      <<~PRAYSPEC
         Package::Specification.new do |spec|
           spec.name = "sample/base"
           spec.version = "1.4.3"
@@ -45,7 +45,7 @@ module GitDistributionFixture
 
   def run_git(directory, *arguments)
     output, status = Open3.capture2e("git", "-C", directory, *arguments)
-    raise "git #{arguments.join(' ')} failed: #{output}" unless status.success?
+    raise "git #{arguments.join(" ")} failed: #{output}" unless status.success?
 
     output
   end

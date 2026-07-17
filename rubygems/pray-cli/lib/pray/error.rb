@@ -25,17 +25,17 @@ module Pray
 
     def to_s
       prefix = case category
-               when :parse then "#{@parse_kind} parse error"
-               when :usage then "usage error"
-               when :manifest then "manifest error"
-               when :resolution then "resolution error"
-               when :integrity then "integrity error"
-               when :render then "render error"
-               when :verify then "verify error"
-               when :unsupported then "unsupported feature"
-               when :io then "I/O error"
-               else category.to_s
-               end
+      when :parse then "#{@parse_kind} parse error"
+      when :usage then "usage error"
+      when :manifest then "manifest error"
+      when :resolution then "resolution error"
+      when :integrity then "integrity error"
+      when :render then "render error"
+      when :verify then "verify error"
+      when :unsupported then "unsupported feature"
+      when :io then "I/O error"
+      else category.to_s
+      end
       "#{prefix}: #{super}"
     end
 

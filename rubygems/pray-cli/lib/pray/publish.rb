@@ -2,11 +2,10 @@
 
 require "json"
 require "fileutils"
-require "set"
 require "time"
 
 module Pray
-  RegistryIndex = Struct.new(:spec, :packages, keyword_init: true) do
+  RegistryIndex = Struct.new(:spec, :packages) do
     def initialize(spec: "prayfile-distribution-1", packages: [])
       super
     end
@@ -98,7 +97,7 @@ module Pray
     def write_registry_index(root, index)
       path = File.join(root, "v1", "index.json")
       FileUtils.mkdir_p(File.dirname(path))
-      File.write(path, JSON.pretty_generate({ "spec" => index.spec, "packages" => index.packages }))
+      File.write(path, JSON.pretty_generate({"spec" => index.spec, "packages" => index.packages}))
     end
 
     def load_registry_package_metadata(path, package_name)
@@ -147,7 +146,7 @@ module Pray
     end
 
     def registry_artifact_path(package_name, version)
-      artifact_name = "#{package_name.tr('/', '-')}-#{version}.praypkg"
+      artifact_name = "#{package_name.tr("/", "-")}-#{version}.praypkg"
       "v1/artifacts/#{package_name}/#{version}/#{artifact_name}"
     end
 

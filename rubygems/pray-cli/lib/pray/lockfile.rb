@@ -5,28 +5,25 @@ require "toml-rb"
 require_relative "lockfile_serialize"
 
 module Pray
-  LockSource = Struct.new(:name, :kind, :url, :revision, :host_key_fingerprint, keyword_init: true)
+  LockSource = Struct.new(:name, :kind, :url, :revision, :host_key_fingerprint)
   LockedPackage = Struct.new(
     :name, :version, :source, :path, :tree_hash, :artifact_hash, :artifact,
-    :exports, :dependencies, :signer_fingerprint,
-    keyword_init: true
+    :exports, :dependencies, :signer_fingerprint
   ) do
     def initialize(exports: [], dependencies: [], signer_fingerprint: nil, source: nil, **kwargs)
       super(**kwargs, exports: exports, dependencies: dependencies, signer_fingerprint: signer_fingerprint, source: source)
     end
   end
 
-  LockedTarget = Struct.new(:name, :outputs, keyword_init: true)
+  LockedTarget = Struct.new(:name, :outputs)
   ManagedSpanRecord = Struct.new(
     :id, :target, :open_line, :close_line, :ideal_checksum, :package, :export,
-    :source_checksum, :silenced,
-    keyword_init: true
+    :source_checksum, :silenced
   )
 
   Lockfile = Struct.new(
     :prayfile_lock, :spec, :generated_by, :manifest_hash, :environment, :source, :package,
-    :target, :managed_span,
-    keyword_init: true
+    :target, :managed_span
   ) do
     def initialize(
       prayfile_lock: "1", spec: "0.1", generated_by: Pray::GENERATED_BY,
@@ -72,13 +69,13 @@ module Pray
         "manifest_hash" => lockfile.manifest_hash,
         "source" => lockfile.source.map { |entry| source_to_hash(entry) },
         "package" => lockfile.package.map { |entry| package_to_hash(entry) },
-        "target" => lockfile.target.map { |entry| { "name" => entry.name, "outputs" => entry.outputs } },
+        "target" => lockfile.target.map { |entry| {"name" => entry.name, "outputs" => entry.outputs} },
         "managed_span" => lockfile.managed_span.map { |entry| managed_span_to_hash(entry) }
       }
     end
 
     def source_to_hash(entry)
-      hash = { "name" => entry.name, "kind" => entry.kind, "url" => entry.url }
+      hash = {"name" => entry.name, "kind" => entry.kind, "url" => entry.url}
       hash["revision"] = entry.revision if entry.revision
       hash["host_key_fingerprint"] = entry.host_key_fingerprint if entry.host_key_fingerprint
       hash
@@ -241,7 +238,7 @@ module Pray
 
     def format_relative_lockfile_path(relative)
       text = relative.to_s.tr("\\", "/")
-      text == "." || text.start_with?("./") ? text : "./#{text}"
+      (text == "." || text.start_with?("./")) ? text : "./#{text}"
     end
 
     def normalize_lockfile_artifact(project_root, artifact, package_root)
@@ -250,10 +247,10 @@ module Pray
       path_text = artifact.delete_prefix("path:")
       path = Pathname(path_text)
       relative = if path.absolute?
-                   relative_lockfile_path(project_root, path)
-                 else
-                   relative_lockfile_path(project_root, package_root)
-                 end
+        relative_lockfile_path(project_root, path)
+      else
+        relative_lockfile_path(project_root, package_root)
+      end
       "path:#{relative}"
     end
   end

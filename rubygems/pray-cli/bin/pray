@@ -18,7 +18,7 @@ begin
 rescue Pray::Error => error
   warn error
   exit_code = error.exit_code
-rescue StandardError => error
+rescue => error
   warn error
   exit_code = 1
 end
