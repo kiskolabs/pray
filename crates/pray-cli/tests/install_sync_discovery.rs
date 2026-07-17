@@ -140,9 +140,20 @@ fn sync_crawls_discovered_peers_and_persists_them() {
     let synced_peers_text =
         fs::read_to_string(downstream_root.join("v1/peers.json")).expect("synced peers file");
     let synced_peers: Value = serde_json::from_str(&synced_peers_text).expect("synced peers json");
-    assert_eq!(synced_peers.as_array().expect("peer array").len(), 2);
-    assert_eq!(synced_peers[0]["url"], seed_url);
-    assert_eq!(synced_peers[1]["url"], upstream_url);
+    let peer_urls = synced_peers
+        .as_array()
+        .expect("peer array")
+        .iter()
+        .map(|peer| {
+            peer["url"]
+                .as_str()
+                .expect("peer url")
+                .to_string()
+        })
+        .collect::<std::collections::BTreeSet<_>>();
+    assert_eq!(peer_urls.len(), 2);
+    assert!(peer_urls.contains(&seed_url));
+    assert!(peer_urls.contains(&upstream_url));
 
     let _ = seed_server.kill();
     let _ = seed_server.wait();

@@ -2,7 +2,7 @@
 mod support;
 
 use std::fs;
-use std::path::{Path, PathBuf};
+use std::path::Path;
 use std::process::{Command, Output};
 
 use support::{create_add_fixture, read_package_archive, run_pray, temporary_directory};
