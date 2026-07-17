@@ -205,6 +205,13 @@ fn publish_rejects_git_push_when_remote_has_advanced() {
         &[],
     );
     assert_success(&publish, "pray publish");
+    assert_success(
+        &git(
+            &remote,
+            &["symbolic-ref", "HEAD", "refs/heads/main"],
+        ),
+        "bare default branch",
+    );
 
     assert_success(
         &git(
@@ -241,7 +248,13 @@ fn publish_rejects_git_push_when_remote_has_advanced() {
         &git(&competing_clone, &["commit", "-m", "advance remote"]),
         "competing commit",
     );
-    assert_success(&git(&competing_clone, &["push"]), "competing push");
+    assert_success(
+        &git(
+            &competing_clone,
+            &["push", "origin", "HEAD:refs/heads/main"],
+        ),
+        "competing push",
+    );
 
     fs::write(
         repository.join("packages/base/README.md"),

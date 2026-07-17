@@ -42,11 +42,9 @@ pub(crate) fn record_git_revision(
     commit_message: String,
 ) -> PrayResult<()> {
     run_command_success(root, "git", &["add", "-A"])?;
-    if !git_has_staged_changes(root)? {
-        return Ok(());
+    if git_has_staged_changes(root)? {
+        run_command_success(root, "git", &["commit", "-m", &commit_message])?;
     }
-
-    run_command_success(root, "git", &["commit", "-m", &commit_message])?;
 
     if config.push {
         let remote = config.remote.as_deref().ok_or_else(|| {
