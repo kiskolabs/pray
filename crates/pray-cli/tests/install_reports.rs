@@ -2,7 +2,6 @@
 mod support;
 
 use std::fs;
-use std::path::PathBuf;
 
 use support::{
     create_add_fixture, create_fixture, create_tree_fixture, run_pray, temporary_directory,

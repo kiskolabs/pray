@@ -1,15 +1,13 @@
 #[path = "install_network_support.rs"]
 mod support;
 
-use pray_core::auth::RegistryAuthStore;
 use pray_core::lockfile::read_lockfile;
 use serde_json::Value;
 use std::fs;
 
 use support::{
-    create_add_fixture, find_free_port, run_pray, signing_key_from_seed, spawn_server,
-    ssh_public_key_text, temporary_directory, verify_email_registration, wait_for_server,
-    write_private_key_file,
+    create_add_fixture, find_free_port, run_pray, spawn_server, temporary_directory,
+    wait_for_server,
 };
 
 #[test]
