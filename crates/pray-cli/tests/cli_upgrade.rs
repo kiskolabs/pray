@@ -59,7 +59,5 @@ fn upgrade_notice_uses_changelog_link() {
     let stderr = String::from_utf8_lossy(&output.stderr);
     assert!(stderr.contains("A new version of pray is available"));
     assert!(stderr.contains("Run: pray upgrade"));
-    assert!(stderr.contains(
-        "Changelog: https://github.com/kiskolabs/pray/blob/main/CHANGELOG.md"
-    ));
+    assert!(stderr.contains("Changelog: https://github.com/kiskolabs/pray/blob/main/CHANGELOG.md"));
 }

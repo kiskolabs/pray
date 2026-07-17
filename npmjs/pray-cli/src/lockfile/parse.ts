@@ -8,9 +8,9 @@ import {
   requireStringArray,
 } from "../validation.js";
 import type {
-  Lockfile,
   LockedPackage,
   LockedTarget,
+  Lockfile,
   LockSource,
   ManagedSpanRecord,
 } from "./types.js";
@@ -20,10 +20,18 @@ const CONTEXT = "lockfile";
 export function parseLockfileValue(value: unknown): Lockfile {
   const record = requireRecord(value, CONTEXT);
   return {
-    prayfile_lock: requireString(record.prayfile_lock, "prayfile_lock", CONTEXT),
+    prayfile_lock: requireString(
+      record.prayfile_lock,
+      "prayfile_lock",
+      CONTEXT,
+    ),
     spec: requireString(record.spec, "spec", CONTEXT),
     generated_by: requireString(record.generated_by, "generated_by", CONTEXT),
-    manifest_hash: requireString(record.manifest_hash, "manifest_hash", CONTEXT),
+    manifest_hash: requireString(
+      record.manifest_hash,
+      "manifest_hash",
+      CONTEXT,
+    ),
     environment: optionalString(record.environment, "environment", CONTEXT),
     source: parseLockSources(record.source),
     package: parseLockedPackages(record.package),
@@ -74,10 +82,18 @@ function parseLockedPackage(value: unknown, index: number): LockedPackage {
     source: optionalString(record.source, "source", context),
     path: requireString(record.path, "path", context),
     tree_hash: requireString(record.tree_hash, "tree_hash", context),
-    artifact_hash: requireString(record.artifact_hash, "artifact_hash", context),
+    artifact_hash: requireString(
+      record.artifact_hash,
+      "artifact_hash",
+      context,
+    ),
     artifact: requireString(record.artifact, "artifact", context),
     exports: requireStringArray(record.exports, "exports", context),
-    dependencies: requireStringArray(record.dependencies, "dependencies", context),
+    dependencies: requireStringArray(
+      record.dependencies,
+      "dependencies",
+      context,
+    ),
     signer_fingerprint: optionalString(
       record.signer_fingerprint,
       "signer_fingerprint",
@@ -117,7 +133,11 @@ function parseManagedSpan(value: unknown, index: number): ManagedSpanRecord {
     target: requireString(record.target, "target", context),
     open_line: requireNumber(record.open_line, "open_line", context),
     close_line: requireNumber(record.close_line, "close_line", context),
-    ideal_checksum: requireString(record.ideal_checksum, "ideal_checksum", context),
+    ideal_checksum: requireString(
+      record.ideal_checksum,
+      "ideal_checksum",
+      context,
+    ),
     package: requireString(record.package, "package", context),
     export: requireString(record.export, "export", context),
     source_checksum: requireString(

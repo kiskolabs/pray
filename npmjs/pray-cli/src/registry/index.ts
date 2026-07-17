@@ -80,7 +80,12 @@ export async function resolveLocalRegistryPackageRoot(
   declaration: ManifestPackage,
   options: RegistryResolveOptions = {},
 ): Promise<RegistryPackageResolution> {
-  const metadataPath = join(sourceRoot, "v1", "packages", `${declaration.name}.json`);
+  const metadataPath = join(
+    sourceRoot,
+    "v1",
+    "packages",
+    `${declaration.name}.json`,
+  );
   if (!existsSync(metadataPath)) {
     throw PrayError.resolution(
       `package ${declaration.name} not found in distribution ${sourceRoot}. ` +
@@ -143,7 +148,12 @@ export async function fetchPackageMetadata(
   packageName: string,
 ): Promise<RegistryPackageMetadata> {
   if (isLocalSourceUrl(sourceUrl)) {
-    const metadataPath = join(sourceUrl, "v1", "packages", `${packageName}.json`);
+    const metadataPath = join(
+      sourceUrl,
+      "v1",
+      "packages",
+      `${packageName}.json`,
+    );
     return parseMetadata(readFileSync(metadataPath, "utf8"));
   }
   return parseMetadata(
@@ -195,10 +205,7 @@ export function selectPackageVersion(
     const preferred = metadata.versions.find(
       (entry) => entry.version === preferredVersion && !entry.yanked,
     );
-    if (
-      preferred &&
-      versionSatisfies(preferred.version, constraint)
-    ) {
+    if (preferred && versionSatisfies(preferred.version, constraint)) {
       return preferred;
     }
   }
@@ -211,10 +218,7 @@ export function selectPackageVersion(
     if (!versionSatisfies(version.version, constraint)) {
       continue;
     }
-    if (
-      !selected ||
-      semver.gt(version.version, selected.version)
-    ) {
+    if (!selected || semver.gt(version.version, selected.version)) {
       selected = version;
     }
   }
@@ -337,7 +341,10 @@ function cacheReady(
   }
 }
 
-async function readArtifactBytes(sourceUrl: string, artifact: string): Promise<Buffer> {
+async function readArtifactBytes(
+  sourceUrl: string,
+  artifact: string,
+): Promise<Buffer> {
   if (isLocalSourceUrl(sourceUrl)) {
     return readLocalArtifactBytes(sourceUrl, artifact);
   }

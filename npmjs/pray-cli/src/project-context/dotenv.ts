@@ -3,7 +3,9 @@ import { join } from "node:path";
 
 const PRAY_ENVIRONMENT_PREFIX = "PRAY_";
 
-export function loadDotenvVariables(projectRootHint: string): Map<string, string> {
+export function loadDotenvVariables(
+  projectRootHint: string,
+): Map<string, string> {
   const path = join(projectRootHint, ".env");
   if (!existsSync(path)) {
     return new Map();

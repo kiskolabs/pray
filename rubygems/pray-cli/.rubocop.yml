@@ -1,0 +1,221 @@
+inherit_mode:
+  merge:
+    - Exclude
+
+plugins:
+  - standard-custom
+  - standard-performance
+  - rubocop-performance
+  - rubocop-rspec
+  - rubocop-thread_safety
+
+inherit_gem:
+  standard: config/base.yml
+  standard-performance: config/base.yml
+  standard-custom: config/base.yml
+
+require:
+  - ./rubocop/cop/pray/circular_require
+
+AllCops:
+  SuggestExtensions: false
+  TargetRubyVersion: 3.3
+  NewCops: enable
+  Exclude:
+    - vendor/**/*
+    - tmp/**/*
+    - script/**/*
+
+Pray/CircularRequire:
+  Enabled: true
+  Include:
+    - lib/**/*
+
+RSpec/ExampleLength:
+  Max: 80
+
+RSpec/SpecFilePathFormat:
+  Enabled: false
+  Exclude:
+    - spec/**/*
+
+RSpec/HooksBeforeExamples:
+  Enabled: false
+
+RSpec/MultipleMemoizedHelpers:
+  Max: 16
+
+RSpec/NestedGroups:
+  Max: 4
+
+RSpec/RepeatedExample:
+  Enabled: false
+
+RSpec/DescribeClass:
+  Enabled: false
+  Exclude:
+    - spec/**/*
+
+RSpec/VerifiedDoubles:
+  Enabled: false
+
+RSpec/BeforeAfterAll:
+  Exclude:
+    - spec/**/*_spec.rb
+
+RSpec/MultipleExpectations:
+  Exclude:
+    - spec/**/*
+
+RSpec/InstanceVariable:
+  Exclude:
+    - spec/**/*
+
+RSpec/MessageSpies:
+  Exclude:
+    - spec/**/*
+
+RSpec/LeakyConstantDeclaration:
+  Enabled: false
+
+RSpec/RemoveConst:
+  Enabled: false
+
+RSpec/AnyInstance:
+  Enabled: false
+
+RSpec/VerifiedDoubleReference:
+  Enabled: false
+
+RSpec/BeEq:
+  Exclude:
+    - spec/**/*
+
+RSpec/ExpectChange:
+  Exclude:
+    - spec/**/*
+
+RSpec/ReceiveMessages:
+  Exclude:
+    - spec/**/*
+
+RSpec/DescribedClass:
+  Exclude:
+    - spec/**/*
+
+ThreadSafety/NewThread:
+  Exclude:
+    - spec/**/*
+    - lib/pray/serve.rb
+
+ThreadSafety/DirChdir:
+  Exclude:
+    - "*.gemspec"
+    - spec/**/*
+
+Lint/ConstantDefinitionInBlock:
+  Exclude:
+    - spec/**/*
+
+RSpec/NoExpectationExample:
+  Exclude:
+    - spec/**/*
+
+RSpec/RepeatedExampleGroupDescription:
+  Exclude:
+    - spec/**/*
+
+Lint/ShadowedException:
+  Exclude:
+    - lib/pray/registry.rb
+
+Style/AccessModifierDeclarations:
+  EnforcedStyle: inline
+
+Style/FrozenStringLiteralComment:
+  Enabled: false
+
+Lint/UselessAssignment:
+  Enabled: false
+
+ThreadSafety/ClassAndModuleAttributes:
+  Enabled: false
+
+ThreadSafety/ClassInstanceVariable:
+  Enabled: false
+
+Lint/Debugger:
+  Enabled: true
+  Exclude: []
+
+RSpec/Focus:
+  Enabled: true
+  Exclude: []
+
+Metrics/ModuleLength:
+  Enabled: true
+  CountAsOne: [array, hash, heredoc, method_call]
+  Max: 250
+
+Metrics/ClassLength:
+  Enabled: true
+  CountAsOne: [array, hash, heredoc, method_call]
+  Max: 200
+
+Metrics/AbcSize:
+  Enabled: true
+  Max: 40
+  CountRepeatedAttributes: false
+  Exclude:
+    - lib/pray/cli.rb
+    - lib/pray/cli/**/*
+    - lib/pray/lockfile.rb
+    - lib/pray/manifest.rb
+    - lib/pray/materialize.rb
+    - lib/pray/package_spec.rb
+    - lib/pray/render.rb
+    - lib/pray/resolve.rb
+    - lib/pray/verify.rb
+
+Metrics/CyclomaticComplexity:
+  Enabled: true
+  Max: 18
+  Exclude:
+    - lib/pray/cli.rb
+    - lib/pray/cli/parse.rb
+    - lib/pray/materialize.rb
+    - lib/pray/verify.rb
+
+Metrics/PerceivedComplexity:
+  Enabled: true
+  Max: 18
+  Exclude:
+    - lib/pray/cli.rb
+    - lib/pray/cli/parse.rb
+    - lib/pray/materialize.rb
+    - lib/pray/verify.rb
+
+Naming/FileName:
+  Exclude:
+    - lib/pray-cli.rb
+
+Style/ModuleFunction:
+  Enabled: false
+
+Style/EnvHome:
+  Enabled: false
+
+Style/FetchEnvVar:
+  Enabled: false
+
+Naming/RescuedExceptionsVariableName:
+  Enabled: false
+
+Lint/NonAtomicFileOperation:
+  Enabled: false
+
+Lint/DeprecatedOpenSSLConstant:
+  Enabled: false
+
+Lint/Void:
+  Enabled: false

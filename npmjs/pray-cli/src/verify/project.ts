@@ -6,9 +6,9 @@ import {
   normalizeLineEndings,
 } from "../hashing.js";
 import type { Lockfile, ManagedSpanRecord } from "../lockfile/types.js";
+import { renderProject } from "../render/project.js";
 import { missingLocalEmbedGuidance } from "../resolve/project.js";
 import type { ResolvedProject } from "../resolve/types.js";
-import { renderProject } from "../render/project.js";
 
 export interface VerificationFinding {
   kind: string;
@@ -217,9 +217,7 @@ function markerPositions(
     string,
     { openLine: number; closeLine: number; checksum: string }
   >();
-  let active:
-    | { id: string; openLine: number; body: string[] }
-    | undefined;
+  let active: { id: string; openLine: number; body: string[] } | undefined;
 
   for (let index = 0; index < lines.length; index += 1) {
     const line = lines[index]!;

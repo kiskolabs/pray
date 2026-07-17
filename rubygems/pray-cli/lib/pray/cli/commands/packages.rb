@@ -1,6 +1,5 @@
 # frozen_string_literal: true
 
-require "set"
 require "fileutils"
 
 module Pray
@@ -30,7 +29,7 @@ module Pray
       end
 
       File.write(manifest_path_value, remove_manifest_statement(manifest_text, name))
-      install_command({ locked: false, frozen: false, offline: false })
+      install_command({locked: false, frozen: false, offline: false})
     end
 
     def list_command
@@ -97,11 +96,10 @@ module Pray
       project = resolve_current_project
       rendered = Render.render_project(project)
       latest_lockfile = build_lockfile(project, rendered)
+      puts "Outdated packages"
       if previous_lockfile && Pray.lockfiles_equivalent?(latest_lockfile, previous_lockfile)
-        puts "Outdated packages"
         puts "All packages up to date"
       else
-        puts "Outdated packages"
         Plan.package_summary_lines(previous_lockfile, latest_lockfile, project).each { |line| puts line }
       end
     end

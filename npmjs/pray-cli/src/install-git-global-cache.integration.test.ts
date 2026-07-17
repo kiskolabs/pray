@@ -59,7 +59,10 @@ function runGit(directory: string, ...argumentsList: string[]): string {
   return result.stdout ?? "";
 }
 
-function initDistributionRepo(distributionRepo: string, prayersRoot: string): void {
+function initDistributionRepo(
+  distributionRepo: string,
+  prayersRoot: string,
+): void {
   mkdirSync(prayersRoot, { recursive: true });
   runGit(distributionRepo, "init", "-b", "main");
   runGit(distributionRepo, "config", "user.name", "Pray Test");
@@ -154,13 +157,20 @@ end
       assert.equal(await runCli(["publish", "--root", prayersRoot]), 0);
       runGit(distributionRepo, "add", "-A");
       runGit(distributionRepo, "commit", "-m", "publish major version");
-      const updatedRevision = runGit(distributionRepo, "rev-parse", "HEAD").trim();
+      const updatedRevision = runGit(
+        distributionRepo,
+        "rev-parse",
+        "HEAD",
+      ).trim();
 
       writeConsumerPrayfile(secondConsumer, distributionRepo, "~> 2.0");
       process.chdir(secondConsumer);
       assert.equal(await runCliWithCache(globalCache, ["install"]), 0);
 
-      const lockfile = readFileSync(join(secondConsumer, "Prayfile.lock"), "utf8");
+      const lockfile = readFileSync(
+        join(secondConsumer, "Prayfile.lock"),
+        "utf8",
+      );
       assert.ok(lockfile.includes(updatedRevision));
       assert.ok(lockfile.includes("2.0.0"));
     } finally {

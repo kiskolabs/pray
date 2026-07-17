@@ -94,7 +94,7 @@ module Pray
           constraint ||= argument
         end
       end
-      { name: name, constraint: constraint, path: path }
+      {name: name, constraint: constraint, path: path}
     end
 
     def parse_publish_arguments(arguments)
@@ -112,11 +112,11 @@ module Pray
       end
       raise Error.unsupported("publish requires at least one --root PATH or --server URL") if roots.empty? && servers.empty?
 
-      { roots: roots, servers: servers }
+      {roots: roots, servers: servers}
     end
 
     def parse_serve_arguments(arguments)
-      options = { root: ".", host: "127.0.0.1", port: 7429, stdio: false }
+      options = {root: ".", host: "127.0.0.1", port: 7429, stdio: false}
       while (argument = arguments.shift)
         case argument
         when "--root" then options[:root] = arguments.shift

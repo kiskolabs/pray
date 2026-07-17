@@ -1,0 +1,7 @@
+{
+  "limit": {
+    "drift": {
+      "collective": 2
+    }
+  }
+}

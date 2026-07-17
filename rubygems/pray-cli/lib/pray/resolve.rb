@@ -3,8 +3,7 @@
 module Pray
   ResolvedProject = Struct.new(
     :manifest_path, :project_root, :manifest, :manifest_hash, :packages,
-    :local_files, :source_revisions, :source_host_keys, :environment,
-    keyword_init: true
+    :local_files, :source_revisions, :source_host_keys, :environment
   ) do
     def lockfile_hash
       manifest_hash
@@ -14,13 +13,11 @@ module Pray
   ResolvedPackage = Struct.new(
     :declaration, :root, :spec, :tree_hash, :artifact_hash, :artifact,
     :selected_exports, :source_checksum, :export_bodies, :skill_files,
-    :signer_fingerprint, :registry_latest_version,
-    keyword_init: true
+    :signer_fingerprint, :registry_latest_version
   )
 
   ResolvedLocalFile = Struct.new(
-    :path, :manifest_path, :content, :position, :optional,
-    keyword_init: true
+    :path, :manifest_path, :content, :position, :optional
   )
 
   module Resolve
@@ -28,7 +25,7 @@ module Pray
 
     def project_root_from_manifest(manifest_path)
       parent = File.dirname(manifest_path)
-      parent.empty? || parent == "." ? "." : parent
+      (parent.empty? || parent == ".") ? "." : parent
     end
 
     def canonical_project_root(manifest_path)
@@ -70,36 +67,32 @@ module Pray
       seen = {}
       errors = []
       manifest.packages.each do |declaration|
-        begin
-          package = resolve_package(
-            project_root,
-            sources,
-            git_sources,
-            user_config,
-            declaration,
-            lockfile_hints,
-            offline: options.offline
-          )
-          if seen[package.declaration.name]
-            raise Error.resolution("duplicate package declaration: #{package.declaration.name}")
-          end
-
-          seen[package.declaration.name] = true
-          packages << package
-        rescue Error => error
-          errors << "#{declaration.name}: #{error.message}"
+        package = resolve_package(
+          project_root,
+          sources,
+          git_sources,
+          user_config,
+          declaration,
+          lockfile_hints,
+          offline: options.offline
+        )
+        if seen[package.declaration.name]
+          raise Error.resolution("duplicate package declaration: #{package.declaration.name}")
         end
+
+        seen[package.declaration.name] = true
+        packages << package
+      rescue Error => error
+        errors << "#{declaration.name}: #{error.message}"
       end
       raise Error.resolution(errors.join("\n")) unless errors.empty?
 
       local_files = []
       local_errors = []
       manifest.local.each do |local|
-        begin
-          local_files << resolve_local_file(project_root, local)
-        rescue Error => error
-          local_errors << "local #{local.path}: #{error.message}"
-        end
+        local_files << resolve_local_file(project_root, local)
+      rescue Error => error
+        local_errors << "local #{local.path}: #{error.message}"
       end
       raise Error.resolution(local_errors.join("\n")) unless local_errors.empty?
 
@@ -127,9 +120,9 @@ module Pray
       resolve_project_with_options(manifest_path, options)
     rescue Error => error
       if allow_git_refresh_fallback &&
-         !offline &&
-         !refresh &&
-         resolution_may_benefit_from_git_source_refresh?(error)
+          !offline &&
+          !refresh &&
+          resolution_may_benefit_from_git_source_refresh?(error)
         refreshed = ResolveOptions.new(offline: offline, refresh: true, environment: environment)
         resolve_project_with_options(manifest_path, refreshed)
       else
@@ -290,7 +283,7 @@ module Pray
     def find_prayspec_file(root)
       files = Dir.children(root).filter_map do |entry|
         path = File.join(root, entry)
-        File.file?(path) && File.extname(entry) == ".prayspec" ? path : nil
+        (File.file?(path) && File.extname(entry) == ".prayspec") ? path : nil
       end
       case files.length
       when 1 then files.first

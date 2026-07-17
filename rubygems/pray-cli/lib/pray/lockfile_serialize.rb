@@ -13,7 +13,7 @@ module Pray
         "prayfile_lock = #{format_string(lockfile.prayfile_lock)}",
         "spec = #{format_string(lockfile.spec)}",
         "generated_by = #{format_string(lockfile.generated_by)}",
-        "manifest_hash = #{format_string(lockfile.manifest_hash)}",
+        "manifest_hash = #{format_string(lockfile.manifest_hash)}"
       ]
       lines << "environment = #{format_string(lockfile.environment)}" if lockfile.environment
       lines << ""
@@ -97,15 +97,15 @@ module Pray
     def append_scalars(lines, entries)
       entries.each do |key, value|
         lines << case value
-                 when String
-                   "#{key} = #{format_string(value)}"
-                 when Integer
-                   "#{key} = #{value}"
-                 when TrueClass, FalseClass
-                   "#{key} = #{value}"
-                 else
-                   raise ArgumentError, "unsupported lockfile scalar type for #{key}"
-                 end
+        when String
+          "#{key} = #{format_string(value)}"
+        when Integer
+          "#{key} = #{value}"
+        when TrueClass, FalseClass
+          "#{key} = #{value}"
+        else
+          raise ArgumentError, "unsupported lockfile scalar type for #{key}"
+        end
       end
     end
 

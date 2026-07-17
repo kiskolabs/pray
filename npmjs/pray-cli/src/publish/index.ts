@@ -4,10 +4,7 @@ import { buildPackageArchiveBytes } from "../archive/praypkg.js";
 import { PrayError } from "../errors.js";
 import { sha256Prefixed } from "../hashing.js";
 import { httpPut, joinUrl } from "../http/client.js";
-import {
-  parseMetadata,
-  registryArtifactSignature,
-} from "../registry/index.js";
+import { parseMetadata, registryArtifactSignature } from "../registry/index.js";
 import type {
   RegistryIndex,
   RegistryPackageMetadata,
@@ -98,14 +95,21 @@ export async function publishToServer(
 }
 
 export function initDistributionRoot(root: string): void {
-  const distributionRoot = root.endsWith("prayers") ? root : join(root, "prayers");
+  const distributionRoot = root.endsWith("prayers")
+    ? root
+    : join(root, "prayers");
   const indexPath = join(distributionRoot, "v1", "index.json");
   if (existsSync(indexPath)) {
-    throw PrayError.manifest(`distribution repo already exists at ${distributionRoot}`);
+    throw PrayError.manifest(
+      `distribution repo already exists at ${distributionRoot}`,
+    );
   }
   mkdirSync(join(distributionRoot, "v1", "packages"), { recursive: true });
   mkdirSync(join(distributionRoot, "v1", "artifacts"), { recursive: true });
-  writeRegistryIndex(distributionRoot, { spec: "prayfile-distribution-1", packages: [] });
+  writeRegistryIndex(distributionRoot, {
+    spec: "prayfile-distribution-1",
+    packages: [],
+  });
 }
 
 function publishedRegistryPackageVersion(
@@ -168,10 +172,16 @@ function writeRegistryPackageMetadata(
   metadata: RegistryPackageMetadata,
 ): void {
   mkdirSync(join(path, ".."), { recursive: true });
-  writeFileSync(path, `${JSON.stringify(metadataToHash(metadata), null, 2)}\n`, "utf8");
+  writeFileSync(
+    path,
+    `${JSON.stringify(metadataToHash(metadata), null, 2)}\n`,
+    "utf8",
+  );
 }
 
-function metadataToHash(metadata: RegistryPackageMetadata): Record<string, unknown> {
+function metadataToHash(
+  metadata: RegistryPackageMetadata,
+): Record<string, unknown> {
   return {
     name: metadata.name,
     versions: metadata.versions.map((entry) => versionToHash(entry)),
@@ -189,7 +199,8 @@ function versionToHash(entry: RegistryPackageVersion): Record<string, unknown> {
   if (entry.artifactHash) hash.artifact_hash = entry.artifactHash;
   if (entry.treeHash) hash.tree_hash = entry.treeHash;
   if (entry.signer) hash.signer = entry.signer;
-  if (entry.signerFingerprint) hash.signer_fingerprint = entry.signerFingerprint;
+  if (entry.signerFingerprint)
+    hash.signer_fingerprint = entry.signerFingerprint;
   if (entry.publishedAt) hash.published_at = entry.publishedAt;
   if (entry.signature) hash.signature = entry.signature;
   return hash;
@@ -199,7 +210,10 @@ function registryMetadataPath(root: string, packageName: string): string {
   return join(root, "v1", "packages", `${packageName}.json`);
 }
 
-export function registryArtifactPath(packageName: string, version: string): string {
+export function registryArtifactPath(
+  packageName: string,
+  version: string,
+): string {
   const artifactName = `${packageName.replaceAll("/", "-")}-${version}.praypkg`;
   return `v1/artifacts/${packageName}/${version}/${artifactName}`;
 }

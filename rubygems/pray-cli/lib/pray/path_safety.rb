@@ -22,7 +22,7 @@ module Pray
 
     def reject_unsafe_package_name!(package_name)
       if package_name.nil? || package_name.empty? || package_name.include?("\0") || package_name.include?("\\") ||
-         package_name.include?("..")
+          package_name.include?("..")
         raise Error.resolution("invalid package name: #{package_name.inspect}")
       end
 

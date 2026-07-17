@@ -73,13 +73,13 @@ function rubyPessimisticToSemver(constraint: string): string {
   const second = numbers[1];
   const third = numbers[2];
   if (first === undefined || second === undefined || third === undefined) {
-    throw PrayError.resolution(`invalid constraint segment count in ${constraint}`);
+    throw PrayError.resolution(
+      `invalid constraint segment count in ${constraint}`,
+    );
   }
   const lower = `${first}.${second}.${third}`;
   const upper =
-    parts.length === 1
-      ? `${first + 1}.0.0`
-      : `${first}.${second + 1}.0`;
+    parts.length === 1 ? `${first + 1}.0.0` : `${first}.${second + 1}.0`;
   return `>=${lower} <${upper}`;
 }
 

@@ -102,9 +102,7 @@ fn verify_reports_missing_managed_span_with_package_context_and_recovery_guidanc
 
     let rendered_path = repo.join("INSTRUCTIONS.md");
     let rendered = fs::read_to_string(&rendered_path).expect("rendered file exists");
-    let rendered = rendered
-        .replace("<!-- pray:", "<!-- removed pray:")
-        .replace(" -->", " -->");
+    let rendered = rendered.replace("<!-- pray:", "<!-- removed pray:");
     fs::write(&rendered_path, rendered).expect("rendered file rewritten");
 
     let verify = run_pray(&repo, &["verify"]);

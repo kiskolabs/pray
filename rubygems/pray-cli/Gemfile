@@ -3,3 +3,13 @@
 source "https://rubygems.org"
 
 gemspec
+
+group :development do
+  gem "rake", "~> 13.0"
+  gem "libyear-bundler", "~> 0.9"
+  gem "standard", "~> 1.52"
+  gem "standard-custom", "~> 1.0"
+  gem "standard-performance", "~> 1.8"
+  gem "rubocop-rspec", "~> 3.8"
+  gem "rubocop-thread_safety", "~> 0.7"
+end

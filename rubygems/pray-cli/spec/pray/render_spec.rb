@@ -43,7 +43,7 @@ RSpec.describe Pray::Render do
       tree_hash: "sha256:base",
       artifact_hash: "sha256:base",
       selected_exports: %w[testing-basics],
-      export_bodies: { "testing-basics" => "base export" }
+      export_bodies: {"testing-basics" => "base export"}
     )
     dev_package = Pray::ResolvedPackage.new(
       declaration: manifest.packages[1],
@@ -52,7 +52,7 @@ RSpec.describe Pray::Render do
       tree_hash: "sha256:dev",
       artifact_hash: "sha256:dev",
       selected_exports: %w[dev-only],
-      export_bodies: { "dev-only" => "dev export" }
+      export_bodies: {"dev-only" => "dev export"}
     )
     project = Pray::ResolvedProject.new(
       manifest_path: File.join(simple_project, "Prayfile"),

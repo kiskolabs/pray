@@ -3,36 +3,34 @@ import { join, resolve } from "node:path";
 import { versionSatisfies } from "../constraint.js";
 import { validateEnvironment } from "../environment.js";
 import { PrayError } from "../errors.js";
-import { activeInvocationContext } from "../project-context/runtime.js";
-import { normalizeLineEndings } from "../hashing.js";
 import { prepareGitSources } from "../git/sources.js";
+import { normalizeLineEndings } from "../hashing.js";
 import { readLockfile } from "../lockfile/index.js";
-import type { Lockfile } from "../lockfile/types.js";
 import { defaultLockfilePath } from "../lockfile/paths.js";
+import type { Lockfile } from "../lockfile/types.js";
 import {
   manifestHash,
   parseManifest,
   readManifestText,
 } from "../manifest/index.js";
-import type { ManifestLocal, ManifestPackage, ManifestSource } from "../manifest/types.js";
+import type {
+  ManifestLocal,
+  ManifestPackage,
+  ManifestSource,
+} from "../manifest/types.js";
 import {
   findPrayspecFile,
   parsePackageSpec,
   treeHashForRoot,
 } from "../package-spec/index.js";
 import type { PackageSpec } from "../package-spec/types.js";
-import {
-  defaultResolveOptions,
-  type ResolveOptions,
-} from "./context.js";
-import {
-  resolvePackageRoot,
-  vendoredPackageRoot,
-} from "./package-root.js";
-import {
-  type ResolvedLocalFile,
-  type ResolvedPackage,
-  type ResolvedProject,
+import { activeInvocationContext } from "../project-context/runtime.js";
+import { defaultResolveOptions, type ResolveOptions } from "./context.js";
+import { resolvePackageRoot, vendoredPackageRoot } from "./package-root.js";
+import type {
+  ResolvedLocalFile,
+  ResolvedPackage,
+  ResolvedProject,
 } from "./types.js";
 
 export async function resolveProject(
@@ -345,5 +343,5 @@ function skillRelativeFile(file: string, skillPrefix: string): string {
   return relative;
 }
 
-export { type ResolvedProject } from "./types.js";
-export { type ResolveOptions, defaultResolveOptions } from "./context.js";
+export { defaultResolveOptions, type ResolveOptions } from "./context.js";
+export type { ResolvedProject } from "./types.js";

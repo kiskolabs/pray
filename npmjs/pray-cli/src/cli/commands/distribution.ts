@@ -1,5 +1,5 @@
-import { PrayError } from "../../errors.js";
 import { submitConfession } from "../../confess/index.js";
+import { PrayError } from "../../errors.js";
 import { defaultManifestPath } from "../../lockfile/paths.js";
 import { publishToRoot, publishToServer } from "../../publish/index.js";
 import { resolveProject } from "../../resolve/project.js";

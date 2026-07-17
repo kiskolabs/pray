@@ -69,7 +69,7 @@ module Pray
       lines = text.lines.map(&:chomp)
       insertion_index = lines.index do |line|
         trimmed = line.lstrip
-        trimmed.start_with?("local ") || trimmed.start_with?("render ")
+        trimmed.start_with?("local ", "render ")
       end || lines.length
       lines.insert(insertion_index, statement)
       output = lines.join("\n")
@@ -83,7 +83,7 @@ module Pray
       alternate_prefix = "agent '#{name}'"
       index = lines.index do |line|
         trimmed = line.lstrip
-        trimmed.start_with?(package_prefix) || trimmed.start_with?(alternate_prefix)
+        trimmed.start_with?(package_prefix, alternate_prefix)
       end
       if index
         lines.delete_at(index)

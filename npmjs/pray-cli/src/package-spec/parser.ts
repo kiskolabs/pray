@@ -29,7 +29,10 @@ class BlockParser {
   parseRoot(): PackageSpec {
     const start = this.reader.nextStatement();
     if (!start?.startsWith("Package::Specification.new")) {
-      throw PrayError.parse(PARSE_CONTEXT, "expected Package::Specification.new");
+      throw PrayError.parse(
+        PARSE_CONTEXT,
+        "expected Package::Specification.new",
+      );
     }
 
     const spec: PackageSpec = {
@@ -78,17 +81,27 @@ class BlockParser {
       const rest = statement.slice("spec.".length);
       const separator = rest.indexOf(" = ");
       if (separator === -1) {
-        throw PrayError.parse(PARSE_CONTEXT, `unrecognized statement: ${statement}`);
+        throw PrayError.parse(
+          PARSE_CONTEXT,
+          `unrecognized statement: ${statement}`,
+        );
       }
       const field = rest.slice(0, separator).trim();
       const value = rest.slice(separator + 3).trim();
       this.applyAssignment(spec, field, value);
       return;
     }
-    throw PrayError.parse(PARSE_CONTEXT, `unrecognized statement: ${statement}`);
+    throw PrayError.parse(
+      PARSE_CONTEXT,
+      `unrecognized statement: ${statement}`,
+    );
   }
 
-  private applyAssignment(spec: PackageSpec, field: string, value: string): void {
+  private applyAssignment(
+    spec: PackageSpec,
+    field: string,
+    value: string,
+  ): void {
     switch (field) {
       case "name":
         spec.name = stringFromLiteral(value, PARSE_CONTEXT);
@@ -127,7 +140,10 @@ class BlockParser {
         spec.adapters = parseStringMap(value);
         return;
       default:
-        throw PrayError.parse(PARSE_CONTEXT, `unsupported assignment: ${field}`);
+        throw PrayError.parse(
+          PARSE_CONTEXT,
+          `unsupported assignment: ${field}`,
+        );
     }
   }
 }

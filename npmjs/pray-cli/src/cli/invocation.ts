@@ -2,13 +2,16 @@ import { PrayError } from "../errors.js";
 import {
   activeInvocationContext,
   lockfilePathForContext,
+  type ProjectInvocationContext,
+  type ProjectInvocationOptions,
   projectInvocationContextFromCurrentDirectory,
   projectInvocationContextFromOptions,
   setActiveInvocationContext,
-  type ProjectInvocationContext,
-  type ProjectInvocationOptions,
 } from "../project-context/index.js";
-import { defaultResolveOptions, type ResolveOptions } from "../resolve/context.js";
+import {
+  defaultResolveOptions,
+  type ResolveOptions,
+} from "../resolve/context.js";
 import {
   resolveProject,
   resolveProjectWithGitRefreshFallback,
@@ -82,7 +85,10 @@ function parseGlobalOptions(argumentsList: string[]): {
     const argument = argumentsList[index]!;
     switch (argument) {
       case "--path":
-        options.projectRoot = requireOptionValue("--path", argumentsList[++index]);
+        options.projectRoot = requireOptionValue(
+          "--path",
+          argumentsList[++index],
+        );
         index++;
         continue;
       case "--file-path":

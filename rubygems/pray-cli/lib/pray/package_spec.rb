@@ -1,16 +1,15 @@
 # frozen_string_literal: true
 
 module Pray
-  PackageExport = Struct.new(:kind, :path, :summary, keyword_init: true)
-  PackageSkill = Struct.new(:path, :summary, keyword_init: true)
-  PackageTemplate = Struct.new(:path, :summary, keyword_init: true)
-  PackageDependency = Struct.new(:name, :constraint, :optional, keyword_init: true)
+  PackageExport = Struct.new(:kind, :path, :summary)
+  PackageSkill = Struct.new(:path, :summary)
+  PackageTemplate = Struct.new(:path, :summary)
+  PackageDependency = Struct.new(:name, :constraint, :optional)
 
   PackageSpec = Struct.new(
     :name, :version, :summary, :description, :authors, :license, :homepage,
     :source_code_uri, :changelog_uri, :prayfile_version, :files, :exports,
-    :skills, :templates, :adapters, :targets, :dependencies, :metadata,
-    keyword_init: true
+    :skills, :templates, :adapters, :targets, :dependencies, :metadata
   ) do
     def initialize(
       name: "", version: "", summary: nil, description: nil, authors: [], license: nil,
@@ -214,7 +213,7 @@ module Pray
           next if statement.empty?
 
           while !statement.end_with?(" do") && statement != "end" && @cursor < @lines.length &&
-                (statement.rstrip.end_with?(",") || !Literal.is_balanced?(statement))
+              (statement.rstrip.end_with?(",") || !Literal.is_balanced?(statement))
             next_line = @lines[@cursor].strip
             @cursor += 1
             next if next_line.empty?

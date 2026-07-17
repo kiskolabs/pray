@@ -17,10 +17,7 @@ pub struct UpgradeNotice {
 }
 
 pub fn normalize_release_version(tag: &str) -> String {
-    tag.trim()
-        .trim_start_matches(['v', 'V'])
-        .trim()
-        .to_string()
+    tag.trim().trim_start_matches(['v', 'V']).trim().to_string()
 }
 
 pub fn changelog_url(repository: &str, _latest_version: &str) -> String {
@@ -174,9 +171,8 @@ edition = "2021"
         assert!(formatted.contains("A new version of pray is available"));
         assert!(formatted.contains("v1.1.0 → v1.2.0"));
         assert!(formatted.contains("Run: pray upgrade"));
-        assert!(formatted.contains(
-            "Changelog: https://github.com/kiskolabs/pray/blob/main/CHANGELOG.md"
-        ));
+        assert!(formatted
+            .contains("Changelog: https://github.com/kiskolabs/pray/blob/main/CHANGELOG.md"));
     }
 
     #[test]

@@ -5,7 +5,7 @@ require "fileutils"
 require "pathname"
 
 module Pray
-  GitSourceCheckout = Struct.new(:cache_directory, :revision, :subdir, keyword_init: true)
+  GitSourceCheckout = Struct.new(:cache_directory, :revision, :subdir)
 
   module GitSources
     module_function
@@ -78,10 +78,10 @@ module Pray
 
     def local_git_source_root(clone_url)
       path = if clone_url.start_with?("file://")
-               clone_url.delete_prefix("file://")
-             else
-               clone_url
-             end
+        clone_url.delete_prefix("file://")
+      else
+        clone_url
+      end
       return nil unless File.exist?(path)
 
       discover_distribution_root(path)
@@ -213,7 +213,7 @@ module Pray
       output, status = Open3.capture2e("git", "-C", cwd, *arguments)
       return if status.success?
 
-      raise Error.resolution(command_error("git #{arguments.join(' ')}", output))
+      raise Error.resolution(command_error("git #{arguments.join(" ")}", output))
     end
 
     def run_git_in_repo(repository, *arguments)

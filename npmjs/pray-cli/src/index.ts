@@ -1,9 +1,8 @@
+export { runCli } from "./cli/main.js";
+export type { MaterializeOptions } from "./cli/materialize.js";
+export { materializeProject } from "./cli/materialize.js";
+export { submitConfession } from "./confess/index.js";
 export { PrayError } from "./errors.js";
-export { parseManifest, manifestHash, readManifestText } from "./manifest/index.js";
-export { addPackageToManifest, removePackageFromManifest } from "./manifest/edit.js";
-export { parsePackageSpec } from "./package-spec/index.js";
-export { resolveProject, defaultResolveOptions } from "./resolve/project.js";
-export { renderProject, writeRenderedTargets } from "./render/project.js";
 export {
   buildLockfile,
   lockfileHash,
@@ -19,21 +18,23 @@ export {
   defaultManifestPath,
   projectRootFromManifest,
 } from "./lockfile/paths.js";
-export {
-  inspectProject,
-  verifyProject,
-  driftProject,
-} from "./verify/project.js";
-export { materializeProject } from "./cli/materialize.js";
-export { publishToRoot, publishToServer } from "./publish/index.js";
-export { runServer } from "./serve/index.js";
-export { runTrustCommand } from "./trust/index.js";
-export { submitConfession } from "./confess/index.js";
-export { syncDistributionRoot } from "./sync/index.js";
-export { vendorProject } from "./vendor/index.js";
-export { runCli } from "./cli/main.js";
+export type {
+  LockedPackage,
+  LockedTarget,
+  Lockfile,
+  LockSource,
+  ManagedSpanRecord,
+} from "./lockfile/types.js";
 export { PACKAGE_VERSION } from "./lockfile/types.js";
-
+export {
+  addPackageToManifest,
+  removePackageFromManifest,
+} from "./manifest/edit.js";
+export {
+  manifestHash,
+  parseManifest,
+  readManifestText,
+} from "./manifest/index.js";
 export type {
   Manifest,
   ManifestLocal,
@@ -42,21 +43,26 @@ export type {
   ManifestTarget,
   RenderPolicy,
 } from "./manifest/types.js";
-export type {
-  Lockfile,
-  LockedPackage,
-  LockedTarget,
-  LockSource,
-  ManagedSpanRecord,
-} from "./lockfile/types.js";
+export { parsePackageSpec } from "./package-spec/index.js";
+export { publishToRoot, publishToServer } from "./publish/index.js";
+export { renderProject, writeRenderedTargets } from "./render/project.js";
+export type { RenderedTarget } from "./render/types.js";
+export { defaultResolveOptions, resolveProject } from "./resolve/project.js";
 export type {
   ResolvedLocalFile,
   ResolvedPackage,
   ResolvedProject,
 } from "./resolve/types.js";
-export type { RenderedTarget } from "./render/types.js";
+export { runServer } from "./serve/index.js";
+export { syncDistributionRoot } from "./sync/index.js";
+export { runTrustCommand } from "./trust/index.js";
+export { vendorProject } from "./vendor/index.js";
 export type {
   VerificationFinding,
   VerificationReport,
 } from "./verify/project.js";
-export type { MaterializeOptions } from "./cli/materialize.js";
+export {
+  driftProject,
+  inspectProject,
+  verifyProject,
+} from "./verify/project.js";

@@ -1,8 +1,8 @@
 import assert from "node:assert/strict";
 import { describe, it } from "node:test";
+import { PrayError } from "./errors.js";
 import { parseManifest } from "./manifest/index.js";
 import { parsePackageSpec } from "./package-spec/index.js";
-import { PrayError } from "./errors.js";
 
 describe("parser", () => {
   it("parses minimal manifest example", () => {

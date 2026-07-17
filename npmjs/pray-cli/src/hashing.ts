@@ -32,9 +32,7 @@ export function checksumManagedBodyLineRefs(bodyLines: string[]): string {
     if (line === undefined) {
       continue;
     }
-    hasher.update(
-      line.includes("\r") ? normalizeLineEndings(line) : line,
-    );
+    hasher.update(line.includes("\r") ? normalizeLineEndings(line) : line);
   }
   return prefixedHexDigest(hasher.digest());
 }

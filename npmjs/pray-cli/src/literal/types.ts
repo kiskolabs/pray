@@ -22,7 +22,9 @@ export function literalAsInteger(value: LiteralValue): number | undefined {
   return value.kind === "integer" ? value.value : undefined;
 }
 
-export function literalAsArray(value: LiteralValue): LiteralValue[] | undefined {
+export function literalAsArray(
+  value: LiteralValue,
+): LiteralValue[] | undefined {
   return value.kind === "array" ? value.value : undefined;
 }
 

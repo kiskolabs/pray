@@ -17,7 +17,10 @@ export function parseLiteral(input: string): LiteralValue {
 export function parseLiteralMap(input: string): Map<string, LiteralValue> {
   const value = parseLiteral(input);
   if (value.kind !== "map") {
-    throw PrayError.parse("literal", `expected map literal, found ${value.kind}`);
+    throw PrayError.parse(
+      "literal",
+      `expected map literal, found ${value.kind}`,
+    );
   }
   return value.value;
 }
@@ -25,7 +28,10 @@ export function parseLiteralMap(input: string): Map<string, LiteralValue> {
 export function parseLiteralArray(input: string): LiteralValue[] {
   const value = parseLiteral(input);
   if (value.kind !== "array") {
-    throw PrayError.parse("literal", `expected array literal, found ${value.kind}`);
+    throw PrayError.parse(
+      "literal",
+      `expected array literal, found ${value.kind}`,
+    );
   }
   return value.value;
 }
@@ -76,7 +82,10 @@ class LiteralParser {
     if (character === "{") {
       return this.parseMap();
     }
-    if (character !== undefined && (/\d/.test(character) || character === "-")) {
+    if (
+      character !== undefined &&
+      (/\d/.test(character) || character === "-")
+    ) {
       return this.parseIntegerOrIdentifier();
     }
     if (character !== undefined) {

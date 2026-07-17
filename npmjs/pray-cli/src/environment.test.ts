@@ -29,9 +29,18 @@ describe("environment", () => {
 
   it("renders grouped packages only for selected environments", () => {
     const packageEntry = packageWithGroups(["development", "test"]);
-    assert.equal(packageMatchesEnvironment(packageEntry.groups, undefined), false);
-    assert.equal(packageMatchesEnvironment(packageEntry.groups, "development"), true);
-    assert.equal(packageMatchesEnvironment(packageEntry.groups, "production"), false);
+    assert.equal(
+      packageMatchesEnvironment(packageEntry.groups, undefined),
+      false,
+    );
+    assert.equal(
+      packageMatchesEnvironment(packageEntry.groups, "development"),
+      true,
+    );
+    assert.equal(
+      packageMatchesEnvironment(packageEntry.groups, "production"),
+      false,
+    );
   });
 
   it("rejects unknown environments when groups exist", () => {

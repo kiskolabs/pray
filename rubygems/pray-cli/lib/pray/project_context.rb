@@ -7,13 +7,13 @@ module Pray
   ENV_MANIFEST_PATH = "PRAY_FILE_PATH"
   ENV_ENVIRONMENT = "PRAY_ENV"
 
-  ProjectInvocationContext = Struct.new(:project_root, :manifest_path, :environment, keyword_init: true) do
+  ProjectInvocationContext = Struct.new(:project_root, :manifest_path, :environment) do
     def lockfile_path
       File.join(project_root, "Prayfile.lock")
     end
   end
 
-  ProjectInvocationOptions = Struct.new(:project_root, :manifest_path, :environment, keyword_init: true)
+  ProjectInvocationOptions = Struct.new(:project_root, :manifest_path, :environment)
 
   module ProjectContext
     module_function
@@ -60,7 +60,7 @@ module Pray
       resolved = Pathname(path).absolute? ? Pathname(path) : Pathname(base).join(path)
       resolved = resolved.expand_path
       resolved.exist? ? resolved.realpath.to_s : resolved.cleanpath.to_s
-    rescue StandardError
+    rescue
       resolved.to_s
     end
   end

@@ -265,4 +265,7 @@ fn stdio_server_answers_sync_package_rpc() {
         response.body.get("name").and_then(|value| value.as_str()),
         Some("sample/base")
     );
+
+    let _ = server.kill();
+    let _ = server.wait().expect("wait for stdio server");
 }

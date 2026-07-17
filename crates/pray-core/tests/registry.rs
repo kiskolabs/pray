@@ -433,7 +433,7 @@ end
 
 fn expected_piece_count(artifact_bytes: &[u8], piece_size: usize) -> usize {
     let piece_size = piece_size.max(1);
-    (artifact_bytes.len() + piece_size - 1) / piece_size
+    artifact_bytes.len().div_ceil(piece_size)
 }
 
 fn unique_temp_dir(prefix: &str) -> PathBuf {

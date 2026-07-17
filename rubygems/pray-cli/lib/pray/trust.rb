@@ -4,8 +4,7 @@ require "toml-rb"
 
 module Pray
   TrustRule = Struct.new(
-    :match_prefix, :allow, :allowed_host_keys, :allowed_publishers,
-    keyword_init: true
+    :match_prefix, :allow, :allowed_host_keys, :allowed_publishers
   ) do
     def initialize(
       match_prefix: nil, allow: true, allowed_host_keys: [], allowed_publishers: []
@@ -14,7 +13,7 @@ module Pray
     end
   end
 
-  TrustPolicy = Struct.new(:default_rule, :rules, keyword_init: true) do
+  TrustPolicy = Struct.new(:default_rule, :rules) do
     def initialize(default_rule: TrustRule.new, rules: [])
       super
     end

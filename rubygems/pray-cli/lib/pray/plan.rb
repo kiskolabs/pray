@@ -5,8 +5,7 @@ require "fileutils"
 module Pray
   module Plan
     MaterializationPreview = Struct.new(
-      :package_lines, :lockfile, :targets, :provisioned, :warnings,
-      keyword_init: true
+      :package_lines, :lockfile, :targets, :provisioned, :warnings
     )
 
     module_function
@@ -22,7 +21,7 @@ module Pray
     end
 
     def print_materialization_report(preview, mode)
-      puts mode == :plan ? "Plan" : "Install"
+      puts (mode == :plan) ? "Plan" : "Install"
       preview.package_lines.each { |line| puts line }
       puts "Lockfile: #{preview.lockfile}"
       preview.targets.each do |path, change|
@@ -60,24 +59,24 @@ module Pray
     def target_change(project, target)
       path = File.join(project.project_root, target.path)
       change = if !File.exist?(path)
-                 "write"
-               elsif File.read(path) == target.content
-                 "unchanged"
-               else
-                 "update"
-               end
+        "write"
+      elsif File.read(path) == target.content
+        "unchanged"
+      else
+        "update"
+      end
       [target.path, change]
     end
 
     def provisioned_change(project, file)
       destination = File.join(project.project_root, file.path)
       change = if !File.exist?(destination)
-                 "write"
-               elsif FileUtils.compare_file(destination, file.source)
-                 "unchanged"
-               else
-                 "update"
-               end
+        "write"
+      elsif FileUtils.compare_file(destination, file.source)
+        "unchanged"
+      else
+        "update"
+      end
       [file.path, change]
     end
   end

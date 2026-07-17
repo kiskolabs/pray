@@ -217,7 +217,15 @@ function seedGitCacheFromGlobal(
   if (!globalCache || !globalGitCacheReady(globalCache)) {
     return false;
   }
-  runGit(workingDirectory, "clone", "--depth", "1", "--quiet", globalCache, destination);
+  runGit(
+    workingDirectory,
+    "clone",
+    "--depth",
+    "1",
+    "--quiet",
+    globalCache,
+    destination,
+  );
   return true;
 }
 
@@ -230,7 +238,14 @@ function mirrorGitCacheToGlobal(cloneUrl: string, projectCache: string): void {
   if (existsSync(globalCache)) {
     rmSync(globalCache, { recursive: true, force: true });
   }
-  runGit(join(projectCache, ".."), "clone", "--bare", "--quiet", projectCache, globalCache);
+  runGit(
+    join(projectCache, ".."),
+    "clone",
+    "--bare",
+    "--quiet",
+    projectCache,
+    globalCache,
+  );
 }
 
 function applySparseCheckout(repository: string, subdir: string): void {
@@ -279,7 +294,10 @@ function runGit(repository: string, ...argumentsList: string[]): void {
   }
   if (result.status !== 0) {
     throw PrayError.resolution(
-      commandError(`git ${argumentsList.join(" ")}`, result.stderr ?? result.stdout ?? ""),
+      commandError(
+        `git ${argumentsList.join(" ")}`,
+        result.stderr ?? result.stdout ?? "",
+      ),
     );
   }
 }
@@ -290,7 +308,10 @@ function runGitCapture(repository: string, ...argumentsList: string[]): string {
   });
   if (result.status !== 0) {
     throw PrayError.resolution(
-      commandError(`git ${argumentsList.join(" ")}`, result.stderr ?? result.stdout ?? ""),
+      commandError(
+        `git ${argumentsList.join(" ")}`,
+        result.stderr ?? result.stdout ?? "",
+      ),
     );
   }
   return result.stdout ?? "";
@@ -298,5 +319,7 @@ function runGitCapture(repository: string, ...argumentsList: string[]): string {
 
 function commandError(program: string, output: string): string {
   const message = output.trim();
-  return message.length === 0 ? `${program} failed` : `${program} failed: ${message}`;
+  return message.length === 0
+    ? `${program} failed`
+    : `${program} failed: ${message}`;
 }

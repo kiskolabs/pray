@@ -3,9 +3,9 @@ import { join, resolve } from "node:path";
 import { PrayError } from "../errors.js";
 import {
   discoverDistributionRoot,
+  type GitSourceCheckout,
   localGitSourceRoot,
   resolveDistributionRoot,
-  type GitSourceCheckout,
 } from "../git/sources.js";
 import type { Lockfile } from "../lockfile/types.js";
 import type { ManifestPackage, ManifestSource } from "../manifest/types.js";
@@ -76,7 +76,9 @@ export async function resolvePackageRoot(
     if (source.kind === "git") {
       const checkout = gitSources.get(source.name);
       if (!checkout) {
-        throw PrayError.resolution(`git source ${source.name} was not prepared`);
+        throw PrayError.resolution(
+          `git source ${source.name} was not prepared`,
+        );
       }
       const cloneUrl = source.url.replace(/^git\+/, "");
       const distributionRoot = resolveDistributionRoot(
@@ -100,11 +102,15 @@ export async function resolvePackageRoot(
       };
     }
 
-    throw PrayError.unsupported(`source kind ${source.kind} not implemented yet`);
+    throw PrayError.unsupported(
+      `source kind ${source.kind} not implemented yet`,
+    );
   }
 
   if (declaration.git || declaration.tarball || declaration.oci) {
-    throw PrayError.unsupported("remote package sources are not implemented yet");
+    throw PrayError.unsupported(
+      "remote package sources are not implemented yet",
+    );
   }
 
   const slug = declaration.name.replaceAll("/", "-");
@@ -126,4 +132,4 @@ export function vendoredPackageRoot(
   return existsSync(path) ? path : undefined;
 }
 
-export { localGitSourceRoot, discoverDistributionRoot };
+export { discoverDistributionRoot, localGitSourceRoot };

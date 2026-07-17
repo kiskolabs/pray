@@ -11,19 +11,19 @@ RSpec.describe Pray::CLI do
 
     it "parses install flags" do
       expect(described_class.parse_command(["install", "--locked", "--offline"])).to eq(
-        [:install, { check: false, strict: false, semantic: false, locked: true, frozen: false, offline: true, targets: [] }]
+        [:install, {check: false, strict: false, semantic: false, locked: true, frozen: false, offline: true, targets: []}]
       )
     end
 
     it "parses add with path" do
       expect(described_class.parse_command(["add", "demo/pkg", "~> 1.0", "--path", "packages/demo"])).to eq(
-        [:add, { name: "demo/pkg", constraint: "~> 1.0", path: "packages/demo" }]
+        [:add, {name: "demo/pkg", constraint: "~> 1.0", path: "packages/demo"}]
       )
     end
 
     it "parses publish destinations" do
       expect(described_class.parse_command(["publish", "--root", "dist", "--server", "https://registry.example"])).to eq(
-        [:publish, { roots: ["dist"], servers: ["https://registry.example"] }]
+        [:publish, {roots: ["dist"], servers: ["https://registry.example"]}]
       )
     end
 

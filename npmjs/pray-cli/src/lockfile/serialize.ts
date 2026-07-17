@@ -1,7 +1,7 @@
 import type {
-  Lockfile,
   LockedPackage,
   LockedTarget,
+  Lockfile,
   LockSource,
   ManagedSpanRecord,
 } from "./types.js";
@@ -84,9 +84,7 @@ function formatPackage(packageEntry: LockedPackage): string[] {
 
 function formatTarget(target: LockedTarget): string[] {
   const lines = ["[[target]]"];
-  appendScalars(lines, [
-    ["name", target.name],
-  ]);
+  appendScalars(lines, [["name", target.name]]);
   lines.push(`outputs = ${formatStringArray(target.outputs)}`);
   return lines;
 }

@@ -4,8 +4,7 @@ require_relative "manifest_json"
 
 module Pray
   RenderPolicy = Struct.new(
-    :mode, :conflict, :churn, :header, :section_markers, :line_endings,
-    keyword_init: true
+    :mode, :conflict, :churn, :header, :section_markers, :line_endings
   ) do
     def self.default
       new(
@@ -19,10 +18,9 @@ module Pray
     end
   end
 
-  ManifestSource = Struct.new(:name, :kind, :url, :subdir, :rev, :tag, keyword_init: true)
+  ManifestSource = Struct.new(:name, :kind, :url, :subdir, :rev, :tag)
   ManifestTarget = Struct.new(
-    :name, :outputs, :skills, :commands, :rules, :max_bytes,
-    keyword_init: true
+    :name, :outputs, :skills, :commands, :rules, :max_bytes
   ) do
     def initialize(name:, outputs: [], skills: [], commands: [], rules: [], max_bytes: nil)
       super
@@ -31,8 +29,7 @@ module Pray
 
   ManifestPackage = Struct.new(
     :name, :constraint, :source, :exports, :targets, :features, :groups, :optional,
-    :path, :git, :tag, :rev, :tarball, :oci,
-    keyword_init: true
+    :path, :git, :tag, :rev, :tarball, :oci
   ) do
     def initialize(
       name:, constraint: "*", source: nil, exports: [], targets: [], features: [], groups: [],
@@ -42,15 +39,14 @@ module Pray
     end
   end
 
-  ManifestLocal = Struct.new(:path, :position, :optional, keyword_init: true) do
+  ManifestLocal = Struct.new(:path, :position, :optional) do
     def initialize(path:, position: "after", optional: false)
       super
     end
   end
 
   Manifest = Struct.new(
-    :prayfile_version, :sources, :targets, :packages, :local, :render,
-    keyword_init: true
+    :prayfile_version, :sources, :targets, :packages, :local, :render
   ) do
     def initialize(
       prayfile_version: "",
@@ -114,7 +110,10 @@ module Pray
       package_prefix = "agent \"#{name}\""
       alternate_prefix = "agent '#{name}'"
       lines = text.lines.map(&:chomp)
-      index = lines.index { |line| trimmed = line.lstrip; trimmed.start_with?(package_prefix) || trimmed.start_with?(alternate_prefix) }
+      index = lines.index { |line|
+        trimmed = line.lstrip
+        trimmed.start_with?(package_prefix, alternate_prefix)
+      }
       raise Error.manifest("package #{name} not found in manifest") unless index
 
       lines[index] = format_package_declaration(package)
@@ -196,7 +195,7 @@ module Pray
             manifest.packages << parse_package_with_groups(match[1])
           elsif (match = statement.match(/\Apackage (.+)\z/))
             manifest.packages << parse_package_with_groups(match[1])
-          elsif statement.match(/\Agroup (.+)\z/)
+          elsif /\Agroup (.+)\z/.match?(statement)
             raise Error.parse("manifest", "nested group blocks are not supported")
           else
             raise Error.parse(
@@ -233,7 +232,7 @@ module Pray
           next if statement.empty?
 
           while !statement.end_with?(" do") && statement != "end" && @cursor < @lines.length &&
-                (statement.rstrip.end_with?(",") || !Literal.is_balanced?(statement))
+              (statement.rstrip.end_with?(",") || !Literal.is_balanced?(statement))
             next_line = @lines[@cursor].strip
             @cursor += 1
             next if next_line.empty?
@@ -310,12 +309,12 @@ module Pray
         else
           url = string_from_value(values[1])
           kind = if url.start_with?("git+")
-                   "git"
-                 elsif url.start_with?("pray+ssh://", "ssh+pray://")
-                   "pray_ssh"
-                 else
-                   "registry"
-                 end
+            "git"
+          elsif url.start_with?("pray+ssh://", "ssh+pray://")
+            "pray_ssh"
+          else
+            "registry"
+          end
         end
 
         ManifestSource.new(
@@ -363,10 +362,10 @@ module Pray
 
         name = string_from_value(values[0])
         constraint = if values[1]
-                       Constraint.normalize_version_constraint(string_from_value(values[1]))
-                     else
-                       "*"
-                     end
+          Constraint.normalize_version_constraint(string_from_value(values[1]))
+        else
+          "*"
+        end
         ManifestPackage.new(
           name: name,
           constraint: constraint,

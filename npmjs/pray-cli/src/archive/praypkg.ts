@@ -7,13 +7,15 @@ import {
   rmSync,
   writeFileSync,
 } from "node:fs";
-import { basename, dirname, join, resolve } from "node:path";
 import { tmpdir } from "node:os";
+import { basename, dirname, join, resolve } from "node:path";
 import { PrayError } from "../errors.js";
 import { findPrayspecFile } from "../package-spec/index.js";
 import type { ResolvedPackage } from "../resolve/types.js";
 
-export function buildPackageArchiveBytes(packageEntry: ResolvedPackage): Buffer {
+export function buildPackageArchiveBytes(
+  packageEntry: ResolvedPackage,
+): Buffer {
   const prayspecPath = findPrayspecFile(packageEntry.root);
   const staging = mkdtempSync(join(tmpdir(), "pray-package-"));
   try {
@@ -52,7 +54,10 @@ export function unpackPraypkg(
   }
 }
 
-export function packageArchivePath(packageName: string, version: string): string {
+export function packageArchivePath(
+  packageName: string,
+  version: string,
+): string {
   const slug = packageName.replaceAll("/", "-");
   return join(".pray", "packages", `${slug}-${version}.praypkg`);
 }
