@@ -16,42 +16,6 @@ The specification and the `pray` reference CLI evolve together. `SPEC.md` define
 
 The canonical GitHub repository is `kiskolabs/pray`.
 
-### npm (Node.js)
-
-Install the TypeScript reference CLI from npm:
-
-```sh
-npm install -g pray-cli
-```
-
-Or run without a global install:
-
-```sh
-npx pray-cli install
-```
-
-The npm package lives in `npmjs/pray-cli` and implements Prayfile parsing, registry and git resolution, lockfile generation, rendering, verification, publish, and serve.
-
-### RubyGems (Ruby)
-
-Install the Ruby reference CLI:
-
-```sh
-gem install pray-cli
-```
-
-Or from this repository:
-
-```sh
-cd rubygems/pray-cli
-bundle install
-bundle exec pray version
-```
-
-The gem lives in `rubygems/pray-cli` and provides the same core workflow: parse `Prayfile`, resolve local and registry packages, write `Prayfile.lock`, render targets, and verify drift.
-
-### Cargo (Rust)
-
 Install the Rust reference CLI as a system-wide binary with Cargo:
 
 ```sh
@@ -985,6 +949,42 @@ Start with `SPEC.md` for:
 * plan/apply behaviour
 * verify and drift detection
 * CLI commands
+
+## Additional packaging
+
+### npm (Node.js)
+
+Install the TypeScript reference CLI from npm:
+
+```sh
+npm install -g pray-cli
+```
+
+Or run without a global install:
+
+```sh
+npx pray-cli install
+```
+
+The npm package lives in `npmjs/pray-cli` and implements Prayfile parsing, registry and git resolution, lockfile generation, rendering, verification, publish, and serve.
+
+### RubyGems (Ruby)
+
+Install the Ruby reference CLI:
+
+```sh
+gem install pray-cli
+```
+
+Or from this repository:
+
+```sh
+cd rubygems/pray-cli
+bundle install
+bundle exec pray version
+```
+
+The gem lives in `rubygems/pray-cli` and provides the same core workflow: parse `Prayfile`, resolve local and registry packages, write `Prayfile.lock`, render targets, and verify drift.
 
 ## Contributing
 
