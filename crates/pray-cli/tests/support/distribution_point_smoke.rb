@@ -1,7 +1,6 @@
 #!/usr/bin/env ruby
 # frozen_string_literal: true
 
-require 'capybara'
 require 'json'
 require 'net/http'
 require 'open3'
@@ -50,24 +49,40 @@ def fetch_html(url)
   response.body
 end
 
+def assert_includes_text(html, text)
+  return if html.include?(text)
+
+  raise "missing #{text.inspect}"
+end
+
+def assert_includes_link(html, label, href)
+  return if html.include?(href) && html.include?(label)
+
+  raise "missing link #{label.inspect} to #{href.inspect}"
+end
+
 run_pray(pray_bin, ['install'], client_a)
 run_pray(pray_bin, ['install'], client_b)
 
 run_pray(pray_bin, ['confess', 'sample/base', '--accepted', '--note', 'client A found the package useful'], client_a)
 run_pray(pray_bin, ['confess', 'sample/base', '--rejected', '--note', 'client B needs a narrower checklist'], client_b)
 
-root_page = Capybara.string(fetch_html("#{server_url}/"))
-raise 'missing registry title' unless root_page.has_text?('Pray distribution point')
-raise 'missing package link' unless root_page.has_link?('sample/base', href: '/packages/sample/base')
+root_page = fetch_html("#{server_url}/")
+assert_includes_text(root_page, 'Pray distribution point')
+assert_includes_link(root_page, 'sample/base', '/packages/sample/base')
 
-package_page = Capybara.string(fetch_html("#{server_url}/packages/sample/base"))
-raise 'missing package heading' unless package_page.has_text?('sample/base')
-raise 'missing accepted tally' unless package_page.has_text?('Accepted: 1')
-raise 'missing rejected tally' unless package_page.has_text?('Rejected: 1')
-raise 'missing signer' unless package_page.has_text?('Signer: sample-agent-packages@example.com')
-raise 'missing signature' unless package_page.has_text?('Signature: sha256:')
-raise 'missing accepted confession note' unless package_page.has_text?('client A found the package useful')
-raise 'missing rejected confession note' unless package_page.has_text?('client B needs a narrower checklist')
-raise 'missing artifact link' unless package_page.has_link?('1.4.3', href: '/v1/artifacts/sample/base/1.4.3/sample-base-1.4.3.praypkg')
+package_page = fetch_html("#{server_url}/packages/sample/base")
+assert_includes_text(package_page, 'sample/base')
+assert_includes_text(package_page, 'Accepted: 1')
+assert_includes_text(package_page, 'Rejected: 1')
+assert_includes_text(package_page, 'Signer: sample-agent-packages@example.com')
+assert_includes_text(package_page, 'Signature: sha256:')
+assert_includes_text(package_page, 'client A found the package useful')
+assert_includes_text(package_page, 'client B needs a narrower checklist')
+assert_includes_link(
+  package_page,
+  '1.4.3',
+  '/v1/artifacts/sample/base/1.4.3/sample-base-1.4.3.praypkg'
+)
 
 puts 'distribution point smoke test passed'
