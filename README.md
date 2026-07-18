@@ -1004,6 +1004,18 @@ Publishing should require strong authentication, explicit publish-time verificat
 
 Confession submission should require explicit verification, signed payloads, replay protection, and privacy-aware handling of network fingerprints.
 
+## Links
+
+- [GitHub](https://github.com/kiskolabs/pray)
+- [GitLab](https://gitlab.com/amkisko/pray)
+- [crates.io](https://crates.io/crates/pray)
+- [libraries.io](https://libraries.io/cargo/pray)
+- [Deps.dev](https://deps.dev/cargo/pray)
+- [SonarCloud](https://sonarcloud.io/project/overview?id=kiskolabs_pray)
+- [Snyk](https://snyk.io/test/github/kiskolabs/pray)
+- [Codecov](https://app.codecov.io/github/kiskolabs/pray)
+- [OpenSSF Scorecard](https://scorecard.dev/viewer/?uri=github.com/kiskolabs/pray)
+
 ## License
 
 MIT. See `LICENSE.md`.
