@@ -57,6 +57,47 @@ fn serves_registry_trust_policy_on_the_root_page() {
     assert!(root_page.contains("SSH-agent signing: enabled"));
 }
 
+#[test]
+fn checks_an_http_compromised_key_feed() {
+    let workspace = temporary_directory("pray-trust-check");
+    let listener = TcpListener::bind("127.0.0.1:0").expect("bind feed server");
+    let port = listener.local_addr().expect("feed server address").port();
+    let feed_body = "[[keys]]\nvalue = \"SHA256:COMPROMISED\"\n";
+    let response = format!(
+        "HTTP/1.1 200 OK\r\nContent-Length: {}\r\nConnection: close\r\n\r\n{}",
+        feed_body.len(),
+        feed_body
+    );
+    let server = thread::spawn(move || {
+        let (mut stream, _) = listener.accept().expect("accept feed request");
+        let mut request = [0_u8; 1024];
+        stream.read(&mut request).expect("read feed request");
+        stream
+            .write_all(response.as_bytes())
+            .expect("write feed response");
+    });
+
+    let output = Command::new(env!("CARGO_BIN_EXE_pray"))
+        .args([
+            "trust",
+            "check",
+            &format!("http://127.0.0.1:{port}/compromised-keys.toml"),
+        ])
+        .env("PRAY_HOME", &workspace)
+        .env("PRAY_NO_VERSION_CHECK", "1")
+        .output()
+        .expect("run trust check");
+    server.join().expect("feed server completes");
+
+    assert!(
+        output.status.success(),
+        "trust check failed: {}",
+        String::from_utf8_lossy(&output.stderr)
+    );
+    assert!(String::from_utf8_lossy(&output.stdout)
+        .contains("no compromised trusted signing keys detected"));
+}
+
 fn temporary_directory(prefix: &str) -> PathBuf {
     let unique = format!(
         "{}-{}-{}",

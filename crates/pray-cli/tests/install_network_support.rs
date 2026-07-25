@@ -2,7 +2,9 @@
 
 use base64::{engine::general_purpose::STANDARD, Engine as _};
 use ed25519_dalek::SigningKey;
+#[cfg(feature = "auth")]
 use pray_core::auth::RegistryAuthStore;
+#[cfg(feature = "auth")]
 use pray_core::trust::EmailConfirmationPolicy;
 use std::fs;
 use std::net::{TcpListener, TcpStream};
@@ -70,6 +72,7 @@ render mode: :managed, conflict: :fail, churn: :minimal
     .expect("write client Prayfile");
 }
 
+#[cfg(feature = "auth")]
 pub fn verify_email_registration(store: &RegistryAuthStore, email: &str) {
     let registration = store
         .register_email(email, EmailConfirmationPolicy::Required)

@@ -154,25 +154,36 @@ fn fetch_workspace_package_version() -> PrayResult<Option<String>> {
     Ok(parse_workspace_package_version(&body))
 }
 
-fn http_get(url: &str) -> PrayResult<String> {
-    let mut response = ureq::get(url)
-        .header(
-            "User-Agent",
-            concat!(env!("CARGO_PKG_NAME"), "/", env!("CARGO_PKG_VERSION")),
-        )
-        .call()
-        .map_err(|error| {
+pub(crate) fn http_get(url: &str) -> PrayResult<String> {
+    let client = reqwest::Client::builder()
+        .user_agent(concat!(
+            env!("CARGO_PKG_NAME"),
+            "/",
+            env!("CARGO_PKG_VERSION")
+        ))
+        .build()
+        .map_err(|error| PrayError::Unsupported(format!("HTTP client setup failed: {error}")))?;
+    let runtime = tokio::runtime::Builder::new_current_thread()
+        .enable_all()
+        .build()
+        .map_err(|error| PrayError::Unsupported(format!("HTTP runtime setup failed: {error}")))?;
+
+    runtime.block_on(async {
+        let response = client.get(url).send().await.map_err(|error| {
             PrayError::Unsupported(format!("HTTP request failed for {url}: {error}"))
         })?;
-    let status = response.status();
-    let body = response.body_mut().read_to_string().unwrap_or_default();
-    if !status.is_success() {
-        return Err(PrayError::Unsupported(format!(
-            "HTTP request for {url} returned {}",
-            status.as_u16()
-        )));
-    }
-    Ok(body)
+        let status = response.status();
+        let body = response.text().await.map_err(|error| {
+            PrayError::Unsupported(format!("HTTP response failed for {url}: {error}"))
+        })?;
+        if !status.is_success() {
+            return Err(PrayError::Unsupported(format!(
+                "HTTP request for {url} returned {}",
+                status.as_u16()
+            )));
+        }
+        Ok(body)
+    })
 }
 
 fn version_check_cache_file() -> Option<PathBuf> {
