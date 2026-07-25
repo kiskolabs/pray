@@ -67,3 +67,12 @@ fn no_input_flag_is_documented_in_help() {
     let stdout = String::from_utf8_lossy(&output.stdout);
     assert!(stdout.contains("--no-input"));
 }
+
+#[cfg(not(feature = "auth"))]
+#[test]
+fn slim_build_help_omits_serve() {
+    let output = run_pray(&["--help"]);
+    let stdout = String::from_utf8_lossy(&output.stdout);
+
+    assert!(!stdout.contains("serve [--root PATH]"));
+}
