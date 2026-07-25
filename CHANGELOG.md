@@ -1,5 +1,10 @@
 # CHANGELOG
 
+## Unreleased
+
+- Shrink the release binary with thin LTO, symbol stripping, and a single codegen unit.
+- Trim Tokio features and build reqwest with rustls only (no default TLS extras).
+
 ## 1.2.0 (2026-07-14)
 
 - Add optional CLI upgrade notice after successful commands when a newer release is available.
