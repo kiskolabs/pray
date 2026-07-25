@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+## 1.2.1 (2026-07-25)
+
 - Shrink the release binary with thin LTO, symbol stripping, and a single codegen unit.
 - Trim Tokio features and build reqwest with rustls only (no default TLS extras).
 
