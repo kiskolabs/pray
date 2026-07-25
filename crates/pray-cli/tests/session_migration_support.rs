@@ -1,6 +1,8 @@
 use base64::{engine::general_purpose::STANDARD, Engine as _};
 use ed25519_dalek::SigningKey;
+#[cfg(feature = "auth")]
 use pray_core::auth::RegistryAuthStore;
+#[cfg(feature = "auth")]
 use pray_core::trust::EmailConfirmationPolicy;
 use serde_json::Value;
 use std::fs;
@@ -85,6 +87,7 @@ pub fn write_auth_registry_fixture(root: &std::path::Path) {
     .expect("write auth trust settings");
 }
 
+#[cfg(feature = "auth")]
 pub fn verify_email_registration(store: &RegistryAuthStore, email: &str) {
     let registration = store
         .register_email(email, EmailConfirmationPolicy::Required)

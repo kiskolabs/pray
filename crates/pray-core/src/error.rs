@@ -56,6 +56,7 @@ impl From<io::Error> for PrayError {
     }
 }
 
+#[cfg(feature = "auth")]
 impl From<rusqlite::Error> for PrayError {
     fn from(error: rusqlite::Error) -> Self {
         Self::Resolution(error.to_string())

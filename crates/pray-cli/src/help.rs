@@ -94,10 +94,19 @@ const PACKAGE_COMMANDS: &[&str] = &[
     "clean                                  remove local cache and vendor trees",
 ];
 
+#[cfg(feature = "auth")]
 const DISTRIBUTION_COMMANDS: &[&str] = &[
     "publish --root PATH [--server URL ...]",
     "login --server URL --email EMAIL",
     "serve [--root PATH] [--host HOST] [--port PORT] [--stdio]",
+    "sync [--root PATH] [--peer URL ...]",
+    "confess <package> | --from-lock SPAN_ID [--accepted|--rejected]",
+];
+
+#[cfg(not(feature = "auth"))]
+const DISTRIBUTION_COMMANDS: &[&str] = &[
+    "publish --root PATH [--server URL ...]",
+    "login --server URL --email EMAIL",
     "sync [--root PATH] [--peer URL ...]",
     "confess <package> | --from-lock SPAN_ID [--accepted|--rejected]",
 ];
@@ -169,6 +178,7 @@ fn command_help_text(command: &str) -> Option<&'static str> {
             "publish — upload packages to a registry or local root\n\n\
              Usage: pray publish --root PATH [--server URL ...]",
         ),
+        #[cfg(feature = "auth")]
         "serve" => Some(
             "serve — run a local registry server\n\n\
              Usage: pray serve [--root PATH] [--host HOST] [--port PORT] [--stdio]",
