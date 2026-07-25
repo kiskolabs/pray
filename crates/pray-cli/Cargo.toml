@@ -8,8 +8,12 @@ repository.workspace = true
 homepage.workspace = true
 description = "Reference pray CLI for Prayfile install, publish, sync, and verification"
 
+[features]
+default = ["auth"]
+auth = ["pray-core/auth"]
+
 [dependencies]
-pray-core = { path = "../pray-core" }
+pray-core = { path = "../pray-core", default-features = false }
 pray-transport = { path = "../pray-transport" }
 base64 = "0.22"
 ed25519-dalek = "3"
@@ -17,5 +21,65 @@ serde = { version = "1", features = ["derive"] }
 serde_json = "1"
 tar = "0.4"
 zstd = "0.13"
-ureq = "3"
+reqwest = { version = "0.13", default-features = false, features = ["json", "rustls"] }
 tokio = { version = "1", features = ["rt", "macros"] }
+
+[[test]]
+name = "auth"
+required-features = ["auth"]
+
+[[test]]
+name = "install_beta_e2e"
+required-features = ["auth"]
+
+[[test]]
+name = "install_confess"
+required-features = ["auth"]
+
+[[test]]
+name = "install_distribution_point"
+required-features = ["auth"]
+
+[[test]]
+name = "install_network"
+required-features = ["auth"]
+
+[[test]]
+name = "install_network_support"
+required-features = ["auth"]
+
+[[test]]
+name = "install_publish"
+required-features = ["auth"]
+
+[[test]]
+name = "install_ssh_stdio"
+required-features = ["auth"]
+
+[[test]]
+name = "install_sync"
+required-features = ["auth"]
+
+[[test]]
+name = "install_sync_discovery"
+required-features = ["auth"]
+
+[[test]]
+name = "login"
+required-features = ["auth"]
+
+[[test]]
+name = "revision"
+required-features = ["auth"]
+
+[[test]]
+name = "session_migration"
+required-features = ["auth"]
+
+[[test]]
+name = "session_migration_support"
+required-features = ["auth"]
+
+[[test]]
+name = "trust"
+required-features = ["auth"]

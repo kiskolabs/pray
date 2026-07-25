@@ -5,8 +5,11 @@ mod help;
 mod invocation;
 mod revision;
 mod revision_backend;
+#[cfg(feature = "auth")]
 mod server;
+#[cfg(feature = "auth")]
 mod server_stdio;
+mod transport_metadata;
 mod trust_command;
 
 use apply_report::{
@@ -18,6 +21,7 @@ use auth_client::{
     current_signer_fingerprint as current_signer_fingerprint_from_session, login_with_passkey,
     login_with_ssh_agent,
 };
+#[cfg(feature = "auth")]
 use pray_core::auth::RegistryAuthStore;
 use pray_core::cli_suggest::unknown_command_message;
 use pray_core::client_trust::prepare_ephemeral_home;
@@ -157,6 +161,7 @@ fn run(arguments: Vec<String>) -> PrayResult<()> {
             public_key,
             ssh_agent,
         ),
+        #[cfg(feature = "auth")]
         Command::Serve {
             root,
             host,
@@ -292,6 +297,7 @@ enum Command {
         public_key: Option<PathBuf>,
         ssh_agent: bool,
     },
+    #[cfg(feature = "auth")]
     Serve {
         root: PathBuf,
         host: String,
@@ -398,7 +404,10 @@ fn parse_command(arguments: Vec<String>) -> PrayResult<Command> {
         "package" => Ok(Command::Package),
         "publish" => parse_publish_command(iter),
         "login" => parse_login_command(iter),
+        #[cfg(feature = "auth")]
         "serve" => parse_serve_command(iter),
+        #[cfg(not(feature = "auth"))]
+        "serve" => Err(PrayError::Usage("unknown command: serve".to_string())),
         "confess" => parse_confess_command(iter),
         "list" => Ok(Command::List),
         "outdated" => parse_outdated_command(iter),
@@ -1192,6 +1201,7 @@ fn parse_login_command(mut arguments: std::vec::IntoIter<String>) -> PrayResult<
     })
 }
 
+#[cfg(feature = "auth")]
 fn parse_serve_command(mut arguments: std::vec::IntoIter<String>) -> PrayResult<Command> {
     let mut root = PathBuf::from(".");
     let mut host = "127.0.0.1".to_string();
@@ -1589,6 +1599,7 @@ fn explain_command(package_name: String) -> PrayResult<()> {
     Ok(())
 }
 
+#[cfg(feature = "auth")]
 fn serve_command(root: PathBuf, host: String, port: u16, stdio: bool) -> PrayResult<()> {
     if stdio {
         server_stdio::run_stdio_server(root)
@@ -1702,7 +1713,7 @@ fn confess_command(
         note,
         lockfile: lockfile_reference,
         distribution_point: Some(source_url.clone()),
-        signer: Some(current_signer()),
+        signer: Some(current_signer()?),
         timestamp: Some(timestamp),
         signature: None,
     };
@@ -1717,27 +1728,38 @@ fn confess_command(
     Ok(())
 }
 
-fn current_signer() -> String {
+fn current_signer() -> PrayResult<String> {
     let session_root = workspace_root();
     if let Some(email) = current_signer_from_session(&session_root) {
-        return email;
+        return Ok(email);
     }
 
     if let Ok(token) = std::env::var("PRAY_SESSION_TOKEN") {
-        let auth_root = std::env::var("PRAY_AUTH_ROOT")
-            .map(PathBuf::from)
-            .unwrap_or_else(|_| session_root.clone());
-        if let Ok(store) = RegistryAuthStore::open(&auth_root) {
-            if let Ok(Some(session)) = store.resolve_session(&token) {
-                return session.email;
+        #[cfg(feature = "auth")]
+        {
+            let auth_root = std::env::var("PRAY_AUTH_ROOT")
+                .map(PathBuf::from)
+                .unwrap_or_else(|_| session_root.clone());
+            if let Ok(store) = RegistryAuthStore::open(&auth_root) {
+                if let Ok(Some(session)) = store.resolve_session(&token) {
+                    return Ok(session.email);
+                }
             }
+        }
+
+        #[cfg(not(feature = "auth"))]
+        {
+            let _ = token;
+            return Err(PrayError::Unsupported(
+                "this build was compiled without auth support".to_string(),
+            ));
         }
     }
 
-    std::env::var("PRAY_SIGNER")
+    Ok(std::env::var("PRAY_SIGNER")
         .or_else(|_| std::env::var("USER"))
         .or_else(|_| std::env::var("USERNAME"))
-        .unwrap_or_else(|_| "unknown".to_string())
+        .unwrap_or_else(|_| "unknown".to_string()))
 }
 
 fn current_signer_fingerprint() -> Option<String> {
@@ -1745,6 +1767,32 @@ fn current_signer_fingerprint() -> Option<String> {
         return Some(fingerprint);
     }
     current_signer_fingerprint_from_session(&workspace_root())
+}
+
+#[cfg(all(test, not(feature = "auth")))]
+mod slim_build_tests {
+    use super::*;
+
+    #[test]
+    fn omits_the_serve_command() {
+        assert!(matches!(
+            parse_command(vec!["serve".to_string()]),
+            Err(PrayError::Usage(message)) if message == "unknown command: serve"
+        ));
+    }
+
+    #[test]
+    fn rejects_session_tokens_without_auth_storage() {
+        std::env::set_var("PRAY_SESSION_TOKEN", "session-token");
+
+        let error = current_signer().expect_err("session tokens require auth storage");
+
+        std::env::remove_var("PRAY_SESSION_TOKEN");
+        assert!(matches!(
+            error,
+            PrayError::Unsupported(message) if message == "this build was compiled without auth support"
+        ));
+    }
 }
 
 fn current_timestamp() -> PrayResult<String> {
@@ -1780,7 +1828,7 @@ fn package_command() -> PrayResult<()> {
 
 fn publish_command(roots: Vec<PathBuf>, servers: Vec<String>) -> PrayResult<()> {
     let project = resolve_project(&manifest_path())?;
-    let signer = current_signer();
+    let signer = current_signer()?;
     let signer_fingerprint = current_signer_fingerprint();
     let published_at = current_timestamp()?;
     let runtime = if servers.is_empty() {
@@ -1949,7 +1997,7 @@ fn publish_to_server(
                 &archive_bytes,
             )?],
         };
-        let transport_metadata = server::transport_package_metadata(&metadata);
+        let transport_metadata = transport_metadata::transport_package_metadata(&metadata);
         runtime
             .block_on(transport.push_package(&peer, &transport_metadata))
             .map_err(map_transport_error)?;
@@ -2005,7 +2053,7 @@ fn publish_to_ssh_server(
                     &archive_bytes,
                 )?],
             };
-            let transport_metadata = server::transport_package_metadata(&metadata);
+            let transport_metadata = transport_metadata::transport_package_metadata(&metadata);
             session.call_json(
                 "sync.push",
                 json!({

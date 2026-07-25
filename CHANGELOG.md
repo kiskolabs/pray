@@ -2,6 +2,9 @@
 
 ## Unreleased
 
+- Use a single HTTP client for release checks and trust-feed retrieval.
+- Allow slim CLI builds to omit local registry authentication storage.
+
 ## 1.2.1 (2026-07-25)
 
 - Shrink the release binary with thin LTO, symbol stripping, and a single codegen unit.
