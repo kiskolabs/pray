@@ -293,12 +293,13 @@ fn resolve_package_root(
             registry_latest_version: None,
         });
     }
-    if let Some(source_name) = &declaration.source {
+    let source_name = implied_source_name(declaration, sources)?;
+    if let Some(source_name) = source_name {
         let source = sources
-            .get(source_name)
+            .get(&source_name)
             .ok_or_else(|| PrayError::Resolution(format!("unknown source: {source_name}")))?;
         let context = PackageResolutionContext::from_lockfile(lockfile, &declaration.name, options);
-        if let Some(local_path) = user_config.local.source.get(source_name) {
+        if let Some(local_path) = user_config.local.source.get(&source_name) {
             let source_root = project_root.join(local_path);
             let resolved = resolve_local_registry_package_root(
                 project_root,
@@ -333,7 +334,7 @@ fn resolve_package_root(
         if source.kind == "git" {
             let resolved = resolve_git_package_root(
                 project_root,
-                source_name,
+                &source_name,
                 &source.url,
                 git_sources,
                 declaration,
@@ -426,6 +427,32 @@ fn source_map(sources: &[ManifestSource]) -> BTreeMap<String, ManifestSource> {
         .iter()
         .map(|source| (source.name.clone(), source.clone()))
         .collect()
+}
+
+fn package_namespace(name: &str) -> Option<&str> {
+    name.split_once('/').map(|(namespace, _)| namespace)
+}
+
+fn implied_source_name(
+    declaration: &ManifestPackage,
+    sources: &BTreeMap<String, ManifestSource>,
+) -> PrayResult<Option<String>> {
+    if let Some(name) = &declaration.source {
+        return Ok(Some(name.clone()));
+    }
+    if let Some(namespace) = package_namespace(&declaration.name) {
+        if sources.contains_key(namespace) {
+            return Ok(Some(namespace.to_string()));
+        }
+    }
+    match sources.len() {
+        0 => Ok(None),
+        1 => Ok(sources.keys().next().cloned()),
+        _ => Err(PrayError::Resolution(format!(
+            "package {} requires source: when multiple sources are declared and the package namespace does not match a source",
+            declaration.name
+        ))),
+    }
 }
 
 #[cfg(test)]

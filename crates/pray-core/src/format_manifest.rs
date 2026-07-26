@@ -27,6 +27,14 @@ pub fn uses_destination_dsl(manifest: &Manifest) -> bool {
         || manifest.local.iter().any(|local| local.bound)
 }
 
+fn has_migratable_legacy_targets(manifest: &Manifest) -> bool {
+    manifest.targets.iter().any(|target| {
+        !target.scoped
+            && target.mode == DestinationMode::Legacy
+            && (!target.outputs.is_empty() || !target.skills.is_empty())
+    })
+}
+
 pub fn classify_format_hints(project: &ResolvedProject) -> BTreeMap<String, PackageFormatHint> {
     let mut hints = BTreeMap::new();
     for package in &project.packages {
@@ -64,10 +72,47 @@ pub fn recommend_manifest(
     manifest: &Manifest,
     hints: &BTreeMap<String, PackageFormatHint>,
 ) -> Manifest {
-    if uses_destination_dsl(manifest) {
-        return manifest.clone();
+    // Top-level file: bindings alone must not skip migration of legacy target blocks.
+    let mut recommended = if has_migratable_legacy_targets(manifest) {
+        migrate_legacy_manifest(manifest, hints)
+    } else {
+        manifest.clone()
+    };
+    omit_context_resolved_exports(&mut recommended);
+    omit_default_sources(&mut recommended);
+    recommended
+}
+
+fn omit_context_resolved_exports(manifest: &mut Manifest) {
+    for package in &mut manifest.packages {
+        if package.bound && package.exports.len() <= 1 {
+            package.exports.clear();
+        }
     }
-    migrate_legacy_manifest(manifest, hints)
+}
+
+fn package_namespace(name: &str) -> Option<&str> {
+    name.split_once('/').map(|(namespace, _)| namespace)
+}
+
+fn omit_default_sources(manifest: &mut Manifest) {
+    let sole_source = (manifest.sources.len() == 1).then(|| manifest.sources[0].name.clone());
+    let source_names: BTreeSet<&str> = manifest
+        .sources
+        .iter()
+        .map(|source| source.name.as_str())
+        .collect();
+    for package in &mut manifest.packages {
+        let Some(source) = package.source.as_deref() else {
+            continue;
+        };
+        let matches_sole = sole_source.as_deref() == Some(source);
+        let matches_namespace = package_namespace(&package.name) == Some(source)
+            && source_names.contains(source);
+        if matches_sole || matches_namespace {
+            package.source = None;
+        }
+    }
 }
 
 pub fn format_recommended(

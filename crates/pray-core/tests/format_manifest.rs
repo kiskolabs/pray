@@ -165,6 +165,181 @@ local ".agents/project.md", at: :start
 }
 
 #[test]
+fn omits_source_keyword_when_manifest_has_one_source() {
+    let original = r#"
+prayfile "1"
+source "sample", path: "packages"
+compose "AGENTS.md" do
+  pray ".agents/project.md"
+  pray "sample/rules", "~> 1.0", source: "sample"
+end
+"#;
+    let manifest = parse_manifest(original).expect("parse");
+    let formatted = format_recommended(&manifest, &BTreeMap::new()).expect("format");
+    assert!(formatted.contains("source \"sample\""));
+    assert!(formatted.contains("pray \"sample/rules\", \"~> 1.0\""));
+    assert!(!formatted.contains("source: \"sample\""));
+}
+
+#[test]
+fn omits_source_keyword_when_namespace_matches_source_handle() {
+    let original = r#"
+prayfile "1"
+source "amkisko", path: "packages/amkisko"
+source "other", path: "packages/other"
+compose "AGENTS.md" do
+  pray "amkisko/rules", "~> 1.0", source: "amkisko"
+  pray "other/notes", "~> 1.0", source: "other"
+end
+"#;
+    let manifest = parse_manifest(original).expect("parse");
+    let formatted = format_recommended(&manifest, &BTreeMap::new()).expect("format");
+    assert!(formatted.contains("pray \"amkisko/rules\", \"~> 1.0\""));
+    assert!(formatted.contains("pray \"other/notes\", \"~> 1.0\""));
+    assert!(!formatted.contains("source: \"amkisko\""));
+    assert!(!formatted.contains("source: \"other\""));
+}
+
+#[test]
+fn resolves_package_from_sole_source_without_source_keyword() {
+    let root = unique_temp_dir("pray-sole-source");
+    write_package(
+        &root,
+        "sample-rules",
+        "sample/rules",
+        "rules",
+        "fragment",
+        "exports/rules.md",
+        "Rules\n",
+        &["exports/rules.md"],
+        None,
+    );
+    let original = r#"
+prayfile "1"
+source "sample", path: "packages"
+compose "AGENTS.md" do
+  pray "sample/rules", "~> 1.0"
+end
+"#;
+    fs::write(root.join("Prayfile"), original).expect("prayfile");
+    let project =
+        resolve_project_in_context(&root.join("Prayfile"), &root, &ResolveOptions::default())
+            .expect("resolve");
+    assert_eq!(project.packages.len(), 1);
+    assert_eq!(project.packages[0].declaration.name, "sample/rules");
+}
+
+#[test]
+fn resolves_package_from_namespace_matching_source_handle() {
+    let root = unique_temp_dir("pray-namespace-source");
+    write_package(
+        &root,
+        "amkisko-rules",
+        "amkisko/rules",
+        "rules",
+        "fragment",
+        "exports/rules.md",
+        "Rules\n",
+        &["exports/rules.md"],
+        None,
+    );
+    fs::create_dir_all(root.join("packages/other")).expect("other source root");
+    let original = r#"
+prayfile "1"
+source "amkisko", path: "packages"
+source "other", path: "packages/other"
+compose "AGENTS.md" do
+  pray "amkisko/rules", "~> 1.0"
+end
+"#;
+    fs::write(root.join("Prayfile"), original).expect("prayfile");
+    let project =
+        resolve_project_in_context(&root.join("Prayfile"), &root, &ResolveOptions::default())
+            .expect("resolve");
+    assert_eq!(project.packages.len(), 1);
+    assert_eq!(project.packages[0].declaration.name, "amkisko/rules");
+}
+
+#[test]
+fn formats_legacy_prayfile_that_already_has_file_bindings() {
+    let root = unique_temp_dir("pray-format-hybrid-file");
+    fs::create_dir_all(root.join(".agents")).expect("agents");
+    write_package(
+        &root,
+        "rules",
+        "sample/rules",
+        "rules",
+        "fragment",
+        "exports/rules.md",
+        "Rules\n",
+        &["exports/rules.md"],
+        None,
+    );
+    fs::create_dir_all(root.join("packages/audit/skills/audit")).expect("skill dir");
+    fs::write(
+        root.join("packages/audit/skills/audit/SKILL.md"),
+        "# Audit\n",
+    )
+    .expect("skill");
+    fs::write(
+        root.join("packages/audit/audit.prayspec"),
+        r#"
+Package::Specification.new do |spec|
+  spec.name = "sample/audit"
+  spec.version = "1.0.0"
+  spec.summary = "fixture"
+  spec.files = ["skills/audit/SKILL.md"]
+  spec.exports = {
+    "audit" => {
+      type: "skill",
+      path: "skills/audit",
+      summary: "audit"
+    }
+  }
+end
+"#,
+    )
+    .expect("prayspec");
+    write_package(
+        &root,
+        "security",
+        "sample/security",
+        "security",
+        "file",
+        "exports/SECURITY.md",
+        "# Security\n",
+        &["exports/SECURITY.md"],
+        Some("SECURITY.md"),
+    );
+    fs::write(root.join(".agents/project.md"), "Local\n").expect("local");
+    let original = r#"
+prayfile "1"
+target :tool_a do
+  output "AGENTS.md"
+  skills ".agents/skills"
+end
+agent "sample/rules", "~> 1.0", path: "packages/rules"
+agent "sample/audit", "~> 1.0", path: "packages/audit"
+pray "sample/security", "~> 1.0", path: "packages/security", file: "SECURITY.md"
+local ".agents/project.md", at: :start
+"#;
+    fs::write(root.join("Prayfile"), original).expect("prayfile");
+
+    let project =
+        resolve_project_in_context(&root.join("Prayfile"), &root, &ResolveOptions::default())
+            .expect("resolve");
+    let hints = classify_format_hints(&project);
+    let manifest = parse_manifest(original).expect("parse");
+    assert!(uses_destination_dsl(&manifest));
+
+    let formatted = format_recommended(&manifest, &hints).expect("format");
+    assert!(formatted.contains("compose \"AGENTS.md\" do"));
+    assert!(formatted.contains("tree \".agents/skills\" do"));
+    assert!(formatted.contains("file: \"SECURITY.md\""));
+    assert!(!formatted.contains("target :tool_a"));
+}
+
+#[test]
 fn formats_existing_destination_dsl_idempotently() {
     let root = unique_temp_dir("pray-format-dsl");
     fs::create_dir_all(root.join(".agents")).expect("agents");
