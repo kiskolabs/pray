@@ -1,3 +1,6 @@
+## Additional instructions
+
+### .agents/project.md
 Repository for the pray open specification and the reference CLI.
 
 Read `README.md` for project positioning and `SPEC.md` for the normative Prayfile, prayspec, lockfile, distribution point, and CLI design.
@@ -22,3 +25,5 @@ Use coverage tooling declared in this repository when validating coverage claims
 Prefer files around 150 lines or fewer when cohesion allows. Treat 300 lines as a hard upper bound for any source file unless a very small exception is clearly justified. When a file approaches that ceiling, split by semantic responsibility into separate modules, folders, or helpers rather than by arbitrary line count.
 
 Test coverage must follow `spec/README.md` guidelines.
+
+## Shared instructions
