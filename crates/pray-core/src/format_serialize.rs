@@ -150,7 +150,10 @@ fn format_destination_entry(entry: &DestinationEntry, manifest: &Manifest) -> St
 }
 
 fn find_package<'a>(manifest: &'a Manifest, name: &str) -> Option<&'a ManifestPackage> {
-    manifest.packages.iter().find(|package| package.name == name)
+    manifest
+        .packages
+        .iter()
+        .find(|package| package.name == name)
 }
 
 fn grouped_packages(manifest: &Manifest) -> Vec<(Vec<String>, Vec<&ManifestPackage>)> {

@@ -2,19 +2,18 @@ use crate::constraint::version_satisfies;
 use crate::derived_metadata::RegistryDerivedMetadata;
 use crate::manifest::ManifestPackage;
 use crate::package_integrity::{artifact_content_digest, require_remote_integrity_fields};
+use crate::paths::remove_path_if_exists;
 use crate::registry_http::{http_get, http_post, http_put, join_url};
 use crate::registry_ssh::{
     resolve_ssh_registry_package_root, submit_confession_ssh, upload_registry_artifact_ssh,
 };
 use crate::registry_torrent::{fetch_torrent_artifact, fetch_torrent_manifest};
-use crate::paths::remove_path_if_exists;
 use crate::resolve_context::PackageResolutionContext;
 use crate::{PrayError, PrayResult};
 use semver::Version;
 use serde::{Deserialize, Serialize};
 use std::fs;
 use std::path::{Path, PathBuf};
-
 
 #[derive(Debug, Clone)]
 pub struct RegistryPackageResolution {
@@ -31,7 +30,6 @@ pub fn lockfile_signer_fingerprint(version: &RegistryPackageVersion) -> Option<S
         .filter(|value| crate::ssh_identity::looks_like_ssh_fingerprint(value))
         .map(crate::ssh_identity::normalize_identity)
 }
-
 
 #[derive(Debug, Clone, Default, Serialize, Deserialize, PartialEq, Eq)]
 pub struct RegistryIndex {
@@ -116,7 +114,6 @@ pub struct ConfessionSubmission {
     #[serde(default)]
     pub signature: Option<String>,
 }
-
 
 pub fn resolve_registry_package_root(
     project_root: &Path,
@@ -282,10 +279,8 @@ pub fn resolve_local_registry_package_root(
     }
     fs::create_dir_all(&cache_directory)?;
 
-    let artifact_bytes = crate::registry_cache::read_local_registry_artifact_bytes(
-        source_root,
-        &selected.artifact,
-    )?;
+    let artifact_bytes =
+        crate::registry_cache::read_local_registry_artifact_bytes(source_root, &selected.artifact)?;
     crate::registry_cache::validate_and_unpack_registry_package(
         &cache_directory,
         declaration,
@@ -459,4 +454,3 @@ pub fn fetch_optional_distribution_bytes(
         Err(error) => Err(error),
     }
 }
-

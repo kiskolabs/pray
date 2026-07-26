@@ -121,9 +121,9 @@ pub fn verifying_key_bytes_from_ssh_public_key(public_key: &str) -> PrayResult<[
             "unsupported public key algorithm: {algorithm}"
         )));
     }
-    let key_value = fields.next().ok_or_else(|| {
-        PrayError::Unsupported("public key must include key bytes".to_string())
-    })?;
+    let key_value = fields
+        .next()
+        .ok_or_else(|| PrayError::Unsupported("public key must include key bytes".to_string()))?;
     let blob = STANDARD
         .decode(key_value.as_bytes())
         .map_err(|error| PrayError::Parse {
@@ -192,13 +192,11 @@ pub fn verify_package_signature(
         let signature = Signature::from_slice(&signature_bytes)
             .map_err(|error| PrayError::Integrity(error.to_string()))?;
         let payload = package_hash_signing_payload(artifact_hash, tree_hash);
-        verifying_key
-            .verify(&payload, &signature)
-            .map_err(|_| {
-                PrayError::Integrity(format!(
-                    "package signature mismatch for {package_name} {version}"
-                ))
-            })?;
+        verifying_key.verify(&payload, &signature).map_err(|_| {
+            PrayError::Integrity(format!(
+                "package signature mismatch for {package_name} {version}"
+            ))
+        })?;
         return Ok(());
     }
 

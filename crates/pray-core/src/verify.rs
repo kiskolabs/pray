@@ -208,9 +208,7 @@ fn collect_verification_report(
             });
             continue;
         };
-        let source = package
-            .root
-            .join(&package.spec.exports[export_name].path);
+        let source = package.root.join(&package.spec.exports[export_name].path);
         if !absolute.exists() {
             report.findings.push(VerificationFinding {
                 kind: "verify_error".to_string(),

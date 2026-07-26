@@ -1,7 +1,7 @@
+use crate::materialize::build_package_archive_bytes;
 use crate::revision::{record_root_revision, RevisionAction};
 use crate::sync_peers::map_transport_error;
 use crate::transport_metadata::transport_package_metadata;
-use crate::materialize::build_package_archive_bytes;
 use crate::{
     current_signer, current_signer_fingerprint, current_timestamp, load_registry_index,
     load_registry_package_metadata, manifest_path, registry_artifact_path, registry_metadata_path,
@@ -17,10 +17,7 @@ use pray_core::registry::{
 use pray_core::resolve::{resolve_project, ResolvedProject};
 use pray_core::ssh_identity::signing_identity;
 use pray_core::{PrayError, PrayResult};
-use pray_transport::{
-    PeerConfig, SyncDirection, TransportRegistry,
-    TrustLevel,
-};
+use pray_transport::{PeerConfig, SyncDirection, TransportRegistry, TrustLevel};
 use std::path::{Path, PathBuf};
 
 pub(crate) fn publish_command(

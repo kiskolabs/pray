@@ -303,8 +303,9 @@ impl<'a> BlockParser<'a> {
             if statement.starts_with("output ") && !statement.ends_with(" do") {
                 return Err(PrayError::Parse {
                     kind: "manifest",
-                    message: "top-level output must use a compose block (output \"path\" do ... end)"
-                        .to_string(),
+                    message:
+                        "top-level output must use a compose block (output \"path\" do ... end)"
+                            .to_string(),
                 });
             }
             self.parse_destination_block(manifest, rest, DestinationMode::Compose)?;
@@ -393,10 +394,7 @@ impl<'a> BlockParser<'a> {
                 if let Some(local_rest) = statement.strip_prefix("local ") {
                     let mut local = parse_local_decl(local_rest)?;
                     local.bound = true;
-                    crate::destination::bind_local_entry(
-                        &mut manifest.targets[index],
-                        &local.path,
-                    );
+                    crate::destination::bind_local_entry(&mut manifest.targets[index], &local.path);
                     crate::destination::upsert_local(manifest, local);
                     continue;
                 }
@@ -566,7 +564,10 @@ impl<'a> BlockParser<'a> {
                 .or_else(|| statement.strip_prefix("pray "))
                 .or_else(|| statement.strip_prefix("use "))
             {
-                crate::destination::upsert_package(manifest, self.parse_package_with_groups(rest)?)?;
+                crate::destination::upsert_package(
+                    manifest,
+                    self.parse_package_with_groups(rest)?,
+                )?;
                 continue;
             }
             return Err(PrayError::Parse {

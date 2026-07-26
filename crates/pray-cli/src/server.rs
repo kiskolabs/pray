@@ -15,16 +15,13 @@ use crate::server_http::{
 
 pub(crate) use crate::server_http::{response_with_status, Response};
 use pray_core::derived_metadata::derive_registry_derived_metadata_from_archive_bytes;
+use pray_core::push_auth::authorize_distribution_push;
 use pray_core::registry::{
     ConfessionSubmission, RegistryIndex, RegistryPackageMetadata, RegistryPackageVersion,
 };
-use pray_core::push_auth::authorize_distribution_push;
 use pray_core::ssh_rpc::{RpcRequest, RpcResponse, SSH_RPC_SPEC};
 use pray_core::{PrayError, PrayResult};
-use pray_transport::{
-    PackageMetadata as TransportPackageMetadata,
-    PackageVersion, PeerInfo,
-};
+use pray_transport::{PackageMetadata as TransportPackageMetadata, PackageVersion, PeerInfo};
 use std::collections::BTreeSet;
 use std::fs;
 use std::io::{BufRead, BufReader, Read, Write};
@@ -57,12 +54,7 @@ impl ServeAuth {
     }
 }
 
-pub fn run_server(
-    root: PathBuf,
-    host: String,
-    port: u16,
-    allow_open_push: bool,
-) -> PrayResult<()> {
+pub fn run_server(root: PathBuf, host: String, port: u16, allow_open_push: bool) -> PrayResult<()> {
     let listener = TcpListener::bind((host.as_str(), port))?;
     println!("Serving {} on http://{}:{}", root.display(), host, port);
     let auth = ServeAuth::http(host, allow_open_push);
@@ -157,7 +149,10 @@ pub(crate) fn dispatch_http_request(
     }
 }
 
-pub(crate) fn ensure_derived_metadata(root: &Path, metadata: &mut RegistryPackageMetadata) -> PrayResult<()> {
+pub(crate) fn ensure_derived_metadata(
+    root: &Path,
+    metadata: &mut RegistryPackageMetadata,
+) -> PrayResult<()> {
     for version in &mut metadata.versions {
         if version.derived_metadata.is_some() {
             continue;
@@ -398,7 +393,10 @@ pub(crate) fn read_or_create_registry_package_metadata(
     }
 }
 
-pub(crate) fn update_registry_index_with_package(root: &Path, package_name: &str) -> PrayResult<()> {
+pub(crate) fn update_registry_index_with_package(
+    root: &Path,
+    package_name: &str,
+) -> PrayResult<()> {
     let mut index = read_or_create_registry_index(root)?;
     if index.spec.trim().is_empty() {
         index.spec = "prayfile-distribution-1".to_string();
@@ -485,12 +483,7 @@ fn artifact_upload_response(
     path: &str,
     body: &[u8],
 ) -> PrayResult<Response> {
-    authorize_distribution_push(
-        root,
-        &auth.bind_host,
-        auth.allow_open_push,
-        auth.stdio_mode,
-    )?;
+    authorize_distribution_push(root, &auth.bind_host, auth.allow_open_push, auth.stdio_mode)?;
     let relative_path = sanitize_request_path(path)?;
     let artifact_path = root.join(relative_path);
     if let Some(parent) = artifact_path.parent() {
@@ -508,15 +501,6 @@ fn artifact_upload_response(
         .into_bytes(),
     })
 }
-
-
-
-
-
-
-
-
-
 
 fn static_file_response(root: &Path, request_path: &str) -> PrayResult<Response> {
     let relative = sanitize_request_path(request_path)?;
@@ -585,11 +569,7 @@ pub(crate) fn content_type_for_path(path: &Path) -> String {
     }
 }
 
-pub fn handle_rpc(
-    root: &Path,
-    auth: &ServeAuth,
-    request: &RpcRequest,
-) -> PrayResult<RpcResponse> {
+pub fn handle_rpc(root: &Path, auth: &ServeAuth, request: &RpcRequest) -> PrayResult<RpcResponse> {
     if request.spec != SSH_RPC_SPEC {
         return Ok(RpcResponse::error(
             &request.id,

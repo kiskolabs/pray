@@ -6,7 +6,10 @@ use std::collections::BTreeMap;
 use std::fs;
 use std::path::Path;
 
-pub(crate) fn select_exports(declaration: &ManifestPackage, spec: &PackageSpec) -> PrayResult<Vec<String>> {
+pub(crate) fn select_exports(
+    declaration: &ManifestPackage,
+    spec: &PackageSpec,
+) -> PrayResult<Vec<String>> {
     if !declaration.exports.is_empty() {
         for export in &declaration.exports {
             if !spec.exports.contains_key(export) {
@@ -24,9 +27,7 @@ pub(crate) fn select_exports(declaration: &ManifestPackage, spec: &PackageSpec) 
     }
 
     let mut roles = declaration.roles.clone();
-    if declaration.file.is_some()
-        && !roles.contains(&crate::manifest::ExportRole::File)
-    {
+    if declaration.file.is_some() && !roles.contains(&crate::manifest::ExportRole::File) {
         roles.push(crate::manifest::ExportRole::File);
     }
 
@@ -35,9 +36,7 @@ pub(crate) fn select_exports(declaration: &ManifestPackage, spec: &PackageSpec) 
         let compatible: Vec<String> = spec
             .exports
             .iter()
-            .filter(|(_, export)| {
-                crate::destination::export_kind_matches_role(&export.kind, role)
-            })
+            .filter(|(_, export)| crate::destination::export_kind_matches_role(&export.kind, role))
             .map(|(name, _)| name.clone())
             .collect();
         match compatible.as_slice() {

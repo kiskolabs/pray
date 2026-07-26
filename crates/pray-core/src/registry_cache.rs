@@ -32,13 +32,7 @@ pub(crate) fn registry_cache_matches_selected(
         .as_deref()
         .is_some_and(|value| value.starts_with(crate::package_integrity::ED25519_SIGNATURE_PREFIX))
     {
-        verify_package_signature(
-            &spec.name,
-            &selected.version,
-            selected,
-            &[],
-            &tree_hash,
-        )?;
+        verify_package_signature(&spec.name, &selected.version, selected, &[], &tree_hash)?;
     }
     Ok(true)
 }

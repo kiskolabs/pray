@@ -32,7 +32,11 @@ pub(crate) fn query_parameter(path: &str, name: &str) -> Option<String> {
     None
 }
 
-pub(crate) fn http_to_rpc_request(method: &str, path: &str, body: &[u8]) -> PrayResult<Option<RpcRequest>> {
+pub(crate) fn http_to_rpc_request(
+    method: &str,
+    path: &str,
+    body: &[u8],
+) -> PrayResult<Option<RpcRequest>> {
     use base64::{engine::general_purpose::STANDARD, Engine as _};
     use serde_json::json;
 
@@ -227,9 +231,7 @@ fn reason_phrase(status: u16) -> &'static str {
 
 #[cfg(test)]
 mod http_rpc_bridge_tests {
-    use super::{
-        http_response_to_rpc, response_with_status, rpc_response_to_http,
-    };
+    use super::{http_response_to_rpc, response_with_status, rpc_response_to_http};
     use crate::server::{dispatch_http_request, handle_rpc, ServeAuth};
     use crate::server_federation::federation_discovery_response;
     use pray_core::ssh_rpc::{RpcRequest, SSH_RPC_SPEC};
@@ -255,9 +257,14 @@ mod http_rpc_bridge_tests {
         let root = temporary_root("discovery");
         let direct = federation_discovery_response(&root).expect("direct response");
         let auth = ServeAuth::http("127.0.0.1", false);
-        let bridged =
-            dispatch_http_request(&root, &auth, "GET", "/.well-known/pray-federation.json", &[])
-                .expect("bridged response");
+        let bridged = dispatch_http_request(
+            &root,
+            &auth,
+            "GET",
+            "/.well-known/pray-federation.json",
+            &[],
+        )
+        .expect("bridged response");
         assert_eq!(direct.status, bridged.status);
         assert_eq!(direct.content_type, bridged.content_type);
         let direct_json: serde_json::Value =
@@ -270,8 +277,7 @@ mod http_rpc_bridge_tests {
 
     #[test]
     fn rpc_response_round_trips_through_http_envelope() {
-        let response =
-            response_with_status(200, "application/json", br#"{"ok":true}"#.to_vec());
+        let response = response_with_status(200, "application/json", br#"{"ok":true}"#.to_vec());
         let rpc = http_response_to_rpc("1", response);
         let http = rpc_response_to_http(&rpc);
         assert_eq!(http.status, 200);

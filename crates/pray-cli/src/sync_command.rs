@@ -10,9 +10,7 @@ use crate::{
 use pray_core::derived_metadata::derive_registry_derived_metadata_from_archive_bytes;
 use pray_core::hashing::sha256_prefixed;
 use pray_core::package_integrity::verify_package_signature;
-use pray_core::registry::{
-    RegistryPackageMetadata, RegistryPackageVersion,
-};
+use pray_core::registry::{RegistryPackageMetadata, RegistryPackageVersion};
 use pray_core::{PrayError, PrayResult};
 use pray_transport::{
     ArtifactRef, PeerConfig, PeerInfo, SyncDirection, TransportAdapter, TransportRegistry,
@@ -61,7 +59,10 @@ pub(crate) struct SyncSummary {
     known_peers: usize,
 }
 
-pub(crate) async fn synchronize_registry(root: &Path, peer_sources: Vec<String>) -> PrayResult<SyncSummary> {
+pub(crate) async fn synchronize_registry(
+    root: &Path,
+    peer_sources: Vec<String>,
+) -> PrayResult<SyncSummary> {
     let registry = TransportRegistry::new();
     let mut discovered_peers: BTreeSet<String> = peer_sources.iter().cloned().collect();
     let mut pending_peers: VecDeque<String> = peer_sources.into_iter().collect();
@@ -267,7 +268,11 @@ pub(crate) fn write_synced_package_metadata(
     write_registry_package_metadata(&metadata_path, &metadata)
 }
 
-pub(crate) fn write_synced_artifact(root: &Path, artifact_path: &str, bytes: &[u8]) -> PrayResult<()> {
+pub(crate) fn write_synced_artifact(
+    root: &Path,
+    artifact_path: &str,
+    bytes: &[u8],
+) -> PrayResult<()> {
     let relative = pray_core::paths::sanitize_relative_path(artifact_path)?;
     let path = root.join(relative);
     if let Some(parent) = path.parent() {
@@ -380,4 +385,3 @@ pub(crate) fn sync_package_version_from_transport(
         derived_metadata: version.derived_metadata.clone(),
     })
 }
-

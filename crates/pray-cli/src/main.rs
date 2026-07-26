@@ -9,28 +9,23 @@ mod materialize;
 mod publish;
 mod revision;
 mod revision_backend;
-mod sync_command;
-mod sync_peers;
 #[cfg(feature = "auth")]
 mod server;
-#[cfg(feature = "auth")]
-mod server_html;
-#[cfg(feature = "auth")]
-mod server_http;
 #[cfg(feature = "auth")]
 mod server_auth;
 #[cfg(feature = "auth")]
 mod server_federation;
 #[cfg(feature = "auth")]
+mod server_html;
+#[cfg(feature = "auth")]
+mod server_http;
+#[cfg(feature = "auth")]
 mod server_stdio;
+mod sync_command;
+mod sync_peers;
 mod transport_metadata;
 mod trust_command;
 
-use cli_parse::parse_command;
-use confess::confess_command;
-use materialize::{materialize_package_directory, remove_path_if_exists, write_package_archive};
-use publish::publish_command;
-use sync_command::sync_command;
 use apply_report::{
     build_materialization_preview, materialization_preview_to_json, print_materialization_report,
     MaterializationMode, MaterializationPreview,
@@ -40,6 +35,9 @@ use auth_client::{
     current_signer_fingerprint as current_signer_fingerprint_from_session, login_with_passkey,
     login_with_ssh_agent,
 };
+use cli_parse::parse_command;
+use confess::confess_command;
+use materialize::{materialize_package_directory, remove_path_if_exists, write_package_archive};
 #[cfg(feature = "auth")]
 use pray_core::auth::RegistryAuthStore;
 use pray_core::cli_suggest::unknown_command_message;
@@ -51,9 +49,7 @@ use pray_core::lockfile::{
     Lockfile,
 };
 use pray_core::manifest::{parse_manifest, read_manifest_text, replace_package_declaration};
-use pray_core::registry::{
-    version_is_greater_than, RegistryIndex, RegistryPackageMetadata,
-};
+use pray_core::registry::{version_is_greater_than, RegistryIndex, RegistryPackageMetadata};
 use pray_core::render::{render_project, write_rendered_targets};
 use pray_core::resolve::ResolvedProject;
 use pray_core::resolve_context::ResolveOptions;
@@ -62,10 +58,12 @@ use pray_core::trust::{write_registry_trust_settings, RegistryTrustSettings};
 use pray_core::verify::{drift_project, format_verification_report, verify_project};
 use pray_core::{PrayError, PrayResult};
 use pray_transport::{TorrentConfig, TorrentTransport};
+use publish::publish_command;
 use std::env;
 use std::fs;
 use std::path::{Path, PathBuf};
 use std::time::{SystemTime, UNIX_EPOCH};
+use sync_command::sync_command;
 
 fn main() {
     let code = match run(env::args().skip(1).collect()) {
@@ -348,8 +346,6 @@ pub(crate) enum Command {
     Upgrade,
     Version,
 }
-
-
 
 fn version_command() -> PrayResult<()> {
     println!("{} {}", env!("CARGO_PKG_NAME"), env!("CARGO_PKG_VERSION"));
@@ -770,11 +766,6 @@ fn remove_manifest_statement(text: &str, name: &str) -> String {
     output
 }
 
-
-
-
-
-
 fn constraint_preview_options() -> ResolveOptions {
     ResolveOptions {
         refresh_source_revisions: true,
@@ -819,12 +810,7 @@ fn preview_remote_updates(selected_package: Option<&str>, json: bool) -> PrayRes
     Ok(())
 }
 
-
-
-
 #[cfg(feature = "auth")]
-
-
 
 fn install_command(
     locked: bool,
@@ -1061,7 +1047,6 @@ fn serve_command(root: PathBuf, host: String, port: u16, stdio: bool) -> PrayRes
     }
 }
 
-
 pub(crate) fn current_signer() -> PrayResult<String> {
     let session_root = workspace_root();
     if let Some(email) = current_signer_from_session(&session_root) {
@@ -1182,7 +1167,6 @@ fn package_command() -> PrayResult<()> {
     Ok(())
 }
 
-
 fn login_command(
     servers: Vec<String>,
     email: String,
@@ -1231,9 +1215,6 @@ fn vendor_command() -> PrayResult<()> {
     }
     Ok(())
 }
-
-
-
 
 pub(crate) fn load_registry_index(root: &Path) -> PrayResult<RegistryIndex> {
     let path = root.join("v1/index.json");
@@ -1363,11 +1344,6 @@ pub(crate) fn write_output_bytes(path: &Path, bytes: &[u8]) -> PrayResult<()> {
     fs::write(path, bytes)?;
     Ok(())
 }
-
-
-
-
-
 
 fn render_command(check_only: bool) -> PrayResult<()> {
     let project = resolve_project(&manifest_path())?;
@@ -1566,7 +1542,6 @@ fn ensure_rendered_outputs_current(
     Ok(())
 }
 
-
 fn package_archive_path(name: &str, version: &str) -> PathBuf {
     PathBuf::from(format!("{}-{}.praypkg", name.replace('/', "-"), version))
 }
@@ -1576,8 +1551,6 @@ fn vendor_package_path(name: &str, version: &str) -> PathBuf {
         .join(name.replace('/', "-"))
         .join(version)
 }
-
-
 
 fn merge_selected_package_update(
     previous: &Lockfile,
@@ -2029,4 +2002,3 @@ fn format_list(values: &[String]) -> String {
         values.join(", ")
     }
 }
-

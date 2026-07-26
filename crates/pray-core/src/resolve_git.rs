@@ -142,7 +142,10 @@ pub(crate) fn apply_sparse_checkout(repository: &Path, subdir: &str) -> PrayResu
     Ok(())
 }
 
-pub(crate) fn resolve_distribution_root(repo_root: &Path, subdir: Option<&str>) -> PrayResult<PathBuf> {
+pub(crate) fn resolve_distribution_root(
+    repo_root: &Path,
+    subdir: Option<&str>,
+) -> PrayResult<PathBuf> {
     if let Some(subdir) = subdir {
         let path = repo_root.join(subdir);
         if is_local_distribution_root(&path) {
@@ -301,4 +304,3 @@ pub(crate) fn cache_key(text: &str) -> String {
         .take(16)
         .collect()
 }
-
