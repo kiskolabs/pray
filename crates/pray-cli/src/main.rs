@@ -400,7 +400,7 @@ fn parse_command(arguments: Vec<String>) -> PrayResult<Command> {
         "apply" => Ok(Command::Apply),
         "verify" => Ok(Command::Verify { strict }),
         "drift" => Ok(Command::Drift { semantic }),
-        "format" => Ok(Command::Format),
+        "format" | "fmt" => Ok(Command::Format),
         "package" => Ok(Command::Package),
         "publish" => parse_publish_command(iter),
         "login" => parse_login_command(iter),
@@ -1803,14 +1803,36 @@ fn current_timestamp() -> PrayResult<String> {
 }
 
 fn format_command() -> PrayResult<()> {
-    let lockfile = read_lockfile(&lockfile_path())?;
-    for target in &lockfile.target {
-        for output in &target.outputs {
-            let path = Path::new(output);
-            let original = fs::read_to_string(path)?;
-            let formatted = format_marker_comments(&normalize_line_endings(&original));
-            if formatted != original {
-                fs::write(path, formatted)?;
+    let path = manifest_path();
+    let original = read_manifest_text(&path)?;
+    let manifest = parse_manifest(&original)?;
+    let project = resolve_project_with_options(
+        &path,
+        &ResolveOptions {
+            offline: true,
+            ..ResolveOptions::default()
+        },
+    )
+    .or_else(|_| resolve_project(&path))?;
+    let hints = pray_core::format_manifest::classify_format_hints(&project);
+    let formatted = pray_core::format_manifest::format_recommended(&manifest, &hints)?;
+    if formatted != original {
+        fs::write(&path, formatted)?;
+    }
+
+    if let Ok(lockfile) = read_lockfile(&lockfile_path()) {
+        for target in &lockfile.target {
+            for output in &target.outputs {
+                let output_path = Path::new(output);
+                if !output_path.exists() {
+                    continue;
+                }
+                let original_output = fs::read_to_string(output_path)?;
+                let formatted_output =
+                    format_marker_comments(&normalize_line_endings(&original_output));
+                if formatted_output != original_output {
+                    fs::write(output_path, formatted_output)?;
+                }
             }
         }
     }

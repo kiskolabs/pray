@@ -183,7 +183,7 @@ agent "sample/base", "~> 1.0", source: "amkisko", exports: ["testing-basics", "s
     let formatted = pray_core::manifest::format_package_declaration(&manifest.packages[0]);
     assert_eq!(
         formatted,
-        r#"agent "sample/base", "~> 1.0", source: "amkisko", exports: ["testing-basics", "security-basics"]"#
+        r#"pray "sample/base", "~> 1.0", source: "amkisko", exports: ["testing-basics", "security-basics"]"#
     );
     let reparsed = parse_manifest(&format!("prayfile \"1\"\n{formatted}\n")).expect("reparses");
     assert_eq!(reparsed.packages[0], manifest.packages[0]);
@@ -245,4 +245,143 @@ Package::Specification.new do |spec|
         }
         other => panic!("unexpected error: {other:?}"),
     }
+}
+
+#[test]
+fn parses_compose_tree_and_file_keyword_forms() {
+    use pray_core::manifest::{DestinationEntry, DestinationMode, ExportRole};
+
+    let manifest = parse_manifest(
+        r#"
+prayfile "1"
+source "amkisko", git: "https://github.com/amkisko/prayers", distribution: "prayers"
+
+compose "AGENTS.md" do
+  pray ".agents/project.md"
+  pray "amkisko/working-rules", "~> 2.0"
+  use "amkisko/docs-conventions", "~> 2.0"
+end
+
+tree ".agents/skills" do
+  pray "amkisko/engineering-audit", "~> 2.0"
+  pray "amkisko/dependency-policy", "~> 2.0"
+end
+
+pray "amkisko/community-security", "~> 1.0", file: "SECURITY.md"
+file "CODE_OF_CONDUCT.md" do
+  pray "amkisko/community-code-of-conduct", "~> 1.0"
+end
+
+render mode: :managed, conflict: :fail, churn: :minimal
+"#,
+    )
+    .expect("manifest parses");
+
+    assert_eq!(manifest.targets.len(), 2);
+    assert_eq!(manifest.targets[0].mode, DestinationMode::Compose);
+    assert!(manifest.targets[0].scoped);
+    assert_eq!(manifest.targets[0].outputs, vec!["AGENTS.md".to_string()]);
+    assert_eq!(
+        manifest.targets[0].entries,
+        vec![
+            DestinationEntry::Local {
+                path: ".agents/project.md".to_string()
+            },
+            DestinationEntry::Package {
+                name: "amkisko/working-rules".to_string()
+            },
+            DestinationEntry::Package {
+                name: "amkisko/docs-conventions".to_string()
+            },
+        ]
+    );
+    assert_eq!(manifest.targets[1].mode, DestinationMode::Tree);
+    assert_eq!(
+        manifest.targets[1].skills,
+        vec![".agents/skills".to_string()]
+    );
+
+    let security = manifest
+        .packages
+        .iter()
+        .find(|package| package.name == "amkisko/community-security")
+        .expect("security package");
+    assert_eq!(security.file.as_deref(), Some("SECURITY.md"));
+    assert!(security.bound);
+    assert!(security.roles.contains(&ExportRole::File));
+
+    let conduct = manifest
+        .packages
+        .iter()
+        .find(|package| package.name == "amkisko/community-code-of-conduct")
+        .expect("conduct package");
+    assert_eq!(conduct.file.as_deref(), Some("CODE_OF_CONDUCT.md"));
+
+    let local = manifest
+        .local
+        .iter()
+        .find(|entry| entry.path == ".agents/project.md")
+        .expect("local path");
+    assert!(local.bound);
+
+    let shared = manifest
+        .packages
+        .iter()
+        .find(|package| package.name == "amkisko/dependency-policy")
+        .expect("dependency-policy");
+    assert!(shared.roles.contains(&ExportRole::Folder));
+}
+
+#[test]
+fn parses_legacy_consumer_shape_unchanged() {
+    let manifest = parse_manifest(
+        r#"
+prayfile "1"
+source "amkisko", git: "https://github.com/amkisko/prayers", distribution: "prayers"
+
+target :cursor do
+  output "AGENTS.md"
+  skills ".agents/skills"
+end
+
+agent "amkisko/working-rules", "~> 2.0", export: "working-rules"
+local ".agents/project.md", at: :start
+render mode: :managed, conflict: :fail, churn: :minimal
+"#,
+    )
+    .expect("legacy manifest parses");
+
+    assert_eq!(manifest.targets[0].name, "cursor");
+    assert!(!manifest.targets[0].scoped);
+    assert_eq!(manifest.targets[0].outputs, vec!["AGENTS.md".to_string()]);
+    assert_eq!(
+        manifest.targets[0].skills,
+        vec![".agents/skills".to_string()]
+    );
+    assert_eq!(manifest.packages[0].exports, vec!["working-rules".to_string()]);
+    assert!(!manifest.packages[0].bound);
+    assert_eq!(manifest.local[0].position, "start");
+    assert!(!manifest.local[0].bound);
+}
+
+#[test]
+fn merges_duplicate_package_roles_across_compose_and_tree() {
+    use pray_core::manifest::ExportRole;
+
+    let manifest = parse_manifest(
+        r#"
+prayfile "1"
+compose "AGENTS.md" do
+  pray "amkisko/dependency-policy", "~> 2.0"
+end
+tree ".agents/skills" do
+  pray "amkisko/dependency-policy", "~> 2.0"
+end
+"#,
+    )
+    .expect("manifest parses");
+
+    assert_eq!(manifest.packages.len(), 1);
+    assert!(manifest.packages[0].roles.contains(&ExportRole::Fragment));
+    assert!(manifest.packages[0].roles.contains(&ExportRole::Folder));
 }

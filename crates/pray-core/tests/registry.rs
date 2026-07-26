@@ -27,19 +27,8 @@ fn prefers_torrent_sidecar_when_available() {
     let project_root = unique_temp_dir("pray-core-torrent-sidecar");
     let declaration = ManifestPackage {
         name: "sample/base".to_string(),
-        constraint: "*".to_string(),
         source: Some("default".to_string()),
-        exports: vec![],
-        targets: vec![],
-        features: vec![],
-        groups: vec![],
-        optional: false,
-        path: None,
-        git: None,
-        tag: None,
-        rev: None,
-        tarball: None,
-        oci: None,
+        ..ManifestPackage::default()
     };
 
     let resolved_root = resolve_registry_package_root(
@@ -107,19 +96,8 @@ fn falls_back_to_direct_artifact_when_sidecar_is_missing() {
     let project_root = unique_temp_dir("pray-core-torrent-fallback");
     let declaration = ManifestPackage {
         name: "sample/base".to_string(),
-        constraint: "*".to_string(),
         source: Some("default".to_string()),
-        exports: vec![],
-        targets: vec![],
-        features: vec![],
-        groups: vec![],
-        optional: false,
-        path: None,
-        git: None,
-        tag: None,
-        rev: None,
-        tarball: None,
-        oci: None,
+        ..ManifestPackage::default()
     };
 
     let resolved_root = resolve_registry_package_root(

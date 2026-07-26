@@ -118,8 +118,40 @@
         "max_bytes": {
           "type": ["integer", "null"],
           "minimum": 1
+        },
+        "mode": {
+          "type": "string",
+          "enum": ["legacy", "compose", "tree"]
+        },
+        "scoped": {
+          "type": "boolean"
+        },
+        "entries": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/destinationEntry"
+          }
         }
       }
+    },
+    "destinationEntry": {
+      "type": "object",
+      "required": ["kind"],
+      "properties": {
+        "kind": {
+          "type": "string",
+          "enum": ["package", "local"]
+        },
+        "name": {
+          "type": "string",
+          "minLength": 1
+        },
+        "path": {
+          "type": "string",
+          "minLength": 1
+        }
+      },
+      "additionalProperties": false
     },
     "manifestPackage": {
       "type": "object",
@@ -200,6 +232,20 @@
         "oci": {
           "type": ["string", "null"],
           "minLength": 1
+        },
+        "file": {
+          "type": "string",
+          "minLength": 1
+        },
+        "roles": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "enum": ["fragment", "folder", "file"]
+          }
+        },
+        "bound": {
+          "type": "boolean"
         }
       }
     },
@@ -217,6 +263,9 @@
           "minLength": 1
         },
         "optional": {
+          "type": "boolean"
+        },
+        "bound": {
           "type": "boolean"
         }
       }

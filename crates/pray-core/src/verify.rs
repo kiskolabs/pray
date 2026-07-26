@@ -1,4 +1,4 @@
-use crate::hashing::{checksum_managed_body_line_refs, normalize_line_endings};
+use crate::hashing::{checksum_managed_body_line_refs, normalize_line_endings, sha256_prefixed};
 use crate::lockfile::{Lockfile, ManagedSpanRecord};
 use crate::render::render_project;
 use crate::resolve::{missing_local_embed_guidance, ResolvedProject};
@@ -184,6 +184,53 @@ fn collect_verification_report(
         }
         for finding in find_orphan_marker_findings_from_markers(&spans, &markers, &target_path) {
             report.findings.push(finding);
+        }
+    }
+
+    for package in &project.packages {
+        let Some(destination) = &package.declaration.file else {
+            continue;
+        };
+        let absolute = project.project_root.join(destination);
+        let Some(export_name) = package.selected_exports.iter().find(|name| {
+            package
+                .spec
+                .exports
+                .get(*name)
+                .is_some_and(|export| export.kind == "file")
+        }) else {
+            report.findings.push(VerificationFinding {
+                kind: "verify_error".to_string(),
+                message: format!(
+                    "Package `{}` declares file: \"{}\" but has no selected file export.",
+                    package.declaration.name, destination
+                ),
+            });
+            continue;
+        };
+        let source = package
+            .root
+            .join(&package.spec.exports[export_name].path);
+        if !absolute.exists() {
+            report.findings.push(VerificationFinding {
+                kind: "verify_error".to_string(),
+                message: format!(
+                    "Exclusive file `{}` from `{}` is missing. Run `pray install` to materialize it.",
+                    destination, package.declaration.name
+                ),
+            });
+            continue;
+        }
+        let destination_bytes = fs::read(&absolute)?;
+        let source_bytes = fs::read(&source)?;
+        if sha256_prefixed(&destination_bytes) != sha256_prefixed(&source_bytes) {
+            report.findings.push(VerificationFinding {
+                kind: "package_integrity".to_string(),
+                message: format!(
+                    "Exclusive file `{}` no longer matches package `{}`. Run `pray install` to restore it.",
+                    destination, package.declaration.name
+                ),
+            });
         }
     }
 

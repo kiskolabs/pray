@@ -35,6 +35,12 @@ pub struct PackageExport {
     pub kind: String,
     pub path: String,
     pub summary: Option<String>,
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub only: Vec<String>,
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub except: Vec<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub default_path: Option<String>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
@@ -302,6 +308,9 @@ fn parse_exports(value: &str) -> PrayResult<BTreeMap<String, PackageExport>> {
                     message: format!("export {missing_path_name} missing path"),
                 })?,
                 summary: map_string(entry, "summary"),
+                only: map_string_array(entry, "only"),
+                except: map_string_array(entry, "except"),
+                default_path: map_string(entry, "default_path"),
             },
         );
     }
@@ -368,6 +377,18 @@ fn parse_metadata(value: &str) -> PrayResult<BTreeMap<String, LiteralValue>> {
 fn map_string(map: &BTreeMap<String, LiteralValue>, key: &str) -> Option<String> {
     map.get(key)
         .and_then(|value| value.as_string().map(str::to_string))
+}
+
+fn map_string_array(map: &BTreeMap<String, LiteralValue>, key: &str) -> Vec<String> {
+    map.get(key)
+        .and_then(|value| value.as_array())
+        .map(|values| {
+            values
+                .iter()
+                .filter_map(|value| value.as_string().map(str::to_string))
+                .collect()
+        })
+        .unwrap_or_default()
 }
 
 fn array_of_strings(value: &str) -> PrayResult<Vec<String>> {

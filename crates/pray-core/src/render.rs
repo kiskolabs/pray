@@ -1,6 +1,8 @@
+use crate::destination::{package_bound_to_compose, package_bound_to_tree};
 use crate::environment::package_matches_environment;
 use crate::hashing::{checksum_managed_span_content, marker_id};
 use crate::lockfile::ManagedSpanRecord;
+use crate::manifest::{DestinationEntry, DestinationMode};
 use crate::resolve::ResolvedProject;
 use crate::{PrayError, PrayResult};
 use std::fs;
@@ -16,9 +18,9 @@ pub struct RenderedTarget {
 pub fn render_project(project: &ResolvedProject) -> PrayResult<Vec<RenderedTarget>> {
     let mut rendered = Vec::new();
     for target in &project.manifest.targets {
-        let output = target.outputs.first().ok_or_else(|| {
-            PrayError::Render(format!("target {} has no output file", target.name))
-        })?;
+        let Some(output) = target.outputs.first() else {
+            continue;
+        };
         rendered.push(render_target(project, target, Path::new(output))?);
     }
     Ok(rendered)
@@ -49,6 +51,7 @@ pub fn planned_provisioned_files(
     project: &ResolvedProject,
 ) -> PrayResult<Vec<PlannedProvisionedFile>> {
     let mut planned = Vec::new();
+    collect_exact_file_bindings(project, &mut planned)?;
     for target in &project.manifest.targets {
         for folder_root in &target.skills {
             let destination_root = project.project_root.join(folder_root);
@@ -59,12 +62,16 @@ pub fn planned_provisioned_files(
                 ) {
                     continue;
                 }
+                if !package_bound_to_tree(&package.declaration, target) {
+                    continue;
+                }
                 collect_legacy_skill_files(project, package, &destination_root, &mut planned)?;
                 collect_selected_export_files(project, package, &destination_root, &mut planned)?;
             }
         }
     }
     planned.sort_by(|left, right| left.path.cmp(&right.path));
+    planned.dedup_by(|left, right| left.path == right.path);
     Ok(planned)
 }
 
@@ -75,6 +82,52 @@ pub fn materialize_provisioned_exports(project: &ResolvedProject) -> PrayResult<
             fs::create_dir_all(parent)?;
         }
         fs::copy(&file.source, &destination)?;
+    }
+    Ok(())
+}
+
+fn collect_exact_file_bindings(
+    project: &ResolvedProject,
+    planned: &mut Vec<PlannedProvisionedFile>,
+) -> PrayResult<()> {
+    for package in &project.packages {
+        let Some(destination) = &package.declaration.file else {
+            continue;
+        };
+        if !package_matches_environment(
+            &package.declaration.groups,
+            project.environment.as_deref(),
+        ) {
+            continue;
+        }
+        let mut matched = false;
+        for export_name in &package.selected_exports {
+            let Some(export) = package.spec.exports.get(export_name) else {
+                continue;
+            };
+            if export.kind != "file" {
+                continue;
+            }
+            let source = package.root.join(&export.path);
+            if !source.is_file() {
+                return Err(PrayError::Render(format!(
+                    "file export source missing: {}",
+                    source.display()
+                )));
+            }
+            planned.push(PlannedProvisionedFile {
+                path: PathBuf::from(destination),
+                source,
+            });
+            matched = true;
+            break;
+        }
+        if !matched {
+            return Err(PrayError::Render(format!(
+                "package {} has file: \"{}\" but no selected file export",
+                package.declaration.name, destination
+            )));
+        }
     }
     Ok(())
 }
@@ -107,6 +160,8 @@ fn collect_legacy_skill_files(
             &package.root.join(&skill.path),
             &destination_root.join(skill_name),
             skill_files,
+            &[],
+            &[],
             planned,
         )?;
     }
@@ -148,10 +203,15 @@ fn collect_selected_export_files(
                     &package.root.join(&export.path),
                     &destination_root.join(destination_name),
                     indexed_files,
+                    &export.only,
+                    &export.except,
                     planned,
                 )?;
             }
             "file" => {
+                if package.declaration.file.is_some() {
+                    continue;
+                }
                 let source = package.root.join(&export.path);
                 if !source.is_file() {
                     return Err(PrayError::Render(format!(
@@ -197,6 +257,8 @@ fn collect_tree_files(
     source_root: &Path,
     destination_root: &Path,
     relative_files: &[String],
+    only: &[String],
+    except: &[String],
     planned: &mut Vec<PlannedProvisionedFile>,
 ) -> PrayResult<()> {
     if !source_root.is_dir() {
@@ -213,7 +275,14 @@ fn collect_tree_files(
         )));
     }
 
+    let mut matched = false;
     for relative in relative_files {
+        if !only.is_empty() && !only.iter().any(|entry| entry == relative) {
+            continue;
+        }
+        if except.iter().any(|entry| entry == relative) {
+            continue;
+        }
         let source = source_root.join(relative);
         if !source.is_file() {
             return Err(PrayError::Render(format!(
@@ -226,6 +295,14 @@ fn collect_tree_files(
             path: relative_project_path(project, &destination),
             source,
         });
+        matched = true;
+    }
+
+    if !matched && only.is_empty() && except.is_empty() {
+        return Err(PrayError::Render(format!(
+            "no files listed in package manifest for {}",
+            source_root.display()
+        )));
     }
 
     Ok(())
@@ -279,7 +356,6 @@ impl ContentBuilder {
 fn should_inline_export(
     package: &crate::resolve::ResolvedPackage,
     export_name: &str,
-    _target: &crate::manifest::ManifestTarget,
 ) -> bool {
     package
         .spec
@@ -289,6 +365,17 @@ fn should_inline_export(
 }
 
 fn render_target(
+    project: &ResolvedProject,
+    target: &crate::manifest::ManifestTarget,
+    output: &Path,
+) -> PrayResult<RenderedTarget> {
+    if target.scoped && target.mode == DestinationMode::Compose {
+        return render_scoped_compose(project, target, output);
+    }
+    render_legacy_compose(project, target, output)
+}
+
+fn render_scoped_compose(
     project: &ResolvedProject,
     target: &crate::manifest::ManifestTarget,
     output: &Path,
@@ -310,11 +397,101 @@ fn render_target(
         builder.append_empty_line();
     }
 
-    if !project.local_files.is_empty() {
+    let mut managed_spans = Vec::new();
+    for entry in &target.entries {
+        match entry {
+            DestinationEntry::Local { path } => {
+                let Some(local) = project
+                    .local_files
+                    .iter()
+                    .find(|local| local.manifest_path == *path)
+                else {
+                    continue;
+                };
+                if local.content.is_empty() && local.optional {
+                    continue;
+                }
+                builder.append_body(&local.content);
+                builder.append_empty_line();
+            }
+            DestinationEntry::Package { name } => {
+                let Some(package) = project
+                    .packages
+                    .iter()
+                    .find(|package| package.declaration.name == *name)
+                else {
+                    continue;
+                };
+                if !package_matches_environment(
+                    &package.declaration.groups,
+                    project.environment.as_deref(),
+                ) {
+                    continue;
+                }
+                for export in &package.selected_exports {
+                    if !should_inline_export(package, export) {
+                        continue;
+                    }
+                    append_managed_export(
+                        &mut builder,
+                        &mut managed_spans,
+                        package,
+                        export,
+                        target,
+                        output,
+                    )?;
+                }
+            }
+        }
+    }
+
+    Ok(RenderedTarget {
+        path: output.to_path_buf(),
+        content: builder.finish(),
+        managed_spans,
+    })
+}
+
+fn render_legacy_compose(
+    project: &ResolvedProject,
+    target: &crate::manifest::ManifestTarget,
+    output: &Path,
+) -> PrayResult<RenderedTarget> {
+    let mut builder = ContentBuilder::with_capacity(8_192);
+    if project.manifest.render.header {
+        let output_name = output
+            .file_name()
+            .map(|name| name.to_string_lossy().to_string())
+            .unwrap_or_else(|| output.to_string_lossy().to_string());
+        builder.append_line("<!-- pray:0 ignore-comments -->");
+        builder.append_empty_line();
+        builder.append_line("# Agent context");
+        builder.append_empty_line();
+        builder.append_line(&format!(
+            "Do not edit managed blocks in `{output_name}` or provisioned files under `.agents/`."
+        ));
+        builder.append_line("To change shared guidance, update `Prayfile` and run `pray install`.");
+        builder.append_empty_line();
+    }
+
+    let unbound_locals: Vec<_> = project
+        .local_files
+        .iter()
+        .filter(|local| {
+            project
+                .manifest
+                .local
+                .iter()
+                .find(|entry| entry.path == local.manifest_path)
+                .is_none_or(|entry| !entry.bound)
+        })
+        .collect();
+
+    if !unbound_locals.is_empty() {
         builder.append_line("## Additional instructions");
         builder.append_empty_line();
     }
-    for local in &project.local_files {
+    for local in unbound_locals {
         if local.content.is_empty() && local.optional {
             continue;
         }
@@ -332,37 +509,21 @@ fn render_target(
         {
             continue;
         }
+        if !package_bound_to_compose(&package.declaration, target) {
+            continue;
+        }
         for export in &package.selected_exports {
-            if !should_inline_export(package, export, target) {
+            if !should_inline_export(package, export) {
                 continue;
             }
-            let body = package.export_bodies.get(export).ok_or_else(|| {
-                PrayError::Render(format!(
-                    "package {} is missing cached export {}",
-                    package.declaration.name, export
-                ))
-            })?;
-            let id = marker_id(&format!(
-                "{}:{}:{}",
-                package.declaration.name, export, target.name
-            ));
-            let open_line = builder.next_line_number();
-            builder.append_line(&format!("<!-- pray:{id} -->"));
-            builder.append_body(body);
-            let close_line = builder.next_line_number();
-            builder.append_line(&format!("<!-- pray:{id} -->"));
-            managed_spans.push(ManagedSpanRecord {
-                id,
-                target: output.to_string_lossy().to_string(),
-                open_line,
-                close_line,
-                ideal_checksum: checksum_managed_span_content(body),
-                package: package.declaration.name.clone(),
-                export: export.clone(),
-                source_checksum: package.source_checksum.clone(),
-                silenced: false,
-            });
-            builder.append_empty_line();
+            append_managed_export(
+                &mut builder,
+                &mut managed_spans,
+                package,
+                export,
+                target,
+                output,
+            )?;
         }
     }
 
@@ -371,4 +532,42 @@ fn render_target(
         content: builder.finish(),
         managed_spans,
     })
+}
+
+fn append_managed_export(
+    builder: &mut ContentBuilder,
+    managed_spans: &mut Vec<ManagedSpanRecord>,
+    package: &crate::resolve::ResolvedPackage,
+    export: &str,
+    target: &crate::manifest::ManifestTarget,
+    output: &Path,
+) -> PrayResult<()> {
+    let body = package.export_bodies.get(export).ok_or_else(|| {
+        PrayError::Render(format!(
+            "package {} is missing cached export {}",
+            package.declaration.name, export
+        ))
+    })?;
+    let id = marker_id(&format!(
+        "{}:{}:{}",
+        package.declaration.name, export, target.name
+    ));
+    let open_line = builder.next_line_number();
+    builder.append_line(&format!("<!-- pray:{id} -->"));
+    builder.append_body(body);
+    let close_line = builder.next_line_number();
+    builder.append_line(&format!("<!-- pray:{id} -->"));
+    managed_spans.push(ManagedSpanRecord {
+        id,
+        target: output.to_string_lossy().to_string(),
+        open_line,
+        close_line,
+        ideal_checksum: checksum_managed_span_content(body),
+        package: package.declaration.name.clone(),
+        export: export.to_string(),
+        source_checksum: package.source_checksum.clone(),
+        silenced: false,
+    });
+    builder.append_empty_line();
+    Ok(())
 }

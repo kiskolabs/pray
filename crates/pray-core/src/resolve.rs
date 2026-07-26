@@ -959,18 +959,60 @@ fn source_map(sources: &[ManifestSource]) -> BTreeMap<String, ManifestSource> {
 }
 
 fn select_exports(declaration: &ManifestPackage, spec: &PackageSpec) -> PrayResult<Vec<String>> {
-    if declaration.exports.is_empty() {
+    if !declaration.exports.is_empty() {
+        for export in &declaration.exports {
+            if !spec.exports.contains_key(export) {
+                return Err(PrayError::Resolution(format!(
+                    "package {} does not export {}",
+                    declaration.name, export
+                )));
+            }
+        }
+        return Ok(declaration.exports.clone());
+    }
+
+    if declaration.roles.is_empty() && declaration.file.is_none() {
         return Ok(spec.exports.keys().cloned().collect());
     }
-    for export in &declaration.exports {
-        if !spec.exports.contains_key(export) {
-            return Err(PrayError::Resolution(format!(
-                "package {} does not export {}",
-                declaration.name, export
-            )));
+
+    let mut roles = declaration.roles.clone();
+    if declaration.file.is_some()
+        && !roles.contains(&crate::manifest::ExportRole::File)
+    {
+        roles.push(crate::manifest::ExportRole::File);
+    }
+
+    let mut selected = Vec::new();
+    for role in roles {
+        let compatible: Vec<String> = spec
+            .exports
+            .iter()
+            .filter(|(_, export)| {
+                crate::destination::export_kind_matches_role(&export.kind, role)
+            })
+            .map(|(name, _)| name.clone())
+            .collect();
+        match compatible.as_slice() {
+            [name] => {
+                if !selected.contains(name) {
+                    selected.push(name.clone());
+                }
+            }
+            [] => {
+                return Err(PrayError::Resolution(format!(
+                    "package {} has no export compatible with {:?}",
+                    declaration.name, role
+                )));
+            }
+            _ => {
+                return Err(PrayError::Resolution(format!(
+                    "package {} has multiple exports compatible with {:?}; set export: \"name\"",
+                    declaration.name, role
+                )));
+            }
         }
     }
-    Ok(declaration.exports.clone())
+    Ok(selected)
 }
 
 fn read_text(path: &Path) -> PrayResult<String> {
