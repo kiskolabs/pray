@@ -745,7 +745,7 @@ Default export resolution when `export:` / `exports:` omitted:
 
 Exactly one compatible export is selected; multiple require `export: "name"`; none is a type mismatch. Legacy-only Prayfiles (no `compose` / `tree` / `pray` / `file:`) keep empty exports selecting all package exports.
 
-Package name prefixes are namespaces, not source handles. `source:` stays optional when only one source exists.
+Package name prefixes are namespaces. When a namespace matches a declared source handle name, `source:` may be omitted. `source:` is also optional when only one source exists.
 
 ### agent
 
