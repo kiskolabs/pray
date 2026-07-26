@@ -71,9 +71,7 @@ fn checks_an_http_compromised_key_feed() {
     let server = thread::spawn(move || {
         let (mut stream, _) = listener.accept().expect("accept feed request");
         let mut request = [0_u8; 1];
-        stream
-            .read_exact(&mut request)
-            .expect("read feed request");
+        stream.read_exact(&mut request).expect("read feed request");
         stream
             .write_all(response.as_bytes())
             .expect("write feed response");
