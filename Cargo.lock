@@ -1394,6 +1394,7 @@ dependencies = [
  "base64",
  "ed25519-dalek",
  "jsonschema",
+ "reqwest",
  "rusqlite",
  "semver",
  "serde",

@@ -96,16 +96,16 @@ const PACKAGE_COMMANDS: &[&str] = &[
 
 #[cfg(feature = "auth")]
 const DISTRIBUTION_COMMANDS: &[&str] = &[
-    "publish --root PATH [--server URL ...]",
+    "publish --root PATH [--server URL ...] [--signing-key PATH]",
     "login --server URL --email EMAIL",
-    "serve [--root PATH] [--host HOST] [--port PORT] [--stdio]",
+    "serve [--root PATH] [--host HOST] [--port PORT] [--stdio] [--allow-open-push]",
     "sync [--root PATH] [--peer URL ...]",
     "confess <package> | --from-lock SPAN_ID [--accepted|--rejected]",
 ];
 
 #[cfg(not(feature = "auth"))]
 const DISTRIBUTION_COMMANDS: &[&str] = &[
-    "publish --root PATH [--server URL ...]",
+    "publish --root PATH [--server URL ...] [--signing-key PATH]",
     "login --server URL --email EMAIL",
     "sync [--root PATH] [--peer URL ...]",
     "confess <package> | --from-lock SPAN_ID [--accepted|--rejected]",
@@ -176,12 +176,18 @@ fn command_help_text(command: &str) -> Option<&'static str> {
         ),
         "publish" => Some(
             "publish — upload packages to a registry or local root\n\n\
-             Usage: pray publish --root PATH [--server URL ...]",
+             Usage: pray publish --root PATH [--server URL ...] [--signing-key PATH]\n\n\
+             Signatures:\n\
+             - Prefer a publisher signing key via --signing-key PATH or PRAY_SIGNING_KEY\n\
+               (32-byte ed25519 seed). Publish then records an ed25519 package signature\n\
+               and signer_public_key so installers can verify the publisher.\n\
+             - Without a signing key, publish records a legacy content digest so older\n\
+               registries keep working; prefer a signing key for publisher authenticity.",
         ),
         #[cfg(feature = "auth")]
         "serve" => Some(
             "serve — run a local registry server\n\n\
-             Usage: pray serve [--root PATH] [--host HOST] [--port PORT] [--stdio]",
+             Usage: pray serve [--root PATH] [--host HOST] [--port PORT] [--stdio] [--allow-open-push]",
         ),
         "upgrade" => Some(
             "upgrade — install the latest pray CLI release\n\n\

@@ -1,7 +1,11 @@
 # frozen_string_literal: true
 
 module Pray
-  PackageExport = Struct.new(:kind, :path, :summary)
+  PackageExport = Struct.new(:kind, :path, :summary, :only, :except, :default_path) do
+    def initialize(kind: "fragment", path: "", summary: nil, only: [], except: [], default_path: nil)
+      super
+    end
+  end
   PackageSkill = Struct.new(:path, :summary)
   PackageTemplate = Struct.new(:path, :summary)
   PackageDependency = Struct.new(:name, :constraint, :optional)
@@ -77,7 +81,10 @@ module Pray
           exports[name] = PackageExport.new(
             kind: map_string(entry, "type") || "fragment",
             path: map_string(entry, "path") || raise(Error.parse("prayspec", "export #{name} missing path")),
-            summary: map_string(entry, "summary")
+            summary: map_string(entry, "summary"),
+            only: map_string_array(entry, "only"),
+            except: map_string_array(entry, "except"),
+            default_path: map_string(entry, "default_path")
           )
         end
         exports
@@ -115,6 +122,13 @@ module Pray
 
       def map_string(map, key)
         map[key]&.as_string
+      end
+
+      def map_string_array(map, key)
+        values = map[key]&.as_array
+        return [] unless values
+
+        values.filter_map(&:as_string)
       end
 
       def array_of_strings(value)

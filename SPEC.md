@@ -1530,11 +1530,11 @@ SSH-native mode uses SSH for transport authentication:
 - host identity via `known_hosts` or equivalent host key pinning (`allowed_host_keys` in client `trust.toml`, optional `host_key_fingerprint` in `Prayfile.lock`)
 - user identity via SSH public key fingerprints (`signer_fingerprint` in package metadata, `allowed_publishers` in client trust policy)
 
-The server maps SSH public key fingerprints to publisher identities for push authorization (`v1/ssh_publishers.json`). The reference CLI reads `PRAY_SSH_USER_FINGERPRINT`, `SSH_USER_FINGERPRINT`, or `PRAY_SSH_PUBLISHER` on the server during push. Clients record `signer` (human label) and `signer_fingerprint` (canonical signing identity) in registry metadata; package signatures use the fingerprint when present.
+The server maps SSH public key fingerprints to publisher identities for push authorization (`v1/ssh_publishers.json`). The reference CLI reads `PRAY_SSH_USER_FINGERPRINT`, `SSH_USER_FINGERPRINT`, or `PRAY_SSH_PUBLISHER` on the server during push. Clients record `signer` (human label) and `signer_fingerprint` (canonical signing identity) in registry metadata.
 
 HTTP-style `auth.*` RPC methods are optional and intended for hybrid hosts. SSH-only servers may reject them.
 
-Package hashes, tree hashes, signatures, and render digests are still verified on the client. SSH establishes who connected and encrypts the channel; it does not replace package signature verification.
+Package hashes, tree hashes, signatures, and render digests are still verified on the client. SSH establishes who connected and encrypts the channel; it does not replace package signature verification. Package signature formats are defined in Section 59.
 
 #### Federation
 
@@ -1592,7 +1592,9 @@ Global flags: `--trust` imports signer keys after interactive consent; `--global
 
 A registry package version should expose:
 
-name, version, summary, description, artifact location, artifact hash, tree hash, yanked flag, license, homepage, source code URI, changelog URI, targets, exports, dependencies, published_at optional, signature optional, render_digest optional, annotation_provenance optional
+name, version, summary, description, artifact location, artifact hash, tree hash, yanked flag, license, homepage, source code URI, changelog URI, targets, exports, dependencies, published_at optional, signature optional, signer optional, signer_fingerprint optional, signer_public_key optional, render_digest optional, annotation_provenance optional
+
+Remote registry installs must fail closed when `artifact_hash` or `tree_hash` is missing. Signature verification rules are defined in Section 59.
 
 To reduce churn and privacy leakage, project lockfiles should not copy unnecessary registry metadata.
 
@@ -2512,20 +2514,45 @@ Agent packages affect automated behavior. They must be treated as supply-chain i
 
 ## 59. Signatures
 
-Optional v1 support:
+Optional v1 support for registry package versions.
 
-- package artifact hash signed by publisher key
-- registry metadata hash signed by registry key
-- lockfile records signature identity
+### Preferred: ed25519 package signature
 
-Example lockfile fields:
+When a publisher signing key is available, the reference CLI prefers an ed25519 signature over the package identity hashes:
+
+- payload: `artifact_hash` UTF-8 bytes, a single `0x00` byte, then `tree_hash` UTF-8 bytes
+- `signature`: `ed25519:` followed by standard Base64 of the 64-byte ed25519 signature
+- `signer_public_key`: OpenSSH `ssh-ed25519` public key text for the verifying key
+- `signer` / `signer_fingerprint`: human label and optional SSH fingerprint identity (unchanged)
+
+Install and sync verify ed25519 signatures with `signer_public_key`. SSH transport auth does not substitute for this check.
+
+Reference CLI key sources for publish:
+
+- `--signing-key PATH` to a 32-byte raw ed25519 seed file
+- or environment `PRAY_SIGNING_KEY` with the same path shape
+
+### Legacy: content digest
+
+When no signing key is available, publish may still record a legacy content digest for compatibility:
+
+- digest input: artifact bytes, `0x00`, tree hash UTF-8, `0x00`, signing identity UTF-8
+- `signature`: `sha256:` prefixed hex digest of that input
+- signing identity prefers `signer_fingerprint` when present, otherwise `signer`
+- `signer_public_key` is omitted
+
+Legacy digests bind published bytes to a claimed identity string. They are not public-key signatures. New publishers should prefer ed25519.
+
+### Other reserved forms
+
+The data model may later add registry-key signatures over metadata or lockfile signature identity fields. Example lockfile placeholders:
 
 ```
-signature = "signed:..."
+signature = "ed25519:..."
 signer = "sample-agent-packages-2026"
 ```
 
-Signature support is optional in v1, but the data model should leave space for it.
+Signature support remains optional in v1, but remote integrity requires artifact and tree hashes.
 
 ---
 

@@ -109,6 +109,7 @@ fn registry_metadata_validates_against_registry_schema() {
             exports: vec!["testing-basics".to_string()],
             signer: None,
             signer_fingerprint: None,
+            signer_public_key: None,
             published_at: None,
             signature: None,
             derived_metadata: None,
