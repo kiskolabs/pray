@@ -2,9 +2,7 @@ use crate::lockfile::Lockfile;
 use crate::manifest::{ManifestPackage, ManifestSource};
 use crate::registry::{resolve_local_registry_package_root, RegistryPackageResolution};
 use crate::resolve_context::{PackageResolutionContext, ResolveOptions};
-use crate::resolve_git::{
-    ensure_git_repository, local_git_source_root, resolve_distribution_root,
-};
+use crate::resolve_git::{ensure_git_repository, local_git_source_root, resolve_distribution_root};
 use crate::{PrayError, PrayResult};
 use std::collections::BTreeMap;
 use std::path::{Path, PathBuf};

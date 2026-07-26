@@ -94,10 +94,8 @@ fn collect_exact_file_bindings(
         let Some(destination) = &package.declaration.file else {
             continue;
         };
-        if !package_matches_environment(
-            &package.declaration.groups,
-            project.environment.as_deref(),
-        ) {
+        if !package_matches_environment(&package.declaration.groups, project.environment.as_deref())
+        {
             continue;
         }
         let mut matched = false;
@@ -353,10 +351,7 @@ impl ContentBuilder {
     }
 }
 
-fn should_inline_export(
-    package: &crate::resolve::ResolvedPackage,
-    export_name: &str,
-) -> bool {
+fn should_inline_export(package: &crate::resolve::ResolvedPackage, export_name: &str) -> bool {
     package
         .spec
         .exports

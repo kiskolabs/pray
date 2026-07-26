@@ -1,15 +1,15 @@
 use crate::server::{
     ensure_derived_metadata, latest_publish_timestamp, merge_registry_package_metadata,
-    read_known_peers, read_registry_index,
-    read_registry_package_metadata, registry_metadata_path,
-    registry_package_metadata_from_transport,
-    update_registry_index_with_package, write_registry_package_metadata, Response, ServeAuth,
+    read_known_peers, read_registry_index, read_registry_package_metadata, registry_metadata_path,
+    registry_package_metadata_from_transport, update_registry_index_with_package,
+    write_registry_package_metadata, Response, ServeAuth,
 };
 use crate::transport_metadata::transport_package_metadata;
 use pray_core::push_auth::authorize_distribution_push;
 use pray_core::{PrayError, PrayResult};
 use pray_transport::{
-    FederationInfo, IndexResponse, PackageMetadata as TransportPackageMetadata, PackageSummary, ServerInfo, SyncEndpoints,
+    FederationInfo, IndexResponse, PackageMetadata as TransportPackageMetadata, PackageSummary,
+    ServerInfo, SyncEndpoints,
 };
 use std::path::Path;
 
@@ -37,7 +37,10 @@ pub(crate) fn federation_discovery_response(root: &Path) -> PrayResult<Response>
     })
 }
 
-pub(crate) fn federation_index_response_since(root: &Path, since: Option<u64>) -> PrayResult<Response> {
+pub(crate) fn federation_index_response_since(
+    root: &Path,
+    since: Option<u64>,
+) -> PrayResult<Response> {
     let index = read_registry_index(root)?;
     let mut packages = Vec::new();
     let mut sync_version = 0u64;
@@ -92,12 +95,7 @@ pub(crate) fn federation_push_response(
     auth: &ServeAuth,
     body: &[u8],
 ) -> PrayResult<Response> {
-    authorize_distribution_push(
-        root,
-        &auth.bind_host,
-        auth.allow_open_push,
-        auth.stdio_mode,
-    )?;
+    authorize_distribution_push(root, &auth.bind_host, auth.allow_open_push, auth.stdio_mode)?;
     let incoming: TransportPackageMetadata =
         serde_json::from_slice(body).map_err(|error| PrayError::Parse {
             kind: "federation package metadata",

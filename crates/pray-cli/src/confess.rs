@@ -1,6 +1,4 @@
-use crate::{
-    current_signer, lockfile_path, locked_package, manifest_path, resolve_project,
-};
+use crate::{current_signer, locked_package, lockfile_path, manifest_path, resolve_project};
 use pray_core::hashing::sha256_prefixed;
 use pray_core::lockfile::read_lockfile;
 use pray_core::registry::{submit_confession, ConfessionSubmission};

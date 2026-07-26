@@ -241,11 +241,9 @@ agent "sample/unbound", "~> 1.0", path: "packages/unbound"
     assert!(planned
         .iter()
         .any(|file| file.path.ends_with(".agents/skills/audit/SKILL.md")));
-    assert!(!planned.iter().any(|file| {
-        file.path
-            .to_string_lossy()
-            .contains("security/SECURITY.md")
-    }));
+    assert!(!planned
+        .iter()
+        .any(|file| { file.path.to_string_lossy().contains("security/SECURITY.md") }));
 
     write_rendered_targets(&project, &rendered).expect("write");
     let security = fs::read_to_string(root.join("SECURITY.md")).expect("security written");
@@ -270,9 +268,17 @@ agent "sample/unbound", "~> 1.0", path: "packages/unbound"
 fn folder_export_only_filter_limits_provisioned_tree() {
     let root = unique_temp_dir("pray-folder-only");
     fs::create_dir_all(root.join("packages/templates/templates")).expect("templates");
-    fs::write(root.join("packages/templates/templates/issue.md"), "issue\n").expect("issue");
+    fs::write(
+        root.join("packages/templates/templates/issue.md"),
+        "issue\n",
+    )
+    .expect("issue");
     fs::write(root.join("packages/templates/templates/pr.md"), "pr\n").expect("pr");
-    fs::write(root.join("packages/templates/templates/draft.md"), "draft\n").expect("draft");
+    fs::write(
+        root.join("packages/templates/templates/draft.md"),
+        "draft\n",
+    )
+    .expect("draft");
     fs::write(
         root.join("packages/templates/templates.prayspec"),
         r#"
@@ -342,7 +348,10 @@ end
     let project =
         resolve_project_in_context(&root.join("Prayfile"), &root, &ResolveOptions::default())
             .expect("resolve");
-    assert_eq!(project.packages[0].selected_exports, vec!["rules".to_string()]);
+    assert_eq!(
+        project.packages[0].selected_exports,
+        vec!["rules".to_string()]
+    );
     let rendered = render_project(&project).expect("render");
     assert!(rendered[0].content.contains("Alias rules"));
 }

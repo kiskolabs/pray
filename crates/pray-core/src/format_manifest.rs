@@ -44,11 +44,7 @@ pub fn classify_format_hints(project: &ResolvedProject) -> BTreeMap<String, Pack
             let Some(export) = package.spec.exports.get(export_name) else {
                 continue;
             };
-            for role in [
-                ExportRole::Fragment,
-                ExportRole::Folder,
-                ExportRole::File,
-            ] {
+            for role in [ExportRole::Fragment, ExportRole::Folder, ExportRole::File] {
                 if export_kind_matches_role(&export.kind, role) && !roles.contains(&role) {
                     roles.push(role);
                 }
@@ -107,8 +103,8 @@ fn omit_default_sources(manifest: &mut Manifest) {
             continue;
         };
         let matches_sole = sole_source.as_deref() == Some(source);
-        let matches_namespace = package_namespace(&package.name) == Some(source)
-            && source_names.contains(source);
+        let matches_namespace =
+            package_namespace(&package.name) == Some(source) && source_names.contains(source);
         if matches_sole || matches_namespace {
             package.source = None;
         }
@@ -241,9 +237,7 @@ fn apply_format_hints(
     }
 }
 
-fn unique_paths(
-    items: impl Iterator<Item = (String, String)>,
-) -> Vec<(String, BTreeSet<String>)> {
+fn unique_paths(items: impl Iterator<Item = (String, String)>) -> Vec<(String, BTreeSet<String>)> {
     let mut map: BTreeMap<String, BTreeSet<String>> = BTreeMap::new();
     for (path, target_name) in items {
         map.entry(path).or_default().insert(target_name);

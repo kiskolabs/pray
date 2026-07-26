@@ -358,7 +358,10 @@ render mode: :managed, conflict: :fail, churn: :minimal
         manifest.targets[0].skills,
         vec![".agents/skills".to_string()]
     );
-    assert_eq!(manifest.packages[0].exports, vec!["working-rules".to_string()]);
+    assert_eq!(
+        manifest.packages[0].exports,
+        vec!["working-rules".to_string()]
+    );
     assert!(!manifest.packages[0].bound);
     assert_eq!(manifest.local[0].position, "start");
     assert!(!manifest.local[0].bound);

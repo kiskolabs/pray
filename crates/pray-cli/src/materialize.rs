@@ -90,7 +90,9 @@ pub(crate) fn build_package_archive_bytes(
     Ok(output)
 }
 
-pub(crate) fn package_metadata(package: &pray_core::resolve::ResolvedPackage) -> PrayResult<String> {
+pub(crate) fn package_metadata(
+    package: &pray_core::resolve::ResolvedPackage,
+) -> PrayResult<String> {
     serde_json::to_string_pretty(&serde_json::json!({
         "name": package.declaration.name,
         "version": package.spec.version,
@@ -128,7 +130,10 @@ pub(crate) fn append_archive_file(
     Ok(())
 }
 
-pub(crate) fn read_package_file_bytes(source_root: &Path, relative_path: &str) -> PrayResult<Vec<u8>> {
+pub(crate) fn read_package_file_bytes(
+    source_root: &Path,
+    relative_path: &str,
+) -> PrayResult<Vec<u8>> {
     let relative = Path::new(relative_path);
     validate_package_relative_path(relative)?;
     let source = source_root.join(relative);

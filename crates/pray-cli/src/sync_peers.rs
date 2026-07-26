@@ -21,7 +21,10 @@ pub(crate) fn load_known_peer_records(root: &Path) -> PrayResult<BTreeMap<String
     Ok(records)
 }
 
-pub(crate) fn write_known_peer_records(root: &Path, peers: &BTreeMap<String, PeerInfo>) -> PrayResult<()> {
+pub(crate) fn write_known_peer_records(
+    root: &Path,
+    peers: &BTreeMap<String, PeerInfo>,
+) -> PrayResult<()> {
     let path = root.join("v1/peers.json");
     if let Some(parent) = path.parent() {
         fs::create_dir_all(parent)?;
@@ -77,4 +80,3 @@ pub(crate) fn map_transport_error(error: TransportError) -> PrayError {
         other => PrayError::Resolution(other.to_string()),
     }
 }
-

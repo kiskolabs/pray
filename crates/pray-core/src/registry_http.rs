@@ -75,7 +75,10 @@ pub(crate) fn http_get(url: &str) -> PrayResult<Vec<u8>> {
     Ok(response.body)
 }
 
-pub(crate) fn http_get_with_headers(url: &str, headers: &[(&str, &str)]) -> PrayResult<(Vec<u8>, u16)> {
+pub(crate) fn http_get_with_headers(
+    url: &str,
+    headers: &[(&str, &str)],
+) -> PrayResult<(Vec<u8>, u16)> {
     let response = http_request("GET", url, None, None, headers)?;
     Ok((response.body, response.status))
 }

@@ -40,10 +40,7 @@ fn publishers_configured(root: &Path) -> PrayResult<bool> {
 }
 
 pub fn is_loopback_bind_host(host: &str) -> bool {
-    matches!(
-        host,
-        "127.0.0.1" | "localhost" | "::1" | "0:0:0:0:0:0:0:1"
-    )
+    matches!(host, "127.0.0.1" | "localhost" | "::1" | "0:0:0:0:0:0:0:1")
 }
 
 #[cfg(test)]
@@ -53,27 +50,22 @@ mod tests {
 
     #[test]
     fn loopback_allows_open_push_without_publishers() {
-        let root = std::env::temp_dir().join(format!(
-            "pray-push-auth-loopback-{}",
-            std::process::id()
-        ));
+        let root =
+            std::env::temp_dir().join(format!("pray-push-auth-loopback-{}", std::process::id()));
         let _ = fs::remove_dir_all(&root);
         fs::create_dir_all(&root).expect("temp root");
-        authorize_distribution_push(&root, "127.0.0.1", false, false)
-            .expect("loopback open push");
+        authorize_distribution_push(&root, "127.0.0.1", false, false).expect("loopback open push");
         let _ = fs::remove_dir_all(&root);
     }
 
     #[test]
     fn non_loopback_requires_flag_without_publishers() {
-        let root = std::env::temp_dir().join(format!(
-            "pray-push-auth-public-{}",
-            std::process::id()
-        ));
+        let root =
+            std::env::temp_dir().join(format!("pray-push-auth-public-{}", std::process::id()));
         let _ = fs::remove_dir_all(&root);
         fs::create_dir_all(&root).expect("temp root");
-        let error = authorize_distribution_push(&root, "0.0.0.0", false, false)
-            .expect_err("public bind");
+        let error =
+            authorize_distribution_push(&root, "0.0.0.0", false, false).expect_err("public bind");
         assert!(error.to_string().contains("--allow-open-push"));
         authorize_distribution_push(&root, "0.0.0.0", true, false).expect("flag allows");
         let _ = fs::remove_dir_all(&root);

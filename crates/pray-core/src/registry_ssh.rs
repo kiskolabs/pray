@@ -102,7 +102,10 @@ pub(crate) fn fetch_ssh_registry_package_metadata(
     })
 }
 
-pub(crate) fn submit_confession_ssh(source_url: &str, confession: &ConfessionSubmission) -> PrayResult<()> {
+pub(crate) fn submit_confession_ssh(
+    source_url: &str,
+    confession: &ConfessionSubmission,
+) -> PrayResult<()> {
     use crate::ssh_client::with_pray_ssh_session;
     use serde_json::json;
 
