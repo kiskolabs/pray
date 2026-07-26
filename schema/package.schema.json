@@ -131,6 +131,24 @@
         "summary": {
           "type": ["string", "null"],
           "minLength": 1
+        },
+        "only": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "minLength": 1
+          }
+        },
+        "except": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "minLength": 1
+          }
+        },
+        "default_path": {
+          "type": "string",
+          "minLength": 1
         }
       }
     },

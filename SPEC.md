@@ -656,7 +656,7 @@ Supported source kinds: `registry`, `static_index`, `git`, `path`, `tarball`, `o
 
 ### target
 
-Declares rendered target.
+Optional grouping for legacy Prayfiles and selective apply. Not required when using top-level `compose` / `tree` / `pray …, file:`.
 
 ```manifest
 target :tool_a do
@@ -677,9 +677,79 @@ max_bytes 120_000
 
 Unknown target features should warn by default. Strict mode should fail.
 
+### compose
+
+Builds one text file from ordered local embeds and package fragments.
+
+```manifest
+compose "AGENTS.md" do
+  pray ".agents/project.md"
+  pray "amkisko/working-rules", "~> 2.0"
+end
+```
+
+Rules:
+
+- Declaration order inside the block is render order.
+- Package inputs use fragment exports (see default export resolution).
+- Local bare paths embed human-owned files (no pray markers).
+- Alias: `output "AGENTS.md" do … end` at top level.
+
+### tree
+
+Provisions package folder/skill exports under a directory root.
+
+```manifest
+tree ".agents/skills" do
+  pray "amkisko/engineering-audit", "~> 2.0"
+end
+```
+
+Aliases: `folder`, `skills` (block form at top level).
+
+### pray
+
+Primary input sugar for packages and (inside `compose`) local files.
+
+```manifest
+pray "amkisko/working-rules", "~> 2.0"
+pray "amkisko/community-security", "~> 1.0", file: "SECURITY.md"
+pray ".agents/project.md"
+```
+
+Aliases: `use`, `include`. Legacy `agent` / `package` remain valid.
+
+Forms:
+
+| Form | Meaning |
+|------|---------|
+| `pray "owner/name", "constraint", …` | Package |
+| `pray "owner/name", …, file: "path"` | Exact package file bytes at path |
+| `pray "relative/or/./path"` bare, inside `compose` | Local file embed |
+
+`file:` rules:
+
+- Requires a `file`-typed package export (default export resolution applies).
+- Writes exact bytes; no pray markers; no agent header.
+- Exclusive ownership of the path.
+- Mutually exclusive with nesting inside `compose` / `tree`.
+- Optional alias: `file "SECURITY.md" do pray "pkg", "~> 1.0" end`.
+
+Default export resolution when `export:` / `exports:` omitted:
+
+| Context | Compatible export types |
+|---------|-------------------------|
+| inside `compose` | `fragment` |
+| `file:` keyword | `file` |
+| inside `tree` | `folder` / `skill` |
+
+Exactly one compatible export is selected; multiple require `export: "name"`; none is a type mismatch. Legacy-only Prayfiles (no `compose` / `tree` / `pray` / `file:`) keep empty exports selecting all package exports.
+
+Package name prefixes are namespaces, not source handles. `source:` stays optional when only one source exists.
+
 ### agent
 
-Declares package dependency.
+Declares package dependency (legacy primary form; prefer `pray`).
 
 ```manifest
 agent "sample/webapp", "~> 2.1",
@@ -690,10 +760,12 @@ Supported options:
 
 ```
 source: :sample
+export: "name"
 exports: [...]
 targets: [...]
 features: [...]
 optional: true
+file: "SECURITY.md"
 git: "..."
 tag: "..."
 rev: "..."
@@ -716,7 +788,7 @@ end
 Rules:
 
 - A group block must use `do ... end` and may list multiple environment names separated by commas.
-- Only `agent` or `package` declarations are allowed inside a group block.
+- Only `agent`, `package`, or `pray` / `use` declarations are allowed inside a group block.
 - Nested group blocks are rejected.
 - Packages outside any group always render.
 - When no render environment is selected, only ungrouped packages render.
@@ -732,12 +804,19 @@ Includes human-owned local project context.
 ```
 local ".agents/project.md"
 local ".agents/security.md", position: :after
+local ".agents/security.md", at: :start
 local ".agents/private.md", optional: true
 ```
 
-Supported positions: `before`, `after`, `target_after`
+Inside `compose`, prefer `pray ".agents/project.md"` so order follows block declaration order.
+
+Supported positions: `before`, `after`, `target_after` (`at:` is an alias for `position:`)
 
 Default: `after`
+
+### Compatibility
+
+Stay on `prayfile "1"`. New keywords are additive. A legacy-only Prayfile keeps today’s fan-out (all unbound packages into legacy `output` / `skills` roots). When new-form destinations are present, packages bind only where `pray` appears; unbound legacy `agent` declarations still fan into legacy outputs.
 
 ### render
 
@@ -1014,9 +1093,9 @@ Supported export types:
 
 | Type | Description |
 |------|-------------|
-| fragment | Text fragment rendered into a target output file |
-| file | Single file provisioned into a target folder |
-| folder | Directory tree provisioned into a target folder |
+| fragment | Text fragment rendered into a `compose` / legacy output |
+| file | Exact file bytes via `pray …, file: "path"` (preferred) or nested under a legacy skills root |
+| folder | Directory tree provisioned into a `tree` / legacy skills root |
 | template | Reusable text artifact |
 | command | Tool-specific or generic command template |
 | rule | Tool-specific rule file |
@@ -1025,15 +1104,27 @@ Supported export types:
 
 `skill` remains a legacy alias for `folder`.
 
+Folder exports may declare `only: [...]` or `except: [...]` relative paths to provision a subset of the tree. `default_path` on a `file` export is a publisher hint only; the consumer `file:` path wins.
+
 ---
 
 ## 24. Provisioned folders
 
-A `folder` export is a directory tree copied deterministically into a target folder declared in the Prayfile.
+A `folder` export is a directory tree copied deterministically into a `tree` destination (or legacy target `skills` / `folder` root).
 
-A `file` export is a single file copied under `<target-folder>/<export-name>/`.
+A `file` export with `pray …, file: "SECURITY.md"` writes exact bytes to that path at the project root (or relative path given). Legacy fan-out without `file:` still copies under `<skills-root>/<export-name>/`.
 
 Example:
+
+```ruby
+tree ".agents/skills" do
+  pray "amkisko/engineering-audit", "~> 2.0"
+end
+
+pray "amkisko/community-security", "~> 1.0", file: "SECURITY.md"
+```
+
+Legacy equivalent:
 
 ```ruby
 target :agents do
@@ -2236,7 +2327,7 @@ pray manifest
 | plan | Computes changes to lockfile, cache, and rendered target files. |
 | apply | Materializes planned changes and refreshes managed span ideal checksums and line positions. |
 | render | Regenerates or verifies target files. Does not replace apply for lock refresh unless documented. |
-| format | Normalizes pray markers in target files. |
+| format / fmt | Rewrites Prayfile to the recommended destination DSL (`compose` / `tree` / `pray …, file:`). Also normalizes pray markers in lockfile target outputs when present. |
 | verify | Read-only check: managed span checksums, line positions, package integrity, cache, signatures. |
 | drift | Reports custom implementation, removed prayers, position drift, renderer drift, and orphan markers. |
 | package | Builds `.praypkg`. |
@@ -2494,19 +2585,31 @@ Resolution must be manifest-driven, not machine-driven.
 
 Formatting is not the product.
 
-Still, a formatter may exist: `pray format`
+Still, a formatter exists: `pray format` (alias `pray fmt`)
+
+`pray format` rewrites Prayfile to the recommended destination DSL:
+
+- `compose "path" do … end` for fragment outputs and local embeds
+- `tree "path" do … end` for folder/skill roots
+- `pray "owner/name", …, file: "path"` for whole-file exports
+- `pray` instead of legacy `agent` / `package`
+- drop empty legacy `target` wrappers that only declared `output` / `skills`
+- keep `target` blocks that still carry `commands`, `rules`, or `max_bytes`
+- keep `group` membership via `group` blocks
+
+Legacy migration classifies packages from resolved export kinds (fragment → compose, folder/skill → tree, file → `file:` using `default_path` when present). Format may resolve packages (offline first) to classify.
 
 Rules:
 
-- preserve comments where practical
-- do not reorder packages unless requested
-- use stable indentation
-- prefer one package declaration per dependency
+- prefer semantic stability over comment preservation when migrating shapes
+- use stable indentation (2 spaces inside blocks)
+- prefer one package declaration per dependency in destination blocks
 - avoid rewriting whole Prayfile for add/remove
 - append new packages at logical location
 - make lockfile canonical
+- formatting twice should be idempotent
 
-Less churn is more important than stylistic perfection.
+Less churn is more important than stylistic perfection for add/remove; `format` / `fmt` is the explicit opt-in rewrite.
 
 ---
 

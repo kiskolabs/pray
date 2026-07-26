@@ -33,25 +33,65 @@ pub struct ManifestSource {
     pub tag: Option<String>,
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
-pub struct ManifestTarget {
-    pub name: String,
-    pub outputs: Vec<String>,
-    pub skills: Vec<String>,
-    pub commands: Vec<String>,
-    pub rules: Vec<String>,
-    pub max_bytes: Option<u64>,
+#[derive(Debug, Clone, Copy, Default, Serialize, Deserialize, PartialEq, Eq)]
+#[serde(rename_all = "snake_case")]
+pub enum DestinationMode {
+    #[default]
+    Legacy,
+    Compose,
+    Tree,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
+#[serde(tag = "kind", rename_all = "snake_case")]
+pub enum DestinationEntry {
+    Package { name: String },
+    Local { path: String },
+}
+
+#[derive(Debug, Clone, Copy, Serialize, Deserialize, PartialEq, Eq)]
+#[serde(rename_all = "snake_case")]
+pub enum ExportRole {
+    Fragment,
+    Folder,
+    File,
+}
+
+#[derive(Debug, Clone, Default, Serialize, Deserialize, PartialEq, Eq)]
+pub struct ManifestTarget {
+    pub name: String,
+    #[serde(default)]
+    pub outputs: Vec<String>,
+    #[serde(default)]
+    pub skills: Vec<String>,
+    #[serde(default)]
+    pub commands: Vec<String>,
+    #[serde(default)]
+    pub rules: Vec<String>,
+    pub max_bytes: Option<u64>,
+    #[serde(default)]
+    pub mode: DestinationMode,
+    #[serde(default)]
+    pub scoped: bool,
+    #[serde(default)]
+    pub entries: Vec<DestinationEntry>,
+}
+
+#[derive(Debug, Clone, Default, Serialize, Deserialize, PartialEq, Eq)]
 pub struct ManifestPackage {
     pub name: String,
+    #[serde(default = "default_constraint")]
     pub constraint: String,
     pub source: Option<String>,
+    #[serde(default)]
     pub exports: Vec<String>,
+    #[serde(default)]
     pub targets: Vec<String>,
+    #[serde(default)]
     pub features: Vec<String>,
+    #[serde(default)]
     pub groups: Vec<String>,
+    #[serde(default)]
     pub optional: bool,
     pub path: Option<String>,
     pub git: Option<String>,
@@ -59,13 +99,31 @@ pub struct ManifestPackage {
     pub rev: Option<String>,
     pub tarball: Option<String>,
     pub oci: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub file: Option<String>,
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub roles: Vec<ExportRole>,
+    #[serde(default, skip_serializing_if = "std::ops::Not::not")]
+    pub bound: bool,
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
+fn default_constraint() -> String {
+    "*".to_string()
+}
+
+#[derive(Debug, Clone, Default, Serialize, Deserialize, PartialEq, Eq)]
 pub struct ManifestLocal {
     pub path: String,
+    #[serde(default = "default_local_position")]
     pub position: String,
+    #[serde(default)]
     pub optional: bool,
+    #[serde(default, skip_serializing_if = "std::ops::Not::not")]
+    pub bound: bool,
+}
+
+fn default_local_position() -> String {
+    "after".to_string()
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
@@ -223,13 +281,59 @@ impl<'a> BlockParser<'a> {
             return Ok(());
         }
         if let Some(rest) = statement.strip_prefix("agent ") {
-            manifest
-                .packages
-                .push(self.parse_package_with_groups(rest)?);
+            crate::destination::upsert_package(manifest, self.parse_package_with_groups(rest)?)?;
+            return Ok(());
+        }
+        if let Some(rest) = statement.strip_prefix("package ") {
+            crate::destination::upsert_package(manifest, self.parse_package_with_groups(rest)?)?;
+            return Ok(());
+        }
+        if let Some(rest) = statement
+            .strip_prefix("pray ")
+            .or_else(|| statement.strip_prefix("use "))
+            .or_else(|| statement.strip_prefix("include "))
+        {
+            self.apply_pray_statement(manifest, rest, None)?;
+            return Ok(());
+        }
+        if let Some(rest) = statement
+            .strip_prefix("compose ")
+            .or_else(|| statement.strip_prefix("output "))
+        {
+            if statement.starts_with("output ") && !statement.ends_with(" do") {
+                return Err(PrayError::Parse {
+                    kind: "manifest",
+                    message: "top-level output must use a compose block (output \"path\" do ... end)"
+                        .to_string(),
+                });
+            }
+            self.parse_destination_block(manifest, rest, DestinationMode::Compose)?;
+            return Ok(());
+        }
+        if let Some(rest) = statement
+            .strip_prefix("tree ")
+            .or_else(|| statement.strip_prefix("folder "))
+            .or_else(|| statement.strip_prefix("skills "))
+        {
+            if (statement.starts_with("folder ") || statement.starts_with("skills "))
+                && !statement.ends_with(" do")
+            {
+                return Err(PrayError::Parse {
+                    kind: "manifest",
+                    message: "top-level folder/skills must use a tree block".to_string(),
+                });
+            }
+            self.parse_destination_block(manifest, rest, DestinationMode::Tree)?;
+            return Ok(());
+        }
+        if let Some(rest) = statement.strip_prefix("file ") {
+            self.parse_file_block(manifest, rest)?;
             return Ok(());
         }
         if let Some(rest) = statement.strip_prefix("local ") {
-            manifest.local.push(parse_local_decl(rest)?);
+            let mut local = parse_local_decl(rest)?;
+            local.bound = false;
+            crate::destination::upsert_local(manifest, local);
             return Ok(());
         }
         if let Some(rest) = statement.strip_prefix("render ") {
@@ -242,27 +346,233 @@ impl<'a> BlockParser<'a> {
         })
     }
 
+    fn parse_destination_block(
+        &mut self,
+        manifest: &mut Manifest,
+        rest: &str,
+        mode: DestinationMode,
+    ) -> PrayResult<()> {
+        let is_block = rest.trim_end().ends_with("do");
+        if !is_block {
+            return Err(PrayError::Parse {
+                kind: "manifest",
+                message: format!(
+                    "{} must use a block",
+                    match mode {
+                        DestinationMode::Compose => "compose",
+                        DestinationMode::Tree => "tree",
+                        DestinationMode::Legacy => "destination",
+                    }
+                ),
+            });
+        }
+        let header = rest.trim_end_matches("do").trim();
+        let (values, _) = parse_call(header)?;
+        let path = string_from_value(values.first().ok_or_else(|| PrayError::Parse {
+            kind: "manifest",
+            message: "destination missing path".to_string(),
+        })?)?;
+        let target = crate::destination::new_destination_target(mode, &path);
+        manifest.targets.push(target);
+        let index = manifest.targets.len() - 1;
+        while let Some(statement) = self.next_statement()? {
+            if statement == "end" {
+                return Ok(());
+            }
+            if let Some(pray_rest) = statement
+                .strip_prefix("pray ")
+                .or_else(|| statement.strip_prefix("use "))
+                .or_else(|| statement.strip_prefix("include "))
+                .or_else(|| statement.strip_prefix("agent "))
+                .or_else(|| statement.strip_prefix("package "))
+            {
+                self.apply_pray_statement(manifest, pray_rest, Some(index))?;
+                continue;
+            }
+            if mode == DestinationMode::Compose {
+                if let Some(local_rest) = statement.strip_prefix("local ") {
+                    let mut local = parse_local_decl(local_rest)?;
+                    local.bound = true;
+                    crate::destination::bind_local_entry(
+                        &mut manifest.targets[index],
+                        &local.path,
+                    );
+                    crate::destination::upsert_local(manifest, local);
+                    continue;
+                }
+            }
+            return Err(PrayError::Parse {
+                kind: "manifest",
+                message: format!("unsupported statement inside destination block: {statement}"),
+            });
+        }
+        Err(PrayError::Parse {
+            kind: "manifest",
+            message: "missing 'end' for destination block".to_string(),
+        })
+    }
+
+    fn parse_file_block(&mut self, manifest: &mut Manifest, rest: &str) -> PrayResult<()> {
+        let is_block = rest.trim_end().ends_with("do");
+        if !is_block {
+            return Err(PrayError::Parse {
+                kind: "manifest",
+                message: "file must use a block (or use pray ..., file: \"path\")".to_string(),
+            });
+        }
+        let header = rest.trim_end_matches("do").trim();
+        let (values, _) = parse_call(header)?;
+        let file_path = string_from_value(values.first().ok_or_else(|| PrayError::Parse {
+            kind: "manifest",
+            message: "file block missing path".to_string(),
+        })?)?;
+        let mut saw_package = false;
+        while let Some(statement) = self.next_statement()? {
+            if statement == "end" {
+                if !saw_package {
+                    return Err(PrayError::Parse {
+                        kind: "manifest",
+                        message: "file block requires a pray package declaration".to_string(),
+                    });
+                }
+                return Ok(());
+            }
+            if let Some(pray_rest) = statement
+                .strip_prefix("pray ")
+                .or_else(|| statement.strip_prefix("use "))
+                .or_else(|| statement.strip_prefix("include "))
+                .or_else(|| statement.strip_prefix("agent "))
+                .or_else(|| statement.strip_prefix("package "))
+            {
+                let mut package = self.parse_package_with_groups(pray_rest)?;
+                if package.file.is_some() {
+                    return Err(PrayError::Parse {
+                        kind: "manifest",
+                        message: "file: keyword is invalid inside a file block".to_string(),
+                    });
+                }
+                package.file = Some(file_path.clone());
+                package.bound = true;
+                if !package.roles.contains(&ExportRole::File) {
+                    package.roles.push(ExportRole::File);
+                }
+                crate::destination::upsert_package(manifest, package)?;
+                saw_package = true;
+                continue;
+            }
+            return Err(PrayError::Parse {
+                kind: "manifest",
+                message: format!("unsupported statement inside file block: {statement}"),
+            });
+        }
+        Err(PrayError::Parse {
+            kind: "manifest",
+            message: "missing 'end' for file block".to_string(),
+        })
+    }
+
+    fn apply_pray_statement(
+        &mut self,
+        manifest: &mut Manifest,
+        rest: &str,
+        destination_index: Option<usize>,
+    ) -> PrayResult<()> {
+        let (values, keywords) = parse_call(rest)?;
+        if values.is_empty() {
+            return Err(PrayError::Parse {
+                kind: "manifest",
+                message: "pray missing package or path".to_string(),
+            });
+        }
+        let first = string_from_value(&values[0])?;
+        let has_package_signal = values.len() > 1
+            || keywords.contains_key("source")
+            || keywords.contains_key("export")
+            || keywords.contains_key("exports")
+            || keywords.contains_key("file")
+            || keywords.contains_key("optional")
+            || keywords.contains_key("path")
+            || keywords.contains_key("git")
+            || keywords.contains_key("tag")
+            || keywords.contains_key("rev")
+            || keywords.contains_key("tarball")
+            || keywords.contains_key("oci")
+            || keywords.contains_key("targets")
+            || keywords.contains_key("features");
+
+        let in_compose = destination_index.is_some_and(|index| {
+            manifest
+                .targets
+                .get(index)
+                .is_some_and(|target| target.mode == DestinationMode::Compose)
+        });
+
+        if !has_package_signal && crate::destination::is_local_path_form(&first) {
+            if !in_compose {
+                return Err(PrayError::Parse {
+                    kind: "manifest",
+                    message: "local pray paths are only valid inside compose blocks".to_string(),
+                });
+            }
+            let local = ManifestLocal {
+                path: first,
+                position: "after".to_string(),
+                optional: false,
+                bound: true,
+            };
+            if let Some(index) = destination_index {
+                crate::destination::bind_local_entry(&mut manifest.targets[index], &local.path);
+            }
+            crate::destination::upsert_local(manifest, local);
+            return Ok(());
+        }
+
+        let mut package = parse_package_decl(rest)?;
+        package.groups = self.group_stack.last().cloned().unwrap_or_default();
+        if package.file.is_some() {
+            if destination_index.is_some() {
+                return Err(PrayError::Parse {
+                    kind: "manifest",
+                    message: "file: is mutually exclusive with compose/tree nesting".to_string(),
+                });
+            }
+            package.bound = true;
+            if !package.roles.contains(&ExportRole::File) {
+                package.roles.push(ExportRole::File);
+            }
+        }
+        if let Some(index) = destination_index {
+            let mode = manifest.targets[index].mode;
+            package.bound = true;
+            if let Some(role) = crate::destination::role_for_destination(mode) {
+                if !package.roles.contains(&role) {
+                    package.roles.push(role);
+                }
+            }
+            crate::destination::bind_package_entry(&mut manifest.targets[index], &package.name);
+        }
+        crate::destination::upsert_package(manifest, package)?;
+        Ok(())
+    }
+
     fn parse_group_block(&mut self, manifest: &mut Manifest) -> PrayResult<()> {
         while let Some(statement) = self.next_statement()? {
             if statement == "end" {
                 return Ok(());
             }
-            if let Some(rest) = statement.strip_prefix("agent ") {
-                manifest
-                    .packages
-                    .push(self.parse_package_with_groups(rest)?);
-                continue;
-            }
-            if let Some(rest) = statement.strip_prefix("package ") {
-                manifest
-                    .packages
-                    .push(self.parse_package_with_groups(rest)?);
+            if let Some(rest) = statement
+                .strip_prefix("agent ")
+                .or_else(|| statement.strip_prefix("package "))
+                .or_else(|| statement.strip_prefix("pray "))
+                .or_else(|| statement.strip_prefix("use "))
+            {
+                crate::destination::upsert_package(manifest, self.parse_package_with_groups(rest)?)?;
                 continue;
             }
             return Err(PrayError::Parse {
                 kind: "manifest",
                 message: format!(
-                    "group blocks only support agent or package declarations: {statement}"
+                    "group blocks only support agent, package, or pray declarations: {statement}"
                 ),
             });
         }
@@ -403,6 +713,9 @@ fn parse_target_header(rest: &str) -> PrayResult<(ManifestTarget, bool)> {
             .get("max_bytes")
             .and_then(|value| value.as_integer())
             .map(|value| value as u64),
+        mode: DestinationMode::Legacy,
+        scoped: false,
+        entries: Vec::new(),
     };
     Ok((target, is_block))
 }
@@ -438,6 +751,20 @@ fn parse_package_decl(rest: &str) -> PrayResult<ManifestPackage> {
     } else {
         "*".to_string()
     };
+    let mut exports = keyword_array(&keywords, "exports");
+    if let Some(export) = keywords.get("export").and_then(|value| value.as_string()) {
+        if !exports.contains(&export.to_string()) {
+            exports.push(export.to_string());
+        }
+    }
+    let mut roles = Vec::new();
+    let file = keywords
+        .get("file")
+        .and_then(|value| value.as_string())
+        .map(str::to_string);
+    if file.is_some() {
+        roles.push(ExportRole::File);
+    }
     Ok(ManifestPackage {
         name,
         constraint,
@@ -445,7 +772,7 @@ fn parse_package_decl(rest: &str) -> PrayResult<ManifestPackage> {
             .get("source")
             .and_then(|value| value.as_string())
             .map(str::to_string),
-        exports: keyword_array(&keywords, "exports"),
+        exports,
         targets: keyword_array(&keywords, "targets"),
         features: keyword_array(&keywords, "features"),
         groups: Vec::new(),
@@ -477,6 +804,9 @@ fn parse_package_decl(rest: &str) -> PrayResult<ManifestPackage> {
             .get("oci")
             .and_then(|value| value.as_string())
             .map(str::to_string),
+        file,
+        roles,
+        bound: false,
     })
 }
 
@@ -486,17 +816,20 @@ fn parse_local_decl(rest: &str) -> PrayResult<ManifestLocal> {
         kind: "manifest",
         message: "local missing path".to_string(),
     })?)?;
+    let position = keywords
+        .get("position")
+        .or_else(|| keywords.get("at"))
+        .and_then(|value| value.as_string())
+        .unwrap_or("after")
+        .to_string();
     Ok(ManifestLocal {
         path,
-        position: keywords
-            .get("position")
-            .and_then(|value| value.as_string())
-            .unwrap_or("after")
-            .to_string(),
+        position,
         optional: keywords
             .get("optional")
             .and_then(|value| value.as_bool())
             .unwrap_or(false),
+        bound: false,
     })
 }
 
@@ -624,7 +957,7 @@ fn apply_target_statement(target: &mut ManifestTarget, statement: String) -> Pra
 }
 
 pub fn format_package_declaration(package: &ManifestPackage) -> String {
-    let mut parts = vec![format!("agent \"{}\"", package.name)];
+    let mut parts = vec![format!("pray \"{}\"", package.name)];
     if package.constraint != "*" {
         parts.push(format!("\"{}\"", package.constraint));
     }
@@ -649,11 +982,18 @@ pub fn format_package_declaration(package: &ManifestPackage) -> String {
     if let Some(oci) = &package.oci {
         parts.push(format!("oci: \"{oci}\""));
     }
+    if let Some(file) = &package.file {
+        parts.push(format!("file: \"{file}\""));
+    }
     if !package.exports.is_empty() {
-        parts.push(format!(
-            "exports: [{}]",
-            format_string_keyword_list(&package.exports)
-        ));
+        if package.exports.len() == 1 {
+            parts.push(format!("export: \"{}\"", package.exports[0]));
+        } else {
+            parts.push(format!(
+                "exports: [{}]",
+                format_string_keyword_list(&package.exports)
+            ));
+        }
     }
     if !package.targets.is_empty() {
         parts.push(format!(
@@ -675,14 +1015,24 @@ pub fn format_package_declaration(package: &ManifestPackage) -> String {
 
 pub fn replace_package_declaration(text: &str, package: &ManifestPackage) -> PrayResult<String> {
     let name = &package.name;
-    let package_prefix = format!("agent \"{name}\"");
-    let alternate_prefix = format!("agent '{name}'");
+    let prefixes = [
+        format!("pray \"{name}\""),
+        format!("pray '{name}'"),
+        format!("use \"{name}\""),
+        format!("include \"{name}\""),
+        format!("agent \"{name}\""),
+        format!("agent '{name}'"),
+        format!("package \"{name}\""),
+        format!("package '{name}'"),
+    ];
     let mut lines: Vec<String> = text.lines().map(|line| line.to_string()).collect();
     let index = lines
         .iter()
         .position(|line| {
             let trimmed = line.trim_start();
-            trimmed.starts_with(&package_prefix) || trimmed.starts_with(&alternate_prefix)
+            prefixes
+                .iter()
+                .any(|prefix| trimmed.starts_with(prefix.as_str()))
         })
         .ok_or_else(|| PrayError::Manifest(format!("package {name} not found in manifest")))?;
     lines[index] = format_package_declaration(package);

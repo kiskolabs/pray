@@ -68,19 +68,8 @@ mod tests {
     fn package_with_groups(groups: &[&str]) -> ManifestPackage {
         ManifestPackage {
             name: "sample/base".to_string(),
-            constraint: "*".to_string(),
-            source: None,
-            exports: Vec::new(),
-            targets: Vec::new(),
-            features: Vec::new(),
             groups: groups.iter().map(|group| (*group).to_string()).collect(),
-            optional: false,
-            path: None,
-            git: None,
-            tag: None,
-            rev: None,
-            tarball: None,
-            oci: None,
+            ..ManifestPackage::default()
         }
     }
 
