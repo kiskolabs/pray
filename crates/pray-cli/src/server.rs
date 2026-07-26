@@ -1,23 +1,29 @@
-use crate::transport_metadata::transport_package_metadata;
-use pray_core::auth::{
-    AuthPasskeyChallengeRequest, AuthPasskeyChallengeResponse, AuthPasskeyEnrollmentRequest,
-    AuthPasskeyEnrollmentResponse, AuthPasskeyLoginRequest, AuthPasskeyLoginResponse,
-    AuthRegistrationRequest, AuthRegistrationResponse, AuthSessionKind, AuthSessionRequest,
-    AuthSessionResponse, AuthSshKeyChallengeRequest, AuthSshKeyChallengeResponse,
-    AuthSshKeyEnrollmentRequest, AuthSshKeyEnrollmentResponse, AuthSshKeyLoginRequest,
-    AuthSshKeyLoginResponse, AuthVerificationRequest, AuthVerificationResponse, RegistryAuthStore,
+use crate::server_auth::{
+    auth_passkey_challenge_response, auth_passkey_enroll_response, auth_passkey_login_response,
+    auth_register_response, auth_session_response, auth_ssh_key_challenge_response,
+    auth_ssh_key_enroll_response, auth_ssh_key_login_response, auth_verify_response,
 };
+use crate::server_federation::{
+    federation_discovery_response, federation_index_response_since, federation_package_response,
+    federation_push_response,
+};
+use crate::server_html::{html_package_response, html_root_response};
+use crate::server_http::{
+    decode_rpc_base64_body, http_response_to_rpc, http_to_rpc_request, rpc_response_to_http,
+    strip_query, write_response,
+};
+
+pub(crate) use crate::server_http::{response_with_status, Response};
 use pray_core::derived_metadata::derive_registry_derived_metadata_from_archive_bytes;
 use pray_core::registry::{
     ConfessionSubmission, RegistryIndex, RegistryPackageMetadata, RegistryPackageVersion,
 };
-use pray_core::ssh_publishers::authorize_ssh_push;
+use pray_core::push_auth::authorize_distribution_push;
 use pray_core::ssh_rpc::{RpcRequest, RpcResponse, SSH_RPC_SPEC};
-use pray_core::trust::read_registry_trust_settings;
 use pray_core::{PrayError, PrayResult};
 use pray_transport::{
-    FederationInfo, IndexResponse, PackageMetadata as TransportPackageMetadata, PackageSummary,
-    PackageVersion, PeerInfo, ServerInfo, SyncEndpoints,
+    PackageMetadata as TransportPackageMetadata,
+    PackageVersion, PeerInfo,
 };
 use std::collections::BTreeSet;
 use std::fs;
@@ -26,14 +32,46 @@ use std::net::{TcpListener, TcpStream};
 use std::path::{Component, Path, PathBuf};
 use std::thread;
 
-pub fn run_server(root: PathBuf, host: String, port: u16) -> PrayResult<()> {
+#[derive(Debug, Clone)]
+pub struct ServeAuth {
+    pub bind_host: String,
+    pub allow_open_push: bool,
+    pub stdio_mode: bool,
+}
+
+impl ServeAuth {
+    pub fn http(bind_host: impl Into<String>, allow_open_push: bool) -> Self {
+        Self {
+            bind_host: bind_host.into(),
+            allow_open_push,
+            stdio_mode: false,
+        }
+    }
+
+    pub fn stdio() -> Self {
+        Self {
+            bind_host: "stdio".to_string(),
+            allow_open_push: false,
+            stdio_mode: true,
+        }
+    }
+}
+
+pub fn run_server(
+    root: PathBuf,
+    host: String,
+    port: u16,
+    allow_open_push: bool,
+) -> PrayResult<()> {
     let listener = TcpListener::bind((host.as_str(), port))?;
     println!("Serving {} on http://{}:{}", root.display(), host, port);
+    let auth = ServeAuth::http(host, allow_open_push);
     for connection in listener.incoming() {
         let stream = connection?;
         let root = root.clone();
+        let auth = auth.clone();
         thread::spawn(move || {
-            if let Err(error) = handle_connection(root, stream) {
+            if let Err(error) = handle_connection(root, auth, stream) {
                 eprintln!("serve error: {error}");
             }
         });
@@ -41,7 +79,7 @@ pub fn run_server(root: PathBuf, host: String, port: u16) -> PrayResult<()> {
     Ok(())
 }
 
-fn handle_connection(root: PathBuf, mut stream: TcpStream) -> PrayResult<()> {
+fn handle_connection(root: PathBuf, auth: ServeAuth, mut stream: TcpStream) -> PrayResult<()> {
     let mut reader = BufReader::new(stream.try_clone()?);
     let mut request_line = String::new();
     if reader.read_line(&mut request_line)? == 0 {
@@ -82,7 +120,7 @@ fn handle_connection(root: PathBuf, mut stream: TcpStream) -> PrayResult<()> {
         reader.read_exact(&mut body)?;
     }
 
-    let response = dispatch_http_request(&root, method, path, &body)?;
+    let response = dispatch_http_request(&root, &auth, method, path, &body)?;
 
     write_response(
         &mut stream,
@@ -93,14 +131,15 @@ fn handle_connection(root: PathBuf, mut stream: TcpStream) -> PrayResult<()> {
     Ok(())
 }
 
-fn dispatch_http_request(
+pub(crate) fn dispatch_http_request(
     root: &Path,
+    auth: &ServeAuth,
     method: &str,
     path: &str,
     body: &[u8],
 ) -> PrayResult<Response> {
     if let Some(rpc_request) = http_to_rpc_request(method, path, body)? {
-        let rpc_response = match handle_rpc(root, &rpc_request) {
+        let rpc_response = match handle_rpc(root, auth, &rpc_request) {
             Ok(response) => response,
             Err(error) => RpcResponse::error(&rpc_request.id, 500, error.to_string()),
         };
@@ -118,265 +157,7 @@ fn dispatch_http_request(
     }
 }
 
-fn http_to_rpc_request(method: &str, path: &str, body: &[u8]) -> PrayResult<Option<RpcRequest>> {
-    use base64::{engine::general_purpose::STANDARD, Engine as _};
-    use serde_json::json;
-
-    let request_path = strip_query(path);
-    let request_id = "http";
-
-    let request = match (method, request_path) {
-        ("GET", "/.well-known/pray-federation.json") => {
-            RpcRequest::new(request_id, "federation.discovery", json!({}))
-        }
-        ("GET", "/v1/sync/index") => {
-            let mut params = json!({});
-            if let Some(since) =
-                query_parameter(path, "since").and_then(|value| value.parse::<i64>().ok())
-            {
-                params["since"] = json!(since);
-            }
-            RpcRequest::new(request_id, "sync.index", params)
-        }
-        ("GET", path) if path.starts_with("/v1/sync/package/") => {
-            let package_name = path.trim_start_matches("/v1/sync/package/");
-            RpcRequest::new(request_id, "sync.package", json!({ "name": package_name }))
-        }
-        ("POST", "/v1/sync/push") => {
-            let metadata: serde_json::Value =
-                serde_json::from_slice(body).map_err(|error| PrayError::Parse {
-                    kind: "federation package metadata",
-                    message: error.to_string(),
-                })?;
-            RpcRequest::new(request_id, "sync.push", json!({ "metadata": metadata }))
-        }
-        ("PUT", path) if path.starts_with("/v1/artifacts/") => RpcRequest::new(
-            request_id,
-            "artifact.put",
-            json!({
-                "path": path.trim_start_matches('/'),
-                "body": STANDARD.encode(body),
-            }),
-        ),
-        ("POST", "/v1/confessions") => {
-            rpc_request_with_json_field(request_id, "confession.submit", "confession", body)?
-        }
-        ("POST", "/v1/auth/register") => {
-            rpc_request_with_json_field(request_id, "auth.register", "request", body)?
-        }
-        ("POST", "/v1/auth/verify") => {
-            rpc_request_with_json_field(request_id, "auth.verify", "request", body)?
-        }
-        ("POST", "/v1/auth/session") => {
-            rpc_request_with_json_field(request_id, "auth.session", "request", body)?
-        }
-        ("POST", "/v1/auth/passkeys/challenge") => {
-            rpc_request_with_json_field(request_id, "auth.passkeys.challenge", "request", body)?
-        }
-        ("POST", "/v1/auth/passkeys/login") => {
-            rpc_request_with_json_field(request_id, "auth.passkeys.login", "request", body)?
-        }
-        ("POST", "/v1/auth/passkeys/enroll") => {
-            rpc_request_with_json_field(request_id, "auth.passkeys.enroll", "request", body)?
-        }
-        ("POST", "/v1/auth/ssh-keys/challenge") => {
-            rpc_request_with_json_field(request_id, "auth.ssh_keys.challenge", "request", body)?
-        }
-        ("POST", "/v1/auth/ssh-keys/login") => {
-            rpc_request_with_json_field(request_id, "auth.ssh_keys.login", "request", body)?
-        }
-        ("POST", "/v1/auth/ssh-keys/enroll") => {
-            rpc_request_with_json_field(request_id, "auth.ssh_keys.enroll", "request", body)?
-        }
-        ("GET", "/") => return Ok(None),
-        ("GET", path) if path.starts_with("/packages/") => return Ok(None),
-        ("GET", path) => RpcRequest::new(
-            request_id,
-            "artifact.get",
-            json!({ "path": path.trim_start_matches('/') }),
-        ),
-        _ => return Ok(None),
-    };
-
-    Ok(Some(request))
-}
-
-fn rpc_request_with_json_field(
-    request_id: &str,
-    method: &str,
-    field_name: &str,
-    body: &[u8],
-) -> PrayResult<RpcRequest> {
-    let value: serde_json::Value =
-        serde_json::from_slice(body).map_err(|error| PrayError::Parse {
-            kind: "request body",
-            message: error.to_string(),
-        })?;
-    Ok(RpcRequest::new(
-        request_id,
-        method,
-        serde_json::json!({ field_name: value }),
-    ))
-}
-
-fn rpc_response_to_http(response: &RpcResponse) -> Response {
-    use base64::{engine::general_purpose::STANDARD, Engine as _};
-
-    let body = if response.body_encoding.as_deref() == Some("base64") {
-        response
-            .body
-            .as_str()
-            .map(|encoded| STANDARD.decode(encoded).unwrap_or_default())
-            .unwrap_or_default()
-    } else if response.content_type.starts_with("application/json") {
-        serde_json::to_vec(&response.body)
-            .unwrap_or_else(|_| response.body.to_string().into_bytes())
-    } else if let Some(text) = response.body.as_str() {
-        text.as_bytes().to_vec()
-    } else {
-        response.body.to_string().into_bytes()
-    };
-
-    Response {
-        status: response.status,
-        content_type: response.content_type.clone(),
-        body,
-    }
-}
-
-struct Response {
-    status: u16,
-    content_type: String,
-    body: Vec<u8>,
-}
-
-fn html_root_response(root: &Path) -> PrayResult<Response> {
-    let index = read_registry_index(root)?;
-    let trust = read_registry_trust_settings(root)?;
-    let mut list_items = String::new();
-    for package in index.packages {
-        list_items.push_str(&format!(
-            "<li><a href=\"/packages/{path}\">{package}</a></li>",
-            path = html_escape(&package)
-        ));
-    }
-    let body = format!(
-        "<!doctype html><html><head><meta charset=\"utf-8\"><title>Pray distribution point</title></head><body><h1>Pray distribution point</h1><p>Spec: {spec}</p><p>Email confirmation: {email}</p><p>Passkeys: {passkeys}</p><p>SSH keys: {ssh_keys}</p><p>SSH-agent signing: {ssh_agent}</p><ul>{packages}</ul></body></html>",
-        spec = html_escape(&index.spec),
-        email = trust.email_confirmation_label(),
-        passkeys = trust.passkeys_label(),
-        ssh_keys = trust.ssh_keys_label(),
-        ssh_agent = trust.ssh_agent_label(),
-        packages = list_items,
-    );
-    Ok(Response {
-        status: 200,
-        content_type: "text/html; charset=utf-8".to_string(),
-        body: body.into_bytes(),
-    })
-}
-
-fn federation_discovery_response(root: &Path) -> PrayResult<Response> {
-    let discovery = FederationInfo {
-        spec: "pray-federation-v1".to_string(),
-        server: ServerInfo {
-            name: "pray".to_string(),
-            version: env!("CARGO_PKG_VERSION").to_string(),
-            capabilities: vec!["static_registry".to_string(), "federation".to_string()],
-        },
-        sync: SyncEndpoints {
-            index_url: "/v1/sync/index".to_string(),
-            package_url: "/v1/sync/package/{name}".to_string(),
-            artifact_url: "/v1/artifacts/{package}/{version}/{artifact}".to_string(),
-            since_param: "since".to_string(),
-        },
-        peers: read_known_peers(root)?,
-    };
-    Ok(Response {
-        status: 200,
-        content_type: "application/json".to_string(),
-        body: serde_json::to_vec_pretty(&discovery)
-            .map_err(|error| PrayError::Manifest(error.to_string()))?,
-    })
-}
-
-fn federation_index_response_since(root: &Path, since: Option<u64>) -> PrayResult<Response> {
-    let index = read_registry_index(root)?;
-    let mut packages = Vec::new();
-    let mut sync_version = 0u64;
-
-    for package_name in index.packages {
-        let Ok(metadata) = read_registry_package_metadata(root, &package_name) else {
-            continue;
-        };
-        let updated_at = latest_publish_timestamp(&metadata)
-            .map(|timestamp| timestamp.to_string())
-            .unwrap_or_else(|| "0".to_string());
-        let updated_at_value = updated_at.parse::<u64>().unwrap_or(0);
-        sync_version = sync_version.max(updated_at_value);
-        if since.is_some_and(|since| updated_at_value <= since) {
-            continue;
-        }
-        packages.push(PackageSummary {
-            name: package_name.clone(),
-            updated_at,
-            url: format!("/v1/sync/package/{package_name}"),
-        });
-    }
-
-    let body = IndexResponse {
-        spec: "prayfile-distribution-1".to_string(),
-        sync_version: sync_version as i64,
-        packages,
-    };
-
-    Ok(Response {
-        status: 200,
-        content_type: "application/json".to_string(),
-        body: serde_json::to_vec_pretty(&body)
-            .map_err(|error| PrayError::Manifest(error.to_string()))?,
-    })
-}
-
-fn federation_package_response(root: &Path, path: &str) -> PrayResult<Response> {
-    let package_name = path.trim_start_matches("/v1/sync/package/");
-    let metadata = read_registry_package_metadata(root, package_name)?;
-    let body = transport_package_metadata(&metadata);
-    Ok(Response {
-        status: 200,
-        content_type: "application/json".to_string(),
-        body: serde_json::to_vec_pretty(&body)
-            .map_err(|error| PrayError::Manifest(error.to_string()))?,
-    })
-}
-
-fn federation_push_response(root: &Path, body: &[u8]) -> PrayResult<Response> {
-    if std::env::var("PRAY_SERVE_STDIO").is_ok() {
-        authorize_ssh_push(root)?;
-    }
-    let incoming: TransportPackageMetadata =
-        serde_json::from_slice(body).map_err(|error| PrayError::Parse {
-            kind: "federation package metadata",
-            message: error.to_string(),
-        })?;
-    let registry_metadata = registry_package_metadata_from_transport(&incoming)?;
-    let mut merged_metadata = merge_registry_package_metadata(root, registry_metadata)?;
-    ensure_derived_metadata(root, &mut merged_metadata)?;
-    let metadata_path = registry_metadata_path(root, &merged_metadata.name);
-    write_registry_package_metadata(&metadata_path, &merged_metadata)?;
-    update_registry_index_with_package(root, &merged_metadata.name)?;
-    Ok(Response {
-        status: 201,
-        content_type: "application/json".to_string(),
-        body: serde_json::to_vec_pretty(&serde_json::json!({
-            "status": "ok",
-            "package": merged_metadata.name,
-        }))
-        .map_err(|error| PrayError::Manifest(error.to_string()))?,
-    })
-}
-
-fn ensure_derived_metadata(root: &Path, metadata: &mut RegistryPackageMetadata) -> PrayResult<()> {
+pub(crate) fn ensure_derived_metadata(root: &Path, metadata: &mut RegistryPackageMetadata) -> PrayResult<()> {
     for version in &mut metadata.versions {
         if version.derived_metadata.is_some() {
             continue;
@@ -399,7 +180,7 @@ fn ensure_derived_metadata(root: &Path, metadata: &mut RegistryPackageMetadata) 
     Ok(())
 }
 
-fn read_registry_package_metadata(
+pub(crate) fn read_registry_package_metadata(
     root: &Path,
     package_name: &str,
 ) -> PrayResult<RegistryPackageMetadata> {
@@ -425,7 +206,7 @@ fn read_registry_package_metadata(
     Ok(metadata)
 }
 
-fn write_registry_package_metadata(
+pub(crate) fn write_registry_package_metadata(
     path: &Path,
     metadata: &RegistryPackageMetadata,
 ) -> PrayResult<()> {
@@ -440,13 +221,13 @@ fn write_registry_package_metadata(
     Ok(())
 }
 
-fn registry_metadata_path(root: &Path, package_name: &str) -> PathBuf {
+pub(crate) fn registry_metadata_path(root: &Path, package_name: &str) -> PathBuf {
     root.join("v1/packages")
         .join(package_name)
         .with_extension("json")
 }
 
-fn read_known_peers(root: &Path) -> PrayResult<Vec<PeerInfo>> {
+pub(crate) fn read_known_peers(root: &Path) -> PrayResult<Vec<PeerInfo>> {
     let path = root.join("v1/peers.json");
     let text = match fs::read_to_string(&path) {
         Ok(text) => text,
@@ -467,7 +248,7 @@ fn read_known_peers(root: &Path) -> PrayResult<Vec<PeerInfo>> {
     Ok(peers)
 }
 
-fn latest_publish_timestamp(metadata: &RegistryPackageMetadata) -> Option<u64> {
+pub(crate) fn latest_publish_timestamp(metadata: &RegistryPackageMetadata) -> Option<u64> {
     metadata
         .versions
         .iter()
@@ -476,7 +257,7 @@ fn latest_publish_timestamp(metadata: &RegistryPackageMetadata) -> Option<u64> {
         .max()
 }
 
-fn registry_package_metadata_from_transport(
+pub(crate) fn registry_package_metadata_from_transport(
     metadata: &TransportPackageMetadata,
 ) -> PrayResult<RegistryPackageMetadata> {
     if metadata.name.trim().is_empty() {
@@ -504,7 +285,7 @@ fn registry_package_metadata_from_transport(
     })
 }
 
-fn registry_package_version_from_transport(
+pub(crate) fn registry_package_version_from_transport(
     version: &PackageVersion,
 ) -> PrayResult<RegistryPackageVersion> {
     if version.version.trim().is_empty() {
@@ -562,13 +343,18 @@ fn registry_package_version_from_transport(
         exports: version.exports.clone(),
         signer,
         signer_fingerprint,
+        signer_public_key: version
+            .signature
+            .as_ref()
+            .map(|value| value.public_key.clone())
+            .and_then(|value| empty_string_to_none(&value)),
         published_at,
         signature,
         derived_metadata: version.derived_metadata.clone(),
     })
 }
 
-fn merge_registry_package_metadata(
+pub(crate) fn merge_registry_package_metadata(
     root: &Path,
     incoming: RegistryPackageMetadata,
 ) -> PrayResult<RegistryPackageMetadata> {
@@ -594,7 +380,7 @@ fn merge_registry_package_metadata(
     Ok(current)
 }
 
-fn read_or_create_registry_package_metadata(
+pub(crate) fn read_or_create_registry_package_metadata(
     root: &Path,
     package_name: &str,
 ) -> PrayResult<RegistryPackageMetadata> {
@@ -612,7 +398,7 @@ fn read_or_create_registry_package_metadata(
     }
 }
 
-fn update_registry_index_with_package(root: &Path, package_name: &str) -> PrayResult<()> {
+pub(crate) fn update_registry_index_with_package(root: &Path, package_name: &str) -> PrayResult<()> {
     let mut index = read_or_create_registry_index(root)?;
     if index.spec.trim().is_empty() {
         index.spec = "prayfile-distribution-1".to_string();
@@ -663,91 +449,6 @@ fn empty_string_to_none(value: &str) -> Option<String> {
     }
 }
 
-fn html_package_response(root: &Path, path: &str) -> PrayResult<Response> {
-    let package_name = path.trim_start_matches("/packages/");
-    let metadata_path = root
-        .join("v1/packages")
-        .join(package_name)
-        .with_extension("json");
-    let metadata_text = fs::read_to_string(&metadata_path).map_err(|error| {
-        if error.kind() == std::io::ErrorKind::NotFound {
-            PrayError::Resolution(format!("package metadata not found: {}", package_name))
-        } else {
-            PrayError::from(error)
-        }
-    })?;
-    let metadata: RegistryPackageMetadata =
-        serde_json::from_str(&metadata_text).map_err(|error| PrayError::Parse {
-            kind: "registry metadata",
-            message: error.to_string(),
-        })?;
-    let confessions = read_confessions(root, package_name)?;
-    let body = render_package_page(package_name, &metadata, &confessions);
-    Ok(Response {
-        status: 200,
-        content_type: "text/html; charset=utf-8".to_string(),
-        body: body.into_bytes(),
-    })
-}
-
-fn render_package_page(
-    package_name: &str,
-    metadata: &RegistryPackageMetadata,
-    confessions: &[ConfessionSubmission],
-) -> String {
-    let mut versions = String::new();
-    for version in &metadata.versions {
-        let mut details = String::new();
-        if let Some(signer) = version.signer.as_ref() {
-            details.push_str(&format!("<div>Signer: {}</div>", html_escape(signer)));
-        }
-        if let Some(signature) = version.signature.as_ref() {
-            details.push_str(&format!("<div>Signature: {}</div>", html_escape(signature)));
-        }
-        if let Some(published_at) = version.published_at.as_ref() {
-            details.push_str(&format!(
-                "<div>Published at: {}</div>",
-                html_escape(published_at)
-            ));
-        }
-        versions.push_str(&format!(
-            "<li><a href=\"/{artifact}\">{version}</a>{details}</li>",
-            artifact = html_escape(&version.artifact),
-            version = html_escape(&version.version),
-            details = details,
-        ));
-    }
-    let accepted = confessions
-        .iter()
-        .filter(|entry| entry.status == "accepted")
-        .count();
-    let rejected = confessions
-        .iter()
-        .filter(|entry| entry.status == "rejected")
-        .count();
-    let mut confession_items = String::new();
-    for confession in confessions {
-        confession_items.push_str(&format!(
-            "<li><strong>{}</strong> {}{}</li>",
-            html_escape(confession.status.as_str()),
-            html_escape(confession.version.as_str()),
-            confession
-                .note
-                .as_ref()
-                .map(|note| format!(": {}", html_escape(note)))
-                .unwrap_or_default()
-        ));
-    }
-    format!(
-        "<!doctype html><html><head><meta charset=\"utf-8\"><title>{package}</title></head><body><h1>{package}</h1><p>Accepted: {accepted}</p><p>Rejected: {rejected}</p><h2>Versions</h2><ul>{versions}</ul><h2>Confessions</h2><ul>{confession_items}</ul></body></html>",
-        package = html_escape(package_name),
-        accepted = accepted,
-        rejected = rejected,
-        versions = versions,
-        confession_items = confession_items,
-    )
-}
-
 fn confession_response(root: &Path, body: &[u8]) -> PrayResult<Response> {
     let confession: ConfessionSubmission =
         serde_json::from_slice(body).map_err(|error| PrayError::Parse {
@@ -778,10 +479,18 @@ fn confession_response(root: &Path, body: &[u8]) -> PrayResult<Response> {
     })
 }
 
-fn artifact_upload_response(root: &Path, path: &str, body: &[u8]) -> PrayResult<Response> {
-    if std::env::var("PRAY_SERVE_STDIO").is_ok() {
-        authorize_ssh_push(root)?;
-    }
+fn artifact_upload_response(
+    root: &Path,
+    auth: &ServeAuth,
+    path: &str,
+    body: &[u8],
+) -> PrayResult<Response> {
+    authorize_distribution_push(
+        root,
+        &auth.bind_host,
+        auth.allow_open_push,
+        auth.stdio_mode,
+    )?;
     let relative_path = sanitize_request_path(path)?;
     let artifact_path = root.join(relative_path);
     if let Some(parent) = artifact_path.parent() {
@@ -800,180 +509,14 @@ fn artifact_upload_response(root: &Path, path: &str, body: &[u8]) -> PrayResult<
     })
 }
 
-fn auth_register_response(root: &Path, body: &[u8]) -> PrayResult<Response> {
-    let request: AuthRegistrationRequest =
-        serde_json::from_slice(body).map_err(|error| PrayError::Parse {
-            kind: "auth registration",
-            message: error.to_string(),
-        })?;
-    let trust = read_registry_trust_settings(root)?;
-    let store = RegistryAuthStore::open(root)?;
-    let response: AuthRegistrationResponse =
-        store.register_email(&request.email, trust.email_confirmation)?;
-    let body =
-        serde_json::to_vec(&response).map_err(|error| PrayError::Manifest(error.to_string()))?;
-    Ok(Response {
-        status: 201,
-        content_type: "application/json".to_string(),
-        body,
-    })
-}
 
-fn auth_verify_response(root: &Path, body: &[u8]) -> PrayResult<Response> {
-    let request: AuthVerificationRequest =
-        serde_json::from_slice(body).map_err(|error| PrayError::Parse {
-            kind: "auth verification",
-            message: error.to_string(),
-        })?;
-    let store = RegistryAuthStore::open(root)?;
-    let response: AuthVerificationResponse = store.verify_email(&request.email, &request.code)?;
-    let body =
-        serde_json::to_vec(&response).map_err(|error| PrayError::Manifest(error.to_string()))?;
-    Ok(Response {
-        status: 200,
-        content_type: "application/json".to_string(),
-        body,
-    })
-}
 
-fn auth_session_response(root: &Path, body: &[u8]) -> PrayResult<Response> {
-    let request: AuthSessionRequest =
-        serde_json::from_slice(body).map_err(|error| PrayError::Parse {
-            kind: "auth session",
-            message: error.to_string(),
-        })?;
-    let store = RegistryAuthStore::open(root)?;
-    let response: AuthSessionResponse =
-        store.issue_session(&request.email, AuthSessionKind::Email)?;
-    let body =
-        serde_json::to_vec(&response).map_err(|error| PrayError::Manifest(error.to_string()))?;
-    Ok(Response {
-        status: 200,
-        content_type: "application/json".to_string(),
-        body,
-    })
-}
 
-fn auth_passkey_enroll_response(root: &Path, body: &[u8]) -> PrayResult<Response> {
-    let request: AuthPasskeyEnrollmentRequest =
-        serde_json::from_slice(body).map_err(|error| PrayError::Parse {
-            kind: "auth passkey enrollment",
-            message: error.to_string(),
-        })?;
-    let store = RegistryAuthStore::open(root)?;
-    let response: AuthPasskeyEnrollmentResponse = store.enroll_passkey(
-        &request.email,
-        &request.credential_id,
-        &request.public_key,
-        request.label.as_deref(),
-    )?;
-    let body =
-        serde_json::to_vec(&response).map_err(|error| PrayError::Manifest(error.to_string()))?;
-    Ok(Response {
-        status: 201,
-        content_type: "application/json".to_string(),
-        body,
-    })
-}
 
-fn auth_passkey_challenge_response(root: &Path, body: &[u8]) -> PrayResult<Response> {
-    let request: AuthPasskeyChallengeRequest =
-        serde_json::from_slice(body).map_err(|error| PrayError::Parse {
-            kind: "auth passkey challenge",
-            message: error.to_string(),
-        })?;
-    let store = RegistryAuthStore::open(root)?;
-    let response: AuthPasskeyChallengeResponse =
-        store.request_passkey_challenge(&request.credential_id)?;
-    let body =
-        serde_json::to_vec(&response).map_err(|error| PrayError::Manifest(error.to_string()))?;
-    Ok(Response {
-        status: 200,
-        content_type: "application/json".to_string(),
-        body,
-    })
-}
 
-fn auth_passkey_login_response(root: &Path, body: &[u8]) -> PrayResult<Response> {
-    let request: AuthPasskeyLoginRequest =
-        serde_json::from_slice(body).map_err(|error| PrayError::Parse {
-            kind: "auth passkey login",
-            message: error.to_string(),
-        })?;
-    let store = RegistryAuthStore::open(root)?;
-    let response: AuthPasskeyLoginResponse = store.respond_passkey_challenge(
-        &request.credential_id,
-        &request.challenge_id,
-        &request.signature,
-    )?;
-    let body =
-        serde_json::to_vec(&response).map_err(|error| PrayError::Manifest(error.to_string()))?;
-    Ok(Response {
-        status: 200,
-        content_type: "application/json".to_string(),
-        body,
-    })
-}
 
-fn auth_ssh_key_challenge_response(root: &Path, body: &[u8]) -> PrayResult<Response> {
-    let request: AuthSshKeyChallengeRequest =
-        serde_json::from_slice(body).map_err(|error| PrayError::Parse {
-            kind: "auth ssh key challenge",
-            message: error.to_string(),
-        })?;
-    let store = RegistryAuthStore::open(root)?;
-    let response: AuthSshKeyChallengeResponse =
-        store.request_ssh_key_challenge(&request.public_key)?;
-    let body =
-        serde_json::to_vec(&response).map_err(|error| PrayError::Manifest(error.to_string()))?;
-    Ok(Response {
-        status: 200,
-        content_type: "application/json".to_string(),
-        body,
-    })
-}
 
-fn auth_ssh_key_enroll_response(root: &Path, body: &[u8]) -> PrayResult<Response> {
-    let request: AuthSshKeyEnrollmentRequest =
-        serde_json::from_slice(body).map_err(|error| PrayError::Parse {
-            kind: "auth ssh key enrollment",
-            message: error.to_string(),
-        })?;
-    let store = RegistryAuthStore::open(root)?;
-    let response: AuthSshKeyEnrollmentResponse = store.enroll_ssh_key(
-        &request.email,
-        &request.public_key,
-        request.label.as_deref(),
-    )?;
-    let body =
-        serde_json::to_vec(&response).map_err(|error| PrayError::Manifest(error.to_string()))?;
-    Ok(Response {
-        status: 201,
-        content_type: "application/json".to_string(),
-        body,
-    })
-}
 
-fn auth_ssh_key_login_response(root: &Path, body: &[u8]) -> PrayResult<Response> {
-    let request: AuthSshKeyLoginRequest =
-        serde_json::from_slice(body).map_err(|error| PrayError::Parse {
-            kind: "auth ssh key login",
-            message: error.to_string(),
-        })?;
-    let store = RegistryAuthStore::open(root)?;
-    let response: AuthSshKeyLoginResponse = store.respond_ssh_key_challenge(
-        &request.public_key,
-        &request.challenge_id,
-        &request.signature,
-    )?;
-    let body =
-        serde_json::to_vec(&response).map_err(|error| PrayError::Manifest(error.to_string()))?;
-    Ok(Response {
-        status: 200,
-        content_type: "application/json".to_string(),
-        body,
-    })
-}
 
 fn static_file_response(root: &Path, request_path: &str) -> PrayResult<Response> {
     let relative = sanitize_request_path(request_path)?;
@@ -999,7 +542,7 @@ fn static_file_response(root: &Path, request_path: &str) -> PrayResult<Response>
     })
 }
 
-fn read_registry_index(root: &Path) -> PrayResult<RegistryIndex> {
+pub(crate) fn read_registry_index(root: &Path) -> PrayResult<RegistryIndex> {
     let index_path = root.join("v1/index.json");
     let index_text = fs::read_to_string(&index_path).map_err(|error| {
         if error.kind() == std::io::ErrorKind::NotFound {
@@ -1014,81 +557,7 @@ fn read_registry_index(root: &Path) -> PrayResult<RegistryIndex> {
     })
 }
 
-fn read_confessions(root: &Path, package_name: &str) -> PrayResult<Vec<ConfessionSubmission>> {
-    let path = root.join("v1/confessions.jsonl");
-    let Ok(text) = fs::read_to_string(path) else {
-        return Ok(Vec::new());
-    };
-    let mut confessions = Vec::new();
-    for line in text.lines() {
-        if line.trim().is_empty() {
-            continue;
-        }
-        let confession: ConfessionSubmission =
-            serde_json::from_str(line).map_err(|error| PrayError::Parse {
-                kind: "confession",
-                message: error.to_string(),
-            })?;
-        if confession.package == package_name {
-            confessions.push(confession);
-        }
-    }
-    Ok(confessions)
-}
-
-fn write_response(
-    stream: &mut TcpStream,
-    status: u16,
-    content_type: &str,
-    body: Vec<u8>,
-) -> PrayResult<()> {
-    let reason = reason_phrase(status);
-    let header = format!(
-        "HTTP/1.1 {status} {reason}\r\nContent-Type: {content_type}\r\nContent-Length: {}\r\nConnection: close\r\n\r\n",
-        body.len()
-    );
-    stream.write_all(header.as_bytes())?;
-    stream.write_all(&body)?;
-    stream.flush()?;
-    Ok(())
-}
-
-fn response_with_status(status: u16, content_type: &str, body: Vec<u8>) -> Response {
-    Response {
-        status,
-        content_type: content_type.to_string(),
-        body,
-    }
-}
-
-fn reason_phrase(status: u16) -> &'static str {
-    match status {
-        200 => "OK",
-        201 => "Created",
-        400 => "Bad Request",
-        404 => "Not Found",
-        405 => "Method Not Allowed",
-        500 => "Internal Server Error",
-        _ => "OK",
-    }
-}
-
-fn strip_query(path: &str) -> &str {
-    path.split_once('?').map(|(path, _)| path).unwrap_or(path)
-}
-
-fn query_parameter(path: &str, name: &str) -> Option<String> {
-    let query = path.split_once('?')?.1;
-    for pair in query.split('&') {
-        let (key, value) = pair.split_once('=').unwrap_or((pair, ""));
-        if key == name {
-            return Some(value.to_string());
-        }
-    }
-    None
-}
-
-fn sanitize_request_path(path: &str) -> PrayResult<PathBuf> {
+pub(crate) fn sanitize_request_path(path: &str) -> PrayResult<PathBuf> {
     let path = path.trim_start_matches('/');
     let mut relative = PathBuf::new();
     for component in Path::new(path).components() {
@@ -1105,7 +574,7 @@ fn sanitize_request_path(path: &str) -> PrayResult<PathBuf> {
     Ok(relative)
 }
 
-fn content_type_for_path(path: &Path) -> String {
+pub(crate) fn content_type_for_path(path: &Path) -> String {
     match path.extension().and_then(|value| value.to_str()) {
         Some("json") => "application/json".to_string(),
         Some("jsonl") => "application/x-ndjson".to_string(),
@@ -1116,14 +585,11 @@ fn content_type_for_path(path: &Path) -> String {
     }
 }
 
-fn html_escape(text: &str) -> String {
-    text.replace('&', "&amp;")
-        .replace('<', "&lt;")
-        .replace('>', "&gt;")
-        .replace('"', "&quot;")
-}
-
-pub fn handle_rpc(root: &Path, request: &RpcRequest) -> PrayResult<RpcResponse> {
+pub fn handle_rpc(
+    root: &Path,
+    auth: &ServeAuth,
+    request: &RpcRequest,
+) -> PrayResult<RpcResponse> {
     if request.spec != SSH_RPC_SPEC {
         return Ok(RpcResponse::error(
             &request.id,
@@ -1157,6 +623,7 @@ pub fn handle_rpc(root: &Path, request: &RpcRequest) -> PrayResult<RpcResponse> 
                 .ok_or_else(|| PrayError::Resolution("sync.push requires metadata".to_string()))?;
             federation_push_response(
                 root,
+                auth,
                 &serde_json::to_vec(metadata)
                     .map_err(|error| PrayError::Manifest(error.to_string()))?,
             )?
@@ -1176,7 +643,7 @@ pub fn handle_rpc(root: &Path, request: &RpcRequest) -> PrayResult<RpcResponse> 
                 .and_then(|value| value.as_str())
                 .ok_or_else(|| PrayError::Resolution("artifact.put requires path".to_string()))?;
             let body = decode_rpc_base64_body(request.params.get("body"))?;
-            artifact_upload_response(root, &format!("/{path}"), &body)?
+            artifact_upload_response(root, auth, &format!("/{path}"), &body)?
         }
         "confession.submit" => confession_response(
             root,
@@ -1252,125 +719,4 @@ pub fn handle_rpc(root: &Path, request: &RpcRequest) -> PrayResult<RpcResponse> 
     };
 
     Ok(http_response_to_rpc(&request.id, response))
-}
-
-fn decode_rpc_base64_body(value: Option<&serde_json::Value>) -> PrayResult<Vec<u8>> {
-    use base64::{engine::general_purpose::STANDARD, Engine as _};
-    let encoded = value
-        .and_then(|value| value.as_str())
-        .ok_or_else(|| PrayError::Resolution("artifact.put requires base64 body".to_string()))?;
-    STANDARD.decode(encoded).map_err(|error| {
-        PrayError::Resolution(format!("artifact.put body base64 decode failed: {error}"))
-    })
-}
-
-fn http_response_to_rpc(id: &str, response: Response) -> RpcResponse {
-    if response.content_type.starts_with("application/json") {
-        let body = serde_json::from_slice(&response.body).unwrap_or_else(|_| {
-            serde_json::json!({
-                "error": String::from_utf8_lossy(&response.body)
-            })
-        });
-        RpcResponse {
-            spec: SSH_RPC_SPEC.to_string(),
-            id: id.to_string(),
-            status: response.status,
-            content_type: response.content_type,
-            body_encoding: None,
-            body,
-        }
-    } else {
-        use base64::{engine::general_purpose::STANDARD, Engine as _};
-        RpcResponse {
-            spec: SSH_RPC_SPEC.to_string(),
-            id: id.to_string(),
-            status: response.status,
-            content_type: response.content_type,
-            body_encoding: Some("base64".to_string()),
-            body: serde_json::Value::String(STANDARD.encode(&response.body)),
-        }
-    }
-}
-
-#[cfg(test)]
-mod http_rpc_bridge_tests {
-    use super::{
-        dispatch_http_request, federation_discovery_response, handle_rpc, http_response_to_rpc,
-        rpc_response_to_http,
-    };
-    use pray_core::ssh_rpc::{RpcRequest, SSH_RPC_SPEC};
-    use serde_json::json;
-    use std::fs;
-    use std::path::PathBuf;
-
-    fn temporary_root(name: &str) -> PathBuf {
-        let path =
-            std::env::temp_dir().join(format!("pray-http-rpc-{name}-{}", std::process::id()));
-        let _ = fs::remove_dir_all(&path);
-        fs::create_dir_all(path.join("v1")).expect("v1 directory");
-        fs::write(
-            path.join("v1/index.json"),
-            r#"{"spec":"prayfile-distribution-1","packages":[]}"#,
-        )
-        .expect("index");
-        path
-    }
-
-    #[test]
-    fn http_discovery_matches_direct_handler() {
-        let root = temporary_root("discovery");
-        let direct = federation_discovery_response(&root).expect("direct response");
-        let bridged = dispatch_http_request(&root, "GET", "/.well-known/pray-federation.json", &[])
-            .expect("bridged response");
-        assert_eq!(direct.status, bridged.status);
-        assert_eq!(direct.content_type, bridged.content_type);
-        let direct_json: serde_json::Value =
-            serde_json::from_slice(&direct.body).expect("direct json");
-        let bridged_json: serde_json::Value =
-            serde_json::from_slice(&bridged.body).expect("bridged json");
-        assert_eq!(direct_json, bridged_json);
-        let _ = fs::remove_dir_all(&root);
-    }
-
-    #[test]
-    fn rpc_response_round_trips_through_http_envelope() {
-        let response =
-            super::response_with_status(200, "application/json", br#"{"ok":true}"#.to_vec());
-        let rpc = http_response_to_rpc("1", response);
-        let http = rpc_response_to_http(&rpc);
-        assert_eq!(http.status, 200);
-        assert_eq!(http.content_type, "application/json");
-        assert_eq!(http.body, br#"{"ok":true}"#);
-    }
-
-    #[test]
-    fn handle_rpc_and_http_dispatch_share_sync_package_path() {
-        let root = temporary_root("sync-package");
-        let metadata_path = root.join("v1/packages/sample/base.json");
-        fs::create_dir_all(metadata_path.parent().unwrap()).expect("package directory");
-        fs::write(
-            &metadata_path,
-            r#"{"name":"sample/base","versions":[{"version":"1.0.0","artifact":"v1/artifacts/sample/base/1.0.0/package.praypkg"}]}"#,
-        )
-        .expect("metadata");
-        fs::write(
-            root.join("v1/index.json"),
-            r#"{"spec":"prayfile-distribution-1","packages":["sample/base"]}"#,
-        )
-        .expect("index");
-
-        let rpc = handle_rpc(
-            &root,
-            &RpcRequest::new("1", "sync.package", json!({ "name": "sample/base" })),
-        )
-        .expect("rpc response");
-        assert_eq!(rpc.spec, SSH_RPC_SPEC);
-        assert_eq!(rpc.status, 200);
-
-        let http = dispatch_http_request(&root, "GET", "/v1/sync/package/sample/base", &[])
-            .expect("http response");
-        assert_eq!(http.status, 200);
-        assert_eq!(rpc_response_to_http(&rpc).body, http.body);
-        let _ = fs::remove_dir_all(&root);
-    }
 }

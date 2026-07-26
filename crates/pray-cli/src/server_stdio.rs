@@ -1,4 +1,4 @@
-use crate::server::handle_rpc;
+use crate::server::{handle_rpc, ServeAuth};
 use pray_core::ssh_rpc::{read_frame, write_frame, RpcRequest, RpcResponse};
 use pray_core::{PrayError, PrayResult};
 use std::io::{self, BufReader, Write};
@@ -20,7 +20,8 @@ pub fn run_stdio_server(root: PathBuf) -> PrayResult<()> {
                 kind: "ssh rpc request",
                 message: error.to_string(),
             })?;
-        let response = match handle_rpc(&root, &request) {
+        let auth = ServeAuth::stdio();
+        let response = match handle_rpc(&root, &auth, &request) {
             Ok(response) => response,
             Err(error) => RpcResponse::error(&request.id, 500, error.to_string()),
         };

@@ -45,10 +45,20 @@ pub(crate) fn transport_package_version(version: &RegistryPackageVersion) -> Pac
         }),
         _ => None,
     };
-    let signature = version.signature.as_ref().map(|signature| SignatureInfo {
-        algorithm: "sha256".to_string(),
-        signature: signature.clone(),
-        public_key: registry_package_signing_identity(version).unwrap_or_default(),
+    let signature = version.signature.as_ref().map(|signature| {
+        if signature.starts_with(pray_core::package_integrity::ED25519_SIGNATURE_PREFIX) {
+            SignatureInfo {
+                algorithm: "ed25519".to_string(),
+                signature: signature.clone(),
+                public_key: version.signer_public_key.clone().unwrap_or_default(),
+            }
+        } else {
+            SignatureInfo {
+                algorithm: "sha256".to_string(),
+                signature: signature.clone(),
+                public_key: registry_package_signing_identity(version).unwrap_or_default(),
+            }
+        }
     });
     let origin = version
         .published_at

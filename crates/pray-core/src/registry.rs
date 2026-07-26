@@ -1,17 +1,20 @@
 use crate::constraint::version_satisfies;
 use crate::derived_metadata::RegistryDerivedMetadata;
-use crate::hashing::sha256_prefixed;
 use crate::manifest::ManifestPackage;
-use crate::package_spec::parse_package_spec;
+use crate::package_integrity::{artifact_content_digest, require_remote_integrity_fields};
+use crate::registry_http::{http_get, http_post, http_put, join_url};
+use crate::registry_ssh::{
+    resolve_ssh_registry_package_root, submit_confession_ssh, upload_registry_artifact_ssh,
+};
+use crate::registry_torrent::{fetch_torrent_artifact, fetch_torrent_manifest};
+use crate::paths::remove_path_if_exists;
 use crate::resolve_context::PackageResolutionContext;
 use crate::{PrayError, PrayResult};
 use semver::Version;
 use serde::{Deserialize, Serialize};
-use std::collections::BTreeSet;
 use std::fs;
-use std::io::{Read, Write};
-use std::net::TcpStream;
 use std::path::{Path, PathBuf};
+
 
 #[derive(Debug, Clone)]
 pub struct RegistryPackageResolution {
@@ -29,7 +32,6 @@ pub fn lockfile_signer_fingerprint(version: &RegistryPackageVersion) -> Option<S
         .map(crate::ssh_identity::normalize_identity)
 }
 
-const TORRENT_MANIFEST_SPEC: &str = "pray-torrent-v1";
 
 #[derive(Debug, Clone, Default, Serialize, Deserialize, PartialEq, Eq)]
 pub struct RegistryIndex {
@@ -63,6 +65,8 @@ pub struct RegistryPackageVersion {
     pub signer: Option<String>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub signer_fingerprint: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub signer_public_key: Option<String>,
     #[serde(default)]
     pub published_at: Option<String>,
     #[serde(default)]
@@ -82,6 +86,7 @@ impl RegistryPackageVersion {
             && self.exports == other.exports
             && self.signer == other.signer
             && self.signer_fingerprint == other.signer_fingerprint
+            && self.signer_public_key == other.signer_public_key
             && self.published_at == other.published_at
             && self.signature == other.signature
     }
@@ -112,86 +117,6 @@ pub struct ConfessionSubmission {
     pub signature: Option<String>,
 }
 
-#[derive(Debug, Clone, Default, Serialize, Deserialize, PartialEq, Eq)]
-struct TorrentManifest {
-    spec: String,
-    name: String,
-    version: String,
-    artifact_url: String,
-    artifact_hash: String,
-    piece_size: usize,
-    length: usize,
-    pieces: Vec<String>,
-    #[serde(default)]
-    sources: Vec<String>,
-    #[serde(default)]
-    trackers: Vec<String>,
-}
-
-#[derive(Debug, Clone, PartialEq, Eq)]
-struct TorrentPieceRange {
-    start: usize,
-    end: usize,
-    hash: String,
-}
-
-impl TorrentManifest {
-    fn validate(&self) -> PrayResult<()> {
-        if self.spec != TORRENT_MANIFEST_SPEC {
-            return Err(PrayError::Parse {
-                kind: "torrent manifest",
-                message: format!("unexpected spec: {}", self.spec),
-            });
-        }
-        if self.piece_size == 0 {
-            return Err(PrayError::Parse {
-                kind: "torrent manifest",
-                message: "piece size must be greater than zero".to_string(),
-            });
-        }
-        let expected_piece_count = if self.length == 0 {
-            0
-        } else {
-            self.length.div_ceil(self.piece_size)
-        };
-        if self.pieces.len() != expected_piece_count {
-            return Err(PrayError::Parse {
-                kind: "torrent manifest",
-                message: format!(
-                    "expected {} piece hash(es), found {}",
-                    expected_piece_count,
-                    self.pieces.len()
-                ),
-            });
-        }
-        Ok(())
-    }
-
-    fn piece_ranges(&self) -> Vec<TorrentPieceRange> {
-        self.pieces
-            .iter()
-            .enumerate()
-            .map(|(index, hash)| {
-                let start = index * self.piece_size;
-                let end = self
-                    .length
-                    .saturating_sub(1)
-                    .min(start + self.piece_size - 1);
-                TorrentPieceRange {
-                    start,
-                    end,
-                    hash: hash.clone(),
-                }
-            })
-            .collect()
-    }
-}
-
-impl TorrentPieceRange {
-    fn length(&self) -> usize {
-        self.end.saturating_sub(self.start) + 1
-    }
-}
 
 pub fn resolve_registry_package_root(
     project_root: &Path,
@@ -211,30 +136,38 @@ pub fn resolve_registry_package_root(
         context.preferred_version.as_deref(),
     )?;
     let signer_fingerprint = lockfile_signer_fingerprint(&selected);
-    if let Some(vendored_root) =
-        try_vendored_package_root(project_root, &declaration.name, &selected.version)
-    {
+    require_remote_integrity_fields(&declaration.name, &selected.version, &selected)?;
+    if let Some(vendored_root) = crate::registry_cache::try_vendored_package_root(
+        project_root,
+        &declaration.name,
+        &selected,
+    )? {
         return Ok(RegistryPackageResolution {
             root: vendored_root,
             signer_fingerprint,
             registry_latest_version,
         });
     }
-    let cache_directory = registry_cache_directory(
+    let cache_directory = crate::registry_cache::registry_cache_directory(
         project_root,
         source_url,
         &declaration.name,
         &selected.version,
     );
 
-    if let Some(mut cached) =
-        try_reuse_cached_registry_package(&cache_directory, &selected, signer_fingerprint.clone())?
-    {
+    if let Some(mut cached) = crate::registry_cache::try_reuse_cached_registry_package(
+        &cache_directory,
+        &selected,
+        signer_fingerprint.clone(),
+    )? {
         cached.registry_latest_version = registry_latest_version.clone();
         return Ok(cached);
     }
     if context.offline {
-        return Err(offline_package_error(&declaration.name, &selected.version));
+        return Err(crate::registry_cache::offline_package_error(
+            &declaration.name,
+            &selected.version,
+        ));
     }
 
     if cache_directory.exists() {
@@ -249,7 +182,7 @@ pub fn resolve_registry_package_root(
     } else {
         http_get(&artifact_url)?
     };
-    validate_and_unpack_registry_package(
+    crate::registry_cache::validate_and_unpack_registry_package(
         &cache_directory,
         declaration,
         &selected,
@@ -260,92 +193,6 @@ pub fn resolve_registry_package_root(
         root: cache_directory,
         signer_fingerprint,
         registry_latest_version,
-    })
-}
-
-fn resolve_ssh_registry_package_root(
-    project_root: &Path,
-    source_url: &str,
-    declaration: &ManifestPackage,
-    context: &PackageResolutionContext,
-) -> PrayResult<RegistryPackageResolution> {
-    use crate::ssh_client::with_pray_ssh_session;
-    use serde_json::json;
-
-    with_pray_ssh_session(source_url, |session| {
-        let metadata = fetch_ssh_registry_package_metadata(session, &declaration.name)?;
-        let registry_latest_version = registry_latest_version_label(&metadata);
-        let selected = select_package_version(
-            &metadata,
-            &declaration.constraint,
-            context.preferred_version.as_deref(),
-        )?;
-        let signer_fingerprint = lockfile_signer_fingerprint(&selected);
-        if let Some(vendored_root) =
-            try_vendored_package_root(project_root, &declaration.name, &selected.version)
-        {
-            return Ok(RegistryPackageResolution {
-                root: vendored_root,
-                signer_fingerprint,
-                registry_latest_version,
-            });
-        }
-        let cache_directory = registry_cache_directory(
-            project_root,
-            source_url,
-            &declaration.name,
-            &selected.version,
-        );
-
-        if let Some(mut cached) = try_reuse_cached_registry_package(
-            &cache_directory,
-            &selected,
-            signer_fingerprint.clone(),
-        )? {
-            cached.registry_latest_version = registry_latest_version.clone();
-            return Ok(cached);
-        }
-        if context.offline {
-            return Err(offline_package_error(&declaration.name, &selected.version));
-        }
-
-        if cache_directory.exists() {
-            remove_path_if_exists(&cache_directory)?;
-        }
-        fs::create_dir_all(&cache_directory)?;
-
-        let artifact_bytes = session.call_bytes(
-            "artifact.get",
-            json!({
-                "path": selected.artifact,
-            }),
-        )?;
-        validate_and_unpack_registry_package(
-            &cache_directory,
-            declaration,
-            &selected,
-            &artifact_bytes,
-        )?;
-
-        Ok(RegistryPackageResolution {
-            root: cache_directory,
-            signer_fingerprint,
-            registry_latest_version,
-        })
-    })
-}
-
-fn fetch_ssh_registry_package_metadata(
-    session: &mut crate::ssh_client::SshRpcSession,
-    package_name: &str,
-) -> PrayResult<RegistryPackageMetadata> {
-    use serde_json::json;
-
-    let metadata_path = format!("v1/packages/{package_name}.json");
-    let metadata_bytes = session.call_bytes("artifact.get", json!({ "path": metadata_path }))?;
-    serde_json::from_slice(&metadata_bytes).map_err(|error| PrayError::Parse {
-        kind: "registry metadata",
-        message: error.to_string(),
     })
 }
 
@@ -386,9 +233,12 @@ pub fn resolve_local_registry_package_root(
         context.preferred_version.as_deref(),
     )?;
     let signer_fingerprint = lockfile_signer_fingerprint(&selected);
-    if let Some(vendored_root) =
-        try_vendored_package_root(project_root, &declaration.name, &selected.version)
-    {
+    require_remote_integrity_fields(&declaration.name, &selected.version, &selected)?;
+    if let Some(vendored_root) = crate::registry_cache::try_vendored_package_root(
+        project_root,
+        &declaration.name,
+        &selected,
+    )? {
         return Ok(RegistryPackageResolution {
             root: vendored_root,
             signer_fingerprint,
@@ -405,21 +255,26 @@ pub fn resolve_local_registry_package_root(
             .as_deref()
             .unwrap_or("no-artifact-hash")
     );
-    let cache_directory = registry_cache_directory(
+    let cache_directory = crate::registry_cache::registry_cache_directory(
         project_root,
         &cache_identifier,
         &declaration.name,
         &selected.version,
     );
 
-    if let Some(mut cached) =
-        try_reuse_cached_registry_package(&cache_directory, &selected, signer_fingerprint.clone())?
-    {
+    if let Some(mut cached) = crate::registry_cache::try_reuse_cached_registry_package(
+        &cache_directory,
+        &selected,
+        signer_fingerprint.clone(),
+    )? {
         cached.registry_latest_version = registry_latest_version.clone();
         return Ok(cached);
     }
     if context.offline {
-        return Err(offline_package_error(&declaration.name, &selected.version));
+        return Err(crate::registry_cache::offline_package_error(
+            &declaration.name,
+            &selected.version,
+        ));
     }
 
     if cache_directory.exists() {
@@ -427,8 +282,11 @@ pub fn resolve_local_registry_package_root(
     }
     fs::create_dir_all(&cache_directory)?;
 
-    let artifact_bytes = read_local_registry_artifact_bytes(source_root, &selected.artifact)?;
-    validate_and_unpack_registry_package(
+    let artifact_bytes = crate::registry_cache::read_local_registry_artifact_bytes(
+        source_root,
+        &selected.artifact,
+    )?;
+    crate::registry_cache::validate_and_unpack_registry_package(
         &cache_directory,
         declaration,
         &selected,
@@ -450,13 +308,7 @@ pub fn registry_package_signing_identity(version: &RegistryPackageVersion) -> Op
 }
 
 pub fn registry_artifact_signature(artifact_bytes: &[u8], tree_hash: &str, signer: &str) -> String {
-    let mut payload = Vec::with_capacity(artifact_bytes.len() + tree_hash.len() + signer.len() + 2);
-    payload.extend_from_slice(artifact_bytes);
-    payload.push(0);
-    payload.extend_from_slice(tree_hash.as_bytes());
-    payload.push(0);
-    payload.extend_from_slice(signer.as_bytes());
-    sha256_prefixed(&payload)
+    artifact_content_digest(artifact_bytes, tree_hash, signer)
 }
 
 pub fn submit_confession(source_url: &str, confession: &ConfessionSubmission) -> PrayResult<()> {
@@ -495,42 +347,6 @@ pub fn upload_registry_artifact(
     Ok(())
 }
 
-fn submit_confession_ssh(source_url: &str, confession: &ConfessionSubmission) -> PrayResult<()> {
-    use crate::ssh_client::with_pray_ssh_session;
-    use serde_json::json;
-
-    with_pray_ssh_session(source_url, |session| {
-        session.call_json(
-            "confession.submit",
-            json!({
-                "confession": confession,
-            }),
-        )?;
-        Ok(())
-    })
-}
-
-fn upload_registry_artifact_ssh(
-    source_url: &str,
-    artifact_path: &str,
-    bytes: &[u8],
-) -> PrayResult<()> {
-    use crate::ssh_client::with_pray_ssh_session;
-    use base64::{engine::general_purpose::STANDARD, Engine as _};
-    use serde_json::json;
-
-    with_pray_ssh_session(source_url, |session| {
-        session.call_json(
-            "artifact.put",
-            json!({
-                "path": artifact_path,
-                "body": STANDARD.encode(bytes),
-            }),
-        )?;
-        Ok(())
-    })
-}
-
 fn fetch_registry_package_metadata(
     source_url: &str,
     package_name: &str,
@@ -540,254 +356,6 @@ fn fetch_registry_package_metadata(
     serde_json::from_slice(&response).map_err(|error| PrayError::Parse {
         kind: "registry metadata",
         message: error.to_string(),
-    })
-}
-
-fn fetch_torrent_manifest(
-    source_url: &str,
-    artifact_path: &str,
-) -> PrayResult<Option<TorrentManifest>> {
-    let url = join_url(source_url, &format!("{}.praytorrent.json", artifact_path));
-    match http_get(&url) {
-        Ok(response) => {
-            let manifest: TorrentManifest =
-                serde_json::from_slice(&response).map_err(|error| PrayError::Parse {
-                    kind: "torrent manifest",
-                    message: error.to_string(),
-                })?;
-            manifest.validate()?;
-            Ok(Some(manifest))
-        }
-        Err(PrayError::Resolution(message)) if message.contains("HTTP 404") => Ok(None),
-        Err(error) => Err(error),
-    }
-}
-
-fn fetch_torrent_artifact(
-    source_url: &str,
-    artifact_path: &str,
-    manifest: &TorrentManifest,
-) -> PrayResult<Vec<u8>> {
-    let artifact_url = if manifest.artifact_url.starts_with("http://")
-        || manifest.artifact_url.starts_with("https://")
-    {
-        manifest.artifact_url.clone()
-    } else {
-        join_url(source_url, &manifest.artifact_url)
-    };
-
-    let sources = if manifest.sources.is_empty() {
-        vec![artifact_url]
-    } else {
-        manifest
-            .sources
-            .iter()
-            .map(|source| {
-                if source.starts_with("http://") || source.starts_with("https://") {
-                    source.clone()
-                } else {
-                    join_url(source_url, source)
-                }
-            })
-            .collect()
-    };
-
-    let mut bytes = vec![0u8; manifest.length];
-    for piece in manifest.piece_ranges() {
-        let piece_bytes = download_torrent_piece(&sources, &piece)?;
-        if sha256_prefixed(&piece_bytes) != piece.hash {
-            return Err(PrayError::Integrity(format!(
-                "torrent piece hash mismatch for {artifact_path} {}..{}",
-                piece.start, piece.end
-            )));
-        }
-        bytes[piece.start..=piece.end].copy_from_slice(&piece_bytes);
-    }
-
-    if sha256_prefixed(&bytes) != manifest.artifact_hash {
-        return Err(PrayError::Integrity(format!(
-            "torrent artifact hash mismatch for {artifact_path}"
-        )));
-    }
-
-    Ok(bytes)
-}
-
-fn download_torrent_piece(sources: &[String], piece: &TorrentPieceRange) -> PrayResult<Vec<u8>> {
-    let range_header = format!("bytes={}-{}", piece.start, piece.end);
-    for source in sources {
-        match http_get_with_headers(source, &[("Range", &range_header)]) {
-            Ok((response, _status)) if response.len() == piece.length() => return Ok(response),
-            Ok(_) => continue,
-            Err(_) => continue,
-        }
-    }
-
-    Err(PrayError::Resolution(format!(
-        "unable to download torrent piece {}-{}",
-        piece.start, piece.end
-    )))
-}
-
-fn registry_cache_matches_selected(
-    cache_directory: &Path,
-    selected: &RegistryPackageVersion,
-) -> PrayResult<bool> {
-    let spec_path = find_prayspec_file(cache_directory)?;
-    let spec_text = fs::read_to_string(&spec_path)?;
-    let spec = parse_package_spec(&spec_text)?.canonicalized();
-    if spec.version != selected.version {
-        return Ok(false);
-    }
-    let tree_hash = spec.tree_hash_for_root(cache_directory)?;
-    if let Some(expected_tree_hash) = selected.tree_hash.as_deref() {
-        return Ok(tree_hash == expected_tree_hash);
-    }
-    Ok(true)
-}
-
-fn try_reuse_cached_registry_package(
-    cache_directory: &Path,
-    selected: &RegistryPackageVersion,
-    signer_fingerprint: Option<String>,
-) -> PrayResult<Option<RegistryPackageResolution>> {
-    if find_prayspec_file(cache_directory).is_ok()
-        && registry_cache_matches_selected(cache_directory, selected)?
-    {
-        return Ok(Some(RegistryPackageResolution {
-            root: cache_directory.to_path_buf(),
-            signer_fingerprint,
-            registry_latest_version: None,
-        }));
-    }
-    Ok(None)
-}
-
-fn validate_and_unpack_registry_package(
-    cache_directory: &Path,
-    declaration: &ManifestPackage,
-    selected: &RegistryPackageVersion,
-    artifact_bytes: &[u8],
-) -> PrayResult<()> {
-    if let Some(expected_artifact_hash) = selected.artifact_hash.as_deref() {
-        let artifact_hash = sha256_prefixed(artifact_bytes);
-        if artifact_hash != expected_artifact_hash {
-            return Err(PrayError::Integrity(format!(
-                "package artifact hash mismatch for {} {}",
-                declaration.name, selected.version
-            )));
-        }
-    }
-    unpack_praypkg(artifact_bytes, cache_directory)?;
-
-    let spec_path = find_prayspec_file(cache_directory)?;
-    let spec_text = fs::read_to_string(&spec_path)?;
-    let spec = parse_package_spec(&spec_text)?.canonicalized();
-
-    if spec.name != declaration.name {
-        return Err(PrayError::Resolution(format!(
-            "package path {:?} declares {:?}, expected {:?}",
-            cache_directory, spec.name, declaration.name
-        )));
-    }
-    if spec.version != selected.version {
-        return Err(PrayError::Resolution(format!(
-            "package {} version {} does not match registry version {}",
-            declaration.name, spec.version, selected.version
-        )));
-    }
-
-    let tree_hash = spec.tree_hash_for_root(cache_directory)?;
-    if let Some(expected_tree_hash) = selected.tree_hash.as_deref() {
-        if tree_hash != expected_tree_hash {
-            return Err(PrayError::Integrity(format!(
-                "package tree hash mismatch for {} {}",
-                declaration.name, selected.version
-            )));
-        }
-    }
-
-    if let Some(expected_signature) = selected.signature.as_deref() {
-        let signing_identity = registry_package_signing_identity(selected).ok_or_else(|| {
-            PrayError::Integrity(format!(
-                "package signature missing signer for {} {}",
-                declaration.name, selected.version
-            ))
-        })?;
-        let actual_signature =
-            registry_artifact_signature(artifact_bytes, &tree_hash, &signing_identity);
-        if actual_signature != expected_signature {
-            return Err(PrayError::Integrity(format!(
-                "package signature mismatch for {} {}",
-                declaration.name, selected.version
-            )));
-        }
-    }
-
-    Ok(())
-}
-
-fn registry_cache_directory(
-    project_root: &Path,
-    source_url: &str,
-    package_name: &str,
-    version: &str,
-) -> PathBuf {
-    let source_key = sha256_prefixed(source_url.as_bytes())
-        .trim_start_matches("sha256:")
-        .chars()
-        .take(16)
-        .collect::<String>();
-    project_root
-        .join(".pray/cache/registry")
-        .join(source_key)
-        .join(package_name)
-        .join(version)
-}
-
-fn try_vendored_package_root(
-    project_root: &Path,
-    package_name: &str,
-    version: &str,
-) -> Option<PathBuf> {
-    let vendored = project_root
-        .join(".pray/vendor")
-        .join(package_name.replace('/', "-"))
-        .join(version);
-    if find_prayspec_file(&vendored).is_ok() {
-        return Some(vendored);
-    }
-    None
-}
-
-fn offline_package_error(package_name: &str, version: &str) -> PrayError {
-    PrayError::Resolution(format!(
-        "package {package_name} {version} is not cached locally and offline mode is enabled"
-    ))
-}
-
-fn read_local_registry_artifact_bytes(source_root: &Path, artifact: &str) -> PrayResult<Vec<u8>> {
-    if artifact.starts_with("http://") || artifact.starts_with("https://") {
-        return http_get(artifact);
-    }
-    if let Some(path) = artifact.strip_prefix("file://") {
-        return fs::read(Path::new(path)).map_err(Into::into);
-    }
-    let artifact_path = Path::new(artifact);
-    validate_package_relative_path(artifact_path)?;
-    let full_path = source_root.join(artifact_path);
-    fs::read(&full_path).map_err(|error| {
-        if error.kind() == std::io::ErrorKind::NotFound {
-            PrayError::Resolution(format!(
-                "package artifact missing at {}. The distribution metadata may be stale or incomplete.",
-                full_path.display()
-            ))
-        } else {
-            PrayError::Resolution(format!(
-                "failed to read package artifact {}: {error}",
-                full_path.display()
-            ))
-        }
     })
 }
 
@@ -818,7 +386,7 @@ pub fn version_is_greater_than(left: &str, right: &str) -> PrayResult<bool> {
     Ok(compare_versions(left, right)? > 0)
 }
 
-fn select_package_version(
+pub(crate) fn select_package_version(
     metadata: &RegistryPackageMetadata,
     constraint: &str,
     preferred_version: Option<&str>,
@@ -875,104 +443,6 @@ fn compare_versions(left: &str, right: &str) -> PrayResult<i32> {
     })
 }
 
-fn unpack_praypkg(artifact_bytes: &[u8], output_directory: &Path) -> PrayResult<()> {
-    let cursor = std::io::Cursor::new(artifact_bytes);
-    let decoder = zstd::stream::read::Decoder::new(cursor)
-        .map_err(|error| PrayError::Integrity(error.to_string()))?;
-    let mut archive = tar::Archive::new(decoder);
-    let mut written_paths = BTreeSet::new();
-
-    for entry in archive
-        .entries()
-        .map_err(|error| PrayError::Integrity(error.to_string()))?
-    {
-        let mut entry = entry.map_err(|error| PrayError::Integrity(error.to_string()))?;
-        let entry_type = entry.header().entry_type();
-        if entry_type.is_dir() {
-            continue;
-        }
-        if entry_type.is_symlink() || entry_type.is_hard_link() || !entry_type.is_file() {
-            return Err(PrayError::Integrity(
-                "unsupported package archive entry type".to_string(),
-            ));
-        }
-        let path = entry
-            .path()
-            .map_err(|error| PrayError::Integrity(error.to_string()))?
-            .into_owned();
-        validate_package_relative_path(&path)?;
-        if !written_paths.insert(path.clone()) {
-            return Err(PrayError::Integrity(format!(
-                "duplicate package archive path: {}",
-                path.display()
-            )));
-        }
-        let destination = output_directory.join(&path);
-        if let Some(parent) = destination.parent() {
-            fs::create_dir_all(parent)?;
-        }
-        let mut destination_file = fs::File::create(&destination)?;
-        std::io::copy(&mut entry, &mut destination_file)
-            .map_err(|error| PrayError::Integrity(error.to_string()))?;
-    }
-    Ok(())
-}
-
-fn find_prayspec_file(root: &Path) -> PrayResult<PathBuf> {
-    let mut prayspec_files = Vec::new();
-    for entry in fs::read_dir(root)? {
-        let entry = entry?;
-        let path = entry.path();
-        if path.extension().and_then(|value| value.to_str()) == Some("prayspec") {
-            prayspec_files.push(path);
-        }
-    }
-    match prayspec_files.len() {
-        1 => Ok(prayspec_files.remove(0)),
-        0 => Err(PrayError::Resolution(format!(
-            "no prayspec file found in {:?}",
-            root
-        ))),
-        _ => Err(PrayError::Resolution(format!(
-            "multiple prayspec files found in {:?}",
-            root
-        ))),
-    }
-}
-
-fn validate_package_relative_path(path: &Path) -> PrayResult<()> {
-    if path.is_absolute() {
-        return Err(PrayError::Integrity(format!(
-            "package file path must be relative: {}",
-            path.display()
-        )));
-    }
-    for component in path.components() {
-        if matches!(component, std::path::Component::ParentDir) {
-            return Err(PrayError::Integrity(format!(
-                "package file path may not traverse upward: {}",
-                path.display()
-            )));
-        }
-    }
-    Ok(())
-}
-
-fn remove_path_if_exists(path: &Path) -> PrayResult<()> {
-    match fs::symlink_metadata(path) {
-        Ok(metadata) if metadata.is_dir() => {
-            fs::remove_dir_all(path)?;
-            Ok(())
-        }
-        Ok(_) => {
-            fs::remove_file(path)?;
-            Ok(())
-        }
-        Err(error) if error.kind() == std::io::ErrorKind::NotFound => Ok(()),
-        Err(error) => Err(error.into()),
-    }
-}
-
 pub fn fetch_optional_distribution_bytes(
     source_url: &str,
     relative_path: &str,
@@ -990,129 +460,3 @@ pub fn fetch_optional_distribution_bytes(
     }
 }
 
-fn join_url(base: &str, path: &str) -> String {
-    format!(
-        "{}/{}",
-        base.trim_end_matches('/'),
-        path.trim_start_matches('/')
-    )
-}
-
-struct HttpResponse {
-    status: u16,
-    #[allow(dead_code)]
-    headers: Vec<(String, String)>,
-    body: Vec<u8>,
-}
-
-fn http_get(url: &str) -> PrayResult<Vec<u8>> {
-    let response = http_request("GET", url, None, None, &[])?;
-    if response.status / 100 != 2 {
-        return Err(PrayError::Resolution(format!(
-            "GET {url} failed with HTTP {}",
-            response.status
-        )));
-    }
-    Ok(response.body)
-}
-
-fn http_get_with_headers(url: &str, headers: &[(&str, &str)]) -> PrayResult<(Vec<u8>, u16)> {
-    let response = http_request("GET", url, None, None, headers)?;
-    Ok((response.body, response.status))
-}
-
-fn http_post(url: &str, content_type: &str, body: &[u8]) -> PrayResult<HttpResponse> {
-    http_request("POST", url, Some(content_type), Some(body), &[])
-}
-
-fn http_put(url: &str, content_type: &str, body: &[u8]) -> PrayResult<HttpResponse> {
-    http_request("PUT", url, Some(content_type), Some(body), &[])
-}
-
-fn http_request(
-    method: &str,
-    url: &str,
-    content_type: Option<&str>,
-    body: Option<&[u8]>,
-    headers: &[(&str, &str)],
-) -> PrayResult<HttpResponse> {
-    let (host, port, path) = parse_http_url(url)?;
-    let mut stream = TcpStream::connect((host.as_str(), port))?;
-    let body = body.unwrap_or(&[]);
-    let mut request =
-        format!("{method} {path} HTTP/1.1\r\nHost: {host}:{port}\r\nConnection: close\r\n");
-    if let Some(content_type) = content_type {
-        request.push_str(&format!("Content-Type: {content_type}\r\n"));
-    }
-    for (name, value) in headers {
-        request.push_str(&format!("{name}: {value}\r\n"));
-    }
-    if !body.is_empty() {
-        request.push_str(&format!("Content-Length: {}\r\n", body.len()));
-    }
-    request.push_str("\r\n");
-    stream.write_all(request.as_bytes())?;
-    if !body.is_empty() {
-        stream.write_all(body)?;
-    }
-    stream.flush()?;
-
-    let mut response_bytes = Vec::new();
-    stream.read_to_end(&mut response_bytes)?;
-    parse_http_response(&response_bytes)
-}
-
-fn parse_http_url(url: &str) -> PrayResult<(String, u16, String)> {
-    let without_scheme = url
-        .strip_prefix("http://")
-        .ok_or_else(|| PrayError::Unsupported(format!("unsupported URL scheme: {url}")))?;
-    let (host_port, path) = if let Some((host_port, path)) = without_scheme.split_once('/') {
-        (host_port, format!("/{}", path))
-    } else {
-        (without_scheme, "/".to_string())
-    };
-    let (host, port) = if let Some((host, port)) = host_port.rsplit_once(':') {
-        (
-            host.to_string(),
-            port.parse::<u16>()
-                .map_err(|error| PrayError::Resolution(error.to_string()))?,
-        )
-    } else {
-        (host_port.to_string(), 80)
-    };
-    if host.is_empty() {
-        return Err(PrayError::Resolution(format!("invalid URL: {url}")));
-    }
-    Ok((host, port, path))
-}
-
-fn parse_http_response(response_bytes: &[u8]) -> PrayResult<HttpResponse> {
-    let header_end = response_bytes
-        .windows(4)
-        .position(|window| window == b"\r\n\r\n")
-        .ok_or_else(|| PrayError::Resolution("malformed HTTP response".to_string()))?;
-    let header_text = std::str::from_utf8(&response_bytes[..header_end])
-        .map_err(|error| PrayError::Resolution(error.to_string()))?;
-    let mut lines = header_text.lines();
-    let status_line = lines
-        .next()
-        .ok_or_else(|| PrayError::Resolution("missing HTTP status line".to_string()))?;
-    let status = status_line
-        .split_whitespace()
-        .nth(1)
-        .ok_or_else(|| PrayError::Resolution("missing HTTP status code".to_string()))?
-        .parse::<u16>()
-        .map_err(|error| PrayError::Resolution(error.to_string()))?;
-    let mut headers = Vec::new();
-    for line in lines {
-        if let Some((name, value)) = line.split_once(':') {
-            headers.push((name.trim().to_string(), value.trim().to_string()));
-        }
-    }
-    let body = response_bytes[header_end + 4..].to_vec();
-    Ok(HttpResponse {
-        status,
-        headers,
-        body,
-    })
-}

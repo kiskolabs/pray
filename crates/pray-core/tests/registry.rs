@@ -1,10 +1,12 @@
 use pray_core::derived_metadata::RegistryDerivedMetadata;
 use pray_core::hashing::sha256_prefixed;
 use pray_core::manifest::ManifestPackage;
+use pray_core::package_spec::PackageSpec;
 use pray_core::registry::{
     resolve_registry_package_root, RegistryPackageMetadata, RegistryPackageVersion,
 };
 use pray_core::resolve_context::PackageResolutionContext;
+use std::collections::BTreeMap;
 
 use serde::Serialize;
 use std::fs;
@@ -52,6 +54,46 @@ fn prefers_torrent_sidecar_when_available() {
 }
 
 #[test]
+fn remote_install_rejects_missing_integrity_hashes() {
+    let artifact_bytes = build_artifact_bytes();
+    let artifact_path = "v1/artifacts/sample/base/1.0.0/package.praypkg";
+    let listener = TcpListener::bind("127.0.0.1:0").expect("bind");
+    let address = listener.local_addr().expect("address");
+    let source_url = format!("http://{address}");
+    let mut metadata = registry_metadata(artifact_path, &artifact_bytes);
+    metadata.versions[0].artifact_hash = None;
+    metadata.versions[0].tree_hash = None;
+    thread::spawn(move || {
+        let (mut stream, _) = listener.accept().expect("accept");
+        let request = read_http_request(&mut stream);
+        assert!(request.contains("/v1/packages/sample/base.json"));
+        respond_json(
+            &mut stream,
+            &serde_json::to_vec(&metadata).expect("metadata json"),
+        );
+    });
+
+    let project_root = unique_temp_dir("pray-core-missing-hashes");
+    let declaration = ManifestPackage {
+        name: "sample/base".to_string(),
+        source: Some("default".to_string()),
+        ..ManifestPackage::default()
+    };
+    let error = resolve_registry_package_root(
+        &project_root,
+        &source_url,
+        &declaration,
+        &PackageResolutionContext::default(),
+    )
+    .expect_err("missing hashes must fail closed");
+    assert!(
+        error.to_string().contains("artifact_hash"),
+        "unexpected error: {error}"
+    );
+    let _ = fs::remove_dir_all(&project_root);
+}
+
+#[test]
 fn registry_package_version_merges_derived_metadata_without_conflict() {
     let mut existing = RegistryPackageVersion {
         version: "1.0.0".to_string(),
@@ -63,6 +105,7 @@ fn registry_package_version_merges_derived_metadata_without_conflict() {
         exports: vec![],
         signer: Some("publisher@example.com".to_string()),
         signer_fingerprint: None,
+        signer_public_key: None,
         published_at: Some("1".to_string()),
         signature: Some("signature".to_string()),
         derived_metadata: None,
@@ -203,8 +246,12 @@ fn handle_registry_request(
     let first_line = request.lines().next().expect("request line");
     let path = first_line.split_whitespace().nth(1).expect("request path");
     let range_header = request.lines().find_map(|line| {
-        line.strip_prefix("Range: ")
-            .map(|value| value.trim().to_string())
+        let (name, value) = line.split_once(':')?;
+        if name.eq_ignore_ascii_case("range") {
+            Some(value.trim().to_string())
+        } else {
+            None
+        }
     });
 
     if path == "/v1/packages/sample/base.json" {
@@ -331,18 +378,29 @@ fn parse_range(range_header: &str, total_length: usize) -> (usize, usize) {
 }
 
 fn registry_metadata(artifact_path: &str, artifact_bytes: &[u8]) -> RegistryPackageMetadata {
+    let prayspec = br#"
+Package::Specification.new do |spec|
+  spec.name = "sample/base"
+  spec.version = "1.0.0"
+  spec.files = ["package.prayspec"]
+end
+"#;
+    let mut file_bytes = BTreeMap::new();
+    file_bytes.insert("package.prayspec".to_string(), prayspec.to_vec());
+    let tree_hash = PackageSpec::tree_hash_from_file_bytes(&file_bytes).expect("tree hash");
     RegistryPackageMetadata {
         name: "sample/base".to_string(),
         versions: vec![RegistryPackageVersion {
             version: "1.0.0".to_string(),
             artifact: artifact_path.to_string(),
             artifact_hash: Some(sha256_prefixed(artifact_bytes)),
-            tree_hash: None,
+            tree_hash: Some(tree_hash),
             yanked: false,
             targets: vec![],
             exports: vec![],
             signer: None,
             signer_fingerprint: None,
+            signer_public_key: None,
             published_at: None,
             signature: None,
             derived_metadata: None,

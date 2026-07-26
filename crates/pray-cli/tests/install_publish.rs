@@ -250,6 +250,8 @@ fn publish_recovers_after_server_restart_and_uploads_over_http() {
             || failed_stderr.contains("timed out")
             || failed_stderr.contains("No such file")
             || failed_stderr.contains("unknown publish flag")
+            || failed_stderr.contains("error sending request"),
+        "unexpected publish failure: {failed_stderr}"
     );
     assert!(!registry_root.join("v1/packages/sample/base.json").exists());
 
@@ -278,4 +280,103 @@ fn publish_recovers_after_server_restart_and_uploads_over_http() {
 
     let _ = server.kill();
     let _ = server.wait();
+}
+
+#[test]
+fn publish_with_signing_key_writes_ed25519_package_signature() {
+    let repo = temporary_directory("pray-publish-ed25519");
+    let registry_root = temporary_directory("pray-publish-ed25519-root");
+    create_add_fixture(&repo);
+
+    let add = run_pray(&repo, &["add", "sample/base", "--path", "packages/base"]);
+    assert!(
+        add.status.success(),
+        "add failed: {}",
+        String::from_utf8_lossy(&add.stderr)
+    );
+
+    let signing_key = signing_key_from_seed(11);
+    let signing_key_path = write_private_key_file(&repo, "publish-signing-key.bin", &signing_key);
+    let expected_public_key = ssh_public_key_text(&signing_key);
+
+    let publish = run_pray(
+        &repo,
+        &[
+            "publish",
+            "--root",
+            registry_root.to_str().expect("registry path"),
+            "--signing-key",
+            signing_key_path.to_str().expect("signing key path"),
+        ],
+    );
+    assert!(
+        publish.status.success(),
+        "publish failed: {}",
+        String::from_utf8_lossy(&publish.stderr)
+    );
+
+    let package_metadata_path = registry_root.join("v1/packages/sample/base.json");
+    let package_metadata_text =
+        fs::read_to_string(&package_metadata_path).expect("package metadata");
+    let package_metadata: Value =
+        serde_json::from_str(&package_metadata_text).expect("package metadata json");
+    let version = &package_metadata["versions"][0];
+    let signature = version["signature"].as_str().expect("signature");
+    assert!(
+        signature.starts_with("ed25519:"),
+        "expected ed25519 signature, got {signature}"
+    );
+    assert_eq!(
+        version["signer_public_key"].as_str().expect("public key"),
+        expected_public_key
+    );
+    assert!(version["artifact_hash"]
+        .as_str()
+        .expect("artifact hash")
+        .starts_with("sha256:"));
+    assert!(version["tree_hash"]
+        .as_str()
+        .expect("tree hash")
+        .starts_with("sha256:"));
+}
+
+#[test]
+fn publish_without_signing_key_keeps_legacy_content_digest() {
+    let repo = temporary_directory("pray-publish-legacy-sig");
+    let registry_root = temporary_directory("pray-publish-legacy-sig-root");
+    create_add_fixture(&repo);
+
+    let add = run_pray(&repo, &["add", "sample/base", "--path", "packages/base"]);
+    assert!(
+        add.status.success(),
+        "add failed: {}",
+        String::from_utf8_lossy(&add.stderr)
+    );
+
+    let publish = run_pray(
+        &repo,
+        &[
+            "publish",
+            "--root",
+            registry_root.to_str().expect("registry path"),
+        ],
+    );
+    assert!(
+        publish.status.success(),
+        "publish failed: {}",
+        String::from_utf8_lossy(&publish.stderr)
+    );
+
+    let package_metadata_text =
+        fs::read_to_string(registry_root.join("v1/packages/sample/base.json"))
+            .expect("package metadata");
+    let package_metadata: Value =
+        serde_json::from_str(&package_metadata_text).expect("package metadata json");
+    let version = &package_metadata["versions"][0];
+    let signature = version["signature"].as_str().expect("signature");
+    assert!(
+        signature.starts_with("sha256:"),
+        "expected legacy content digest, got {signature}"
+    );
+    assert!(version["signer_public_key"].is_null());
 }
