@@ -4,6 +4,9 @@ export interface PackageExport {
   kind: PackageExportKind;
   path: string;
   summary?: string;
+  only?: string[];
+  except?: string[];
+  defaultPath?: string;
 }
 
 export interface PackageSkill {

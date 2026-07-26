@@ -24,10 +24,19 @@ export function removeManifestStatement(
   manifestText: string,
   packageName: string,
 ): string {
-  const prefix = `agent "${packageName}"`;
+  const prefixes = [
+    `pray "${packageName}"`,
+    `pray '${packageName}'`,
+    `use "${packageName}"`,
+    `include "${packageName}"`,
+    `agent "${packageName}"`,
+    `agent '${packageName}'`,
+    `package "${packageName}"`,
+    `package '${packageName}'`,
+  ];
   const lines = manifestText.split(/\r?\n/).filter((line) => {
     const trimmed = line.trim();
-    return !trimmed.startsWith(prefix);
+    return !prefixes.some((prefix) => trimmed.startsWith(prefix));
   });
   return `${lines.join("\n").replace(/\n*$/, "")}\n`;
 }

@@ -26,6 +26,14 @@ export interface ManifestSource {
   tag?: string;
 }
 
+export type DestinationMode = "legacy" | "compose" | "tree";
+
+export type ExportRole = "fragment" | "folder" | "file";
+
+export type DestinationEntry =
+  | { kind: "package"; name: string }
+  | { kind: "local"; path: string };
+
 export interface ManifestTarget {
   name: string;
   outputs: string[];
@@ -33,6 +41,9 @@ export interface ManifestTarget {
   commands: string[];
   rules: string[];
   maxBytes?: number;
+  mode?: DestinationMode;
+  scoped?: boolean;
+  entries?: DestinationEntry[];
 }
 
 export interface ManifestPackage {
@@ -50,12 +61,16 @@ export interface ManifestPackage {
   rev?: string;
   tarball?: string;
   oci?: string;
+  file?: string;
+  roles?: ExportRole[];
+  bound?: boolean;
 }
 
 export interface ManifestLocal {
   path: string;
   position: LocalPosition;
   optional: boolean;
+  bound?: boolean;
 }
 
 export interface RenderPolicy {
@@ -125,6 +140,13 @@ export function manifestToJson(manifest: Manifest): Record<string, unknown> {
       commands: target.commands,
       rules: target.rules,
       ...(target.maxBytes !== undefined ? { max_bytes: target.maxBytes } : {}),
+      mode: target.mode ?? "legacy",
+      scoped: target.scoped ?? false,
+      entries: (target.entries ?? []).map((entry) =>
+        entry.kind === "package"
+          ? { kind: "package", name: entry.name }
+          : { kind: "local", path: entry.path },
+      ),
     })),
     packages: canonical.packages.map((packageEntry) => ({
       name: packageEntry.name,
@@ -141,11 +163,15 @@ export function manifestToJson(manifest: Manifest): Record<string, unknown> {
       ...(packageEntry.rev ? { rev: packageEntry.rev } : {}),
       ...(packageEntry.tarball ? { tarball: packageEntry.tarball } : {}),
       ...(packageEntry.oci ? { oci: packageEntry.oci } : {}),
+      ...(packageEntry.file ? { file: packageEntry.file } : {}),
+      roles: packageEntry.roles ?? [],
+      bound: packageEntry.bound ?? false,
     })),
     local: canonical.local.map((entry) => ({
       path: entry.path,
       position: entry.position,
       optional: entry.optional,
+      bound: entry.bound ?? false,
     })),
     render: {
       mode: canonical.render.mode,

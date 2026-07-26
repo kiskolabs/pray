@@ -42,29 +42,37 @@ export function manifestHash(manifest: Manifest): string {
   return sha256Prefixed(bytes);
 }
 
-export function formatPackageDeclaration(
-  packageEntry: ManifestPackage,
-): string {
-  const parts = [`agent "${packageEntry.name}"`];
-  if (packageEntry.constraint !== "*") {
-    parts.push(`"${packageEntry.constraint}"`);
-  }
-  if (packageEntry.path) {
-    parts.push(`path: "${packageEntry.path}"`);
-  }
-  if (packageEntry.source) {
-    parts.push(`source: "${packageEntry.source}"`);
-  }
-  if (packageEntry.exports.length > 0) {
-    parts.push(
-      `exports: [${packageEntry.exports.map((value) => `"${value}"`).join(", ")}]`,
-    );
-  }
-  if (packageEntry.optional) {
-    parts.push("optional: true");
-  }
-  return parts.join(", ");
-}
+export {
+  bindLocalEntry,
+  bindPackageEntry,
+  destinationTargetName,
+  exportKindMatchesRole,
+  isLocalPathForm,
+  localBound,
+  newDestinationTarget,
+  packageBound,
+  packageBoundToCompose,
+  packageBoundToTree,
+  packageRoles,
+  roleForDestination,
+  targetEntries,
+  targetMode,
+  targetScoped,
+  upsertLocal,
+  upsertPackage,
+} from "./destination.js";
+export {
+  classifyFormatHints,
+  formatRecommended,
+  type PackageFormatHint,
+  recommendManifest,
+  usesDestinationDsl,
+} from "./format-manifest.js";
+export { serializeRecommended } from "./format-serialize.js";
+export {
+  formatPackageDeclaration,
+  replacePackageDeclaration,
+} from "./package-declaration.js";
 
 export {
   canonicalManifest,

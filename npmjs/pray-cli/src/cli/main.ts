@@ -157,6 +157,7 @@ export async function runCli(argumentsList: string[]): Promise<number> {
         return 0;
       }
       case "format":
+      case "fmt":
         await runFormat();
         return 0;
       case "package":

@@ -15,4 +15,4 @@ export type LineEndings = "lf" | "crlf" | "native";
 
 export type LocalPosition = "before" | "after";
 
-export type PackageExportKind = "fragment" | "folder" | "skill";
+export type PackageExportKind = "fragment" | "folder" | "skill" | "file";

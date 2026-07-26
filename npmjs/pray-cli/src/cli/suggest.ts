@@ -5,6 +5,7 @@ export const TOP_LEVEL_COMMANDS = [
   "confess",
   "drift",
   "explain",
+  "fmt",
   "format",
   "help",
   "init",

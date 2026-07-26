@@ -49,12 +49,18 @@ export function parseExports(value: string): Map<string, PackageExport> {
     if (!path) {
       throw PrayError.parse(PARSE_CONTEXT, `export ${name} missing path`);
     }
+    const only = mapStringArray(entry, "only");
+    const except = mapStringArray(entry, "except");
+    const defaultPath = mapString(entry, "default_path");
     exports.set(name, {
       kind: (mapString(entry, "type") ?? "fragment") as PackageExportKind,
       path,
       ...(mapString(entry, "summary")
         ? { summary: mapString(entry, "summary") }
         : {}),
+      ...(only.length > 0 ? { only } : {}),
+      ...(except.length > 0 ? { except } : {}),
+      ...(defaultPath ? { defaultPath } : {}),
     });
   }
   return exports;
@@ -138,4 +144,18 @@ function mapString(
 ): string | undefined {
   const value = map.get(key);
   return value ? literalAsString(value) : undefined;
+}
+
+function mapStringArray(map: Map<string, LiteralValue>, key: string): string[] {
+  const value = map.get(key);
+  if (!value) {
+    return [];
+  }
+  const entries = literalAsArray(value);
+  if (!entries) {
+    return [];
+  }
+  return entries
+    .map((entry) => literalAsString(entry))
+    .filter((entry): entry is string => Boolean(entry));
 }

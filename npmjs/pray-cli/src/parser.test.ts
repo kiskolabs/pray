@@ -59,7 +59,9 @@ end
       (error: unknown) =>
         error instanceof PrayError &&
         error.kind === "parse" &&
-        error.message.includes("nested group blocks are not supported"),
+        error.message.includes(
+          "group blocks only support agent, package, or pray declarations",
+        ),
     );
   });
 
@@ -75,8 +77,22 @@ end
       (error: unknown) =>
         error instanceof PrayError &&
         error.kind === "parse" &&
-        error.message.includes("group blocks only support agent or package"),
+        error.message.includes(
+          "group blocks only support agent, package, or pray declarations",
+        ),
     );
+  });
+
+  it("accepts pray declarations inside group blocks", () => {
+    const manifest = parseManifest(`
+prayfile "1"
+group :development do
+  pray "sample/dev", "*"
+end
+`);
+
+    assert.deepEqual(manifest.packages[0]?.groups, ["development"]);
+    assert.equal(manifest.packages[0]?.name, "sample/dev");
   });
 
   it("parses minimal package spec example", () => {
@@ -108,6 +124,76 @@ end
       "exports/testing-basics.md",
     );
     assert.equal(packageSpec.dependencies[0]?.name, "sample/common");
+  });
+
+  it("parses compose blocks with pray and local entries", () => {
+    const manifest = parseManifest(`
+prayfile "1"
+compose "AGENTS.md" do
+  pray ".agents/project.md"
+  pray "sample/rules", "~> 1.0", path: "packages/rules"
+end
+`);
+
+    assert.equal(manifest.targets[0]?.mode, "compose");
+    assert.equal(manifest.targets[0]?.scoped, true);
+    assert.deepEqual(manifest.targets[0]?.outputs, ["AGENTS.md"]);
+    assert.deepEqual(manifest.targets[0]?.entries, [
+      { kind: "local", path: ".agents/project.md" },
+      { kind: "package", name: "sample/rules" },
+    ]);
+    assert.equal(manifest.local[0]?.bound, true);
+    assert.equal(manifest.packages[0]?.bound, true);
+  });
+
+  it("parses tree blocks scoping packages to a provisioned folder", () => {
+    const manifest = parseManifest(`
+prayfile "1"
+tree ".agents/skills" do
+  pray "sample/audit", "~> 1.0", path: "packages/audit"
+end
+`);
+
+    assert.equal(manifest.targets[0]?.mode, "tree");
+    assert.equal(manifest.targets[0]?.scoped, true);
+    assert.deepEqual(manifest.targets[0]?.skills, [".agents/skills"]);
+    assert.equal(manifest.packages[0]?.bound, true);
+  });
+
+  it("parses file: on a pray declaration for exact bindings", () => {
+    const manifest = parseManifest(`
+prayfile "1"
+pray "sample/security", "~> 1.0", path: "packages/security", file: "SECURITY.md"
+`);
+
+    assert.equal(manifest.packages[0]?.file, "SECURITY.md");
+    assert.deepEqual(manifest.packages[0]?.roles, ["file"]);
+  });
+
+  it("parses a file block with a single pray declaration", () => {
+    const manifest = parseManifest(`
+prayfile "1"
+file "SECURITY.md" do
+  pray "sample/security", "~> 1.0", path: "packages/security"
+end
+`);
+
+    assert.equal(manifest.packages[0]?.file, "SECURITY.md");
+  });
+
+  it("rejects a file block without a pray declaration", () => {
+    assert.throws(
+      () =>
+        parseManifest(`
+prayfile "1"
+file "SECURITY.md" do
+end
+`),
+      (error: unknown) =>
+        error instanceof PrayError &&
+        error.kind === "parse" &&
+        error.message.includes("requires a pray package declaration"),
+    );
   });
 
   it("rejects manifest without prayfile version", () => {
