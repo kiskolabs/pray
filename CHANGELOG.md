@@ -2,6 +2,11 @@
 
 ## Unreleased
 
+## 1.3.0 (2026-07-26)
+
+- Add recommended Prayfile destination forms: `compose`, `tree`, and `pray` with `file:`.
+- Select default exports from destination context (fragment, folder or skill, file).
+- Add `pray format` (`fmt`) to rewrite Prayfile to the recommended destination DSL.
 - Use a single HTTP client for release checks and trust-feed retrieval.
 - Allow slim CLI builds to omit local registry authentication storage.
 
