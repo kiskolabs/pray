@@ -17,6 +17,7 @@ fn unique_temp_dir(label: &str) -> PathBuf {
     std::env::temp_dir().join(format!("{label}-{stamp}"))
 }
 
+#[allow(clippy::too_many_arguments)]
 fn write_package(
     root: &Path,
     directory: &str,
@@ -376,6 +377,73 @@ end
 }
 
 #[test]
+fn formats_legacy_package_with_multiple_fragment_exports() {
+    let root = unique_temp_dir("pray-format-multi-fragment");
+    fs::create_dir_all(root.join(".agents")).expect("agents");
+    fs::create_dir_all(root.join("packages/base/exports")).expect("exports");
+    fs::write(
+        root.join("packages/base/sample-base.prayspec"),
+        r#"
+Package::Specification.new do |spec|
+  spec.name = "sample/base"
+  spec.version = "1.4.3"
+  spec.summary = "shared guidance"
+  spec.files = ["exports/testing-basics.md", "exports/security-basics.md"]
+  spec.exports = {
+    "testing-basics" => {
+      type: "fragment",
+      path: "exports/testing-basics.md",
+      summary: "Testing guidance"
+    },
+    "security-basics" => {
+      type: "fragment",
+      path: "exports/security-basics.md",
+      summary: "Security guidance"
+    }
+  }
+end
+"#,
+    )
+    .expect("prayspec");
+    fs::write(
+        root.join("packages/base/exports/testing-basics.md"),
+        "Testing guidance\n",
+    )
+    .expect("testing");
+    fs::write(
+        root.join("packages/base/exports/security-basics.md"),
+        "Security guidance\n",
+    )
+    .expect("security");
+    fs::write(root.join(".agents/project.md"), "Local\n").expect("local");
+    let original = r#"
+prayfile "1"
+target :tool_a do
+  output "INSTRUCTIONS.md"
+end
+agent "sample/base", "~> 1.4", path: "packages/base"
+local ".agents/project.md"
+"#;
+    fs::write(root.join("Prayfile"), original).expect("prayfile");
+    let project =
+        resolve_project_in_context(&root.join("Prayfile"), &root, &ResolveOptions::default())
+            .expect("resolve");
+    let hints = classify_format_hints(&project);
+    let manifest = parse_manifest(original).expect("parse");
+    let formatted = format_recommended(&manifest, &hints).expect("format");
+    assert!(formatted.contains("exports: ["));
+    assert!(formatted.contains("\"testing-basics\""));
+    assert!(formatted.contains("\"security-basics\""));
+    let formatted_manifest = parse_manifest(&formatted).expect("parse formatted");
+    assert_eq!(formatted_manifest.packages[0].exports.len(), 2);
+    fs::write(root.join("Prayfile"), &formatted).expect("write formatted");
+    let resolved_again =
+        resolve_project_in_context(&root.join("Prayfile"), &root, &ResolveOptions::default())
+            .expect("resolve formatted");
+    assert_eq!(resolved_again.packages[0].selected_exports.len(), 2);
+}
+
+#[test]
 fn recommend_manifest_classifies_roles_from_hints() {
     let manifest = parse_manifest(
         r#"
@@ -395,6 +463,7 @@ agent "sample/audit", "~> 1.0", path: "packages/audit"
         pray_core::format_manifest::PackageFormatHint {
             roles: vec![ExportRole::Fragment],
             file_path: None,
+            exports: Vec::new(),
         },
     );
     hints.insert(
@@ -402,6 +471,7 @@ agent "sample/audit", "~> 1.0", path: "packages/audit"
         pray_core::format_manifest::PackageFormatHint {
             roles: vec![ExportRole::Folder],
             file_path: None,
+            exports: Vec::new(),
         },
     );
     let recommended = recommend_manifest(&manifest, &hints);

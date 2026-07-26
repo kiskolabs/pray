@@ -184,6 +184,12 @@ fn format_normalizes_pray_markers_and_line_endings() {
     assert!(!formatted.contains("<!--  pray:"));
     assert!(!formatted.contains("   -->"));
 
+    // Format may rewrite Prayfile (legacy → destination DSL); refresh the lockfile.
+    assert!(
+        run_pray(&repo, &["install"]).status.success(),
+        "reinstall after format failed"
+    );
+
     let verify = run_pray(&repo, &["verify"]);
     assert!(
         verify.status.success(),

@@ -811,7 +811,6 @@ fn preview_remote_updates(selected_package: Option<&str>, json: bool) -> PrayRes
 }
 
 #[cfg(feature = "auth")]
-
 fn install_command(
     locked: bool,
     frozen: bool,

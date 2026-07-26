@@ -13,6 +13,8 @@ use std::collections::{BTreeMap, BTreeSet};
 pub struct PackageFormatHint {
     pub roles: Vec<ExportRole>,
     pub file_path: Option<String>,
+    /// Export names that must stay explicit after migration when a role is ambiguous.
+    pub exports: Vec<String>,
 }
 
 pub fn uses_destination_dsl(manifest: &Manifest) -> bool {
@@ -56,12 +58,45 @@ pub fn classify_format_hints(project: &ResolvedProject) -> BTreeMap<String, Pack
                     .or_else(|| Some(export_name.clone()));
             }
         }
+        let exports =
+            ambiguous_exports_for_roles(&package.selected_exports, &package.spec.exports, &roles);
         hints.insert(
             package.declaration.name.clone(),
-            PackageFormatHint { roles, file_path },
+            PackageFormatHint {
+                roles,
+                file_path,
+                exports,
+            },
         );
     }
     hints
+}
+
+fn ambiguous_exports_for_roles(
+    selected_exports: &[String],
+    exports: &BTreeMap<String, crate::package_spec::PackageExport>,
+    roles: &[ExportRole],
+) -> Vec<String> {
+    let mut ambiguous = Vec::new();
+    for role in roles {
+        let matching: Vec<String> = selected_exports
+            .iter()
+            .filter(|export_name| {
+                exports
+                    .get(*export_name)
+                    .is_some_and(|export| export_kind_matches_role(&export.kind, *role))
+            })
+            .cloned()
+            .collect();
+        if matching.len() > 1 {
+            for export_name in matching {
+                if !ambiguous.contains(&export_name) {
+                    ambiguous.push(export_name);
+                }
+            }
+        }
+    }
+    ambiguous
 }
 
 pub fn recommend_manifest(
@@ -229,6 +264,9 @@ fn apply_format_hints(
             }
             if package.file.is_none() {
                 package.file = hint.file_path.clone();
+            }
+            if package.exports.is_empty() && !hint.exports.is_empty() {
+                package.exports = hint.exports.clone();
             }
         }
         if package.file.is_some() && !package.roles.contains(&ExportRole::File) {

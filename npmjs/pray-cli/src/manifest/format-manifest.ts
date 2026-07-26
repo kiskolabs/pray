@@ -22,6 +22,8 @@ import { canonicalManifest, manifestToJson } from "./types.js";
 export interface PackageFormatHint {
   roles: ExportRole[];
   filePath?: string;
+  /** Export names that must stay explicit after migration when a role is ambiguous. */
+  exports?: string[];
 }
 
 export function usesDestinationDsl(manifest: Manifest): boolean {
@@ -68,9 +70,39 @@ export function classifyFormatHints(
         filePath = exportEntry.defaultPath ?? exportName;
       }
     }
-    hints.set(packageEntry.declaration.name, { roles, filePath });
+    const exports = ambiguousExportsForRoles(
+      packageEntry.selectedExports,
+      packageEntry.spec.exports,
+      roles,
+    );
+    hints.set(packageEntry.declaration.name, { roles, filePath, exports });
   }
   return hints;
+}
+
+function ambiguousExportsForRoles(
+  selectedExports: string[],
+  exports: Map<string, { kind: string }>,
+  roles: ExportRole[],
+): string[] {
+  const ambiguous: string[] = [];
+  for (const role of roles) {
+    const matching = selectedExports.filter((exportName) => {
+      const exportEntry = exports.get(exportName);
+      return (
+        exportEntry !== undefined &&
+        exportKindMatchesRole(exportEntry.kind, role)
+      );
+    });
+    if (matching.length > 1) {
+      for (const exportName of matching) {
+        if (!ambiguous.includes(exportName)) {
+          ambiguous.push(exportName);
+        }
+      }
+    }
+  }
+  return ambiguous;
 }
 
 export function recommendManifest(
@@ -273,6 +305,13 @@ function applyFormatHints(
       packageEntry.roles = roles;
       if (!packageEntry.file) {
         packageEntry.file = hint.filePath;
+      }
+      if (
+        packageEntry.exports.length === 0 &&
+        hint.exports &&
+        hint.exports.length > 0
+      ) {
+        packageEntry.exports = [...hint.exports];
       }
     }
     if (packageEntry.file && !packageRoles(packageEntry).includes("file")) {
