@@ -1,5 +1,12 @@
 # CHANGELOG
 
+## 1.3.0 (2026-07-26)
+
+- Add destination DSL parsing: `compose`, `tree`, and `file:` blocks in `Prayfile` for scoped rendering and exact file bindings, matching `pray-core`.
+- Add role-based export selection (`fragment`, `folder`, `file`) so packages without an explicit `export:` resolve unambiguous exports automatically.
+- Add `format`/`fmt` command to rewrite a legacy `Prayfile` into the recommended destination DSL and normalize marker comments in rendered lockfile outputs.
+- Emit `pray` as the canonical package declaration keyword when formatting or editing manifests, while still accepting `use`, `include`, `agent`, and `package` on read for backward compatibility.
+
 ## 1.1.0 (2026-07-14)
 
 - Add environment-aware rendering with `group` blocks and `--env` or `PRAY_ENV`.

@@ -33,10 +33,12 @@ export async function resolvePackageRoot(
     return { root: resolve(projectRoot, declaration.path) };
   }
 
-  if (declaration.source) {
-    const source = sources.get(declaration.source);
+  const sourceName = impliedSourceName(declaration, sources);
+
+  if (sourceName) {
+    const source = sources.get(sourceName);
     if (!source) {
-      throw PrayError.resolution(`unknown source: ${declaration.source}`);
+      throw PrayError.resolution(`unknown source: ${sourceName}`);
     }
 
     const registryOptions = {
@@ -115,6 +117,33 @@ export async function resolvePackageRoot(
 
   const slug = declaration.name.replaceAll("/", "-");
   return { root: resolve(projectRoot, slug) };
+}
+
+function packageNamespace(name: string): string | undefined {
+  const separator = name.indexOf("/");
+  return separator === -1 ? undefined : name.slice(0, separator);
+}
+
+function impliedSourceName(
+  declaration: ManifestPackage,
+  sources: Map<string, ManifestSource>,
+): string | undefined {
+  if (declaration.source) {
+    return declaration.source;
+  }
+  const namespace = packageNamespace(declaration.name);
+  if (namespace && sources.has(namespace)) {
+    return namespace;
+  }
+  if (sources.size === 1) {
+    return sources.keys().next()?.value;
+  }
+  if (sources.size > 1) {
+    throw PrayError.resolution(
+      `package ${declaration.name} requires source: when multiple sources are declared and the package namespace does not match a source`,
+    );
+  }
+  return undefined;
 }
 
 export function vendoredPackageRoot(

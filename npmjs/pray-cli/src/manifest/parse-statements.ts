@@ -10,8 +10,13 @@ import {
   stringFromValue,
 } from "../literal/call-parser.js";
 import { parseLiteral } from "../literal/parser.js";
-import { literalAsBool, literalAsInteger } from "../literal/types.js";
+import {
+  literalAsBool,
+  literalAsInteger,
+  literalAsString,
+} from "../literal/types.js";
 import type {
+  ExportRole,
   ManifestLocal,
   ManifestPackage,
   ManifestSource,
@@ -141,6 +146,19 @@ export function parsePackageDecl(rest: string): ManifestPackage {
   const constraint = values[1]
     ? normalizeVersionConstraint(stringFromValue(values[1], PARSE_CONTEXT))
     : "*";
+  const exports = keywordArray(keywords, "exports");
+  if (keywords.has("export")) {
+    const single = literalAsString(
+      keywordValue(keywords, "export", PARSE_CONTEXT),
+    );
+    if (single && !exports.includes(single)) {
+      exports.push(single);
+    }
+  }
+  const file = keywords.has("file")
+    ? literalAsString(keywordValue(keywords, "file", PARSE_CONTEXT))
+    : undefined;
+  const roles: ExportRole[] = file ? ["file"] : [];
   return {
     name,
     constraint,
@@ -150,7 +168,7 @@ export function parsePackageDecl(rest: string): ManifestPackage {
           PARSE_CONTEXT,
         )
       : undefined,
-    exports: keywordArray(keywords, "exports"),
+    exports,
     targets: keywordArray(keywords, "targets"),
     features: keywordArray(keywords, "features"),
     groups: [],
@@ -194,6 +212,9 @@ export function parsePackageDecl(rest: string): ManifestPackage {
           PARSE_CONTEXT,
         )
       : undefined,
+    file,
+    roles,
+    bound: false,
   };
 }
 

@@ -156,6 +156,7 @@ function isTopLevelCommand(token: string): boolean {
     "verify",
     "drift",
     "format",
+    "fmt",
     "package",
     "publish",
     "login",

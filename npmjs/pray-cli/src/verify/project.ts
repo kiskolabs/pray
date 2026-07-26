@@ -4,6 +4,7 @@ import { PrayError } from "../errors.js";
 import {
   checksumManagedBodyLineRefs,
   normalizeLineEndings,
+  sha256Prefixed,
 } from "../hashing.js";
 import type { Lockfile, ManagedSpanRecord } from "../lockfile/types.js";
 import { renderProject } from "../render/project.js";
@@ -191,6 +192,10 @@ function collectVerificationReport(
     }
   }
 
+  for (const packageEntry of project.packages) {
+    verifyExclusiveFileBinding(packageEntry, project, report);
+  }
+
   for (const local of project.localFiles) {
     if (local.optional) {
       continue;
@@ -204,6 +209,45 @@ function collectVerificationReport(
   }
 
   return { report, renderedTargets };
+}
+
+function verifyExclusiveFileBinding(
+  packageEntry: ResolvedProject["packages"][number],
+  project: ResolvedProject,
+  report: VerificationReport,
+): void {
+  const destination = packageEntry.declaration.file;
+  if (!destination) {
+    return;
+  }
+  const absolute = resolve(project.projectRoot, destination);
+  const exportName = packageEntry.selectedExports.find((name) => {
+    return packageEntry.spec.exports.get(name)?.kind === "file";
+  });
+  if (!exportName) {
+    report.findings.push({
+      kind: "verify_error",
+      message: `Package \`${packageEntry.declaration.name}\` declares file: "${destination}" but has no selected file export.`,
+    });
+    return;
+  }
+  if (!existsSync(absolute)) {
+    report.findings.push({
+      kind: "verify_error",
+      message: `Exclusive file \`${destination}\` from \`${packageEntry.declaration.name}\` is missing. Run \`pray install\` to materialize it.`,
+    });
+    return;
+  }
+  const exportEntry = packageEntry.spec.exports.get(exportName);
+  const source = resolve(packageEntry.root, exportEntry?.path ?? "");
+  const destinationBytes = readFileSync(absolute);
+  const sourceBytes = readFileSync(source);
+  if (sha256Prefixed(destinationBytes) !== sha256Prefixed(sourceBytes)) {
+    report.findings.push({
+      kind: "package_integrity",
+      message: `Exclusive file \`${destination}\` no longer matches package \`${packageEntry.declaration.name}\`. Run \`pray install\` to restore it.`,
+    });
+  }
 }
 
 function isWarning(finding: VerificationFinding): boolean {
