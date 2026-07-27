@@ -78,6 +78,7 @@ function projectWithEnvironment(
       ],
       packages: packages.map((packageEntry) => packageEntry.declaration),
       local: [],
+      symbols: {},
       render: {
         mode: "managed",
         conflict: "fail",

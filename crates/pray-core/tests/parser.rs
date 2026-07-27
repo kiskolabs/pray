@@ -210,6 +210,51 @@ agent "sample/base", "1.0.0", source: :team
 }
 
 #[test]
+fn parses_pray_symbol_block() {
+    let manifest = parse_manifest(
+        r#"
+prayfile "1"
+pray do
+  support_email "contact@kiskolabs.com"
+  security_email "security@kiskolabs.com"
+end
+pray "sample/base", "~> 1.0"
+"#,
+    )
+    .expect("manifest parses");
+
+    assert_eq!(
+        manifest.symbols.get("support_email").map(String::as_str),
+        Some("contact@kiskolabs.com")
+    );
+    assert_eq!(
+        manifest.symbols.get("security_email").map(String::as_str),
+        Some("security@kiskolabs.com")
+    );
+}
+
+#[test]
+fn rejects_duplicate_pray_symbols() {
+    let error = parse_manifest(
+        r#"
+prayfile "1"
+pray do
+  support_email "a@example.com"
+  support_email "b@example.com"
+end
+"#,
+    )
+    .expect_err("duplicate symbols should fail");
+
+    match error {
+        PrayError::Parse { message, .. } => {
+            assert!(message.contains("duplicate pray symbol"));
+        }
+        other => panic!("unexpected error: {other:?}"),
+    }
+}
+
+#[test]
 fn rejects_manifest_without_prayfile_version() {
     let error = parse_manifest(
         r#"

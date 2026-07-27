@@ -2,6 +2,7 @@ import { packageMatchesEnvironment } from "../environment.js";
 import { targetEntries } from "../manifest/destination.js";
 import type { ManifestTarget } from "../manifest/types.js";
 import type { ResolvedProject } from "../resolve/types.js";
+import { substitutePraySymbols } from "../substitute.js";
 import { ContentBuilder } from "./content-builder.js";
 import { appendHeaderIfEnabled } from "./header.js";
 import { appendManagedExport, shouldInlineExport } from "./managed-export.js";
@@ -52,7 +53,9 @@ function appendLocalEntry(
   if (local.content.length === 0 && local.optional) {
     return;
   }
-  builder.appendBody(local.content);
+  builder.appendBody(
+    substitutePraySymbols(local.content, project.manifest.symbols ?? {}),
+  );
   builder.appendEmptyLine();
 }
 
@@ -89,6 +92,7 @@ function appendPackageEntry(
       exportName,
       target,
       output,
+      project.manifest.symbols ?? {},
     );
   }
 }

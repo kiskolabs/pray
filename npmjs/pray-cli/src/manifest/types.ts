@@ -88,6 +88,7 @@ export interface Manifest {
   targets: ManifestTarget[];
   packages: ManifestPackage[];
   local: ManifestLocal[];
+  symbols: Record<string, string>;
   render: RenderPolicy;
 }
 
@@ -117,6 +118,11 @@ export function canonicalManifest(manifest: Manifest): Manifest {
     ),
     local: [...manifest.local].sort((left, right) =>
       left.path.localeCompare(right.path),
+    ),
+    symbols: Object.fromEntries(
+      Object.entries(manifest.symbols ?? {}).sort(([left], [right]) =>
+        left.localeCompare(right),
+      ),
     ),
   };
 }
@@ -173,6 +179,9 @@ export function manifestToJson(manifest: Manifest): Record<string, unknown> {
       optional: entry.optional,
       bound: entry.bound ?? false,
     })),
+    ...(Object.keys(canonical.symbols ?? {}).length > 0
+      ? { symbols: canonical.symbols }
+      : {}),
     render: {
       mode: canonical.render.mode,
       conflict: canonical.render.conflict,

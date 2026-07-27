@@ -1,9 +1,10 @@
-import { copyFileSync, existsSync, mkdirSync } from "node:fs";
+import { existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import { basename, resolve } from "node:path";
 import { packageMatchesEnvironment } from "../environment.js";
 import { PrayError } from "../errors.js";
 import { packageBoundToTree } from "../manifest/destination.js";
 import type { ResolvedPackage, ResolvedProject } from "../resolve/types.js";
+import { substitutePraySymbols } from "../substitute.js";
 
 export interface PlannedProvisionedFile {
   path: string;
@@ -68,8 +69,36 @@ export function materializeProvisionedExports(project: ResolvedProject): void {
   for (const file of plannedProvisionedFiles(project)) {
     const destination = resolve(project.projectRoot, file.path);
     mkdirSync(resolve(destination, ".."), { recursive: true });
-    copyFileSync(file.source, destination);
+    writeProvisionedFile(
+      file.source,
+      destination,
+      project.manifest.symbols ?? {},
+    );
   }
+}
+
+export function expectedProvisionedBytes(
+  source: string,
+  symbols: Record<string, string>,
+): Buffer {
+  const bytes = readFileSync(source);
+  try {
+    const decoded = new TextDecoder("utf-8", { fatal: true }).decode(bytes);
+    return Buffer.from(substitutePraySymbols(decoded, symbols), "utf8");
+  } catch (error) {
+    if (error instanceof PrayError) {
+      throw error;
+    }
+    return bytes;
+  }
+}
+
+function writeProvisionedFile(
+  source: string,
+  destination: string,
+  symbols: Record<string, string>,
+): void {
+  writeFileSync(destination, expectedProvisionedBytes(source, symbols));
 }
 
 function collectExactFileBindings(

@@ -171,6 +171,7 @@ fn migrate_legacy_manifest(
         targets: Vec::new(),
         packages: manifest.packages.clone(),
         local: manifest.local.clone(),
+        symbols: manifest.symbols.clone(),
         render: manifest.render.clone(),
     };
 

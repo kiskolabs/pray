@@ -1,5 +1,10 @@
 prayfile "1"
 
+pray do
+  support_email "contact@kiskolabs.com"
+  security_email "security@kiskolabs.com"
+end
+
 source "amkisko", git: "https://github.com/amkisko/prayers.git"
 
 compose "AGENTS.md" do

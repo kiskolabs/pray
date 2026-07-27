@@ -154,7 +154,7 @@ end
     mkdirSync(join(root, "packages/security/exports"), { recursive: true });
     writeFileSync(
       join(root, "packages/security/exports/SECURITY.md"),
-      "# Security Policy\n",
+      "# Security Policy\n\nEmail: ((pray:security_email))\n",
     );
     writeFileSync(
       join(root, "packages/security/security.prayspec"),
@@ -179,6 +179,9 @@ end
       join(root, "Prayfile"),
       `
 prayfile "1"
+pray do
+  security_email "security@example.com"
+end
 compose "AGENTS.md" do
   pray ".agents/project.md"
   pray "sample/rules", "~> 1.0", path: "packages/rules"
@@ -213,7 +216,10 @@ agent "sample/unbound", "~> 1.0", path: "packages/unbound"
 
     writeRenderedTargets(project, rendered);
     const security = readFileSync(join(root, "SECURITY.md"), "utf8");
-    assert.equal(security, "# Security Policy\n");
+    assert.equal(
+      security,
+      "# Security Policy\n\nEmail: security@example.com\n",
+    );
 
     const lockfile = buildLockfile({
       manifestHash: project.manifestHash,

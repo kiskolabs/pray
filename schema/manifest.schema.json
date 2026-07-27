@@ -42,6 +42,16 @@
         "$ref": "#/$defs/manifestLocal"
       }
     },
+    "symbols": {
+      "type": "object",
+      "additionalProperties": {
+        "type": "string"
+      },
+      "propertyNames": {
+        "type": "string",
+        "pattern": "^[A-Za-z0-9._/-]+$"
+      }
+    },
     "render": {
       "$ref": "#/$defs/renderPolicy"
     }

@@ -26,6 +26,18 @@ export function serializeRecommended(manifest: Manifest): string {
     }
   }
 
+  const symbolEntries = Object.entries(manifest.symbols ?? {}).sort(
+    ([left], [right]) => left.localeCompare(right),
+  );
+  if (symbolEntries.length > 0) {
+    lines.push("");
+    lines.push("pray do");
+    for (const [key, value] of symbolEntries) {
+      lines.push(`  ${key} "${value}"`);
+    }
+    lines.push("end");
+  }
+
   for (const target of manifest.targets) {
     if (!target.scoped) {
       continue;
