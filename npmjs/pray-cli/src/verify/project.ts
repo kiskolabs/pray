@@ -7,6 +7,7 @@ import {
   sha256Prefixed,
 } from "../hashing.js";
 import type { Lockfile, ManagedSpanRecord } from "../lockfile/types.js";
+import { expectedProvisionedBytes } from "../render/provisioned.js";
 import { renderProject } from "../render/project.js";
 import { missingLocalEmbedGuidance } from "../resolve/project.js";
 import type { ResolvedProject } from "../resolve/types.js";
@@ -241,8 +242,11 @@ function verifyExclusiveFileBinding(
   const exportEntry = packageEntry.spec.exports.get(exportName);
   const source = resolve(packageEntry.root, exportEntry?.path ?? "");
   const destinationBytes = readFileSync(absolute);
-  const sourceBytes = readFileSync(source);
-  if (sha256Prefixed(destinationBytes) !== sha256Prefixed(sourceBytes)) {
+  const expectedBytes = expectedProvisionedBytes(
+    source,
+    project.manifest.symbols ?? {},
+  );
+  if (sha256Prefixed(destinationBytes) !== sha256Prefixed(expectedBytes)) {
     report.findings.push({
       kind: "package_integrity",
       message: `Exclusive file \`${destination}\` no longer matches package \`${packageEntry.declaration.name}\`. Run \`pray install\` to restore it.`,

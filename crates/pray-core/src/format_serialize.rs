@@ -14,6 +14,15 @@ pub(crate) fn serialize_recommended(manifest: &Manifest) -> String {
         }
     }
 
+    if !manifest.symbols.is_empty() {
+        lines.push(String::new());
+        lines.push("pray do".to_string());
+        for (key, value) in &manifest.symbols {
+            lines.push(format!("  {key} \"{value}\""));
+        }
+        lines.push("end".to_string());
+    }
+
     for target in &manifest.targets {
         if !target.scoped {
             continue;

@@ -1,6 +1,6 @@
 use crate::hashing::{checksum_managed_body_line_refs, normalize_line_endings, sha256_prefixed};
 use crate::lockfile::{Lockfile, ManagedSpanRecord};
-use crate::render::render_project;
+use crate::render::{expected_provisioned_bytes, render_project};
 use crate::resolve::{missing_local_embed_guidance, ResolvedProject};
 use crate::{PrayError, PrayResult};
 use std::collections::{BTreeMap, BTreeSet, HashSet};
@@ -220,8 +220,8 @@ fn collect_verification_report(
             continue;
         }
         let destination_bytes = fs::read(&absolute)?;
-        let source_bytes = fs::read(&source)?;
-        if sha256_prefixed(&destination_bytes) != sha256_prefixed(&source_bytes) {
+        let expected_bytes = expected_provisioned_bytes(&source, &project.manifest.symbols)?;
+        if sha256_prefixed(&destination_bytes) != sha256_prefixed(&expected_bytes) {
             report.findings.push(VerificationFinding {
                 kind: "package_integrity".to_string(),
                 message: format!(

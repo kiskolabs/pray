@@ -322,6 +322,89 @@ end
 }
 
 #[test]
+fn file_export_substitutes_pray_symbols() {
+    let root = unique_temp_dir("pray-symbol-file");
+    write_package(
+        &root,
+        "security",
+        "sample/security",
+        "security",
+        "file",
+        "exports/SECURITY.md",
+        "Email: ((pray:security_email))\n",
+        &["exports/SECURITY.md"],
+    );
+    fs::write(
+        root.join("Prayfile"),
+        r#"
+prayfile "1"
+pray do
+  security_email "security@example.com"
+end
+pray "sample/security", "~> 1.0", path: "packages/security", file: "SECURITY.md"
+"#,
+    )
+    .expect("prayfile");
+
+    let project =
+        resolve_project_in_context(&root.join("Prayfile"), &root, &ResolveOptions::default())
+            .expect("resolve");
+    write_rendered_targets(&project, &[]).expect("materialize");
+    let content = fs::read_to_string(root.join("SECURITY.md")).expect("security");
+    assert_eq!(content, "Email: security@example.com\n");
+    let lockfile = build_lockfile(
+        project.manifest_hash.clone(),
+        None,
+        &root,
+        &project.manifest.sources,
+        &project.manifest.targets,
+        &[],
+        &project.packages,
+        &BTreeMap::new(),
+        &BTreeMap::new(),
+    );
+    let report = verify_project(&project, &lockfile, true).expect("verify");
+    assert!(report.is_clean());
+}
+
+#[test]
+fn compose_substitutes_pray_symbols_in_fragments() {
+    let root = unique_temp_dir("pray-symbol-compose");
+    write_package(
+        &root,
+        "rules",
+        "sample/rules",
+        "rules",
+        "fragment",
+        "exports/rules.md",
+        "Contact ((pray:support_email))\n",
+        &["exports/rules.md"],
+    );
+    fs::write(
+        root.join("Prayfile"),
+        r#"
+prayfile "1"
+pray do
+  support_email "contact@example.com"
+end
+compose "AGENTS.md" do
+  pray "sample/rules", "~> 1.0", path: "packages/rules"
+end
+"#,
+    )
+    .expect("prayfile");
+
+    let project =
+        resolve_project_in_context(&root.join("Prayfile"), &root, &ResolveOptions::default())
+            .expect("resolve");
+    let rendered = render_project(&project).expect("render");
+    assert!(rendered[0]
+        .content
+        .contains("Contact contact@example.com"));
+    assert!(!rendered[0].content.contains("((pray:support_email))"));
+}
+
+#[test]
 fn export_singular_and_aliases_parse_for_resolution() {
     let root = unique_temp_dir("pray-export-alias");
     write_package(

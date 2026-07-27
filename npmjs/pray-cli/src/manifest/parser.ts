@@ -26,6 +26,7 @@ import {
   parseSource,
   parseTargetHeader,
 } from "./parse-statements.js";
+import { isPraySymbolKey } from "../substitute.js";
 import {
   type DestinationMode,
   defaultRenderPolicy,
@@ -56,6 +57,7 @@ class BlockParser {
       targets: [],
       packages: [],
       local: [],
+      symbols: {},
       render: defaultRenderPolicy(),
     };
 
@@ -137,6 +139,10 @@ class BlockParser {
         manifest,
         this.parsePackageWithGroups(statement.slice("package ".length)),
       );
+      return;
+    }
+    if (statement === "pray do" || statement === "template do") {
+      this.parseSymbolsBlock(manifest);
       return;
     }
     for (const prefix of ["pray ", "use ", "include "]) {
@@ -261,6 +267,44 @@ class BlockParser {
         PARSE_CONTEXT,
         `unsupported statement inside destination block: ${statement}`,
       );
+    }
+  }
+
+  private parseSymbolsBlock(manifest: Manifest): void {
+    while (true) {
+      const statement = this.reader.nextStatement();
+      if (statement === undefined) {
+        throw PrayError.parse(
+          PARSE_CONTEXT,
+          "missing 'end' for pray/template block",
+        );
+      }
+      if (statement === "end") {
+        return;
+      }
+      const trimmed = statement.trim();
+      const match = trimmed.match(/^(\S+)\s+(.+)$/);
+      if (!match) {
+        throw PrayError.parse(
+          PARSE_CONTEXT,
+          `unsupported statement inside pray/template block: ${statement}`,
+        );
+      }
+      const key = match[1]!;
+      const valueLiteral = match[2]!;
+      if (!isPraySymbolKey(key)) {
+        throw PrayError.parse(
+          PARSE_CONTEXT,
+          `invalid pray symbol key \`${key}\``,
+        );
+      }
+      if (Object.prototype.hasOwnProperty.call(manifest.symbols, key)) {
+        throw PrayError.parse(
+          PARSE_CONTEXT,
+          `duplicate pray symbol \`${key}\``,
+        );
+      }
+      manifest.symbols[key] = stringFromLiteral(valueLiteral, PARSE_CONTEXT);
     }
   }
 

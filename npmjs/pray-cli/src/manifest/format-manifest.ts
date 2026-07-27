@@ -203,6 +203,7 @@ function migrateLegacyManifest(
       roles: [...(entry.roles ?? [])],
     })),
     local: manifest.local.map((entry) => ({ ...entry })),
+    symbols: { ...(manifest.symbols ?? {}) },
     render: manifest.render,
   };
 

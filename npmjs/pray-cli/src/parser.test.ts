@@ -210,4 +210,33 @@ end
         error.message.includes("missing prayfile version"),
     );
   });
+
+  it("parses pray symbol block", () => {
+    const manifest = parseManifest(`
+prayfile "1"
+pray do
+  support_email "contact@kiskolabs.com"
+  security_email "security@kiskolabs.com"
+end
+`);
+    assert.equal(manifest.symbols.support_email, "contact@kiskolabs.com");
+    assert.equal(manifest.symbols.security_email, "security@kiskolabs.com");
+  });
+
+  it("rejects duplicate pray symbols", () => {
+    assert.throws(
+      () =>
+        parseManifest(`
+prayfile "1"
+pray do
+  support_email "a@example.com"
+  support_email "b@example.com"
+end
+`),
+      (error: unknown) =>
+        error instanceof PrayError &&
+        error.kind === "parse" &&
+        error.message.includes("duplicate"),
+    );
+  });
 });

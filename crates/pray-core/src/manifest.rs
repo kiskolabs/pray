@@ -17,6 +17,8 @@ pub struct Manifest {
     pub targets: Vec<ManifestTarget>,
     pub packages: Vec<ManifestPackage>,
     pub local: Vec<ManifestLocal>,
+    #[serde(default, skip_serializing_if = "BTreeMap::is_empty")]
+    pub symbols: BTreeMap<String, String>,
     pub render: RenderPolicy,
 }
 
@@ -288,6 +290,10 @@ impl<'a> BlockParser<'a> {
             crate::destination::upsert_package(manifest, self.parse_package_with_groups(rest)?)?;
             return Ok(());
         }
+        if statement == "pray do" || statement == "template do" {
+            self.parse_symbols_block(manifest)?;
+            return Ok(());
+        }
         if let Some(rest) = statement
             .strip_prefix("pray ")
             .or_else(|| statement.strip_prefix("use "))
@@ -407,6 +413,41 @@ impl<'a> BlockParser<'a> {
         Err(PrayError::Parse {
             kind: "manifest",
             message: "missing 'end' for destination block".to_string(),
+        })
+    }
+
+    fn parse_symbols_block(&mut self, manifest: &mut Manifest) -> PrayResult<()> {
+        while let Some(statement) = self.next_statement()? {
+            if statement == "end" {
+                return Ok(());
+            }
+            let Some((key, value_literal)) = split_symbol_assignment(&statement) else {
+                return Err(PrayError::Parse {
+                    kind: "manifest",
+                    message: format!(
+                        "unsupported statement inside pray/template block: {statement}"
+                    ),
+                });
+            };
+            if !crate::substitute::is_pray_symbol_key(key) {
+                return Err(PrayError::Parse {
+                    kind: "manifest",
+                    message: format!("invalid pray symbol key `{key}`"),
+                });
+            }
+            if manifest.symbols.contains_key(key) {
+                return Err(PrayError::Parse {
+                    kind: "manifest",
+                    message: format!("duplicate pray symbol `{key}`"),
+                });
+            }
+            manifest
+                .symbols
+                .insert(key.to_string(), string_from_literal(value_literal)?);
+        }
+        Err(PrayError::Parse {
+            kind: "manifest",
+            message: "missing 'end' for pray/template block".to_string(),
         })
     }
 
@@ -923,6 +964,17 @@ fn string_from_value(value: &LiteralValue) -> PrayResult<String> {
 
 fn string_from_literal(input: &str) -> PrayResult<String> {
     string_from_value(&parse_literal(input)?)
+}
+
+fn split_symbol_assignment(statement: &str) -> Option<(&str, &str)> {
+    let trimmed = statement.trim();
+    let mut parts = trimmed.splitn(2, char::is_whitespace);
+    let key = parts.next()?.trim();
+    let value = parts.next()?.trim();
+    if key.is_empty() || value.is_empty() {
+        return None;
+    }
+    Some((key, value))
 }
 
 fn apply_target_statement(target: &mut ManifestTarget, statement: String) -> PrayResult<()> {

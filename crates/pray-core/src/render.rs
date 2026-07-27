@@ -4,6 +4,7 @@ use crate::hashing::{checksum_managed_span_content, marker_id};
 use crate::lockfile::ManagedSpanRecord;
 use crate::manifest::{DestinationEntry, DestinationMode};
 use crate::resolve::ResolvedProject;
+use crate::substitute::substitute_pray_symbols;
 use crate::{PrayError, PrayResult};
 use std::fs;
 use std::path::{Path, PathBuf};
@@ -81,8 +82,28 @@ pub fn materialize_provisioned_exports(project: &ResolvedProject) -> PrayResult<
         if let Some(parent) = destination.parent() {
             fs::create_dir_all(parent)?;
         }
-        fs::copy(&file.source, &destination)?;
+        write_provisioned_file(&file.source, &destination, &project.manifest.symbols)?;
     }
+    Ok(())
+}
+
+pub fn expected_provisioned_bytes(
+    source: &Path,
+    symbols: &std::collections::BTreeMap<String, String>,
+) -> PrayResult<Vec<u8>> {
+    let bytes = fs::read(source)?;
+    match String::from_utf8(bytes) {
+        Ok(text) => Ok(substitute_pray_symbols(&text, symbols)?.into_bytes()),
+        Err(error) => Ok(error.into_bytes()),
+    }
+}
+
+fn write_provisioned_file(
+    source: &Path,
+    destination: &Path,
+    symbols: &std::collections::BTreeMap<String, String>,
+) -> PrayResult<()> {
+    fs::write(destination, expected_provisioned_bytes(source, symbols)?)?;
     Ok(())
 }
 
@@ -406,7 +427,9 @@ fn render_scoped_compose(
                 if local.content.is_empty() && local.optional {
                     continue;
                 }
-                builder.append_body(&local.content);
+                let content =
+                    substitute_pray_symbols(&local.content, &project.manifest.symbols)?;
+                builder.append_body(&content);
                 builder.append_empty_line();
             }
             DestinationEntry::Package { name } => {
@@ -434,6 +457,7 @@ fn render_scoped_compose(
                         export,
                         target,
                         output,
+                        &project.manifest.symbols,
                     )?;
                 }
             }
@@ -491,7 +515,8 @@ fn render_legacy_compose(
             continue;
         }
         builder.append_line(&format!("### {}", local.manifest_path));
-        builder.append_body(&local.content);
+        let content = substitute_pray_symbols(&local.content, &project.manifest.symbols)?;
+        builder.append_body(&content);
         builder.append_empty_line();
     }
 
@@ -518,6 +543,7 @@ fn render_legacy_compose(
                 export,
                 target,
                 output,
+                &project.manifest.symbols,
             )?;
         }
     }
@@ -536,20 +562,22 @@ fn append_managed_export(
     export: &str,
     target: &crate::manifest::ManifestTarget,
     output: &Path,
+    symbols: &std::collections::BTreeMap<String, String>,
 ) -> PrayResult<()> {
-    let body = package.export_bodies.get(export).ok_or_else(|| {
+    let raw = package.export_bodies.get(export).ok_or_else(|| {
         PrayError::Render(format!(
             "package {} is missing cached export {}",
             package.declaration.name, export
         ))
     })?;
+    let body = substitute_pray_symbols(raw, symbols)?;
     let id = marker_id(&format!(
         "{}:{}:{}",
         package.declaration.name, export, target.name
     ));
     let open_line = builder.next_line_number();
     builder.append_line(&format!("<!-- pray:{id} -->"));
-    builder.append_body(body);
+    builder.append_body(&body);
     let close_line = builder.next_line_number();
     builder.append_line(&format!("<!-- pray:{id} -->"));
     managed_spans.push(ManagedSpanRecord {
@@ -557,7 +585,7 @@ fn append_managed_export(
         target: output.to_string_lossy().to_string(),
         open_line,
         close_line,
-        ideal_checksum: checksum_managed_span_content(body),
+        ideal_checksum: checksum_managed_span_content(&body),
         package: package.declaration.name.clone(),
         export: export.to_string(),
         source_checksum: package.source_checksum.clone(),

@@ -2,6 +2,7 @@ import { packageMatchesEnvironment } from "../environment.js";
 import { packageBoundToCompose } from "../manifest/destination.js";
 import type { ManifestTarget } from "../manifest/types.js";
 import type { ResolvedLocalFile, ResolvedProject } from "../resolve/types.js";
+import { substitutePraySymbols } from "../substitute.js";
 import { ContentBuilder } from "./content-builder.js";
 import { appendHeaderIfEnabled } from "./header.js";
 import { appendManagedExport, shouldInlineExport } from "./managed-export.js";
@@ -43,6 +44,7 @@ export function renderLegacyCompose(
         exportName,
         target,
         output,
+        project.manifest.symbols ?? {},
       );
     }
   }
@@ -71,7 +73,9 @@ function appendUnboundLocals(
       continue;
     }
     builder.appendLine(`### ${local.manifestPath}`);
-    builder.appendBody(local.content);
+    builder.appendBody(
+      substitutePraySymbols(local.content, project.manifest.symbols ?? {}),
+    );
     builder.appendEmptyLine();
   }
 }

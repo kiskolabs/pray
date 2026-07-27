@@ -3,6 +3,7 @@ import { checksumManagedSpanContent, markerId } from "../hashing.js";
 import type { ManagedSpanRecord } from "../lockfile/types.js";
 import type { ManifestTarget } from "../manifest/types.js";
 import type { ResolvedPackage } from "../resolve/types.js";
+import { substitutePraySymbols } from "../substitute.js";
 import type { ContentBuilder } from "./content-builder.js";
 
 export function shouldInlineExport(
@@ -20,13 +21,15 @@ export function appendManagedExport(
   exportName: string,
   target: ManifestTarget,
   output: string,
+  symbols: Record<string, string>,
 ): void {
-  const body = packageEntry.exportBodies.get(exportName);
-  if (!body) {
+  const raw = packageEntry.exportBodies.get(exportName);
+  if (!raw) {
     throw PrayError.render(
       `package ${packageEntry.declaration.name} is missing cached export ${exportName}`,
     );
   }
+  const body = substitutePraySymbols(raw, symbols);
   const id = markerId(
     `${packageEntry.declaration.name}:${exportName}:${target.name}`,
   );

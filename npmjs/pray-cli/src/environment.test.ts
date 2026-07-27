@@ -50,6 +50,7 @@ describe("environment", () => {
       targets: [],
       packages: [packageWithGroups(["development"])],
       local: [],
+      symbols: {},
       render: {
         mode: "managed",
         conflict: "fail",

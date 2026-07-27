@@ -724,16 +724,50 @@ Forms:
 | Form | Meaning |
 |------|---------|
 | `pray "owner/name", "constraint", …` | Package |
-| `pray "owner/name", …, file: "path"` | Exact package file bytes at path |
+| `pray "owner/name", …, file: "path"` | Package file export at path (after `((pray:…))` substitution) |
 | `pray "relative/or/./path"` bare, inside `compose` | Local file embed |
+| `pray do … end` | Default symbol map for `((pray:…))` placeholders |
 
 `file:` rules:
 
 - Requires a `file`-typed package export (default export resolution applies).
-- Writes exact bytes; no pray markers; no agent header.
+- Writes UTF-8 text after `((pray:…))` substitution (binary non-UTF-8 copies as bytes); no pray markers; no agent header.
 - Exclusive ownership of the path.
 - Mutually exclusive with nesting inside `compose` / `tree`.
 - Optional alias: `file "SECURITY.md" do pray "pkg", "~> 1.0" end`.
+
+### pray symbols (templating)
+
+Project-wide string symbols for package and local content. Declared once; applied to every compose fragment, local embed, and `file:` / tree text export.
+
+```manifest
+pray do
+  support_email "contact@kiskolabs.com"
+  security_email "security@kiskolabs.com"
+end
+```
+
+Alias: `template do … end`.
+
+Placeholder form (strict, no spaces):
+
+```
+((pray:<path>))
+```
+
+Grammar:
+
+- `Placeholder := "((" "pray" ":" Path "))"`
+- `Path := [A-Za-z0-9._/-]+`
+
+Examples: `((pray:support_email))`, `((pray:user.email))`.
+
+Rules:
+
+- Unknown `((pray:…))` symbols fail render.
+- Spaced forms such as `(( pray:email ))` are not placeholders.
+- Only the `pray` resolver is implemented; other resolvers such as `((env:…))` are reserved for later.
+- Verify compares provisioned UTF-8 files to the substituted expected content, not the raw package bytes.
 
 Default export resolution when `export:` / `exports:` omitted:
 
@@ -1112,7 +1146,7 @@ Folder exports may declare `only: [...]` or `except: [...]` relative paths to pr
 
 A `folder` export is a directory tree copied deterministically into a `tree` destination (or legacy target `skills` / `folder` root).
 
-A `file` export with `pray …, file: "SECURITY.md"` writes exact bytes to that path at the project root (or relative path given). Legacy fan-out without `file:` still copies under `<skills-root>/<export-name>/`.
+A `file` export with `pray …, file: "SECURITY.md"` writes the export to that path at the project root (or relative path given), after `((pray:…))` substitution for UTF-8 text. Legacy fan-out without `file:` still copies under `<skills-root>/<export-name>/`.
 
 Example:
 
