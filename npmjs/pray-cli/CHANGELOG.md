@@ -2,8 +2,11 @@
 
 ## Unreleased
 
+## 1.5.0 (2026-07-27)
+
 - Accept Gemfile-like Ruby surface sugar for Prayfile statements: `{…}` blocks, top-level `;`, and optional call parentheses.
 - Add parser coverage for symbol maps and surface forms alongside substitute tests.
+- Exercise the shared `testdata/shared` Prayfile corpus alongside Rust and Ruby.
 
 ## 1.3.0 (2026-07-26)
 
