@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+## 1.4.0 (2026-07-27)
+
 - Add `((pray:symbol))` templating with a project-wide `pray do … end` symbol map (alias `template do`).
 - Substitute symbols in compose fragments, local embeds, and UTF-8 `file:` / tree exports.
 - Verify exclusive `file:` bindings against substituted expected content.
