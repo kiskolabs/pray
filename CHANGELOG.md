@@ -2,6 +2,13 @@
 
 ## Unreleased
 
+- Accept Gemfile-like Ruby surface sugar for Prayfile statements: `{…}` blocks, top-level `;`, and optional call parentheses on keywords and symbol assignments.
+- Align Ruby `pray-cli` with `((pray:…))` symbol maps (`pray do` / `template do`), substitution on render/provision, and the same surface sugar.
+- Add TypeScript and Ruby parser/substitute coverage for the surface forms.
+- Port `compose` / `tree` / `file:` destination parse, role-based export selection, and scoped render/provision into Ruby `pray-cli`.
+- Add a shared Prayfile fixture corpus under `testdata/shared/` exercised by Rust, TypeScript, and Ruby CI suites.
+- Port Ruby `pray format` (`fmt`) recommended destination DSL rewrite to match Rust and TypeScript.
+
 ## 1.4.0 (2026-07-27)
 
 - Add `((pray:symbol))` templating with a project-wide `pray do … end` symbol map (alias `template do`).

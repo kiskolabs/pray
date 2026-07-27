@@ -12,7 +12,7 @@ module Pray
         "verify [--strict]                      check rendered output against the lockfile",
         "drift [--semantic]                     compare lockfile to current resolution",
         "render [--check]                       render targets without updating the lockfile",
-        "format                                 canonicalize Prayfile formatting"
+        "format, fmt                            rewrite Prayfile to recommended destination DSL"
       ].freeze
 
       PACKAGE_COMMANDS = [

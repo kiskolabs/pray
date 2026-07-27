@@ -14,12 +14,14 @@ module Pray
     module_function
 
     def render_project(project)
-      project.manifest.targets.map do |target|
+      rendered = []
+      project.manifest.targets.each do |target|
         output = target.outputs.first
-        raise Error.render("target #{target.name} has no output file") unless output
+        next unless output
 
-        render_target(project, target, output)
+        rendered << render_target(project, target, output)
       end
+      rendered
     end
 
     def write_rendered_targets(project, rendered)
@@ -32,53 +34,88 @@ module Pray
     end
 
     def materialize_provisioned_exports(project)
+      symbols = project.manifest.symbols || {}
       planned_provisioned_files(project).each do |file|
         destination = File.join(project.project_root, file.path)
         FileUtils.mkdir_p(File.dirname(destination))
-        FileUtils.cp(file.source, destination)
+        write_provisioned_file(file.source, destination, symbols)
+      end
+    end
+
+    def write_provisioned_file(source, destination, symbols)
+      bytes = File.binread(source)
+      text = bytes.force_encoding(Encoding::UTF_8)
+      if text.valid_encoding?
+        File.write(destination, Substitute.substitute_pray_symbols(text, symbols))
+      else
+        File.binwrite(destination, bytes)
       end
     end
 
     def planned_provisioned_files(project)
       planned = []
+      collect_exact_file_bindings(project, planned)
       project.manifest.targets.each do |target|
         target.skills.each do |folder_root|
           destination_root = File.join(project.project_root, folder_root)
           project.packages.each do |package|
             next unless Environment.package_matches_environment?(package.declaration.groups, project.environment)
+            next unless Destination.package_bound_to_tree?(package.declaration, target)
 
             collect_legacy_skill_files(project, package, destination_root, planned)
             collect_selected_export_files(project, package, destination_root, planned)
           end
         end
       end
-      planned.sort_by(&:path)
+      planned.sort_by(&:path).uniq(&:path)
     end
 
     PlannedProvisionedFile = Struct.new(:path, :source)
 
     def render_target(project, target, output)
-      builder = ContentBuilder.new
-      if project.manifest.render.header
-        output_name = File.basename(output)
-        builder.append_line("<!-- pray:0 ignore-comments -->")
-        builder.append_empty_line
-        builder.append_line("# Agent context")
-        builder.append_empty_line
-        builder.append_line("Do not edit managed blocks in `#{output_name}` or provisioned files under `.agents/`.")
-        builder.append_line("To change shared guidance, update `Prayfile` and run `pray install`.")
-        builder.append_empty_line
+      if target.scoped && target.mode == "compose"
+        return render_scoped_compose(project, target, output)
       end
 
-      unless project.local_files.empty?
+      render_legacy_compose(project, target, output)
+    end
+
+    def render_scoped_compose(project, target, output)
+      builder = ContentBuilder.new
+      append_header(builder, project, output)
+      symbols = project.manifest.symbols || {}
+      managed_spans = []
+
+      (target.entries || []).each do |entry|
+        if entry.kind == "local"
+          append_scoped_local(builder, project, entry.path, symbols)
+        else
+          append_scoped_package(builder, managed_spans, project, target, output, entry.name, symbols)
+        end
+      end
+
+      RenderedTarget.new(path: output, content: builder.finish, managed_spans: managed_spans)
+    end
+
+    def render_legacy_compose(project, target, output)
+      builder = ContentBuilder.new
+      append_header(builder, project, output)
+
+      unbound_locals = project.local_files.select do |local|
+        declaration = project.manifest.local.find { |entry| entry.path == local.manifest_path }
+        declaration.nil? || !declaration.bound
+      end
+
+      unless unbound_locals.empty?
         builder.append_line("## Additional instructions")
         builder.append_empty_line
       end
-      project.local_files.each do |local|
+      symbols = project.manifest.symbols || {}
+      unbound_locals.each do |local|
         next if local.content.empty? && local.optional
 
         builder.append_line("### #{local.manifest_path}")
-        builder.append_body(local.content)
+        builder.append_body(Substitute.substitute_pray_symbols(local.content, symbols))
         builder.append_empty_line
       end
 
@@ -88,40 +125,106 @@ module Pray
       managed_spans = []
       project.packages.each do |package|
         next unless Environment.package_matches_environment?(package.declaration.groups, project.environment)
+        next unless Destination.package_bound_to_compose?(package.declaration, target)
 
         package.selected_exports.each do |export|
           next unless should_inline_export?(package, export)
 
-          body = package.export_bodies[export]
-          raise Error.render("package #{package.declaration.name} is missing cached export #{export}") unless body
-
-          identifier = Hashing.marker_id("#{package.declaration.name}:#{export}:#{target.name}")
-          open_line = builder.next_line_number
-          builder.append_line("<!-- pray:#{identifier} -->")
-          builder.append_body(body)
-          close_line = builder.next_line_number
-          builder.append_line("<!-- pray:#{identifier} -->")
-          managed_spans << ManagedSpanRecord.new(
-            id: identifier,
-            target: output,
-            open_line: open_line,
-            close_line: close_line,
-            ideal_checksum: Hashing.checksum_managed_span_content(body),
-            package: package.declaration.name,
-            export: export,
-            source_checksum: package.source_checksum,
-            silenced: false
-          )
-          builder.append_empty_line
+          append_managed_export(builder, managed_spans, package, export, target, output, symbols)
         end
       end
 
       RenderedTarget.new(path: output, content: builder.finish, managed_spans: managed_spans)
     end
 
+    def append_header(builder, project, output)
+      return unless project.manifest.render.header
+
+      output_name = File.basename(output)
+      builder.append_line("<!-- pray:0 ignore-comments -->")
+      builder.append_empty_line
+      builder.append_line("# Agent context")
+      builder.append_empty_line
+      builder.append_line("Do not edit managed blocks in `#{output_name}` or provisioned files under `.agents/`.")
+      builder.append_line("To change shared guidance, update `Prayfile` and run `pray install`.")
+      builder.append_empty_line
+    end
+
+    def append_scoped_local(builder, project, path, symbols)
+      local = project.local_files.find { |candidate| candidate.manifest_path == path }
+      return unless local
+      return if local.content.empty? && local.optional
+
+      builder.append_body(Substitute.substitute_pray_symbols(local.content, symbols))
+      builder.append_empty_line
+    end
+
+    def append_scoped_package(builder, managed_spans, project, target, output, package_name, symbols)
+      package = project.packages.find { |candidate| candidate.declaration.name == package_name }
+      return unless package
+      return unless Environment.package_matches_environment?(package.declaration.groups, project.environment)
+
+      package.selected_exports.each do |export|
+        next unless should_inline_export?(package, export)
+
+        append_managed_export(builder, managed_spans, package, export, target, output, symbols)
+      end
+    end
+
+    def append_managed_export(builder, managed_spans, package, export, target, output, symbols)
+      body = package.export_bodies[export]
+      raise Error.render("package #{package.declaration.name} is missing cached export #{export}") unless body
+
+      body = Substitute.substitute_pray_symbols(body, symbols)
+      identifier = Hashing.marker_id("#{package.declaration.name}:#{export}:#{target.name}")
+      open_line = builder.next_line_number
+      builder.append_line("<!-- pray:#{identifier} -->")
+      builder.append_body(body)
+      close_line = builder.next_line_number
+      builder.append_line("<!-- pray:#{identifier} -->")
+      managed_spans << ManagedSpanRecord.new(
+        id: identifier,
+        target: output,
+        open_line: open_line,
+        close_line: close_line,
+        ideal_checksum: Hashing.checksum_managed_span_content(body),
+        package: package.declaration.name,
+        export: export,
+        source_checksum: package.source_checksum,
+        silenced: false
+      )
+      builder.append_empty_line
+    end
+
     def should_inline_export?(package, export_name)
       export = package.spec.exports[export_name]
       export.nil? || export.kind == "fragment"
+    end
+
+    def collect_exact_file_bindings(project, planned)
+      project.packages.each do |package|
+        destination = package.declaration.file
+        next unless destination
+        next unless Environment.package_matches_environment?(package.declaration.groups, project.environment)
+
+        matched = false
+        package.selected_exports.each do |export_name|
+          export = package.spec.exports[export_name]
+          next unless export&.kind == "file"
+
+          source = File.join(package.root, export.path)
+          raise Error.render("file export source missing: #{source}") unless File.file?(source)
+
+          planned << PlannedProvisionedFile.new(path: destination, source: source)
+          matched = true
+          break
+        end
+        unless matched
+          raise Error.render(
+            "package #{package.declaration.name} has file: \"#{destination}\" but no selected file export"
+          )
+        end
+      end
     end
 
     def collect_legacy_skill_files(project, package, destination_root, planned)
@@ -136,6 +239,8 @@ module Pray
           File.join(package.root, skill.path),
           File.join(destination_root, skill_name),
           skill_files,
+          [],
+          [],
           planned
         )
       end
@@ -167,9 +272,13 @@ module Pray
             File.join(package.root, export.path),
             File.join(destination_root, destination_name),
             indexed_files,
+            export.only || [],
+            export.except || [],
             planned
           )
         when "file"
+          next if package.declaration.file
+
           source = File.join(package.root, export.path)
           raise Error.render("file export source missing: #{source}") unless File.file?(source)
 
@@ -186,11 +295,15 @@ module Pray
       File.basename(export_path.delete_suffix("/")).empty? ? export_name : File.basename(export_path.delete_suffix("/"))
     end
 
-    def collect_tree_files(project, source_root, destination_root, relative_files, planned)
+    def collect_tree_files(project, source_root, destination_root, relative_files, only, except, planned)
       raise Error.render("folder source directory missing: #{source_root}") unless File.directory?(source_root)
       raise Error.render("no files listed in package manifest for #{source_root}") if relative_files.empty?
 
+      matched = false
       relative_files.each do |relative|
+        next if !only.empty? && !only.include?(relative)
+        next if except.include?(relative)
+
         source = File.join(source_root, relative)
         raise Error.render("provisioned file missing: #{source}") unless File.file?(source)
 
@@ -199,6 +312,11 @@ module Pray
           path: relative_project_path(project, destination),
           source: source
         )
+        matched = true
+      end
+
+      if !matched && only.empty? && except.empty?
+        raise Error.render("no files listed in package manifest for #{source_root}")
       end
     end
 

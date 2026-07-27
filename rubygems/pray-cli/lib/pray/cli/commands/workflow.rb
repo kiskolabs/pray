@@ -43,12 +43,28 @@ module Pray
     end
 
     def format_command
+      path = manifest_path
+      original = Pray.read_manifest_text(path)
+      manifest = Pray.parse_manifest(original)
+      project = begin
+        resolve_current_project(ResolveOptions.new(offline: true))
+      rescue Error
+        resolve_current_project
+      end
+      hints = FormatManifest.classify_format_hints(project)
+      formatted = FormatManifest.format_recommended(manifest, hints)
+      File.write(path, formatted) if formatted != original
+
+      return unless File.exist?(lockfile_path)
+
       lockfile = Pray.read_lockfile(lockfile_path)
       lockfile.target.each do |target|
         target.outputs.each do |output|
-          original = File.read(output)
-          formatted = format_marker_comments(Hashing.normalize_line_endings(original))
-          File.write(output, formatted) if formatted != original
+          next unless File.exist?(output)
+
+          original_output = File.read(output)
+          formatted_output = format_marker_comments(Hashing.normalize_line_endings(original_output))
+          File.write(output, formatted_output) if formatted_output != original_output
         end
       end
     end

@@ -9,7 +9,7 @@ module Pray
     end
 
     def manifest_fields(manifest)
-      {
+      fields = {
         "prayfile_version" => manifest.prayfile_version,
         "sources" => manifest.sources.map { |source| source_fields(source) },
         "targets" => manifest.targets.map { |target| target_fields(target) },
@@ -17,6 +17,8 @@ module Pray
         "local" => manifest.local.map { |entry| local_fields(entry) },
         "render" => render_fields(manifest.render)
       }
+      fields["symbols"] = manifest.symbols.sort.to_h unless manifest.symbols.empty?
+      fields
     end
 
     def source_fields(source)
@@ -38,12 +40,23 @@ module Pray
         "skills" => target.skills,
         "commands" => target.commands,
         "rules" => target.rules,
-        "max_bytes" => target.max_bytes
+        "max_bytes" => target.max_bytes,
+        "mode" => target.mode || "legacy",
+        "scoped" => target.scoped || false,
+        "entries" => (target.entries || []).map { |entry| entry_fields(entry) }
       }
     end
 
+    def entry_fields(entry)
+      if entry.kind == "package"
+        { "kind" => "package", "name" => entry.name }
+      else
+        { "kind" => "local", "path" => entry.path }
+      end
+    end
+
     def package_fields(package)
-      {
+      fields = {
         "name" => package.name,
         "constraint" => package.constraint,
         "source" => package.source,
@@ -59,14 +72,20 @@ module Pray
         "tarball" => package.tarball,
         "oci" => package.oci
       }
+      fields["file"] = package.file if package.file
+      fields["roles"] = package.roles unless package.roles.nil? || package.roles.empty?
+      fields["bound"] = true if package.bound
+      fields
     end
 
     def local_fields(entry)
-      {
+      fields = {
         "path" => entry.path,
         "position" => entry.position,
         "optional" => entry.optional
       }
+      fields["bound"] = true if entry.bound
+      fields
     end
 
     def render_fields(render)

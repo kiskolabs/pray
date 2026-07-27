@@ -54,7 +54,7 @@ module Pray
       when "apply" then [:apply]
       when "verify" then [:verify, flags]
       when "drift" then [:drift, flags]
-      when "format" then [:format]
+      when "format", "fmt" then [:format]
       when "package" then [:package]
       when "publish" then [:publish, parse_publish_arguments(arguments)]
       when "login" then [:unsupported, "login"]

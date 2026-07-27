@@ -125,7 +125,7 @@ RSpec.describe "Pray parser" do
 
     formatted = Pray.format_package_declaration(manifest.packages.first)
     expect(formatted).to eq(
-      'agent "sample/base", "~> 1.0", source: "amkisko", exports: ["testing-basics", "security-basics"]'
+      'pray "sample/base", "~> 1.0", source: "amkisko", exports: ["testing-basics", "security-basics"]'
     )
     reparsed = Pray.parse_manifest("prayfile \"1\"\n#{formatted}\n")
     expect(reparsed.packages.first).to eq(manifest.packages.first)
@@ -173,7 +173,7 @@ RSpec.describe "Pray parser" do
     prayfile = File.read(File.expand_path("../../../../examples/simple-project/Prayfile", __dir__))
     manifest = Pray.parse_manifest(prayfile)
     expect(manifest.manifest_hash).to eq(
-      "sha256:25b1ca9becbb58d2b4e1b173231689dd76b94e358c490f829c9190b9431d244b"
+      "sha256:88e048f95c0a5ec3f09f11d24826f393fc541aebdf0aa50da45fab61d852226c"
     )
   end
 
@@ -212,6 +212,121 @@ RSpec.describe "Pray parser" do
           source "default", "https://agents.example.com"
         end
       PRAYFILE
-    end.to raise_error(Pray::Error, /group blocks only support agent or package declarations/)
+    end.to raise_error(Pray::Error, /group blocks only support agent, package, or pray declarations/)
+  end
+
+  it "parses compose blocks with pray and local entries" do
+    manifest = Pray.parse_manifest(<<~PRAYFILE)
+      prayfile "1"
+      compose "AGENTS.md" do
+        pray ".agents/project.md"
+        pray "sample/rules", "~> 1.0", path: "packages/rules"
+      end
+    PRAYFILE
+
+    expect(manifest.targets[0].mode).to eq("compose")
+    expect(manifest.targets[0].scoped).to eq(true)
+    expect(manifest.targets[0].outputs).to eq(["AGENTS.md"])
+    expect(manifest.targets[0].entries.map { |entry| [entry.kind, entry.name || entry.path] }).to eq(
+      [["local", ".agents/project.md"], ["package", "sample/rules"]]
+    )
+    expect(manifest.local[0].bound).to eq(true)
+    expect(manifest.packages[0].bound).to eq(true)
+    expect(manifest.packages[0].roles).to eq(["fragment"])
+  end
+
+  it "parses tree blocks scoping packages to a provisioned folder" do
+    manifest = Pray.parse_manifest(<<~PRAYFILE)
+      prayfile "1"
+      tree ".agents/skills" do
+        pray "sample/audit", "~> 1.0", path: "packages/audit"
+      end
+    PRAYFILE
+
+    expect(manifest.targets[0].mode).to eq("tree")
+    expect(manifest.targets[0].scoped).to eq(true)
+    expect(manifest.targets[0].skills).to eq([".agents/skills"])
+    expect(manifest.packages[0].bound).to eq(true)
+    expect(manifest.packages[0].roles).to eq(["folder"])
+  end
+
+  it "parses file: on a pray declaration for exact bindings" do
+    manifest = Pray.parse_manifest(<<~PRAYFILE)
+      prayfile "1"
+      pray "sample/security", "~> 1.0", path: "packages/security", file: "SECURITY.md"
+    PRAYFILE
+
+    expect(manifest.packages[0].file).to eq("SECURITY.md")
+    expect(manifest.packages[0].roles).to eq(["file"])
+    expect(manifest.packages[0].bound).to eq(true)
+  end
+
+  it "parses a file block with a single pray declaration" do
+    manifest = Pray.parse_manifest(<<~PRAYFILE)
+      prayfile "1"
+      file "SECURITY.md" do
+        pray "sample/security", "~> 1.0", path: "packages/security"
+      end
+    PRAYFILE
+
+    expect(manifest.packages[0].file).to eq("SECURITY.md")
+    expect(manifest.packages[0].bound).to eq(true)
+  end
+
+  it "rejects a file block without a pray declaration" do
+    expect do
+      Pray.parse_manifest(<<~PRAYFILE)
+        prayfile "1"
+        file "SECURITY.md" do
+        end
+      PRAYFILE
+    end.to raise_error(Pray::Error, /requires a pray package declaration/)
+  end
+
+  it "parses pray symbol block" do
+    manifest = Pray.parse_manifest(<<~PRAYFILE)
+      prayfile "1"
+      pray do
+        support_email "contact@kiskolabs.com"
+        security_email "security@kiskolabs.com"
+      end
+      pray "sample/base", "~> 1.0"
+    PRAYFILE
+
+    expect(manifest.symbols["support_email"]).to eq("contact@kiskolabs.com")
+    expect(manifest.symbols["security_email"]).to eq("security@kiskolabs.com")
+    expect(manifest.packages.first.name).to eq("sample/base")
+  end
+
+  it "parses ruby surface brace blocks and call parentheses for symbols" do
+    manifest = Pray.parse_manifest(<<~PRAYFILE)
+      prayfile "1"
+      pray{support_email("contact@kiskolabs.com");security_email("security@kiskolabs.com")}
+    PRAYFILE
+
+    expect(manifest.symbols["support_email"]).to eq("contact@kiskolabs.com")
+    expect(manifest.symbols["security_email"]).to eq("security@kiskolabs.com")
+  end
+
+  it "parses ruby surface semicolon do/end one-liner" do
+    manifest = Pray.parse_manifest(<<~PRAYFILE)
+      prayfile "1"
+      pray do; support_email("a@example.com"); security_email("b@example.com"); end
+    PRAYFILE
+
+    expect(manifest.symbols["support_email"]).to eq("a@example.com")
+    expect(manifest.symbols["security_email"]).to eq("b@example.com")
+  end
+
+  it "rejects duplicate pray symbols" do
+    expect do
+      Pray.parse_manifest(<<~PRAYFILE)
+        prayfile "1"
+        pray do
+          support_email "a@example.com"
+          support_email "b@example.com"
+        end
+      PRAYFILE
+    end.to raise_error(Pray::Error, /duplicate pray symbol/)
   end
 end

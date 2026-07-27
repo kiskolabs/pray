@@ -102,7 +102,7 @@ module Pray
     def top_level_command?(token)
       %w[
         manifest init prayer repo install add remove update unlock render plan apply verify drift
-        format package publish login serve confess list outdated explain vendor clean tree sync trust
+        format fmt package publish login serve confess list outdated explain vendor clean tree sync trust
         version -V --version -h --help help
       ].include?(token)
     end

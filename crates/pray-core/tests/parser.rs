@@ -255,6 +255,53 @@ end
 }
 
 #[test]
+fn parses_ruby_surface_pray_brace_and_call_parens() {
+    let manifest = parse_manifest(
+        r#"
+prayfile "1"
+pray{support_email("contact@kiskolabs.com");security_email("security@kiskolabs.com")}
+compose("AGENTS.md"){
+  pray "sample/base", "~> 1.0"
+}
+"#,
+    )
+    .expect("manifest parses");
+
+    assert_eq!(
+        manifest.symbols.get("support_email").map(String::as_str),
+        Some("contact@kiskolabs.com")
+    );
+    assert_eq!(
+        manifest.symbols.get("security_email").map(String::as_str),
+        Some("security@kiskolabs.com")
+    );
+    assert_eq!(manifest.targets.len(), 1);
+    assert_eq!(manifest.targets[0].name, "compose:AGENTS.md");
+    assert_eq!(manifest.targets[0].outputs, vec!["AGENTS.md".to_string()]);
+    assert_eq!(manifest.packages[0].name, "sample/base");
+}
+
+#[test]
+fn parses_ruby_surface_semicolon_do_end_one_liner() {
+    let manifest = parse_manifest(
+        r#"
+prayfile "1"
+pray do; support_email("a@example.com"); security_email("b@example.com"); end
+"#,
+    )
+    .expect("manifest parses");
+
+    assert_eq!(
+        manifest.symbols.get("support_email").map(String::as_str),
+        Some("a@example.com")
+    );
+    assert_eq!(
+        manifest.symbols.get("security_email").map(String::as_str),
+        Some("b@example.com")
+    );
+}
+
+#[test]
 fn rejects_manifest_without_prayfile_version() {
     let error = parse_manifest(
         r#"

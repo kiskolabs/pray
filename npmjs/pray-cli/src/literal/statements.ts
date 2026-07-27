@@ -1,11 +1,17 @@
 import { isBalanced } from "./split.js";
+import { SurfaceStatementReader } from "./statement-surface.js";
 
 export class StatementReader {
   private cursor = 0;
+  private readonly surface = new SurfaceStatementReader();
 
   constructor(private readonly lines: readonly string[]) {}
 
   nextStatement(): string | undefined {
+    const pending = this.surface.next();
+    if (pending !== undefined) {
+      return pending;
+    }
     while (this.cursor < this.lines.length) {
       const line = this.lines[this.cursor];
       if (line === undefined) {
@@ -33,7 +39,11 @@ export class StatementReader {
         }
         statement = `${statement} ${next}`;
       }
-      return statement;
+      this.surface.pushRaw(statement);
+      const normalized = this.surface.next();
+      if (normalized !== undefined) {
+        return normalized;
+      }
     }
     return undefined;
   }
