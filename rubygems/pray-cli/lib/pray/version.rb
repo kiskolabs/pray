@@ -1,6 +1,6 @@
 # frozen_string_literal: true
 
 module Pray
-  VERSION = "1.4.0"
-  GENERATED_BY = "pray 1.4.0"
+  VERSION = "1.5.0"
+  GENERATED_BY = "pray 1.5.0"
 end

@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+## 1.5.0 (2026-07-27)
+
 - Accept Gemfile-like Ruby surface sugar for Prayfile statements: `{…}` blocks, top-level `;`, and optional call parentheses on keywords and symbol assignments.
 - Align Ruby `pray-cli` with `((pray:…))` symbol maps (`pray do` / `template do`), substitution on render/provision, and the same surface sugar.
 - Add TypeScript and Ruby parser/substitute coverage for the surface forms.

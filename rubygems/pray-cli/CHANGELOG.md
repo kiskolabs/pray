@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+## 1.5.0 (2026-07-27)
+
 - Add `((pray:symbol))` templating with project-wide `pray do` / `template do` symbol maps.
 - Substitute symbols in rendered fragments, local embeds, and UTF-8 provisioned files.
 - Accept Gemfile-like Ruby surface sugar: `{…}` blocks, top-level `;`, and optional call parentheses.
