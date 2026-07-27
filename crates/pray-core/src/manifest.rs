@@ -2,6 +2,7 @@ use crate::hashing::sha256_prefixed;
 use crate::literal::{
     find_top_level, is_balanced, parse_literal, prepare_parser_lines, split_top_level, LiteralValue,
 };
+use crate::statement_surface::{split_symbol_assignment, SurfaceStatementReader};
 use crate::{PrayError, PrayResult};
 use serde::{Deserialize, Serialize};
 use std::borrow::Cow;
@@ -206,6 +207,7 @@ struct BlockParser<'a> {
     lines: &'a [Cow<'a, str>],
     cursor: usize,
     group_stack: Vec<Vec<String>>,
+    surface: SurfaceStatementReader,
 }
 
 impl<'a> BlockParser<'a> {
@@ -214,6 +216,7 @@ impl<'a> BlockParser<'a> {
             lines,
             cursor: 0,
             group_stack: Vec::new(),
+            surface: SurfaceStatementReader::default(),
         }
     }
 
@@ -429,13 +432,13 @@ impl<'a> BlockParser<'a> {
                     ),
                 });
             };
-            if !crate::substitute::is_pray_symbol_key(key) {
+            if !crate::substitute::is_pray_symbol_key(&key) {
                 return Err(PrayError::Parse {
                     kind: "manifest",
                     message: format!("invalid pray symbol key `{key}`"),
                 });
             }
-            if manifest.symbols.contains_key(key) {
+            if manifest.symbols.contains_key(&key) {
                 return Err(PrayError::Parse {
                     kind: "manifest",
                     message: format!("duplicate pray symbol `{key}`"),
@@ -443,7 +446,7 @@ impl<'a> BlockParser<'a> {
             }
             manifest
                 .symbols
-                .insert(key.to_string(), string_from_literal(value_literal)?);
+                .insert(key, string_from_literal(&value_literal)?);
         }
         Err(PrayError::Parse {
             kind: "manifest",
@@ -652,6 +655,9 @@ impl<'a> BlockParser<'a> {
     }
 
     fn next_statement(&mut self) -> PrayResult<Option<String>> {
+        if let Some(pending) = self.surface.next() {
+            return Ok(Some(pending));
+        }
         while self.cursor < self.lines.len() {
             let mut statement = self.lines[self.cursor].trim().to_string();
             self.cursor += 1;
@@ -671,7 +677,10 @@ impl<'a> BlockParser<'a> {
                 statement.push(' ');
                 statement.push_str(next);
             }
-            return Ok(Some(statement));
+            self.surface.push_raw(statement);
+            if let Some(normalized) = self.surface.next() {
+                return Ok(Some(normalized));
+            }
         }
         Ok(None)
     }
@@ -964,17 +973,6 @@ fn string_from_value(value: &LiteralValue) -> PrayResult<String> {
 
 fn string_from_literal(input: &str) -> PrayResult<String> {
     string_from_value(&parse_literal(input)?)
-}
-
-fn split_symbol_assignment(statement: &str) -> Option<(&str, &str)> {
-    let trimmed = statement.trim();
-    let mut parts = trimmed.splitn(2, char::is_whitespace);
-    let key = parts.next()?.trim();
-    let value = parts.next()?.trim();
-    if key.is_empty() || value.is_empty() {
-        return None;
-    }
-    Some((key, value))
 }
 
 fn apply_target_statement(target: &mut ManifestTarget, statement: String) -> PrayResult<()> {

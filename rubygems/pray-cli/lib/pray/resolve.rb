@@ -297,14 +297,40 @@ module Pray
     end
 
     def select_exports(declaration, spec)
-      return spec.exports.keys.sort if declaration.exports.empty?
+      unless declaration.exports.empty?
+        declaration.exports.each do |export|
+          unless spec.exports.key?(export)
+            raise Error.resolution("package #{declaration.name} does not export #{export}")
+          end
+        end
+        return declaration.exports
+      end
 
-      declaration.exports.each do |export|
-        unless spec.exports.key?(export)
-          raise Error.resolution("package #{declaration.name} does not export #{export}")
+      roles = declaration.roles || []
+      return spec.exports.keys.sort if roles.empty? && declaration.file.nil?
+
+      effective_roles = roles.dup
+      effective_roles << "file" if declaration.file && !effective_roles.include?("file")
+
+      selected = []
+      effective_roles.each do |role|
+        compatible = spec.exports.filter_map do |name, export|
+          name if Destination.export_kind_matches_role?(export.kind, role)
+        end
+        case compatible.length
+        when 1
+          selected << compatible.first unless selected.include?(compatible.first)
+        when 0
+          raise Error.resolution(
+            "package #{declaration.name} has no export compatible with #{role}"
+          )
+        else
+          raise Error.resolution(
+            "package #{declaration.name} has multiple exports compatible with #{role}; set export: \"name\""
+          )
         end
       end
-      declaration.exports
+      selected
     end
 
     def load_package_file_bytes(root, spec)

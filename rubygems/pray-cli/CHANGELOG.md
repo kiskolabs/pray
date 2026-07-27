@@ -1,5 +1,15 @@
 # CHANGELOG
 
+## Unreleased
+
+- Add `((pray:symbol))` templating with project-wide `pray do` / `template do` symbol maps.
+- Substitute symbols in rendered fragments, local embeds, and UTF-8 provisioned files.
+- Accept Gemfile-like Ruby surface sugar: `{…}` blocks, top-level `;`, and optional call parentheses.
+- Accept `pray` / `use` / `include` / `package` as package declaration aliases of `agent`.
+- Parse and apply `compose`, `tree`, and `file:` destinations with role-based export selection and scoped render/provision.
+- Exercise the shared `testdata/shared` Prayfile corpus alongside Rust and TypeScript.
+- Rewrite Prayfile with `pray format` (`fmt`) to the recommended compose/tree/file destination DSL.
+
 ## 1.1.0 (2026-07-14)
 
 - Add environment-aware rendering with `group` blocks and `--env` or `PRAY_ENV`.

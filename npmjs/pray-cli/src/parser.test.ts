@@ -239,4 +239,29 @@ end
         error.message.includes("duplicate"),
     );
   });
+
+  it("parses ruby surface brace blocks and call parentheses", () => {
+    const manifest = parseManifest(`
+prayfile "1"
+pray{support_email("contact@kiskolabs.com");security_email("security@kiskolabs.com")}
+compose("AGENTS.md"){
+  pray "sample/base", "~> 1.0"
+}
+`);
+    assert.equal(manifest.symbols.support_email, "contact@kiskolabs.com");
+    assert.equal(manifest.symbols.security_email, "security@kiskolabs.com");
+    assert.equal(manifest.targets.length, 1);
+    assert.equal(manifest.targets[0]?.name, "compose:AGENTS.md");
+    assert.deepEqual(manifest.targets[0]?.outputs, ["AGENTS.md"]);
+    assert.equal(manifest.packages[0]?.name, "sample/base");
+  });
+
+  it("parses ruby surface semicolon do/end one-liner", () => {
+    const manifest = parseManifest(`
+prayfile "1"
+pray do; support_email("a@example.com"); security_email("b@example.com"); end
+`);
+    assert.equal(manifest.symbols.support_email, "a@example.com");
+    assert.equal(manifest.symbols.security_email, "b@example.com");
+  });
 });

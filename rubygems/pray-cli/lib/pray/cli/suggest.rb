@@ -4,7 +4,7 @@ module Pray
   module CLI
     module Suggest
       TOP_LEVEL_COMMANDS = %w[
-        add apply clean confess drift explain format help init install list login manifest
+        add apply clean confess drift explain fmt format help init install list login manifest
         outdated package plan prayer publish remove render repo serve sync tree trust unlock
         update vendor verify version
       ].freeze

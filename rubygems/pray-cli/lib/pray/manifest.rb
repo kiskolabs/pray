@@ -18,35 +18,42 @@ module Pray
     end
   end
 
-  ManifestSource = Struct.new(:name, :kind, :url, :subdir, :rev, :tag)
+  ManifestSource = Struct.new(:name, :kind, :url, :subdir, :rev, :tag, keyword_init: true)
   ManifestTarget = Struct.new(
-    :name, :outputs, :skills, :commands, :rules, :max_bytes
+    :name, :outputs, :skills, :commands, :rules, :max_bytes, :mode, :scoped, :entries,
+    keyword_init: true
   ) do
-    def initialize(name:, outputs: [], skills: [], commands: [], rules: [], max_bytes: nil)
+    def initialize(
+      name:, outputs: [], skills: [], commands: [], rules: [], max_bytes: nil,
+      mode: "legacy", scoped: false, entries: []
+    )
       super
     end
   end
 
   ManifestPackage = Struct.new(
     :name, :constraint, :source, :exports, :targets, :features, :groups, :optional,
-    :path, :git, :tag, :rev, :tarball, :oci
+    :path, :git, :tag, :rev, :tarball, :oci, :file, :roles, :bound,
+    keyword_init: true
   ) do
     def initialize(
       name:, constraint: "*", source: nil, exports: [], targets: [], features: [], groups: [],
-      optional: false, path: nil, git: nil, tag: nil, rev: nil, tarball: nil, oci: nil
+      optional: false, path: nil, git: nil, tag: nil, rev: nil, tarball: nil, oci: nil,
+      file: nil, roles: [], bound: false
     )
       super
     end
   end
 
-  ManifestLocal = Struct.new(:path, :position, :optional) do
-    def initialize(path:, position: "after", optional: false)
+  ManifestLocal = Struct.new(:path, :position, :optional, :bound, keyword_init: true) do
+    def initialize(path:, position: "after", optional: false, bound: false)
       super
     end
   end
 
   Manifest = Struct.new(
-    :prayfile_version, :sources, :targets, :packages, :local, :render
+    :prayfile_version, :sources, :targets, :packages, :local, :symbols, :render,
+    keyword_init: true
   ) do
     def initialize(
       prayfile_version: "",
@@ -54,6 +61,7 @@ module Pray
       targets: [],
       packages: [],
       local: [],
+      symbols: {},
       render: RenderPolicy.default
     )
       super
@@ -89,7 +97,7 @@ module Pray
     end
 
     def format_package_declaration(package)
-      parts = ["agent \"#{package.name}\""]
+      parts = ["pray \"#{package.name}\""]
       parts << "\"#{package.constraint}\"" unless package.constraint == "*"
       parts << "path: \"#{package.path}\"" if package.path
       parts << "source: \"#{package.source}\"" if package.source
@@ -98,7 +106,14 @@ module Pray
       parts << "rev: \"#{package.rev}\"" if package.rev
       parts << "tarball: \"#{package.tarball}\"" if package.tarball
       parts << "oci: \"#{package.oci}\"" if package.oci
-      parts << "exports: [#{format_string_keyword_list(package.exports)}]" unless package.exports.empty?
+      parts << "file: \"#{package.file}\"" if package.file
+      unless package.exports.empty?
+        parts << if package.exports.length == 1
+          "export: \"#{package.exports.first}\""
+        else
+          "exports: [#{format_string_keyword_list(package.exports)}]"
+        end
+      end
       parts << "targets: [#{format_string_keyword_list(package.targets)}]" unless package.targets.empty?
       parts << "features: [#{format_string_keyword_list(package.features)}]" unless package.features.empty?
       parts << "optional: true" if package.optional
@@ -107,12 +122,16 @@ module Pray
 
     def replace_package_declaration(text, package)
       name = package.name
-      package_prefix = "agent \"#{name}\""
-      alternate_prefix = "agent '#{name}'"
+      prefixes = [
+        "pray \"#{name}\"", "pray '#{name}'",
+        "use \"#{name}\"", "include \"#{name}\"",
+        "agent \"#{name}\"", "agent '#{name}'",
+        "package \"#{name}\"", "package '#{name}'"
+      ]
       lines = text.lines.map(&:chomp)
       index = lines.index { |line|
         trimmed = line.lstrip
-        trimmed.start_with?(package_prefix, alternate_prefix)
+        prefixes.any? { |prefix| trimmed.start_with?(prefix) }
       }
       raise Error.manifest("package #{name} not found in manifest") unless index
 
@@ -131,6 +150,7 @@ module Pray
         @lines = lines
         @cursor = 0
         @group_stack = []
+        @surface = StatementSurface::Reader.new
       end
 
       def parse_root
@@ -177,10 +197,32 @@ module Pray
           @group_stack.push(group_names)
           parse_group_block(manifest)
           @group_stack.pop
-        when /\Aagent (.+)\z/
-          manifest.packages << parse_package_with_groups(Regexp.last_match(1))
+        when "pray do", "template do"
+          parse_symbols_block(manifest)
+        when /\A(?:compose|output) (.+)\z/
+          if statement.start_with?("output ") && !statement.end_with?(" do")
+            raise Error.parse(
+              "manifest",
+              "top-level output must use a compose block (output \"path\" do ... end)"
+            )
+          end
+          parse_destination_block(manifest, Regexp.last_match(1), "compose")
+        when /\A(?:tree|folder|skills) (.+)\z/
+          if (statement.start_with?("folder ") || statement.start_with?("skills ")) &&
+              !statement.end_with?(" do")
+            raise Error.parse("manifest", "top-level folder/skills must use a tree block")
+          end
+          parse_destination_block(manifest, Regexp.last_match(1), "tree")
+        when /\Afile (.+)\z/
+          parse_file_block(manifest, Regexp.last_match(1))
+        when /\A(?:agent|package) (.+)\z/
+          Destination.upsert_package(manifest, parse_package_with_groups(Regexp.last_match(1)))
+        when /\A(?:pray|use|include) (.+)\z/
+          apply_pray_statement(manifest, Regexp.last_match(1), nil)
         when /\Alocal (.+)\z/
-          manifest.local << parse_local_decl(Regexp.last_match(1))
+          local = parse_local_decl(Regexp.last_match(1))
+          local.bound = false
+          Destination.upsert_local(manifest, local)
         when /\Arender (.+)\z/
           manifest.render = parse_render_policy(Regexp.last_match(1))
         else
@@ -188,23 +230,154 @@ module Pray
         end
       end
 
+      def parse_symbols_block(manifest)
+        while (statement = next_statement)
+          return if statement == "end"
+
+          assignment = StatementSurface.split_symbol_assignment(statement)
+          unless assignment
+            raise Error.parse(
+              "manifest",
+              "unsupported statement inside pray/template block: #{statement}"
+            )
+          end
+
+          key, value_literal = assignment
+          unless Substitute.pray_symbol_key?(key)
+            raise Error.parse("manifest", "invalid pray symbol key `#{key}`")
+          end
+          if manifest.symbols.key?(key)
+            raise Error.parse("manifest", "duplicate pray symbol `#{key}`")
+          end
+
+          manifest.symbols[key] = string_from_literal(value_literal)
+        end
+        raise Error.parse("manifest", "missing 'end' for pray/template block")
+      end
+
       def parse_group_block(manifest)
         while (statement = next_statement)
           return if statement == "end"
-          if (match = statement.match(/\Aagent (.+)\z/))
-            manifest.packages << parse_package_with_groups(match[1])
-          elsif (match = statement.match(/\Apackage (.+)\z/))
-            manifest.packages << parse_package_with_groups(match[1])
+          if (match = statement.match(/\A(?:agent|package|pray|use|include) (.+)\z/))
+            Destination.upsert_package(manifest, parse_package_with_groups(match[1]))
           elsif /\Agroup (.+)\z/.match?(statement)
             raise Error.parse("manifest", "nested group blocks are not supported")
           else
             raise Error.parse(
               "manifest",
-              "group blocks only support agent or package declarations: #{statement}"
+              "group blocks only support agent, package, or pray declarations: #{statement}"
             )
           end
         end
         raise Error.parse("manifest", "missing 'end' for group block")
+      end
+
+      def parse_destination_block(manifest, rest, mode)
+        unless rest.rstrip.end_with?("do")
+          label = mode == "compose" ? "compose" : "tree"
+          raise Error.parse("manifest", "#{label} must use a block")
+        end
+
+        header = rest.sub(/\s*do\z/, "").strip
+        values, = parse_call(header)
+        raise Error.parse("manifest", "destination missing path") if values.empty?
+
+        path = string_from_value(values.first)
+        manifest.targets << Destination.new_destination_target(mode, path)
+        index = manifest.targets.length - 1
+
+        while (statement = next_statement)
+          return if statement == "end"
+
+          if (match = statement.match(/\A(?:pray|use|include|agent|package) (.+)\z/))
+            apply_pray_statement(manifest, match[1], index)
+            next
+          end
+          if mode == "compose" && (match = statement.match(/\Alocal (.+)\z/))
+            local = parse_local_decl(match[1])
+            local.bound = true
+            Destination.bind_local_entry(manifest.targets[index], local.path)
+            Destination.upsert_local(manifest, local)
+            next
+          end
+          raise Error.parse("manifest", "unsupported statement inside destination block: #{statement}")
+        end
+        raise Error.parse("manifest", "missing 'end' for destination block")
+      end
+
+      def parse_file_block(manifest, rest)
+        unless rest.rstrip.end_with?("do")
+          raise Error.parse("manifest", "file must use a block (or use pray ..., file: \"path\")")
+        end
+
+        header = rest.sub(/\s*do\z/, "").strip
+        values, = parse_call(header)
+        raise Error.parse("manifest", "file block missing path") if values.empty?
+
+        file_path = string_from_value(values.first)
+        saw_package = false
+        while (statement = next_statement)
+          if statement == "end"
+            unless saw_package
+              raise Error.parse("manifest", "file block requires a pray package declaration")
+            end
+            return
+          end
+          if (match = statement.match(/\A(?:pray|use|include|agent|package) (.+)\z/))
+            package = parse_package_with_groups(match[1])
+            if package.file
+              raise Error.parse("manifest", "file: keyword is invalid inside a file block")
+            end
+            package.file = file_path
+            package.bound = true
+            package.roles << "file" unless package.roles.include?("file")
+            Destination.upsert_package(manifest, package)
+            saw_package = true
+            next
+          end
+          raise Error.parse("manifest", "unsupported statement inside file block: #{statement}")
+        end
+        raise Error.parse("manifest", "missing 'end' for file block")
+      end
+
+      def apply_pray_statement(manifest, rest, destination_index)
+        values, keywords = parse_call(rest)
+        raise Error.parse("manifest", "pray missing package or path") if values.empty?
+
+        first = string_from_value(values.first)
+        has_package_signal = values.length > 1 ||
+          %w[source export exports file optional path git tag rev tarball oci targets features]
+            .any? { |key| keywords.key?(key) }
+
+        in_compose = destination_index &&
+          manifest.targets[destination_index]&.mode == "compose"
+
+        if !has_package_signal && Destination.local_path_form?(first)
+          unless in_compose
+            raise Error.parse("manifest", "local pray paths are only valid inside compose blocks")
+          end
+          local = ManifestLocal.new(path: first, position: "after", optional: false, bound: true)
+          Destination.bind_local_entry(manifest.targets[destination_index], local.path)
+          Destination.upsert_local(manifest, local)
+          return
+        end
+
+        package = parse_package_with_groups(rest)
+        if package.file
+          if destination_index
+            raise Error.parse("manifest", "file: is mutually exclusive with compose/tree nesting")
+          end
+          package.bound = true
+          package.roles << "file" unless package.roles.include?("file")
+        end
+        if destination_index
+          mode = manifest.targets[destination_index].mode
+          package.bound = true
+          role = Destination.role_for_destination(mode)
+          package.roles << role if role && !package.roles.include?(role)
+          Destination.bind_package_entry(manifest.targets[destination_index], package.name)
+        end
+        Destination.upsert_package(manifest, package)
       end
 
       def parse_package_with_groups(rest)
@@ -226,6 +399,9 @@ module Pray
       end
 
       def next_statement
+        pending = @surface.next
+        return pending if pending
+
         while @cursor < @lines.length
           statement = @lines[@cursor].strip
           @cursor += 1
@@ -239,7 +415,9 @@ module Pray
 
             statement = "#{statement} #{next_line}"
           end
-          return statement
+          @surface.push_raw(statement)
+          pending = @surface.next
+          return pending if pending
         end
         nil
       end
@@ -366,11 +544,18 @@ module Pray
         else
           "*"
         end
+        exports = keyword_array(keywords, "exports")
+        if (export = keywords["export"]&.as_string)
+          exports << export unless exports.include?(export)
+        end
+        file = keywords["file"]&.as_string
+        roles = []
+        roles << "file" if file
         ManifestPackage.new(
           name: name,
           constraint: constraint,
           source: keywords["source"]&.as_string,
-          exports: keyword_array(keywords, "exports"),
+          exports: exports,
           targets: keyword_array(keywords, "targets"),
           features: keyword_array(keywords, "features"),
           optional: keywords["optional"]&.as_bool || false,
@@ -379,7 +564,10 @@ module Pray
           tag: keywords["tag"]&.as_string,
           rev: keywords["rev"]&.as_string,
           tarball: keywords["tarball"]&.as_string,
-          oci: keywords["oci"]&.as_string
+          oci: keywords["oci"]&.as_string,
+          file: file,
+          roles: roles,
+          bound: false
         )
       end
 
@@ -387,8 +575,9 @@ module Pray
         values, keywords = parse_call(rest)
         ManifestLocal.new(
           path: string_from_value(values.first),
-          position: keywords["position"]&.as_string || "after",
-          optional: keywords["optional"]&.as_bool || false
+          position: keywords["position"]&.as_string || keywords["at"]&.as_string || "after",
+          optional: keywords["optional"]&.as_bool || false,
+          bound: false
         )
       end
 

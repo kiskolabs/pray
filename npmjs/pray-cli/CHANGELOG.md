@@ -1,5 +1,10 @@
 # CHANGELOG
 
+## Unreleased
+
+- Accept Gemfile-like Ruby surface sugar for Prayfile statements: `{…}` blocks, top-level `;`, and optional call parentheses.
+- Add parser coverage for symbol maps and surface forms alongside substitute tests.
+
 ## 1.3.0 (2026-07-26)
 
 - Add destination DSL parsing: `compose`, `tree`, and `file:` blocks in `Prayfile` for scoped rendering and exact file bindings, matching `pray-core`.

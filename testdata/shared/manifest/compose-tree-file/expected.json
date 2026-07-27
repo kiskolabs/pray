@@ -1,0 +1,50 @@
+{
+  "targets": [
+    {
+      "name": "compose:AGENTS.md",
+      "mode": "compose",
+      "scoped": true,
+      "outputs": ["AGENTS.md"],
+      "entries": [
+        { "kind": "local", "path": ".agents/project.md" },
+        { "kind": "package", "name": "sample/rules" }
+      ]
+    },
+    {
+      "name": "tree:.agents/skills",
+      "mode": "tree",
+      "scoped": true,
+      "skills": [".agents/skills"],
+      "entries": [
+        { "kind": "package", "name": "sample/audit" }
+      ]
+    }
+  ],
+  "packages": [
+    {
+      "name": "sample/rules",
+      "bound": true,
+      "roles": ["fragment"],
+      "path": "packages/rules"
+    },
+    {
+      "name": "sample/audit",
+      "bound": true,
+      "roles": ["folder"],
+      "path": "packages/audit"
+    },
+    {
+      "name": "sample/security",
+      "bound": true,
+      "roles": ["file"],
+      "file": "SECURITY.md",
+      "path": "packages/security"
+    }
+  ],
+  "local": [
+    {
+      "path": ".agents/project.md",
+      "bound": true
+    }
+  ]
+}

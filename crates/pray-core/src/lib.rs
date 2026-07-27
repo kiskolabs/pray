@@ -26,6 +26,7 @@ mod registry_http;
 mod registry_ssh;
 mod registry_torrent;
 pub mod render;
+pub mod statement_surface;
 pub mod substitute;
 pub mod resolve;
 pub mod resolve_context;

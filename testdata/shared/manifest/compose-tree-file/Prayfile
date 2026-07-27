@@ -1,0 +1,12 @@
+prayfile "1"
+
+compose "AGENTS.md" do
+  pray ".agents/project.md"
+  pray "sample/rules", "~> 1.0", path: "packages/rules"
+end
+
+tree ".agents/skills" do
+  pray "sample/audit", "~> 1.0", path: "packages/audit"
+end
+
+pray "sample/security", "~> 1.0", path: "packages/security", file: "SECURITY.md"

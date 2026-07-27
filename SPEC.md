@@ -749,6 +749,15 @@ end
 
 Alias: `template do … end`.
 
+Surface sugar (optional, normalizes to the canonical form above):
+
+- `{ … }` blocks instead of `do` / `end` when the statement is a keyword call (`pray{…}`, `compose("AGENTS.md"){…}`, `compose "AGENTS.md"{…}`); assignment map literals such as `spec.exports = { … }` are left alone
+- top-level `;` statement separators (including one-liners)
+- optional call parentheses after keywords (`compose("AGENTS.md") do`)
+- optional call parentheses on symbol assignments (`support_email("…")`)
+
+Still forbidden: interpolation, constants, variables, method chaining, and other executable Ruby.
+
 Placeholder form (strict, no spaces):
 
 ```
@@ -2876,6 +2885,8 @@ fixtures/
 Each fixture should contain: input Prayfile, input prayspec files, package sources, expected canonical manifest, expected Prayfile.lock, expected rendered files, expected diagnostics
 
 This allows independent implementations.
+
+The reference tree also keeps a smaller shared corpus at `testdata/shared/manifest/` (Prayfile plus destination-focused `expected.json`) exercised by Rust, TypeScript, and Ruby CI suites. Grow that tree for cross-runtime parse contracts; reserve fuller conformance packs for the `fixtures/` layout above.
 
 ---
 

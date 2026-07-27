@@ -6,6 +6,7 @@ import {
 } from "../literal/call-parser.js";
 import { prepareParserLines } from "../literal/lines.js";
 import { StatementReader } from "../literal/statements.js";
+import { splitSymbolAssignment } from "../literal/statement-surface.js";
 import {
   bindLocalEntry,
   bindPackageEntry,
@@ -282,16 +283,14 @@ class BlockParser {
       if (statement === "end") {
         return;
       }
-      const trimmed = statement.trim();
-      const match = trimmed.match(/^(\S+)\s+(.+)$/);
-      if (!match) {
+      const assignment = splitSymbolAssignment(statement);
+      if (!assignment) {
         throw PrayError.parse(
           PARSE_CONTEXT,
           `unsupported statement inside pray/template block: ${statement}`,
         );
       }
-      const key = match[1]!;
-      const valueLiteral = match[2]!;
+      const { key, value: valueLiteral } = assignment;
       if (!isPraySymbolKey(key)) {
         throw PrayError.parse(
           PARSE_CONTEXT,
