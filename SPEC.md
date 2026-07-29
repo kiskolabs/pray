@@ -1,174 +1,71 @@
 # Prayfile Open Specification
 
-**Status:** Active development v0.1  
-**Primary file names:** Prayfile, Prayfile.lock, *.prayspec, *.praypkg  
-**Reference CLI name:** pray  
-**Project name:** pray  
-**Reference implementation target:** systems language  
-**Specification goal:** language-independent, platform-independent, implementation-independent
+Status: Active development v0.1  
+Primary file names: Prayfile, Prayfile.lock, *.prayspec, *.praypkg  
+Reference CLI name: pray  
+Project name: pray  
+Reference implementation target: systems language  
+Specification goal: language-independent, platform-independent, implementation-independent
 
 ---
 
 ## 1. Summary
 
-Prayfile is an open specification for reproducible pre-inference input composition.
+Prayfile is an open specification for reproducible pre-inference input composition: declare shared instructions and related input, resolve deterministically, lock versions and hashes, preserve source fragments, and render tool-specific outputs with compact pray markers that cite `Prayfile.lock`.
 
-It lets projects declare shared instructions, policies, memories, templates, review checklists, formatting rules, and workflows in one place; resolve them deterministically; lock exact versions and hashes; preserve original source fragments; and render tool-specific outputs with compact provenance markers.
+Core model:
 
-The core model is:
+- Prayfile: human-authored input dependency manifest
+- Prayfile.lock: machine-authored resolved state
+- *.prayspec: package definition
+- *.praypkg: package archive
+- distribution point: packages, metadata, checksums, signatures, feedback, docs
+- pray: reference CLI
 
-| Concept | Role |
-|---------|------|
-| Prayfile | human-authored input dependency manifest |
-| Prayfile.lock | machine-authored resolved state |
-| *.prayspec | package definition |
-| *.praypkg | package archive |
-| distribution point | registry-like source for packages, metadata, checksums, signatures, feedback, and docs |
-| pray | reference CLI |
+Static declarations only. No host-language execution. Parseable by any implementation.
 
-Prayfile is conceptually similar to dependency manifest.
-
-Prayfile.lock is conceptually similar to dependency lockfile.
-
-*.prayspec is conceptually similar to *.packagespec.
-
-But unlike legacy package registries, the specification must not require host-language execution. All files must be parseable as static declarations by any implementation in any language.
-
-The goal is not to create a magic agent. The goal is to distribute, lock, verify, and render inference input cleanly—with compact pray markers that cite `Prayfile.lock`.
+Not a prompt framework or agent runtime. The durable problem is packaging and distributing material placed before inference. Spec and reference CLI evolve together; formats may still change.
 
 ---
 
 ## 2. Core positioning
 
-**One-sentence definition:**
-
-Prayfile is an open specification for reproducible inference input composition.
-
-**Short pitch:**
-
-Modern tools rely on surrounding instruction files, templates, review checklists, memories, formatting rules, and workflow notes. These files are often distributed manually through copy-paste. Prayfile lets projects declare shared input dependencies, resolve them deterministically, lock exact versions and content hashes, preserve original source fragments, and render tool-specific outputs with compact provenance markers.
-
-**FAQ:**
-
-| Question | Answer |
-|----------|--------|
-| Is this a prompt framework? | No. The durable problem is packaging and distributing the material placed before inference—not prompt design itself. |
-| What is input drift? | The gradual divergence of instructions, policies, templates, memories, formatting rules, and workflow assumptions between projects. |
-| Why now? | More tools now read repository-local instruction files, but manual copy-paste still does not scale. |
-| Is the spec final? | Not yet. Terminology, formats, and behaviour may still evolve as the system is hardened through real-world use. |
-| Implementation status? | The specification and reference CLI evolve together, with production readiness as the goal. |
-
-**Design principles:**
+Design principles:
 
 ```text
-Declare input.
-Resolve deterministically.
-Lock exactly.
-Verify by checksum.
-Sign packages.
-Harden publishing.
-Collect signed feedback.
-Cache original fragments.
-Render reproducibly.
-Cite compactly.
-Format safely.
-Plan before applying.
-Detect drift.
+Declare input. Resolve deterministically. Lock exactly.
+Verify by checksum. Sign packages. Harden publishing.
+Collect signed feedback. Cache original fragments.
+Render reproducibly. Cite compactly. Format safely.
+Plan before applying. Detect drift.
 Serve without extra machinery.
-Keep revision history visible through the configured repository backend.
-Never execute package code.
-Never hide updates.
-Keep diffs small.
-Preserve provenance.
-Support rollback.
-Respect silence.
-Avoid bundled binary assets.
+Never execute package code. Never hide updates.
+Keep diffs small. Preserve provenance. Support rollback.
+Respect silence. Avoid bundled binary assets.
 ```
 
-### Core values
+Core values (normative indicators):
 
-Inference input is operational—it shapes what models notice, ignore, repeat, refuse, prioritize, imitate, format, or treat as important. Prayfile treats observability and trust as first-class requirements, not optional polish.
+- Auditable traces: compact pray markers on managed spans; lockfile holds resolved state, ideal checksums, marker lines, source checksums, silence, provenance
+- Temporal clarity: lock and drift show what changed; markers enable blame and rollback
+- Measurable effects: manifest → lock → rendered bytes → diff; inference quality stays human-validated
+- Security: static packages, hash-verified, path-safe, explicitly updated, optionally signed
 
-| Value | What it means |
-|-------|---------------|
-| Auditable traces | Every managed rendered span carries a compact pray marker. `Prayfile.lock` records exact resolved state, ideal checksums, marker line positions, source checksums, silenced fragments, and provenance metadata. |
-| Temporal clarity | Lockfile and drift semantics show what changed between resolves. Version control carries when. Pray markers enable surgical rollback, blame, and review without rereading entire target files. |
-| Measurable effects | Effects are measured at the dependency boundary first: manifest → lock → rendered bytes → reviewable diff. Inference behaviour remains human-validated; the specification does not score model quality. |
-| Security | Input packages are supply-chain inputs: static declarations only, hash-verified, path-safe, explicitly updated, optionally signed. Audit trails align with integrity—implementations can prove what was installed, from where, and at which version. |
-
-These values inform lockfile fields, pray markers, `pray drift` output, `pray verify` checks, and the security model in later sections.
-
-### Production intent
-
-Packaging shapes, tool conventions, and workflow surfaces for inference input will keep changing drastically. Prayfile is designed to stay useful while that surface changes by defining stable contracts, clear indicators, and reviewable change paths.
-
-To observe change, you need indicators. Prayfile defines them as contracts: pinned lock state, pray markers, explicit diffs, integrity checks, and signed feedback. The core values above are those indicators made normative so teams can measure what altered, when, and from where while the surrounding ecosystem shifts.
+Inference-input packaging will keep changing. Prayfile stays useful by pinning lock state, markers, diffs, integrity checks, and signed feedback as contracts.
 
 ---
 
 ## 3. Problem
 
-Inference-oriented development now commonly uses files and folders such as:
+Teams copy instruction files, templates, checklists, memories, formatting rules, and workflow notes between repositories. That yields duplication, stale context, noisy diffs, unclear ownership, hidden drift, hard rollback/audit, tool-specific conflicts, private-input leakage, and giant merged files.
 
-- instruction files
-- instruction libraries
-- prompt templates
-- review checklists
-- memories
-- formatting rules
-- workflow notes
-
-Teams copy the same context between repositories.
-
-This causes:
-
-- duplicated instructions
-- stale context
-- large noisy diffs
-- manual copy-paste updates
-- unclear package ownership
-- hidden behavioral drift
-- hard rollback
-- hard audit
-- conflicting rules
-- different output for different inference tools
-- accidental private-input leakage
-- giant merged instruction files
-
-Inference input is not passive documentation. It affects what models notice, ignore, repeat, refuse, prioritize, imitate, format, or treat as important.
-
-Therefore it should be treated as a dependency.
+Inference input shapes model behavior. Treat it as a dependency.
 
 ---
 
 ## 4. Goals
 
-The specification prioritizes:
-
-- human-readable files
-- small git diffs
-- minimal generated output
-- deterministic installs
-- deterministic rendering
-- explicit updates
-- lockfile-based reproducibility
-- cross-platform behavior
-- implementation in any language
-- support for public/private/local and peer-to-peer distribution
-- safe package installation
-- no arbitrary code execution
-- easy recovery
-- easy vendoring
-- easy CI validation
-- clear package ownership
-- tool-neutral package model
-- tool-specific adapters
-- auditable provenance for every managed rendered span
-- temporal impact visible through lockfile and diff semantics
-- measurable textual effects at the manifest–lock–render boundary
-- supply-chain security for context packages
-
-The main aesthetic is:
+Priorities: human-readable files; small diffs; minimal generated output; deterministic install and render; explicit updates; lockfile reproducibility; cross-platform; any-language implementations; public/private/local/P2P distribution; no code execution; recovery, vendoring, CI validation; clear ownership; tool-neutral packages with tool-specific adapters; auditable provenance; supply-chain security for context packages.
 
 ```
 less formatting religion
@@ -181,178 +78,54 @@ more readable reviewable context
 
 ## 5. Non-goals
 
-This system is not:
+Not: agent runtime, chat memory, session-end learning, prompt-injection firewall, secret manager, governance platform, marketplace ranking, background self-updater, hidden instruction mutator, autonomous context writer, human-review replacement, executable-code package manager, or a bet on any single agent workflow shape.
 
-- an agent runtime
-- a chat memory system
-- a session-end learning hook
-- a prompt-injection firewall
-- a secret manager
-- a policy/governance platform
-- a marketplace ranking system
-- a background self-updater
-- a hidden instruction mutator
-- an autonomous context writer
-- a replacement for human review
-- a package manager for executable code
-- a product built around any single agent workflow shape (for example, today's skills packaging)
-- a bet that current inference-input conventions will stay unchanged; it assumes they will evolve while reproducible composition remains
-
-Self-recovery means deterministic reconstruction from Prayfile.lock.
-
-Self-update means explicit `pray update`.
-
-It must not mean hidden mutation.
+Self-recovery: reconstruct from Prayfile.lock. Self-update: explicit `pray update`. Never hidden mutation.
 
 ---
 
 ## 6. Naming
 
-Recommended names:
+- manifest / lockfile: Prayfile, Prayfile.lock
+- package: *.prayspec, *.praypkg
+- distribution point: registry-like source
+- CLI / project / crate: pray
 
-| Concept | Name |
-|---------|------|
-| Spec / manifest | Prayfile |
-| Lockfile | Prayfile.lock |
-| Package spec | *.prayspec |
-| Package archive | *.praypkg |
-| Distribution point | registry-like source for packages, metadata, checksums, signatures, feedback, and docs |
-| CLI | pray |
-| Project / implementation | pray |
-| Implementation crate/package | pray |
-
-**Prayfile** and **Prayfile.lock** are the manifest and lockfile names.
-
-The reference CLI is **pray**. See `README.md` for project positioning and name rationale.
-
-Example command usage:
-
-```
-pray init
-pray prayer init
-pray repo init
-pray add sample/webapp "~> 2.1"
-pray install
-pray update
-pray plan
-pray apply
-pray render
-pray format
-pray verify
-pray drift
-pray package
-pray publish
-pray confess
-pray serve
-pray vendor
-pray clean
-```
-
-When a distribution repository lives inside a larger checkout, the recommended root folder is `prayers/` (for example, created by `pray repo init`).
-
-Implementations may split resolve and render internally. Those phase names are not CLI commands or aliases.
-
-Semantic analogy:
-
-| Prayfile concept | Analogy |
-|-------------------|---------|
-| Prayfile | recipe |
-| Prayfile.lock | exact brew record |
-| package | ingredient / volume |
-| export | portion |
-| distribution point | pantry |
-| install | resolve + render |
-| update | re-resolve |
-| render | materialize |
-| verify | taste test |
-| vendor | jar on the shelf |
+See `README.md` for name rationale. Distribution repo root inside a larger checkout: `prayers/` (`pray repo init`). Resolve and render may be internal phases, not CLI aliases.
 
 ---
 
 ## 7. Ecosystem analogy
 
-| Reference package ecosystem | Prayfile ecosystem |
-|----------------|---------------------|
-| dependency manifest | Prayfile |
-| dependency lockfile | Prayfile.lock |
-| *.packagespec | *.prayspec |
-| .legacy-archive | .praypkg |
-| resolver install | pray install |
-| resolver update | pray update |
-| package build | pray package |
-| package publish | pray publish |
-| legacy package registry | distribution point / static index |
+Closest reference: dependency manifest/lockfile ecosystems.
 
-**Important difference:**
+- Prayfile / Prayfile.lock ↔ manifest / lockfile
+- *.prayspec / *.praypkg ↔ package spec / archive
+- resolve / render ↔ lock step / materialize merged context (no direct code-dep equivalent)
+- `pray verify` / `pray drift` ↔ integrity checks / lock+render diff
 
-Legacy registries may execute host-language code.  
-Prayfile must parse declarations only.
+Difference: legacy registries may execute host code; Prayfile parses declarations only. Same supply-chain baseline (checksums, optional signing, vendoring) plus compact markers in rendered files.
 
-### Dependency ecosystem alignment
-
-Prayfile is lockfile-shaped for resolve and render, with an additional materialize phase. Existing dependency ecosystems provide the closest reference patterns; the core values in section 2 extend their indicator model to inference-input dependencies.
-
-| Prayfile | Dependency ecosystem |
-|----------|---------------------|
-| Prayfile | dependency manifest |
-| Prayfile.lock | lockfile |
-| *.prayspec | package spec |
-| *.praypkg | package archive |
-| resolve (lock) | resolver / lock step |
-| render (fetch + materialize) | no direct equivalent — dependencies install as their own artifacts, not merged context files |
-| pray verify | checksum / integrity checks |
-| pray drift | lockfile diff plus rendered-output diff |
-
-| Core value | Dependency ecosystem | Prayfile extension |
-|------------|---------------------|---------------------|
-| Auditable traces | lockfile pins; versioned artifacts | compact pray markers inside rendered target files |
-| Temporal clarity | lockfile history; explicit updates | `pray drift` across lock and render; marker-level blame and rollback |
-| Measurable effects | manifest → lock → install; behavior validated by tests | manifest → lock → rendered bytes → diff; inference behaviour stays human-validated |
-| Security | checksums; optional signing; vendoring | same supply-chain baseline; packages are static declarations only — no host-language execution |
-
-Prayfile does not replace dependency ecosystems. It applies reproducibility and audit patterns proven necessary for code dependencies to inference-input dependencies: lock what resolved, render what landed, cite managed spans compactly in target files.
-
-A planned host-language adapter may provide runtime loading and assembly for applications that need it; it consumes `Prayfile.lock` and cache artifacts produced by `pray`, and it does not replace the CLI resolve/render pipeline.
+Prayfile does not replace language package managers. A planned host-language adapter may load from `Prayfile.lock` and cache; it does not replace CLI resolve/render.
 
 ---
 
 ## 8. Terminology
 
-**Prayfile** — Human-authored dependency manifest.
-
-**Prayfile.lock** — Machine-authored exact resolved state.
-
-**prayspec** — Package definition file.
-
-**agent package** — Versioned bundle of agent-context content.
-
-**export** — Named unit provided by a package.
-
-Examples: `webapp-review`, `testing-guidance`, `security-basics`, `ui-components`, `incident-template`
-
-**target** — An agent tool or output environment.
-
-Examples: `tool_a`, `tool_b`, `tool_c`, `tool_d`, `tool_e`, `generic`
-
-**adapter** — Mapping from generic package exports into target-specific files.
-
-**render** — Process of creating actual target files from locked package state.
-
-**managed file** — Generated file owned by pray.
-
-**local file** — Human-owned project file included or appended into rendered output.
-
-**source** — Place where packages are resolved from.
-
-Examples: registry, static index, git, local path, tarball, OCI artifact, file share
-
-**frozen install** — Install mode that refuses to update lockfile or generated files.
-
-**annotation** — Untrusted derived metadata, confession, or analysis output that describes a package, render, or usage event.
-
-**claim** — Any annotation, summary, confession, score, or metadata field supplied by a client, server, or engine.
-
-**render digest** — Exact hash of the final injected bytes after render and normalization.
+- Prayfile: human-authored dependency manifest
+- Prayfile.lock: machine-authored resolved state
+- prayspec: package definition file
+- agent package: versioned bundle of agent-context content
+- export: named unit from a package (e.g. `webapp-review`, `testing-guidance`)
+- target: agent tool or output environment (`tool_a` … `generic`)
+- adapter: maps exports to target-specific files
+- render: create target files from locked state
+- managed file: generated file owned by pray
+- local file: human-owned project file embedded into rendered output
+- source: registry, static index, git, path, tarball, OCI, file share, …
+- frozen install: refuses lockfile or generated-file updates
+- annotation / claim: untrusted derived metadata, confession, score, or analysis
+- render digest: hash of final injected bytes after render and normalization
 
 ---
 
@@ -383,34 +156,17 @@ Depending on repository policy, rendered target files may be committed or ignore
 
 ## 10. Commit policy
 
-**Recommended default for most repositories:**
+Default: commit Prayfile, Prayfile.lock, and rendered targets when tools need them; ignore cache and state.
 
-- commit Prayfile
-- commit Prayfile.lock
-- commit rendered target files when tools require repository-local files
-- ignore cache
-- ignore state
+Personal local: commit Prayfile; optionally lock; ignore generated tool output, cache, state.
 
-**Recommended for local personal context:**
-
-- commit Prayfile
-- optionally commit Prayfile.lock
-- ignore generated local tool output
-- ignore cache
-- ignore state
-
-**Recommended for offline / archival workflows:**
-
-- commit Prayfile
-- commit Prayfile.lock
-- commit `.pray/vendor`
-- commit generated files if target tools need them
+Offline / archival: also commit `.pray/vendor` and generated files if targets need them.
 
 ---
 
 ## 11. Prayfile design
 
-Prayfile is a declarative declarative manifest DSL.
+Prayfile is a declarative manifest DSL.
 
 It must be:
 
@@ -464,39 +220,7 @@ The parser must reject:
 
 ### Editor language mode
 
-`Prayfile` and `Prayfile.lock` have no file extension. Editors that auto-detect language from buffer content may misclassify them (for example as TypeScript) because the DSL uses Gemfile-like keyword arguments, string literals, and symbol-like tokens (`:managed`). That is an editor integration gap, not invalid Prayfile syntax.
-
-Until a dedicated `prayfile` grammar exists, pin language mode by filename in editor settings.
-
-Ruby is the closest practical match for `Prayfile` highlighting today:
-
-```json
-"files.associations": {
-  "Prayfile": "ruby",
-  "Prayfile.lock": "toml"
-}
-```
-
-Use plain text when syntax highlighting is not needed and false diagnostics are distracting:
-
-```json
-"files.associations": {
-  "Prayfile": "plaintext",
-  "Prayfile.lock": "toml"
-}
-```
-
-When extensionless files keep flipping language after auto-detection, disable detection workspace-wide:
-
-```json
-"workbench.editor.languageDetection": false
-```
-
-Manual override through the status bar language picker (Ruby or Plain Text) should stick once chosen; auto-detection must not override an explicit picker selection.
-
-Longer term, a small editor extension should register language id `prayfile` with a TextMate grammar and ship `files.associations` for `Prayfile` and `Prayfile.lock`, similar to how `Gemfile` is commonly associated with Ruby or handled by dedicated tooling.
-
-Implementations may document the snippets above in repository `README.md` or contributor setup notes; the spec does not require a particular editor.
+`Prayfile` and `Prayfile.lock` are extensionless; editors may mis-detect language. Pin by filename until a `prayfile` grammar exists. Practical defaults: associate `Prayfile` with Ruby (or plaintext) and `Prayfile.lock` with TOML. Disable workspace language detection if auto-detect keeps flipping. Spec does not require a particular editor.
 
 ---
 
@@ -723,12 +447,10 @@ Aliases: `use`, `include`. Legacy `agent` / `package` remain valid in prayfile `
 
 Forms:
 
-| Form | Meaning |
-|------|---------|
-| `pray "owner/name", "constraint", …` | Package |
-| `pray "owner/name", …, file: "path"` | Package file export at path (after `((pray:…))` substitution) |
-| `pray "relative/or/./path"` bare, inside `compose` | Local file embed |
-| `pray do … end` | Default symbol map for `((pray:…))` placeholders |
+- `pray "owner/name", "constraint", …`: Package
+- `pray "owner/name", …, file: "path"`: Package file export at path (after `((pray:…))` substitution)
+- `pray "relative/or/./path"` bare, inside `compose`: Local file embed
+- `pray do … end`: Default symbol map for `((pray:…))` placeholders
 
 `file:` rules:
 
@@ -782,11 +504,9 @@ Rules:
 
 Default export resolution when `export:` / `exports:` omitted:
 
-| Context | Compatible export types |
-|---------|-------------------------|
-| inside `compose` | `fragment` |
-| `file:` keyword | `file` |
-| inside `tree` | `folder` / `skill` |
+- inside `compose`: `fragment`
+- `file:` keyword: `file`
+- inside `tree`: `folder` / `skill`
 
 Exactly one compatible export is selected; multiple require `export: "name"`; none is a type mismatch. Legacy-only Prayfiles (no `compose` / `tree` / `pray` / `file:`) keep empty exports selecting all package exports.
 
@@ -1136,16 +856,14 @@ Every `*.prayspec` compiles to a canonical package model:
 
 Supported export types:
 
-| Type | Description |
-|------|-------------|
-| fragment | Text fragment rendered into a `compose` / legacy output |
-| file | Exact file bytes via `pray …, file: "path"` (preferred) or nested under a legacy skills root |
-| folder | Directory tree provisioned into a `tree` / legacy skills root |
-| template | Reusable text artifact |
-| command | Tool-specific or generic command template |
-| rule | Tool-specific rule file |
-| asset | Static file used by a template or folder export |
-| bundle | Named collection of other exports |
+- fragment: Text fragment rendered into a `compose` / legacy output
+- file: Exact file bytes via `pray …, file: "path"` (preferred) or nested under a legacy skills root
+- folder: Directory tree provisioned into a `tree` / legacy skills root
+- template: Reusable text artifact
+- command: Tool-specific or generic command template
+- rule: Tool-specific rule file
+- asset: Static file used by a template or folder export
+- bundle: Named collection of other exports
 
 `skill` remains a legacy alias for `folder`.
 
@@ -1542,29 +1260,25 @@ RPC methods mirror the reference HTTP distribution API. Params replace path segm
 
 Required methods:
 
-| Method | HTTP equivalent | Params |
-|--------|-----------------|--------|
-| `federation.discovery` | `GET /.well-known/pray-federation.json` | none |
-| `sync.index` | `GET /v1/sync/index` | `since` optional, integer |
-| `sync.package` | `GET /v1/sync/package/{name}` | `name` string |
-| `sync.push` | `POST /v1/sync/push` | `metadata` package metadata object |
-| `artifact.get` | `GET` static artifact path | `path` relative path under server root |
-| `artifact.put` | `PUT /v1/artifacts/...` | `path`, `body` base64 |
+- `federation.discovery`: `GET /.well-known/pray-federation.json`; none
+- `sync.index`: `GET /v1/sync/index`; `since` optional, integer
+- `sync.package`: `GET /v1/sync/package/{name}`; `name` string
+- `sync.push`: `POST /v1/sync/push`; `metadata` package metadata object
+- `artifact.get`: `GET` static artifact path; `path` relative path under server root
+- `artifact.put`: `PUT /v1/artifacts/...`; `path`, `body` base64
 
 Optional methods:
 
-| Method | HTTP equivalent |
-|--------|-----------------|
-| `confession.submit` | `POST /v1/confessions` |
-| `auth.register` | `POST /v1/auth/register` |
-| `auth.verify` | `POST /v1/auth/verify` |
-| `auth.session` | `POST /v1/auth/session` |
-| `auth.passkeys.challenge` | `POST /v1/auth/passkeys/challenge` |
-| `auth.passkeys.login` | `POST /v1/auth/passkeys/login` |
-| `auth.passkeys.enroll` | `POST /v1/auth/passkeys/enroll` |
-| `auth.ssh_keys.challenge` | `POST /v1/auth/ssh-keys/challenge` |
-| `auth.ssh_keys.login` | `POST /v1/auth/ssh-keys/login` |
-| `auth.ssh_keys.enroll` | `POST /v1/auth/ssh-keys/enroll` |
+- `confession.submit`: `POST /v1/confessions`
+- `auth.register`: `POST /v1/auth/register`
+- `auth.verify`: `POST /v1/auth/verify`
+- `auth.session`: `POST /v1/auth/session`
+- `auth.passkeys.challenge`: `POST /v1/auth/passkeys/challenge`
+- `auth.passkeys.login`: `POST /v1/auth/passkeys/login`
+- `auth.passkeys.enroll`: `POST /v1/auth/passkeys/enroll`
+- `auth.ssh_keys.challenge`: `POST /v1/auth/ssh-keys/challenge`
+- `auth.ssh_keys.login`: `POST /v1/auth/ssh-keys/login`
+- `auth.ssh_keys.enroll`: `POST /v1/auth/ssh-keys/enroll`
 
 JSON shapes for `federation.discovery`, `sync.index`, `sync.package`, `sync.push`, artifacts, confessions, and auth match the HTTP API and federation types in Section 29.2. HTML index and package pages are not exposed over SSH-RPC.
 
@@ -1666,19 +1380,17 @@ Recommended format: TOML tables.
 
 Required fields:
 
-| Field | Meaning |
-|-------|---------|
-| `kind` | Verification subject type: `package`, `render_plan`, `render_output`, or `confession` |
-| `subject` | Stable subject reference such as package name and version, managed span ID, confession ID, or artifact reference |
-| `subject_hash` | Expected hash for the subject being verified |
-| `verifier` | Identity of the client or server that performed the verification |
-| `method` | Verification method such as `hash`, `signature`, `manual`, `heuristic`, `local_model`, `cloud_model`, or `rule` |
-| `policy` | Policy or trust rule reference used during verification |
-| `input_hash` | Hash of the inputs used to produce the claim |
-| `observed_hash` | Hash actually observed during verification |
-| `observed_at` | Verification timestamp |
-| provenance | Origin, source, or federation path for the claim |
-| `signature` | Optional signature over the canonical record |
+- `kind`: Verification subject type: `package`, `render_plan`, `render_output`, or `confession`
+- `subject`: Stable subject reference such as package name and version, managed span ID, confession ID, or artifact reference
+- `subject_hash`: Expected hash for the subject being verified
+- `verifier`: Identity of the client or server that performed the verification
+- `method`: Verification method such as `hash`, `signature`, `manual`, `heuristic`, `local_model`, `cloud_model`, or `rule`
+- `policy`: Policy or trust rule reference used during verification
+- `input_hash`: Hash of the inputs used to produce the claim
+- `observed_hash`: Hash actually observed during verification
+- `observed_at`: Verification timestamp
+- provenance: Origin, source, or federation path for the claim
+- `signature`: Optional signature over the canonical record
 
 Render-output records should bind the final injected bytes. Render-plan records should also record selected exports, exclusions, ordering, normalization, and target policy in their provenance or detail fields. Confession records should bind the confession body to the sender, package reference, and replay-prevention data.
 
@@ -1823,24 +1535,22 @@ outputs = [
 
 ## 32.1 Managed span records
 
-Each managed span (a **prayer** between pray markers) must have a lockfile record.
+Each managed span (a prayer between pray markers) must have a lockfile record.
 
 Required fields:
 
-| Field | Meaning |
-|-------|---------|
-| `id` | Opaque pray marker ID |
-| `target` | Target file path |
-| `open_line` | Line number of opening marker |
-| `close_line` | Line number of closing marker |
-| `ideal_checksum` | Semantic hash of managed body between markers |
-| provenance | Package, export, source fragment checksum, silenced flag |
+- `id`: Opaque pray marker ID
+- `target`: Target file path
+- `open_line`: Line number of opening marker
+- `close_line`: Line number of closing marker
+- `ideal_checksum`: Semantic hash of managed body between markers
+- provenance: Package, export, source fragment checksum, silenced flag
 
 `ideal_checksum` is computed from the managed body only:
 
-* exclude opening and closing pray marker comment lines
-* normalize line endings according to target policy
-* apply the same semantic hashing rules as `README.md` (pray comments ignored for semantic hash)
+- exclude opening and closing pray marker comment lines
+- normalize line endings according to target policy
+- apply the same semantic hashing rules as `README.md` (pray comments ignored for semantic hash)
 
 `open_line` and `close_line` are 1-based line numbers in the target file after materialization.
 
@@ -1857,10 +1567,10 @@ Read-only. Compare on-disk target files to managed span records.
 For each lockfile managed span:
 
 1. locate the marker pair by `id` in `target`
-2. fail if either marker is missing (**removed prayer**)
+2. fail if either marker is missing (removed prayer)
 3. compute semantic checksum of the managed body
-4. compare body checksum to `ideal_checksum` (**custom implementation** when different)
-5. compare current marker line numbers to `open_line` / `close_line` (**position drift** when checksum matches but lines differ)
+4. compare body checksum to `ideal_checksum` (custom implementation when different)
+5. compare current marker line numbers to `open_line` / `close_line` (position drift when checksum matches but lines differ)
 
 `pray verify` reports mismatches. It must not modify `Prayfile.lock` or target files.
 
@@ -1868,28 +1578,24 @@ Also checks lockfile integrity, package checksums, signatures, cache validity, c
 
 ### `pray apply`
 
-Materializes planned changes, then **refreshes** managed span records:
+Materializes planned changes, then refreshes managed span records:
 
-* rewrite target files when needed
-* recompute `ideal_checksum` for each managed span
-* recompute `open_line` and `close_line`
-* add, update, or remove managed span records
+- rewrite target files when needed
+- recompute `ideal_checksum` for each managed span
+- recompute `open_line` and `close_line`
+- add, update, or remove managed span records
 
 ### `pray drift`
 
 Superset of verify. Reports:
 
-| Drift kind | Meaning |
-|------------|---------|
-| `custom_implementation` | Marker pair exists, but body checksum ≠ `ideal_checksum` |
-| `removed_prayer` | Lockfile record exists, marker pair missing from target |
-| `position_drift` | Body checksum matches `ideal_checksum`, but marker lines moved |
-| `renderer_drift` | On-disk file matches lock, but fresh render from current inputs would change ideals |
-| `orphan_marker` | Marker pair in target file has no lockfile managed span record |
+- `custom_implementation`: Marker pair exists, but body checksum ≠ `ideal_checksum`
+- `removed_prayer`: Lockfile record exists, marker pair missing from target
+- `position_drift`: Body checksum matches `ideal_checksum`, but marker lines moved. Report one finding per target: group uniform shifts, cite first marker lock vs file lines, and when unmarked preamble differs from fresh composition cite `path:line` cause (prefer compose local source when attributable).
+- `renderer_drift`: On-disk file matches lock, but fresh render from current inputs would change ideals
+- `orphan_marker`: Marker pair in target file has no lockfile managed span record
 
 `pray drift` does not refresh the lockfile.
-
----
 
 ---
 
@@ -1906,7 +1612,7 @@ Stable ordering:
 - targets sorted by name
 - arrays sorted unless order is semantic
 
-The lockfile should record: manifest hash, resolved package versions, source identity, artifact hashes, tree hashes, selected exports, dependency graph, and **managed span records** (ideal checksums and marker line positions per prayer).
+The lockfile should record: manifest hash, resolved package versions, source identity, artifact hashes, tree hashes, selected exports, dependency graph, and managed span records (ideal checksums and marker line positions per prayer).
 
 Per-target `render_hash` may summarize an entire output file. Managed span records are the authoritative per-prayer contract for verify and drift.
 
@@ -1935,9 +1641,9 @@ Comment-only changes should not change `manifest_hash`.
 
 ## 35. Resolver behavior
 
-**Resolver input:** Prayfile, existing Prayfile.lock if present, available sources, target list from manifest, package metadata, cache
+Resolver input: Prayfile, existing Prayfile.lock if present, available sources, target list from manifest, package metadata, cache
 
-**Resolver output:** resolved package graph, selected versions, selected exports, source identities, artifact hashes, tree hashes, target render plan, Prayfile.lock
+Resolver output: resolved package graph, selected versions, selected exports, source identities, artifact hashes, tree hashes, target render plan, Prayfile.lock
 
 Resolution rules:
 
@@ -2032,9 +1738,9 @@ Expected behavior:
 
 ## 39. Render behavior
 
-**Render input:** Prayfile.lock, resolved package contents, local files, target adapters, render policy
+Render input: Prayfile.lock, resolved package contents, local files, target adapters, render policy
 
-**Render output:** INSTRUCTIONS.md, TOOL_B.md, skill directories, command directories, rule files, target-specific files
+Render output: INSTRUCTIONS.md, TOOL_B.md, skill directories, command directories, rule files, target-specific files
 
 Render must be deterministic. Same inputs must produce byte-identical outputs.
 
@@ -2058,13 +1764,9 @@ Generated files should not include: timestamps, hostnames, absolute paths, rando
 
 ## 41. Pray markers
 
-Rendered target files should not duplicate the dependency graph, package list, source URLs, source hashes, or provenance records already stored in `Prayfile.lock`.
+Rendered targets cite lockfile with compact markers; they must not duplicate the dependency graph, hashes, or provenance already in `Prayfile.lock`.
 
-Rendered files use compact citation markers, not provenance blocks.
-
-A marker is an opaque reference into `Prayfile.lock`. It identifies a managed rendered span but does not explain it.
-
-Markdown targets use this canonical marker form:
+Markdown canonical form (same opaque id opens and closes; own lines; not nested; unmatched invalid):
 
 ```md
 <!-- pray:p7f3k9m2 -->
@@ -2074,71 +1776,20 @@ Markdown targets use this canonical marker form:
 <!-- pray:p7f3k9m2 -->
 ```
 
-The same marker appears exactly twice for one managed block.
+Marker ID: opaque, lowercase ASCII letters and digits, 8–16 characters. Must not encode package, topic, version, hash, path, or labels.
 
-The first occurrence opens the block.
-
-The second occurrence closes the block.
-
-Nested pray blocks are invalid.
-
-Unmatched markers are invalid.
-
-A marker ID must be opaque. It must not encode package names, topic names, versions, hashes, source paths, or semantic labels.
-
-Marker IDs must use only lowercase ASCII letters and digits.
-
-Marker IDs should be 8–16 characters.
-
-Marker comments must appear on their own lines.
-
-The purpose of a marker is region identity, drift detection, and lockfile lookup.
-
-Each marker ID maps to a managed span record in `Prayfile.lock` storing the ideal checksum and opening/closing line positions for that prayer.
-
-Rendered output cites.
-Lockfile explains.
-Cache preserves.
-
-Prayfile tooling must ignore pray comments when computing semantic content hashes.
-
-Prayfile tooling may also compute exact file hashes that include marker bytes.
-
-Therefore, implementations may track both:
+Each id maps to a managed span record in `Prayfile.lock` (ideal checksum, open/close lines). Tooling ignores pray comments for semantic hashes; may also track exact file hashes including markers.
 
 ```text
 semantic hash  = rendered content without pray markers
 file hash      = exact target file bytes including pray markers
 ```
 
-Benefits: smaller diffs, easier verify checks, easier partial regeneration, easier human review, drift detection without duplicating provenance in target files
-
 ---
 
 ## 42. Churn-minimal rendering
 
-When enabled:
-
-```manifest
-render churn: :minimal
-```
-
-The renderer should:
-
-- keep package order stable
-- keep section headings stable
-- avoid timestamp changes
-- avoid rewrapping paragraphs
-- avoid generated package tables unless requested
-- avoid large root context
-- prefer separate skill files
-- preserve local text
-- normalize line endings only when configured
-- avoid blank-line noise
-
-Preferred output model: small root files, separate skills, separate templates, stable pray markers
-
-Avoid: giant concatenated instruction files, giant duplicated target files, generated walls of generic advice
+`render churn: :minimal`: stable package order and headings; no timestamps, rewrap, generated package tables, or blank-line noise; preserve local text; normalize line endings only when configured. Prefer small roots and separate skills/templates with stable markers. Avoid giant concatenated instruction files.
 
 ---
 
@@ -2174,12 +1825,10 @@ Local file hashes may be stored in `.pray/state.json`, not Prayfile.lock.
 
 ## 44. Render modes
 
-| Mode | Behavior |
-|------|----------|
-| managed | Generated files are owned by pray. Manual edits are overwritten after warning or error depending on policy. Recommended for repositories. |
-| check | No files are written. Used by `pray render --check`. |
-| local | Generated files are placed into local tool directories. Useful for personal context. |
-| vendor | Packages are copied into `.pray/vendor`. Useful for offline and archival workflows. |
+- managed: Generated files are owned by pray. Manual edits are overwritten after warning or error depending on policy. Recommended for repositories.
+- check: No files are written. Used by `pray render --check`.
+- local: Generated files are placed into local tool directories. Useful for personal context.
+- vendor: Packages are copied into `.pray/vendor`. Useful for offline and archival workflows.
 
 ---
 
@@ -2331,62 +1980,29 @@ Use when a task changes application code, data models, migrations, jobs, service
 
 ## 50. CLI command set
 
-Example command set:
+Primary: `init`, `add`, `install`, `update`, `plan`, `apply`, `render`, `format`/`fmt`, `verify`, `drift`, `package`, `publish`, `confess`, `serve`, `vendor`, `clean`.
 
-```sh
-pray init
-pray add kiskolabs/rails-review
-pray install
-pray update
-pray plan
-pray apply
-pray render
-pray format
-pray verify
-pray drift
-pray package
-pray publish
-pray confess
-pray serve
-pray vendor
-pray clean
-```
-
-Additional useful commands:
-
-```
-pray remove
-pray tree
-pray list
-pray outdated
-pray explain
-pray manifest
-```
+Also useful: `remove`, `tree`, `list`, `outdated`, `explain`, `manifest`, `prayer init`, `repo init`.
 
 ---
 
 ## 51. CLI command semantics
 
-| Command | Behavior |
-|---------|----------|
-| init | Creates minimal Prayfile. Optional: `pray init --targets tool_a,tool_b` |
-| add | Adds a package declaration. |
-| remove | Removes a package declaration and re-renders. |
-| install | Installs according to Prayfile and Prayfile.lock. |
-| update | Updates resolved versions. |
-| plan | Computes changes to lockfile, cache, and rendered target files. |
-| apply | Materializes planned changes and refreshes managed span ideal checksums and line positions. |
-| render | Regenerates or verifies target files. Does not replace apply for lock refresh unless documented. |
-| format / fmt | Rewrites Prayfile to the recommended destination DSL (`compose` / `tree` / `pray …, file:`). Also normalizes pray markers in lockfile target outputs when present. |
-| verify | Read-only check: managed span checksums, line positions, package integrity, cache, signatures. |
-| drift | Reports custom implementation, removed prayers, position drift, renderer drift, and orphan markers. |
-| package | Builds `.praypkg`. |
-| publish | Packages, signs, and uploads to a distribution point. |
-| confess | Signs and submits acceptance or rejection feedback. |
-| serve | Runs a local or self-hosted distribution point. |
-| vendor | Copies packages into `.pray/vendor`. |
-| clean | Removes cache and other local ephemeral state. |
-| tree | Shows dependency graph. |
+- init: minimal Prayfile; optional `--targets tool_a,tool_b`
+- add / remove: edit package declaration; remove re-renders
+- install: from Prayfile and Prayfile.lock
+- update: re-resolve versions within constraints
+- plan: compute lock/cache/render changes
+- apply: materialize plan; refresh managed span checksums and lines
+- render: regenerate or check targets; does not replace apply for lock refresh unless documented
+- format / fmt: rewrite Prayfile to `compose` / `tree` / `pray …, file:`; normalize markers in lock targets
+- verify: read-only managed-span, integrity, cache, signature checks
+- drift: custom implementation, removed prayers, position/renderer drift, orphan markers
+- package / publish: build `.praypkg`; sign and upload
+- confess: signed acceptance/rejection feedback
+- serve: local or self-hosted distribution point
+- vendor / clean: copy into `.pray/vendor`; remove cache/ephemeral state
+- tree: dependency graph
 
 ---
 
@@ -2401,9 +2017,9 @@ For each `[[managed_span]]` record:
 - opening and closing markers with `id` exist in `target`
 - managed body semantic checksum equals `ideal_checksum`
 - current `open_line` and `close_line` equal lockfile line positions
-- report **removed prayer** when lock record exists but marker pair is absent
-- report **custom implementation** when markers exist but body checksum ≠ `ideal_checksum`
-- report **position drift** when body checksum matches `ideal_checksum` but line positions differ
+- report removed prayer when lock record exists but marker pair is absent
+- report custom implementation when markers exist but body checksum ≠ `ideal_checksum`
+- report position drift when body checksum matches `ideal_checksum` but line positions differ
 
 ### Repository checks
 
@@ -2432,13 +2048,11 @@ Strict mode: `pray verify --strict` turns warnings into errors.
 
 Required drift kinds:
 
-| Kind | Detection |
-|------|-----------|
-| `custom_implementation` | Marker pair present; body checksum ≠ `ideal_checksum` |
-| `removed_prayer` | Lock record present; marker pair absent |
-| `position_drift` | Body checksum = `ideal_checksum`; marker lines moved |
-| `renderer_drift` | On-disk state matches lock; fresh render would change ideals or spans |
-| `orphan_marker` | Marker pair present; no lock managed span record |
+- `custom_implementation`: Marker pair present; body checksum ≠ `ideal_checksum`
+- `removed_prayer`: Lock record present; marker pair absent
+- `position_drift`: Body checksum = `ideal_checksum`; marker lines moved (one finding per target; see section 32.2)
+- `renderer_drift`: On-disk state matches lock; fresh render would change ideals or spans
+- `orphan_marker`: Marker pair present; no lock managed span record
 
 Required report sections: Lockfile changes, Package changes, Managed span changes, Rendered file changes, Removed prayers, Orphan markers, Warnings
 
@@ -2492,11 +2106,9 @@ Default cache location: `$PRAY_HOME/cache`
 
 If `PRAY_HOME` is unset:
 
-| Platform | Path |
-|----------|------|
-| Unix-like | `~/.cache/pray` |
-| Alternate desktop layout A | `~/Library/Caches/pray` |
-| Alternate desktop layout B | `%LOCALAPPDATA%\pray\cache` |
+- Unix-like: `~/.cache/pray`
+- Alternate desktop layout A: `~/Library/Caches/pray`
+- Alternate desktop layout B: `%LOCALAPPDATA%\pray\cache`
 
 Recommended cache structure:
 
@@ -2636,23 +2248,7 @@ Rules:
 
 ## 62. Tool discovery
 
-Implementations may detect installed tools, but discovery must not affect lockfile resolution unless explicitly requested.
-
-Good:
-
-```
-pray verify
-# warns: tool_a target configured but tool A not found
-```
-
-Bad:
-
-```
-pray install
-# silently changes lockfile because tool B is installed locally
-```
-
-Resolution must be manifest-driven, not machine-driven.
+May detect installed tools, but discovery must not change lockfile resolution unless explicitly requested. Warn on missing tools during verify; never silently change the lock because a tool is present locally. Resolution is manifest-driven.
 
 ---
 
@@ -2756,17 +2352,15 @@ Error categories: `parse_error`, `manifest_error`, `resolution_error`, `fetch_er
 
 Exit codes (reference CLI):
 
-| Code | Meaning |
-|------|---------|
-| 0 | success |
-| 1 | general error (I/O, missing or invalid manifest context) |
-| 2 | parse error or usage/CLI argument error |
-| 3 | resolution error |
-| 4 | integrity error |
-| 5 | render/check failed |
-| 6 | verify failed (also used when `pray drift` finds drift) |
-| 7 | network/fetch error |
-| 8 | unsupported feature |
+- 0: success
+- 1: general error (I/O, missing or invalid manifest context)
+- 2: parse error or usage/CLI argument error
+- 3: resolution error
+- 4: integrity error
+- 5: render/check failed
+- 6: verify failed (also used when `pray drift` finds drift)
+- 7: network/fetch error
+- 8: unsupported feature
 
 Errors print to stderr. Successful primary output prints to stdout. Operator summary: `docs/cli-exit-codes.md`. Man page EXIT STATUS: `docs/man/pray.1`.
 
@@ -2774,21 +2368,7 @@ Errors print to stderr. Successful primary output prints to stdout. Operator sum
 
 ## 67. Semantic versioning for packages
 
-Agent packages should use semantic versioning.
-
-**Patch** — Small clarification that should not materially change behavior.
-
-Examples: typo fix, wording clarification, broken link fix, small example correction
-
-**Minor** — Backward-compatible new guidance.
-
-Examples: new export, new optional skill, new target adapter, expanded checklist
-
-**Major** — Behavior-changing instruction update.
-
-Examples: changed testing policy, changed security policy, removed export, renamed skill, changed default target behavior, new strict rule
-
-Agent context affects behavior, so package authors should not hide meaningful changes in patch versions.
+Use semver. Patch: clarification without material behavior change. Minor: backward-compatible new guidance/export. Major: behavior-changing policy, removed/renamed export, stricter defaults. Do not hide meaningful changes in patch.
 
 ---
 
@@ -2808,44 +2388,13 @@ spec.changelog_uri = "https://example.com/sample/webapp/CHANGELOG.md"
 
 ## 69. Package author best practices
 
-Package authors should:
-
-- keep exports small
-- make exports topic-specific
-- avoid giant root context
-- prefer skills for large procedures
-- prefer templates for reusable output forms
-- avoid vague rules
-- avoid generic AI advice
-- avoid private data
-- avoid secrets
-- avoid conflicting instructions
-- document when to use each export
-- document target compatibility
-- keep changelogs
-- use semantic versioning
-
-Good package split: `sample/base`, `sample/security`, `sample/webapp`, `sample/frontend`, `sample/testing`, `sample/accessibility`, `sample/deployment`
-
-Bad package split: `sample/everything`
+Small topic-specific exports; skills for long procedures; templates for reusable forms; no vague/generic advice, private data, secrets, or conflicting instructions; document when to use each export and target compatibility; changelog + semver. Prefer `sample/base`, `sample/security`, … over `sample/everything`.
 
 ---
 
 ## 70. Repository author best practices
 
-Repository authors should:
-
-- keep project-local instructions short
-- put reusable instructions into packages
-- commit Prayfile.lock
-- review generated diffs
-- use frozen CI mode
-- update packages intentionally
-- avoid editing generated files
-- split local context by topic
-- remove dead instructions
-- prefer small root files
-- prefer skills for longer material
+Short project-local instructions; reusable material in packages; commit lockfile; review generated diffs; frozen CI; intentional updates; do not edit generated files; split local context by topic; remove dead instructions; small roots; skills for longer material.
 
 ---
 
@@ -2861,13 +2410,11 @@ Do not put secrets into Prayfile.lock.
 
 ## 72. Conformance levels
 
-| Level | Capability | Required commands |
-|-------|------------|-------------------|
-| 0: Parser | Can parse Prayfile and *.prayspec | `pray manifest` |
-| 1: Installer | Can resolve local/path/tarball packages and produce lockfile | `pray install`, `pray verify` |
-| 2: Renderer | Can render at least one target | `pray render`, `pray render --check` |
-| 3: Package manager | Supports distribution point, Git, update, drift, verify | `pray update`, `pray drift`, `pray verify` |
-| 4: Publisher | Can pack and publish packages to static registry | `pray package`, `pray publish` |
+- 0: Parser: Can parse Prayfile and *.prayspec; `pray manifest`
+- 1: Installer: Can resolve local/path/tarball packages and produce lockfile; `pray install`, `pray verify`
+- 2: Renderer: Can render at least one target; `pray render`, `pray render --check`
+- 3: Package manager: Supports distribution point, Git, update, drift, verify; `pray update`, `pray drift`, `pray verify`
+- 4: Publisher: Can pack and publish packages to static registry; `pray package`, `pray publish`
 
 The reference implementation should target Level 3 first.
 
@@ -2943,145 +2490,39 @@ Do not implement in v1:
 
 ## 75. Suggested reference implementation architecture
 
-Crate/module split:
+Modules: `pray-cli`, `pray-core`, `pray-parser`, `pray-resolve`, `pray-lock`, `pray-render`, `pray-package`, `pray-distribution`, `pray-verify`.
 
-```
-pray-cli
-pray-core
-pray-parser
-pray-resolve
-pray-lock
-pray-render
-pray-package
-pray-distribution
-pray-verify
-```
+Layers: CLI → core orchestration → parser (Prayfile/prayspec DSL) → model (manifest, package, lock, render plan) → resolve (semver, sources, graph, lock writes) → render (fetch, hash/signature verify, adapters, markers, churn-minimal write) → doctor (drift, conflicts).
 
-Internal layers:
+Deps: CLI args, codecs, lock/adapter formats, version constraints, hashing, UTF-8 paths, archives, compression, fs walk, text diff, structured errors.
 
-```
-CLI (pray)
-  parses commands
-Core
-  orchestrates resolve and render
-Parser
-  Prayfile DSL
-  prayspec DSL
-Model
-  canonical manifest
-  package spec
-  lockfile model
-  render plan
-Resolve
-  semver resolution
-  sources
-  dependency graph
-  lockfile writes
-Render
-  fetch registry / git / path / tarball
-  verify artifact hash
-  verify tree hash
-  optional signatures
-  target adapters
-  generated files
-  pray markers
-  churn-minimal writing
-Doctor
-  drift checks
-  stale files
-  conflict checks
-```
-
-Suggested dependency categories:
-
-```
-CLI argument parsing
-serialization and schema codecs
-lockfile and adapter formats
-version constraint parsing
-cryptographic hashing
-UTF-8 path handling
-archive read/write
-compression codecs
-filesystem traversal
-text diffing
-structured error reporting
-```
-
-Parser choice: Start with a strict hand-written parser or parser combinator libraries. Do not embed a host language. Do not use eval.
+Parser: strict hand-written or combinators. No host-language embed. No eval.
 
 ---
 
 ## 76. Open specification repository layout
 
-Suggested repository:
-
 ```
 prayfile-spec/
-  README.md
-  SPEC.md
-  CHANGELOG.md
-  LICENSE
-  schema/
-    manifest.schema.json
-    lockfile.schema.json
-    registry.schema.json
-    package.schema.json
-  examples/
-    minimal/
-    webapp/
-    multi-target/
-    private-registry/
-  fixtures/
-    parser/
-    prayspec/
-    resolver/
-    render/
-    verify/
+  README.md SPEC.md CHANGELOG.md LICENSE
+  schema/   # manifest, lockfile, registry, package JSON schemas
+  examples/ # minimal, webapp, multi-target, private-registry
+  fixtures/ # parser, prayspec, resolver, render, verify
   rfcs/
-    0001-prayfile.md
-    0002-prayspec.md
-    0003-registry.md
 ```
 
-Suggested implementation repo:
-
-```
-pray/
-  crates/
-    pray-cli/
-    pray-core/
-    pray-parser/
-    pray-resolve/
-    pray-render/
-    pray-package/
-  tests/
-  README.md
-```
+Implementation tree mirrors the module split in section 75 under `crates/`.
 
 ---
 
 ## 77. First milestone
 
-Milestone 1 should produce:
-
-- parse Prayfile
-- parse prayspec
-- load local path package
-- resolve exact version
-- write Prayfile.lock
-- render INSTRUCTIONS.md
-- verify check generated file
-
-No registry yet.
-
-Example demo:
+Parse Prayfile and prayspec; local path packages; exact resolve; write lock; render `INSTRUCTIONS.md`; verify. No registry.
 
 ```
 pray init --targets tool_a
 pray add local/base --path ../agent-packages/base
 pray install
-cat INSTRUCTIONS.md
 pray verify
 ```
 
@@ -3089,49 +2530,27 @@ pray verify
 
 ## 78. Second milestone
 
-Milestone 2:
-
-- package build
-- .praypkg archive
-- tree hash
-- tarball source
-- static registry source
-- install --locked
-- install --frozen
-- render --check
-- diff
+Package build, `.praypkg`, tree hash, tarball and static registry sources, `install --locked` / `--frozen`, `render --check`, diff.
 
 ---
 
 ## 79. Third milestone
 
-Milestone 3:
-
-- git source
-- update command
-- semantic diff
-- tool_b target
-- tool-specific rendering
-- vendor mode
-- offline mode
-- publish static registry
-- conformance fixtures
+Git source, update, semantic diff, additional targets/adapters, vendor and offline modes, static publish, conformance fixtures.
 
 ---
 
 ## 80. Ownership and generated-output contract
 
-The hardest part of Prayfile is keeping **managed** rendered output stable and read-only while **local** additions remain editable and safe from overwrite.
+The hardest part of Prayfile is keeping managed rendered output stable and read-only while local additions remain editable and safe from overwrite.
 
 The model is not one shared rendered file everyone edits. It is three zones with different owners.
 
 ### Three zones
 
-| Zone | Source | Who edits | What pray does |
-|------|--------|-----------|----------------|
-| **Recipe** | Prayfile, packages, Prayfile.lock | Humans via `pray add`, `pray remove`, `pray update` | resolves and locks |
-| **`.agents`** | `.agents/**` (human-owned; `.agents/skills/**` is package-managed) | Humans and applications | reads on render; **never writes** |
-| **Managed** | `AGENTS.md`, generated target files, package-owned rules | Nobody directly | fully regenerates from lock + recipe + `.agents` inputs |
+- Recipe: source Prayfile, packages, Prayfile.lock; edits Humans via `pray add`, `pray remove`, `pray update`; pray resolves and locks
+- `.agents`: source `.agents/` (human-owned; `.agents/skills/` is package-managed); edits Humans and applications; pray reads on render; never writes
+- Managed: source `AGENTS.md`, generated target files, package-owned rules; edits Nobody directly; pray fully regenerates from lock + recipe + `.agents` inputs
 
 Package exports live only in the managed zone. They are pinned by recipe and hash. Applications consume them; they do not rewrite them.
 
@@ -3139,9 +2558,9 @@ Human-owned files under `.agents/` (outside package-managed `.agents/skills/**`)
 
 ### Golden rules
 
-1. Applications must **not** edit managed files or managed blocks.
-2. Applications **may** edit human-owned files under `.agents/` when project-specific input must change.
-3. Humans change shared packages by editing **Prayfile** and running **pray**, not by patching rendered target files.
+1. Applications must not edit managed files or managed blocks.
+2. Applications may edit human-owned files under `.agents/` when project-specific input must change.
+3. Humans change shared packages by editing Prayfile and running pray, not by patching rendered target files.
 4. Render reconstructs managed output from inputs. There is no three-way merge in v1.
 
 ### Render composition
@@ -3165,7 +2584,7 @@ Managed blocks use opaque pray markers from section 41:
 <!-- pray:p7f3k9m2 -->
 ```
 
-On render, pray replaces each managed block from locked package content and re-embeds listed `.agents` files into their spans. Anything outside allowed marker regions is a **verify error**.
+On render, pray replaces each managed block from locked package content and re-embeds listed `.agents` files into their spans. Anything outside allowed marker regions is a verify error.
 
 ### Target preamble
 
@@ -3197,13 +2616,13 @@ version = "2.1.5"
 tree_hash = "sha256:..."
 ```
 
-Optional human-owned files under `.agents/` are not origin-tagged as packages. Name collisions between human-owned and managed content are **conflicts** unless policy says otherwise.
+Optional human-owned files under `.agents/` are not origin-tagged as packages. Name collisions between human-owned and managed content are conflicts unless policy says otherwise.
 
 Applications must not edit managed directories. They may edit other files under `.agents/`.
 
 ### Idempotency
 
-**Definition:** same inputs must yield the same managed bytes.
+Definition: same inputs must yield the same managed bytes.
 
 Inputs to render:
 
@@ -3215,12 +2634,10 @@ Inputs to render:
 
 Guarantees:
 
-| Command | Idempotent when |
-|---------|-----------------|
-| `pray install` | lock and inputs unchanged → no writes (optional optimization) |
-| `pray render` | always reconstructs managed zones from inputs |
-| `pray install --frozen` | fails instead of mutating when output would change |
-| render phase (internal) | same lock + same local files + same packages → byte-identical managed output |
+- `pray install`: lock and inputs unchanged → no writes (optional optimization)
+- `pray render`: always reconstructs managed zones from inputs
+- `pray install --frozen`: fails instead of mutating when output would change
+- render phase (internal): same lock + same local files + same packages → byte-identical managed output
 
 Local file edits change only local embeds and the root file hash. They do not require resolve unless Prayfile changed.
 
@@ -3251,53 +2668,22 @@ pray remove sample/webapp
 3. render deletes all managed blocks mapped to `sample/webapp`.
 4. render deletes managed directories tagged with that package origin.
 5. Human-owned `.agents/**` files are preserved.
-6. Orphan pray markers after remove are **verify errors**.
+6. Orphan pray markers after remove are verify errors.
 
 ### Verify enforcement
 
-`pray verify` is read-only. `pray drift` extends it with renderer comparison.
-
-Must detect:
-
-- **custom implementation** — managed body checksum ≠ lockfile `ideal_checksum`
-- **removed prayer** — lockfile managed span exists; marker pair missing
-- **position drift** — body checksum matches `ideal_checksum`; marker lines moved
-- **orphan marker** — marker pair exists; no lock managed span record
-- manual edits inside managed directories
-- content outside any allowed marker region in managed root files
-- stale render relative to lock and local inputs
-- missing local files referenced by Prayfile
-- duplicate managed names across local and managed paths
-- invalid, nested, or unmatched pray markers
-
-Strict mode turns all of these into errors. CI uses `pray install --frozen`, `pray verify --strict`, and `pray drift`.
-
-To refresh ideal checksums and line positions after intentional changes, run `pray apply`.
-
-### Why this works
-
-Applications are untrusted editors. Treat managed rendered output like compiled output:
+See sections 32.2, 52, and 53. Applications are untrusted editors: managed output is like compiled output. Rewrite of a managed block fails the next render or frozen CI check; fix by regenerating and moving custom text into `.agents/` or updating Prayfile.
 
 ```
 Prayfile + packages  →  resolve  →  lock
 lock + local + packages  →  render  →  rendered targets
 ```
 
-If an application rewrites a managed block, the next `pray render` or CI frozen check fails. The fix is not merge logic. The fix is regenerate and move custom text into `.agents/` or update `Prayfile`.
-
-That keeps shared packages stable, local overrides editable, and the system idempotent.
-
 ---
 
 ## 81. Final principle
 
-This system should not try to make inference smarter by adding more magic.
-
-It should make inference input boring enough to trust.
-
-The valuable thing is not another prompt folder.
-
-The valuable thing is:
+Do not make inference smarter with magic. Make inference input boring enough to trust.
 
 ```
 declared input
@@ -3308,4 +2694,3 @@ recoverable source fragments
 explicit silence
 ```
 
-That is the whole point of Prayfile, Prayfile.lock, *.prayspec, and pray.
