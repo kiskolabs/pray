@@ -43,7 +43,13 @@ pub(crate) fn artifact_upload_response(
     path: &str,
     body: &[u8],
 ) -> PrayResult<Response> {
-    authorize_distribution_push(root, &auth.bind_host, auth.allow_open_push, auth.stdio_mode)?;
+    authorize_distribution_push(
+        root,
+        &auth.bind_host,
+        auth.allow_open_push,
+        auth.stdio_mode,
+        auth.authorization.as_deref(),
+    )?;
     let relative_path = sanitize_request_path(path)?;
     let artifact_path = root.join(relative_path);
     if let Some(parent) = artifact_path.parent() {

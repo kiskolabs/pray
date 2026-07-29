@@ -9,6 +9,8 @@ pub struct ResolveOptions {
     pub refresh_source_revisions: bool,
     /// When true, resolve against registry constraints instead of versions pinned in Prayfile.lock.
     pub ignore_locked_versions: bool,
+    /// When true, refuse yanked versions even if the lockfile pins them (SPEC §60 strict).
+    pub fail_on_yanked: bool,
     /// Selected render environment; does not change package resolution.
     pub environment: Option<String>,
 }
@@ -17,6 +19,7 @@ pub struct ResolveOptions {
 pub struct PackageResolutionContext {
     pub preferred_version: Option<String>,
     pub offline: bool,
+    pub fail_on_yanked: bool,
 }
 
 impl PackageResolutionContext {
@@ -40,6 +43,7 @@ impl PackageResolutionContext {
         Self {
             preferred_version,
             offline: options.offline,
+            fail_on_yanked: options.fail_on_yanked,
         }
     }
 }

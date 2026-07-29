@@ -2,6 +2,8 @@
 
 This note compares the supported ways to move pre-inference input packages while keeping install, verify, and sync behavior deterministic.
 
+For the static v1 tree layout, discovery URLs, CI `publish --root`, and yank rules, see [static-distribution.md](static-distribution.md).
+
 ## 1. Centralized distribution
 
 A single distribution point publishes packages and serves clients.

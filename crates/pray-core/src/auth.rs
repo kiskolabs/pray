@@ -137,7 +137,10 @@ pub struct AuthSshKeyLoginResponse {
 }
 
 #[cfg(feature = "auth")]
-pub use crate::auth_store::{ssh_public_key_fingerprint_text, RegistryAuthStore};
+pub use crate::auth_store::{
+    bearer_token_from_authorization, ssh_public_key_fingerprint_text, PublishTokenRecord,
+    RegistryAuthStore, PUBLISH_SCOPE,
+};
 
 #[cfg(not(feature = "auth"))]
 pub fn ssh_public_key_fingerprint_text(public_key: &str) -> PrayResult<String> {

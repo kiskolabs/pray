@@ -10,14 +10,15 @@ pub(crate) use crate::server_registry::{
     read_known_peers, read_registry_index, read_registry_package_metadata, registry_metadata_path,
     update_registry_index_with_package, write_registry_package_metadata,
 };
-pub(crate) use crate::transport_metadata::registry_package_metadata_from_transport;
 pub use crate::server_rpc::handle_rpc;
+pub(crate) use crate::transport_metadata::registry_package_metadata_from_transport;
 
 #[derive(Debug, Clone)]
 pub struct ServeAuth {
     pub bind_host: String,
     pub allow_open_push: bool,
     pub stdio_mode: bool,
+    pub authorization: Option<String>,
 }
 
 impl ServeAuth {
@@ -26,6 +27,7 @@ impl ServeAuth {
             bind_host: bind_host.into(),
             allow_open_push,
             stdio_mode: false,
+            authorization: None,
         }
     }
 
@@ -34,6 +36,7 @@ impl ServeAuth {
             bind_host: "stdio".to_string(),
             allow_open_push: false,
             stdio_mode: true,
+            authorization: None,
         }
     }
 }

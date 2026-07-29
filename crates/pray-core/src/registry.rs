@@ -1,18 +1,23 @@
-use crate::constraint::version_satisfies;
 use crate::derived_metadata::RegistryDerivedMetadata;
 use crate::manifest::ManifestPackage;
 use crate::package_integrity::{artifact_content_digest, require_remote_integrity_fields};
 use crate::paths::remove_path_if_exists;
-use crate::registry_http::{http_get, http_post, http_put, join_url};
-use crate::registry_ssh::{
-    resolve_ssh_registry_package_root, submit_confession_ssh, upload_registry_artifact_ssh,
-};
+use crate::registry_http::{http_get, http_post, join_url};
+use crate::registry_select::{apply_yank_policy, select_package_version};
+use crate::registry_ssh::{resolve_ssh_registry_package_root, submit_confession_ssh};
 use crate::resolve_context::PackageResolutionContext;
 use crate::{PrayError, PrayResult};
-use semver::Version;
 use serde::{Deserialize, Serialize};
 use std::fs;
 use std::path::{Path, PathBuf};
+
+pub use crate::registry_select::{
+    highest_registry_version, set_package_version_yanked, version_is_greater_than,
+};
+pub use crate::registry_upload::{
+    publish_authorization_header, upload_registry_artifact,
+    upload_registry_artifact_with_authorization,
+};
 
 #[derive(Debug, Clone)]
 pub struct RegistryPackageResolution {
@@ -131,8 +136,10 @@ pub fn resolve_registry_package_root(
         &declaration.constraint,
         context.preferred_version.as_deref(),
     )?;
+    apply_yank_policy(&declaration.name, &selected, context.fail_on_yanked)?;
     let signer_fingerprint = lockfile_signer_fingerprint(&selected);
     require_remote_integrity_fields(&declaration.name, &selected.version, &selected)?;
+    crate::client_trust::enforce_require_signed_packages(source_url, &declaration.name, &selected)?;
     crate::client_trust::gate_pray_ssh_publisher_optional(
         source_url,
         signer_fingerprint.as_deref(),
@@ -220,8 +227,10 @@ pub fn resolve_local_registry_package_root(
         &declaration.constraint,
         context.preferred_version.as_deref(),
     )?;
+    apply_yank_policy(&declaration.name, &selected, context.fail_on_yanked)?;
     let signer_fingerprint = lockfile_signer_fingerprint(&selected);
     require_remote_integrity_fields(&declaration.name, &selected.version, &selected)?;
+    crate::client_trust::enforce_require_signed_packages(source_key, &declaration.name, &selected)?;
     crate::client_trust::gate_pray_ssh_publisher_optional(
         source_key,
         signer_fingerprint.as_deref(),
@@ -318,25 +327,6 @@ pub fn submit_confession(source_url: &str, confession: &ConfessionSubmission) ->
     Ok(())
 }
 
-pub fn upload_registry_artifact(
-    source_url: &str,
-    artifact_path: &str,
-    bytes: &[u8],
-) -> PrayResult<()> {
-    if crate::ssh_client::is_pray_ssh_url(source_url) {
-        return upload_registry_artifact_ssh(source_url, artifact_path, bytes);
-    }
-    let endpoint = join_url(source_url, artifact_path);
-    let response = http_put(&endpoint, "application/octet-stream", bytes)?;
-    if response.status / 100 != 2 {
-        return Err(PrayError::Resolution(format!(
-            "artifact upload failed with HTTP {}",
-            response.status
-        )));
-    }
-    Ok(())
-}
-
 fn fetch_registry_package_metadata(
     source_url: &str,
     package_name: &str,
@@ -349,69 +339,11 @@ fn fetch_registry_package_metadata(
     })
 }
 
-pub fn highest_registry_version(
-    metadata: &RegistryPackageMetadata,
-) -> PrayResult<Option<RegistryPackageVersion>> {
-    let mut selected: Option<RegistryPackageVersion> = None;
-    for version in &metadata.versions {
-        if version.yanked {
-            continue;
-        }
-        match &selected {
-            Some(existing) if compare_versions(&version.version, &existing.version)? <= 0 => {}
-            _ => selected = Some(version.clone()),
-        }
-    }
-    Ok(selected)
-}
-
 pub fn registry_latest_version_label(metadata: &RegistryPackageMetadata) -> Option<String> {
     highest_registry_version(metadata)
         .ok()
         .flatten()
         .map(|version| version.version)
-}
-
-pub fn version_is_greater_than(left: &str, right: &str) -> PrayResult<bool> {
-    Ok(compare_versions(left, right)? > 0)
-}
-
-pub(crate) fn select_package_version(
-    metadata: &RegistryPackageMetadata,
-    constraint: &str,
-    preferred_version: Option<&str>,
-) -> PrayResult<RegistryPackageVersion> {
-    if let Some(preferred_version) = preferred_version {
-        if let Some(version) = metadata
-            .versions
-            .iter()
-            .find(|version| version.version == preferred_version && !version.yanked)
-        {
-            if version_satisfies(&version.version, constraint)? {
-                return Ok(version.clone());
-            }
-            // Prayfile constraint changed; fall through to the highest satisfying version.
-        }
-    }
-    let mut selected: Option<RegistryPackageVersion> = None;
-    for version in &metadata.versions {
-        if version.yanked {
-            continue;
-        }
-        if !version_satisfies(&version.version, constraint)? {
-            continue;
-        }
-        match &selected {
-            Some(existing) if compare_versions(&version.version, &existing.version)? <= 0 => {}
-            _ => selected = Some(version.clone()),
-        }
-    }
-    selected.ok_or_else(|| {
-        PrayError::Resolution(format!(
-            "no registry version for {} satisfies {}",
-            metadata.name, constraint
-        ))
-    })
 }
 
 #[doc(hidden)]
@@ -421,16 +353,6 @@ pub fn select_package_version_for_test(
     preferred_version: Option<&str>,
 ) -> PrayResult<RegistryPackageVersion> {
     select_package_version(metadata, constraint, preferred_version)
-}
-
-fn compare_versions(left: &str, right: &str) -> PrayResult<i32> {
-    let left = Version::parse(left).map_err(|error| PrayError::Resolution(error.to_string()))?;
-    let right = Version::parse(right).map_err(|error| PrayError::Resolution(error.to_string()))?;
-    Ok(match left.cmp(&right) {
-        std::cmp::Ordering::Less => -1,
-        std::cmp::Ordering::Equal => 0,
-        std::cmp::Ordering::Greater => 1,
-    })
 }
 
 pub fn fetch_optional_distribution_bytes(

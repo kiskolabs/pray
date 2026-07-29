@@ -12,7 +12,8 @@ use pray_core::derived_metadata::derive_registry_derived_metadata_from_archive_b
 use pray_core::hashing::sha256_prefixed;
 use pray_core::package_integrity::{package_signature_for_publish, resolve_publish_signing_key};
 use pray_core::registry::{
-    upload_registry_artifact, RegistryPackageMetadata, RegistryPackageVersion,
+    publish_authorization_header, upload_registry_artifact_with_authorization,
+    RegistryPackageMetadata, RegistryPackageVersion,
 };
 use pray_core::resolve::{resolve_project, ResolvedProject};
 use pray_core::ssh_identity::signing_identity;
@@ -175,13 +176,21 @@ pub(crate) fn publish_to_server(
         );
     }
 
+    let authorization = publish_authorization_header();
+    let mut headers = serde_json::Map::new();
+    if let Some(authorization) = authorization.as_ref() {
+        headers.insert(
+            "Authorization".to_string(),
+            serde_json::Value::String(authorization.clone()),
+        );
+    }
     let peer = PeerConfig {
         name: server_url.to_string(),
         transport: "http".to_string(),
         url: Some(server_url.to_string()),
         trust: TrustLevel::Full,
         direction: SyncDirection::Push,
-        config: serde_json::json!({}),
+        config: serde_json::json!({ "headers": headers }),
     };
     let registry = TransportRegistry::new();
     let transport = registry.create(&peer).map_err(map_transport_error)?;
@@ -190,11 +199,17 @@ pub(crate) fn publish_to_server(
         let archive_bytes = build_package_archive_bytes(package)?;
         let artifact_path =
             registry_artifact_path(&package.declaration.name, &package.spec.version);
-        upload_registry_artifact(server_url, &artifact_path, &archive_bytes)?;
-        upload_registry_artifact(
+        upload_registry_artifact_with_authorization(
+            server_url,
+            &artifact_path,
+            &archive_bytes,
+            authorization.as_deref(),
+        )?;
+        upload_registry_artifact_with_authorization(
             server_url,
             &torrent_manifest_path(&artifact_path),
             &torrent_manifest_bytes(package, &artifact_path, &archive_bytes)?,
+            authorization.as_deref(),
         )?;
 
         let metadata = RegistryPackageMetadata {

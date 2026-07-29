@@ -5,7 +5,10 @@ use crate::cli_parse_packages::{
     parse_add_command, parse_explain_command, parse_outdated_command, parse_plan_command,
     parse_remove_command, parse_unlock_command, parse_update_command,
 };
-use crate::cli_parse_remote::{parse_confess_command, parse_publish_command, parse_sync_command};
+use crate::cli_parse_remote::{
+    parse_confess_command, parse_publish_command, parse_search_command, parse_sync_command,
+    parse_yank_command,
+};
 use crate::Command;
 use pray_core::cli_suggest::unknown_command_message;
 use pray_core::{PrayError, PrayResult};
@@ -41,6 +44,7 @@ pub(crate) fn parse_command(arguments: Vec<String>) -> PrayResult<Command> {
             let mut locked = false;
             let mut frozen = false;
             let mut offline = false;
+            let mut strict = false;
             for argument in iter {
                 match argument.as_str() {
                     "--locked" => locked = true,
@@ -49,6 +53,7 @@ pub(crate) fn parse_command(arguments: Vec<String>) -> PrayResult<Command> {
                         frozen = true;
                     }
                     "--offline" => offline = true,
+                    "--strict" => strict = true,
                     other if other.starts_with("--") => {
                         return Err(PrayError::Unsupported(format!(
                             "unknown install flag: {other}"
@@ -65,6 +70,7 @@ pub(crate) fn parse_command(arguments: Vec<String>) -> PrayResult<Command> {
                 locked,
                 frozen,
                 offline,
+                strict,
             })
         }
         "add" => parse_add_command(iter),
@@ -79,6 +85,14 @@ pub(crate) fn parse_command(arguments: Vec<String>) -> PrayResult<Command> {
         "format" | "fmt" => Ok(Command::Format),
         "package" => Ok(Command::Package),
         "publish" => parse_publish_command(iter),
+        "yank" => parse_yank_command(iter),
+        "search" => parse_search_command(iter),
+        #[cfg(feature = "auth")]
+        "token" => Ok(Command::Token {
+            arguments: iter.collect(),
+        }),
+        #[cfg(not(feature = "auth"))]
+        "token" => Err(PrayError::Usage("unknown command: token".to_string())),
         "login" => parse_login_command(iter),
         #[cfg(feature = "auth")]
         "serve" => parse_serve_command(iter),
@@ -103,9 +117,7 @@ pub(crate) fn parse_command(arguments: Vec<String>) -> PrayResult<Command> {
     }
 }
 
-fn parse_completion_command(
-    mut arguments: std::vec::IntoIter<String>,
-) -> PrayResult<Command> {
+fn parse_completion_command(mut arguments: std::vec::IntoIter<String>) -> PrayResult<Command> {
     let shell = arguments.next().ok_or_else(|| {
         PrayError::Usage("completion requires bash, zsh, or fish\nSee 'pray --help'.".to_string())
     })?;

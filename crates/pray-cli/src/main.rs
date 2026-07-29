@@ -11,6 +11,7 @@ mod commands_inspect;
 mod commands_manifest_edit;
 mod commands_materialize;
 mod commands_package;
+mod commands_search;
 mod commands_update;
 mod commands_verify;
 mod completion;
@@ -47,10 +48,13 @@ mod server_static;
 mod server_stdio;
 mod sync_command;
 mod sync_peers;
+#[cfg(feature = "auth")]
+mod token_command;
 mod transport_metadata;
 mod trust_command;
 mod update_report;
 mod update_summary;
+mod yank;
 
 pub(crate) use command::Command;
 pub(crate) use project_paths::{locked_package, lockfile_path, manifest_path, resolve_project};
@@ -70,6 +74,7 @@ use commands_inspect::{
 use commands_manifest_edit::{add_command, remove_command};
 use commands_materialize::{apply_command, install_command};
 use commands_package::{format_command, login_command, package_command, vendor_command};
+use commands_search::search_command;
 use commands_update::{unlock_command, update_command};
 use commands_verify::{drift_command, render_command, verify_command};
 use completion::completion_command;
@@ -83,6 +88,9 @@ use std::env;
 use std::fs;
 use std::path::PathBuf;
 use sync_command::sync_command;
+#[cfg(feature = "auth")]
+use token_command::run_token_command;
+use yank::yank_command;
 
 fn main() {
     let code = match run(env::args().skip(1).collect()) {
@@ -153,12 +161,14 @@ fn run(arguments: Vec<String>) -> PrayResult<()> {
             locked,
             frozen,
             offline,
+            strict,
         } => {
             install_command(
                 locked,
                 frozen,
                 ResolveOptions {
                     offline,
+                    fail_on_yanked: strict,
                     ..ResolveOptions::default()
                 },
                 false,
@@ -177,6 +187,20 @@ fn run(arguments: Vec<String>) -> PrayResult<()> {
             servers,
             signing_key,
         } => publish_command(roots, servers, signing_key),
+        Command::Yank {
+            package,
+            version,
+            root,
+            undo,
+        } => yank_command(package, version, root, undo),
+        #[cfg(feature = "auth")]
+        Command::Token { arguments } => run_token_command(arguments),
+        Command::Search {
+            query,
+            source,
+            root,
+            url,
+        } => search_command(query, source, root, url),
         Command::Login {
             servers,
             email,
@@ -253,27 +277,5 @@ fn serve_command(
 }
 
 #[cfg(all(test, not(feature = "auth")))]
-mod slim_build_tests {
-    use super::*;
-
-    #[test]
-    fn omits_the_serve_command() {
-        assert!(matches!(
-            parse_command(vec!["serve".to_string()]),
-            Err(PrayError::Usage(message)) if message == "unknown command: serve"
-        ));
-    }
-
-    #[test]
-    fn rejects_session_tokens_without_auth_storage() {
-        std::env::set_var("PRAY_SESSION_TOKEN", "session-token");
-
-        let error = current_signer().expect_err("session tokens require auth storage");
-
-        std::env::remove_var("PRAY_SESSION_TOKEN");
-        assert!(matches!(
-            error,
-            PrayError::Unsupported(message) if message == "this build was compiled without auth support"
-        ));
-    }
-}
+#[path = "slim_build_tests.rs"]
+mod slim_build_tests;

@@ -2,8 +2,8 @@ use crate::cli_release::http_get;
 use pray_core::client_trust::{
     add_allowed_signing_key, check_compromised_keys, effective_trust_home, import_registry_trust,
     import_signing_keys_from_repository, list_policy, parse_compromised_feed,
-    remove_allowed_signing_key, set_allow, set_require_signed_commit, show_policy_toml,
-    TrustListScope, DEFAULT_COMPROMISED_KEYS_SOURCE,
+    remove_allowed_signing_key, set_allow, set_require_signed_commit, set_require_signed_packages,
+    show_policy_toml, TrustListScope, DEFAULT_COMPROMISED_KEYS_SOURCE,
 };
 use pray_core::resolve::git_source_cache_directory;
 use pray_core::{PrayError, PrayResult};
@@ -22,6 +22,7 @@ pub fn run_trust_command(arguments: Vec<String>) -> PrayResult<()> {
         "add-key" => trust_add_key_command(iter),
         "remove-key" | "revoke" => trust_remove_key_command(iter),
         "set-signed" => trust_set_signed_command(iter),
+        "set-require-signed-packages" => trust_set_require_signed_packages_command(iter),
         "set-allow" => trust_set_allow_command(iter),
         "import-repo" => trust_import_repo_command(iter),
         "import-registry" => trust_import_registry_command(iter),
@@ -132,6 +133,40 @@ fn trust_set_signed_command(mut arguments: std::vec::IntoIter<String>) -> PrayRe
         PrayError::Unsupported("trust set-signed requires --match-prefix PREFIX".into())
     })?;
     set_require_signed_commit(&trust_home()?, &prefix, enabled)?;
+    Ok(())
+}
+
+fn trust_set_require_signed_packages_command(
+    mut arguments: std::vec::IntoIter<String>,
+) -> PrayResult<()> {
+    let mut match_prefix = None;
+    let mut enabled = true;
+    while let Some(argument) = arguments.next() {
+        match argument.as_str() {
+            "--match-prefix" => {
+                match_prefix = Some(arguments.next().ok_or_else(|| {
+                    PrayError::Unsupported("--match-prefix requires VALUE".into())
+                })?);
+            }
+            "--enabled" => {
+                let value = arguments.next().ok_or_else(|| {
+                    PrayError::Unsupported("--enabled requires true|false".into())
+                })?;
+                enabled = parse_bool_flag(&value)?;
+            }
+            other => {
+                return Err(PrayError::Unsupported(format!(
+                    "unknown trust set-require-signed-packages argument: {other}"
+                )))
+            }
+        }
+    }
+    let prefix = match_prefix.ok_or_else(|| {
+        PrayError::Unsupported(
+            "trust set-require-signed-packages requires --match-prefix PREFIX".into(),
+        )
+    })?;
+    set_require_signed_packages(&trust_home()?, &prefix, enabled)?;
     Ok(())
 }
 

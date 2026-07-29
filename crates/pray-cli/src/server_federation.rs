@@ -95,7 +95,13 @@ pub(crate) fn federation_push_response(
     auth: &ServeAuth,
     body: &[u8],
 ) -> PrayResult<Response> {
-    authorize_distribution_push(root, &auth.bind_host, auth.allow_open_push, auth.stdio_mode)?;
+    authorize_distribution_push(
+        root,
+        &auth.bind_host,
+        auth.allow_open_push,
+        auth.stdio_mode,
+        auth.authorization.as_deref(),
+    )?;
     let incoming: TransportPackageMetadata =
         serde_json::from_slice(body).map_err(|error| PrayError::Parse {
             kind: "federation package metadata",

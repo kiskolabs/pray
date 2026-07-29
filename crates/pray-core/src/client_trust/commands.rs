@@ -159,6 +159,20 @@ pub fn set_require_signed_commit(home: &Path, match_prefix: &str, enabled: bool)
     save_policy(home, &policy)
 }
 
+pub fn set_require_signed_packages(
+    home: &Path,
+    match_prefix: &str,
+    enabled: bool,
+) -> PrayResult<()> {
+    if match_prefix.trim().is_empty() {
+        return Err(PrayError::Unsupported("match-prefix is empty".into()));
+    }
+    let mut policy = load_policy_or_default(home)?;
+    let rule = mutable_rule_for_match_prefix(&mut policy, match_prefix);
+    rule.require_signed_packages = enabled;
+    save_policy(home, &policy)
+}
+
 pub fn set_allow(home: &Path, match_prefix: &str, allow: bool) -> PrayResult<()> {
     if match_prefix.trim().is_empty() {
         return Err(PrayError::Unsupported("match-prefix is empty".into()));

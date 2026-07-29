@@ -70,6 +70,7 @@ fn handle_connection(root: PathBuf, auth: ServeAuth, mut stream: TcpStream) -> P
 
     let mut content_length = 0usize;
     let mut header_bytes = 0usize;
+    let mut authorization = None;
     loop {
         let mut header_line = String::new();
         reader.read_line(&mut header_line)?;
@@ -93,9 +94,13 @@ fn handle_connection(root: PathBuf, auth: ServeAuth, mut stream: TcpStream) -> P
                     .trim()
                     .parse::<usize>()
                     .map_err(|error| PrayError::Resolution(error.to_string()))?;
+            } else if name.eq_ignore_ascii_case("authorization") {
+                authorization = Some(value.trim().to_string());
             }
         }
     }
+    let mut auth = auth;
+    auth.authorization = authorization;
 
     if content_length > MAX_SERVE_BODY_BYTES {
         write_response(

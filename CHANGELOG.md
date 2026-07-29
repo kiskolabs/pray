@@ -2,6 +2,14 @@
 
 ## Unreleased
 
+- Add `pray yank` / `--undo` to mark yanked versions in a distribution root (metadata only).
+- Keep locked yanked versions with a warning; `pray install --strict` refuses them; new resolves and `pray update` skip yanked versions.
+- Add HTML-free packaging smoke: publish `--root` → install → verify → yank.
+- Document static distribution discovery and CI `--root` publish in `docs/static-distribution.md`.
+- Add scoped publish tokens (`pray token create|revoke`, `PRAY_PUBLISH_TOKEN`) for `pray publish --server`.
+- Add `pray trust set-require-signed-packages` to refuse unsigned remote packages under a source prefix.
+- Add `pray search` for substring matches over a distribution index (no ranking).
+
 ## 1.7.0 (2026-07-29)
 
 - Reshape CLI help around a `Usage` synopsis and `Options` block; drop documentation URL and exit-code footers from default help.
