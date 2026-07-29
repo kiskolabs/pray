@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+## 1.7.0 (2026-07-29)
+
 - Reshape CLI help around a `Usage` synopsis and `Options` block; cover every listed command; point unknown-command errors at `pray --help`.
 
 ## 1.6.0 (2026-07-29)

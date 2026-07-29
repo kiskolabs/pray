@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+## 1.7.0 (2026-07-29)
+
 - Reshape CLI help around a `Usage` synopsis and `Options` block; drop documentation URL and exit-code footers from default help.
 - Add per-command help for every listed command so `pray help <command>` no longer reports known commands as unknown.
 - Point unknown-command errors at `pray --help`.
