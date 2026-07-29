@@ -1,11 +1,8 @@
 use crate::http::{HttpConfig, HttpTransport};
 use crate::types::*;
 use async_trait::async_trait;
-use reqwest::{header::RANGE, Client};
 use serde::{Deserialize, Serialize};
 use sha2::{Digest, Sha256};
-
-use std::time::Duration;
 
 const DEFAULT_PIECE_SIZE: usize = 16 * 1024;
 const DEFAULT_METADATA_SUFFIX: &str = ".praytorrent.json";
@@ -89,7 +86,6 @@ pub struct PieceRange {
 pub struct TorrentTransport {
     config: TorrentConfig,
     http: HttpTransport,
-    client: Client,
 }
 
 impl TorrentTransport {
@@ -100,13 +96,8 @@ impl TorrentTransport {
             ));
         }
 
-        let client = build_client(&config.http)?;
         let http = HttpTransport::new(config.http.clone())?;
-        Ok(Self {
-            config,
-            http,
-            client,
-        })
+        Ok(Self { config, http })
     }
 
     pub fn build_manifest(
@@ -131,91 +122,6 @@ impl TorrentTransport {
             sources,
             trackers,
         }
-    }
-
-    fn manifest_url(&self, peer: &PeerConfig, artifact: &ArtifactRef) -> Result<String> {
-        let artifact_url = resolve_peer_url(peer, &artifact.url)?;
-        if artifact_url.ends_with(&self.config.metadata_suffix) {
-            return Ok(artifact_url);
-        }
-
-        Ok(format!("{}{}", artifact_url, self.config.metadata_suffix))
-    }
-
-    fn source_urls(
-        &self,
-        peer: &PeerConfig,
-        artifact: &ArtifactRef,
-        manifest: &TorrentManifest,
-    ) -> Result<Vec<String>> {
-        if !manifest.sources.is_empty() {
-            return Ok(manifest.sources.clone());
-        }
-
-        Ok(vec![resolve_peer_url(peer, &manifest.artifact_url)
-            .or_else(|_| resolve_peer_url(peer, &artifact.url))?])
-    }
-
-    async fn fetch_manifest(
-        &self,
-        peer: &PeerConfig,
-        artifact: &ArtifactRef,
-    ) -> Result<TorrentManifest> {
-        let manifest_url = self.manifest_url(peer, artifact)?;
-        let response = self
-            .client
-            .get(&manifest_url)
-            .send()
-            .await
-            .map_err(|error| TransportError::Network(format!("HTTP request failed: {error}")))?;
-
-        if !response.status().is_success() {
-            return Err(TransportError::NotFound(format!(
-                "Torrent manifest not found: {}",
-                manifest_url
-            )));
-        }
-
-        let manifest: TorrentManifest = response
-            .json()
-            .await
-            .map_err(|error| TransportError::InvalidResponse(format!("Invalid JSON: {error}")))?;
-
-        manifest.validate_for(artifact)?;
-        Ok(manifest)
-    }
-
-    async fn download_piece(&self, source_urls: &[String], piece: &PieceRange) -> Result<Vec<u8>> {
-        let range_header = format!("bytes={}-{}", piece.start, piece.end);
-
-        for source_url in source_urls {
-            let response = self
-                .client
-                .get(source_url)
-                .header(RANGE, range_header.as_str())
-                .send()
-                .await
-                .map_err(|error| {
-                    TransportError::Network(format!("HTTP request failed: {error}"))
-                })?;
-
-            if !(response.status().is_success() || response.status().as_u16() == 206) {
-                continue;
-            }
-
-            let bytes = response.bytes().await.map_err(|error| {
-                TransportError::Network(format!("Failed to read response: {error}"))
-            })?;
-
-            if bytes.len() == piece.length() {
-                return Ok(bytes.to_vec());
-            }
-        }
-
-        Err(TransportError::NotFound(format!(
-            "Unable to fetch torrent piece {}-{}",
-            piece.start, piece.end
-        )))
     }
 
     fn fallback_discovery(&self) -> FederationInfo {
@@ -285,29 +191,26 @@ impl TransportAdapter for TorrentTransport {
     }
 
     async fn fetch_artifact(&self, peer: &PeerConfig, artifact: &ArtifactRef) -> Result<Vec<u8>> {
-        let manifest = self.fetch_manifest(peer, artifact).await?;
-        let source_urls = self.source_urls(peer, artifact, &manifest)?;
-        let mut bytes = vec![0u8; manifest.length];
-
-        for piece in manifest.piece_ranges() {
-            let piece_bytes = self.download_piece(&source_urls, &piece).await?;
-            if sha256_prefixed(&piece_bytes) != piece.hash {
-                return Err(TransportError::InvalidResponse(format!(
-                    "piece hash mismatch for {}..{}",
-                    piece.start, piece.end
-                )));
-            }
-            bytes[piece.start..=piece.end].copy_from_slice(&piece_bytes);
-        }
-
+        let base = peer
+            .url
+            .clone()
+            .ok_or_else(|| TransportError::InvalidResponse("Missing URL".to_string()))?;
+        let artifact_path = artifact.url.clone();
+        let expected_hash = artifact.hash.clone();
+        let artifact_name = artifact.name.clone();
+        let artifact_version = artifact.version.clone();
+        let bytes = tokio::task::spawn_blocking(move || {
+            pray_core::fetch::download_registry_artifact(&base, &artifact_path)
+                .map_err(|error| TransportError::Network(error.to_string()))
+        })
+        .await
+        .map_err(|error| TransportError::Network(format!("fetch join failed: {error}")))??;
         let computed_hash = sha256_prefixed(&bytes);
-        if computed_hash != artifact.hash {
+        if computed_hash != expected_hash {
             return Err(TransportError::InvalidResponse(format!(
-                "artifact hash mismatch for {} {}",
-                artifact.name, artifact.version
+                "artifact hash mismatch for {artifact_name} {artifact_version}"
             )));
         }
-
         Ok(bytes)
     }
 
@@ -379,46 +282,6 @@ impl PieceRange {
     pub fn length(&self) -> usize {
         self.end.saturating_sub(self.start) + 1
     }
-}
-
-fn build_client(config: &HttpConfig) -> Result<Client> {
-    let mut builder = Client::builder()
-        .timeout(Duration::from_secs(config.timeout_secs))
-        .danger_accept_invalid_certs(!config.tls_verify);
-
-    let mut headers = reqwest::header::HeaderMap::new();
-    for (key, value) in &config.headers {
-        if let (Ok(name), Ok(header_value)) = (
-            reqwest::header::HeaderName::try_from(key.as_str()),
-            reqwest::header::HeaderValue::from_str(value),
-        ) {
-            headers.insert(name, header_value);
-        }
-    }
-    builder = builder.default_headers(headers);
-
-    builder.build().map_err(|error| {
-        TransportError::Other(anyhow::anyhow!(
-            "Failed to create torrent HTTP client: {error}"
-        ))
-    })
-}
-
-fn resolve_peer_url(peer: &PeerConfig, path: &str) -> Result<String> {
-    if path.starts_with("http://") || path.starts_with("https://") {
-        return Ok(path.to_string());
-    }
-
-    let base = peer
-        .url
-        .as_ref()
-        .ok_or_else(|| TransportError::InvalidResponse("Missing URL".to_string()))?;
-
-    Ok(format!(
-        "{}/{}",
-        base.trim_end_matches('/'),
-        path.trim_start_matches('/')
-    ))
 }
 
 fn sha256_prefixed(bytes: &[u8]) -> String {

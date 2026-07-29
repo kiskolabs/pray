@@ -7,8 +7,8 @@ import {
   sha256Prefixed,
 } from "../hashing.js";
 import type { Lockfile, ManagedSpanRecord } from "../lockfile/types.js";
-import { expectedProvisionedBytes } from "../render/provisioned.js";
 import { renderProject } from "../render/project.js";
+import { expectedProvisionedBytes } from "../render/provisioned.js";
 import { missingLocalEmbedGuidance } from "../resolve/project.js";
 import type { ResolvedProject } from "../resolve/types.js";
 
