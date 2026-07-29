@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+## 1.6.0 (2026-07-29)
+
 - Add `login` with passkey and ssh-agent modes; persist sessions in `.pray/session.json`.
 - Add `upgrade` via `npm install -g pray-cli@latest`.
 - Honor `update --major|--latest|--dry-run|--json`, `plan --remote`, and `outdated --remote`.
