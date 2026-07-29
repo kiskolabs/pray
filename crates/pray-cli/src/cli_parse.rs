@@ -98,7 +98,28 @@ pub(crate) fn parse_command(arguments: Vec<String>) -> PrayResult<Command> {
         }
         "upgrade" => Ok(Command::Upgrade),
         "version" | "-V" | "--version" => Ok(Command::Version),
+        "completion" => parse_completion_command(iter),
         other => Err(PrayError::Usage(unknown_command_message(other))),
+    }
+}
+
+fn parse_completion_command(
+    mut arguments: std::vec::IntoIter<String>,
+) -> PrayResult<Command> {
+    let shell = arguments.next().ok_or_else(|| {
+        PrayError::Usage("completion requires bash, zsh, or fish\nSee 'pray --help'.".to_string())
+    })?;
+    if arguments.next().is_some() {
+        return Err(PrayError::Usage(
+            "completion accepts one shell argument: bash, zsh, or fish\nSee 'pray --help'."
+                .to_string(),
+        ));
+    }
+    match shell.as_str() {
+        "bash" | "zsh" | "fish" => Ok(Command::Completion { shell }),
+        _ => Err(PrayError::Usage(
+            "completion requires bash, zsh, or fish\nSee 'pray --help'.".to_string(),
+        )),
     }
 }
 

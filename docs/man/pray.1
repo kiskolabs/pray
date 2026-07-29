@@ -1,0 +1,125 @@
+.TH PRAY 1 "July 2026" "pray" "User Commands"
+.SH NAME
+pray \- reproducible inference input composition for projects
+.SH SYNOPSIS
+.B pray
+[\fIOPTIONS\fR]
+.I COMMAND
+.SH DESCRIPTION
+.B pray
+resolves declared Prayfile dependencies, locks versions and hashes, and renders
+tool-specific output with compact provenance markers.
+.PP
+Declare shared instructions in
+.BR Prayfile ,
+lock exact versions, and keep shared input pinned through manifest and lockfile
+semantics.
+.SH GETTING STARTED
+.nf
+pray init
+pray install
+pray plan
+pray apply
+pray verify
+.fi
+.SH OPTIONS
+.TP
+.BI \-\-path " PATH"
+Project root (default: current directory).
+.TP
+.BI \-\-file\-path " PATH"
+Prayfile path.
+.TP
+.BI \-\-env " NAME"
+Environment name for render filtering.
+.TP
+.B \-\-no\-input
+Disable interactive prompts.
+.TP
+.B \-\-rm
+Use an ephemeral home directory for this invocation.
+.TP
+.B \-\-trust
+[\fB\-\-global\fR]
+Import trust on first use.
+.TP
+.BR \-h ", " \-\-help
+Show help for pray or one command.
+.TP
+.BR \-V ", " \-\-version
+Print the pray CLI version.
+.SH COMMANDS
+.SS Workflow
+.BR install ", " plan ", " apply ", " verify ", " drift ", " render ", " format
+.SS Packages
+.BR add ", " remove ", " update ", " unlock ", " vendor ", " clean
+.SS Distribution
+.BR publish ", " login ", " serve ", " sync ", " confess
+.SS Trust
+.B trust
+with subcommands list, show, add-key, remove-key, set-signed, set-allow,
+import-repo, import-registry, check.
+.SS Inspect
+.BR list ", " outdated ", " explain ", " tree
+.SS Meta
+.BR init ", " prayer\ init ", " repo\ init ", " manifest ", " package ", "
+.BR upgrade ", " version ", " completion ", " help
+.PP
+Run
+.B pray help
+.I COMMAND
+or
+.B pray
+.I COMMAND
+.B \-\-help
+for details on one command.
+.SH EXIT STATUS
+.TP
+.B 0
+Success.
+.TP
+.B 1
+General error (I/O, missing or invalid manifest context).
+.TP
+.B 2
+Parse error or usage/CLI argument error.
+.TP
+.B 3
+Resolution error.
+.TP
+.B 4
+Integrity error.
+.TP
+.B 5
+Render/check failed.
+.TP
+.B 6
+Verify failed (also when
+.B pray drift
+finds drift).
+.TP
+.B 7
+Network/fetch error.
+.TP
+.B 8
+Unsupported feature.
+.SH FILES
+.TP
+.I Prayfile
+Project manifest.
+.TP
+.I Prayfile.lock
+Locked resolution and managed span records.
+.SH SEE ALSO
+docs/cli-exit-codes.md,
+SPEC.md section 66,
+.UR https://github.com/kiskolabs/pray
+.UE
+.SH COMPLETIONS
+Emit shell completion scripts:
+.PP
+.nf
+pray completion bash
+pray completion zsh
+pray completion fish
+.fi

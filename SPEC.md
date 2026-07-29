@@ -2751,19 +2751,21 @@ Resolution failed.
 
 Error categories: `parse_error`, `manifest_error`, `resolution_error`, `fetch_error`, `integrity_error`, `render_error`, `verify_error`, `target_error`
 
-Suggested exit codes:
+Exit codes (reference CLI):
 
 | Code | Meaning |
 |------|---------|
 | 0 | success |
-| 1 | general error |
-| 2 | parse error |
+| 1 | general error (I/O, missing or invalid manifest context) |
+| 2 | parse error or usage/CLI argument error |
 | 3 | resolution error |
 | 4 | integrity error |
 | 5 | render/check failed |
-| 6 | verify failed |
+| 6 | verify failed (also used when `pray drift` finds drift) |
 | 7 | network/fetch error |
 | 8 | unsupported feature |
+
+Errors print to stderr. Successful primary output prints to stdout. Operator summary: `docs/cli-exit-codes.md`. Man page EXIT STATUS: `docs/man/pray.1`.
 
 ---
 

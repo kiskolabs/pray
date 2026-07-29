@@ -36,6 +36,16 @@ If `~/.cargo/bin` is not already on your `PATH`, add this line to `~/.zshrc`, `~
 export PATH="$PATH:~/.cargo/bin"
 ```
 
+Shell completions (bash, zsh, or fish):
+
+```sh
+pray completion bash > ~/.local/share/bash-completion/completions/pray
+pray completion zsh > ~/.zsh/completions/_pray
+pray completion fish > ~/.config/fish/completions/pray.fish
+```
+
+Man page (from a checkout): `man ./docs/man/pray.1`. Exit codes: [docs/cli-exit-codes.md](docs/cli-exit-codes.md).
+
 ## Why
 
 Modern inference engines increasingly rely on surrounding input files such as `AGENTS.md`, `CLAUDE.md`, instruction libraries, prompt templates, review checklists, memories, formatting rules, and workflow notes.

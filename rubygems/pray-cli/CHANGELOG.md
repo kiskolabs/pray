@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+- Reshape CLI help around a `Usage` synopsis and `Options` block; cover every listed command; point unknown-command errors at `pray --help`.
+
 ## 1.6.0 (2026-07-29)
 
 - Run tests with polyrun parallel RSpec, coverage gate, Makefile lint/test, and RBS validate.
