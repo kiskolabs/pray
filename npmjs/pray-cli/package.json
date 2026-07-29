@@ -1,7 +1,7 @@
 {
   "name": "pray-cli",
-  "version": "1.5.1",
-  "description": "TypeScript pray CLI and library for Prayfile: resolve, lock, render, verify, and publish inference input packages",
+  "version": "1.5.2",
+  "description": "Package manager for the language placed before inference — TypeScript Prayfile CLI and library",
   "author": "Andrei Makarov <contact@kiskolabs.com>",
   "license": "MIT",
   "homepage": "https://pray.kisko.dev",

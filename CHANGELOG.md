@@ -2,6 +2,10 @@
 
 ## Unreleased
 
+## 1.5.2 (2026-07-29)
+
+- Put the Prayfile positioning line into crates.io, npm, and RubyGems package descriptions so registry search finds “language before inference”.
+
 ## 1.5.1 (2026-07-29)
 
 - Publish the Rust CLI as crates.io package `pray-cli` (binary remains `pray`); `pray` is already taken on crates.io.
