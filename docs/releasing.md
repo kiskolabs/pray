@@ -69,3 +69,15 @@ cargo install pray-cli --locked
 npm install -g pray-cli
 gem install pray-cli
 ```
+
+## Registry release feeds
+
+Subscribe in a feed reader to watch publishes land:
+
+| Surface | Feed | Notes |
+|---------|------|-------|
+| crates.io | https://static.crates.io/rss/crates/pray-cli.xml | Per-crate RSS (also site-wide `crates.xml` / `updates.xml` under the same host) |
+| RubyGems | https://rubygems.org/gems/pray-cli/versions.atom | Per-gem Atom (linked as RSS on the gem page) |
+| npmjs | — | No first-party per-package RSS/Atom; registry only exposes a global recent-updates feed at `https://registry.npmjs.org/-/rss` |
+
+For npm, poll package metadata (`https://registry.npmjs.org/pray-cli`) or use a third-party feed if you need per-package notifications.

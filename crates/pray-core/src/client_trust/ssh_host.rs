@@ -61,6 +61,26 @@ pub fn gate_pray_ssh_publisher(
     }
 }
 
+pub fn gate_pray_ssh_publisher_optional(
+    source_url: &str,
+    signer_fingerprint: Option<&str>,
+) -> PrayResult<()> {
+    let home = crate::client_trust::effective_trust_home()?;
+    let Some(policy) = load_policy(&home)? else {
+        return Ok(());
+    };
+    let rule = best_rule(&policy, source_url);
+    if rule.allowed_publishers.is_empty() {
+        return Ok(());
+    }
+    let Some(fingerprint) = signer_fingerprint else {
+        return Err(PrayError::Integrity(format!(
+            "package from {source_url} has no signer fingerprint; allowed_publishers is set"
+        )));
+    };
+    gate_pray_ssh_publisher(&home, source_url, fingerprint)
+}
+
 pub fn fetch_host_key_fingerprints(host: &str, port: u16) -> PrayResult<Vec<String>> {
     let scan = Command::new("ssh-keyscan")
         .args(["-p", &port.to_string(), "-t", "ed25519,rsa", host])

@@ -7,7 +7,6 @@ use crate::registry_http::{http_get, http_post, http_put, join_url};
 use crate::registry_ssh::{
     resolve_ssh_registry_package_root, submit_confession_ssh, upload_registry_artifact_ssh,
 };
-use crate::registry_torrent::{fetch_torrent_artifact, fetch_torrent_manifest};
 use crate::resolve_context::PackageResolutionContext;
 use crate::{PrayError, PrayResult};
 use semver::Version;
@@ -134,6 +133,10 @@ pub fn resolve_registry_package_root(
     )?;
     let signer_fingerprint = lockfile_signer_fingerprint(&selected);
     require_remote_integrity_fields(&declaration.name, &selected.version, &selected)?;
+    crate::client_trust::gate_pray_ssh_publisher_optional(
+        source_url,
+        signer_fingerprint.as_deref(),
+    )?;
     if let Some(vendored_root) = crate::registry_cache::try_vendored_package_root(
         project_root,
         &declaration.name,
@@ -167,23 +170,11 @@ pub fn resolve_registry_package_root(
         ));
     }
 
-    if cache_directory.exists() {
-        remove_path_if_exists(&cache_directory)?;
-    }
-    fs::create_dir_all(&cache_directory)?;
-
-    let artifact_url = join_url(source_url, &selected.artifact);
-    let torrent_manifest = fetch_torrent_manifest(source_url, &selected.artifact)?;
-    let artifact_bytes = if let Some(manifest) = torrent_manifest {
-        fetch_torrent_artifact(source_url, &selected.artifact, &manifest)?
-    } else {
-        http_get(&artifact_url)?
-    };
-    crate::registry_cache::validate_and_unpack_registry_package(
+    crate::registry_cache::install_registry_artifact_to_cache(
         &cache_directory,
+        source_url,
         declaration,
         &selected,
-        &artifact_bytes,
     )?;
 
     Ok(RegistryPackageResolution {
@@ -231,6 +222,10 @@ pub fn resolve_local_registry_package_root(
     )?;
     let signer_fingerprint = lockfile_signer_fingerprint(&selected);
     require_remote_integrity_fields(&declaration.name, &selected.version, &selected)?;
+    crate::client_trust::gate_pray_ssh_publisher_optional(
+        source_key,
+        signer_fingerprint.as_deref(),
+    )?;
     if let Some(vendored_root) = crate::registry_cache::try_vendored_package_root(
         project_root,
         &declaration.name,

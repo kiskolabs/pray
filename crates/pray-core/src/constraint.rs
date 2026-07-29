@@ -26,6 +26,23 @@ pub fn normalize_version_constraint(constraint: &str) -> String {
 }
 
 pub fn version_satisfies(version: &str, constraint: &str) -> PrayResult<bool> {
+    let parts: Vec<&str> = constraint
+        .split(',')
+        .map(str::trim)
+        .filter(|part| !part.is_empty())
+        .collect();
+    if parts.is_empty() {
+        return Ok(true);
+    }
+    for part in parts {
+        if !version_satisfies_one(version, part)? {
+            return Ok(false);
+        }
+    }
+    Ok(true)
+}
+
+fn version_satisfies_one(version: &str, constraint: &str) -> PrayResult<bool> {
     let normalized = normalize_version_constraint(constraint);
     if normalized.is_empty() || normalized == "*" {
         return Ok(true);

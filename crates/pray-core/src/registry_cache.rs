@@ -3,12 +3,44 @@ use crate::manifest::ManifestPackage;
 use crate::package_archive::unpack_praypkg;
 use crate::package_integrity::{require_remote_integrity_fields, verify_package_signature};
 use crate::package_spec::parse_package_spec;
-use crate::paths::{find_prayspec_file, validate_package_relative_path};
+use crate::paths::{find_prayspec_file, remove_path_if_exists, validate_package_relative_path};
 use crate::registry::{RegistryPackageResolution, RegistryPackageVersion};
 use crate::registry_http::http_get;
 use crate::{PrayError, PrayResult};
 use std::fs;
 use std::path::{Path, PathBuf};
+
+/// Download into a staging directory, unpack, then rename into the final cache path.
+pub(crate) fn install_registry_artifact_to_cache(
+    cache_directory: &Path,
+    source_url: &str,
+    declaration: &ManifestPackage,
+    selected: &RegistryPackageVersion,
+) -> PrayResult<()> {
+    let staging_directory = cache_directory.with_extension("staging");
+    remove_path_if_exists(&staging_directory)?;
+    fs::create_dir_all(&staging_directory)?;
+    let unpacked_directory = staging_directory.join("unpacked");
+    fs::create_dir_all(&unpacked_directory)?;
+
+    let artifact_bytes = crate::fetch::download_registry_artifact(source_url, &selected.artifact)?;
+    if let Err(error) = validate_and_unpack_registry_package(
+        &unpacked_directory,
+        declaration,
+        selected,
+        &artifact_bytes,
+    ) {
+        let _ = remove_path_if_exists(&staging_directory);
+        return Err(error);
+    }
+    remove_path_if_exists(cache_directory)?;
+    fs::rename(&unpacked_directory, cache_directory).map_err(|error| {
+        let _ = remove_path_if_exists(&staging_directory);
+        PrayError::from(error)
+    })?;
+    let _ = remove_path_if_exists(&staging_directory);
+    Ok(())
+}
 
 pub(crate) fn registry_cache_matches_selected(
     cache_directory: &Path,
