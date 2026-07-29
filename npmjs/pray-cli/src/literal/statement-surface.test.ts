@@ -51,8 +51,7 @@ describe("statement surface", () => {
   });
 
   it("leaves assignment map literals alone", () => {
-    const statement =
-      'spec.exports = { "AGENTS.md" => "templates/agents.md" }';
+    const statement = 'spec.exports = { "AGENTS.md" => "templates/agents.md" }';
     assert.deepEqual(expandStatementSurface(statement), [statement]);
   });
 });
