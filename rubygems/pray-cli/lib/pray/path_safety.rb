@@ -28,5 +28,14 @@ module Pray
 
       package_name
     end
+
+    def sanitize_relative_path(path)
+      cleaned = path.to_s.delete_prefix("/").tr("\\", "/")
+      if cleaned.empty? || cleaned.include?("\0") || cleaned.split("/").include?("..")
+        raise Error.resolution("unsafe relative path: #{path.inspect}")
+      end
+
+      cleaned
+    end
   end
 end

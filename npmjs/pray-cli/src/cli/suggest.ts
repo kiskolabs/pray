@@ -27,6 +27,7 @@ export const TOP_LEVEL_COMMANDS = [
   "trust",
   "unlock",
   "update",
+  "upgrade",
   "vendor",
   "verify",
   "version",

@@ -1,4 +1,4 @@
-.PHONY: build clean install bench bench-scaling ruby-test libyears libyears-rust libyears-ruby libyears-npm bump-homebrew \
+.PHONY: build clean install bench bench-scaling ruby-test loc-check libyears libyears-rust libyears-ruby libyears-npm bump-homebrew \
 	release-dry-run release-crates release-npm release-rubygems release-distribution release-all \
 	coverage coverage-rust mutants fuzz-build
 
@@ -19,7 +19,11 @@ install:
 	cargo install --path crates/pray-cli --locked
 
 ruby-test:
-	cd rubygems/pray-cli && bundle install && bundle exec rspec
+	cd rubygems/pray-cli && bundle install && make test
+
+# Soft warn at 150 LOC; hard fail above 300 unless ratcheted in scripts/loc-limits.allowlist.
+loc-check:
+	./scripts/check-loc-limits.sh
 
 bench:
 	cargo bench -p pray-bench

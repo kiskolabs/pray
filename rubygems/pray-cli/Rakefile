@@ -8,8 +8,10 @@ RuboCop::RakeTask.new do |task|
   task.options = %w[--format progress]
 end
 
-desc "Run RuboCop"
-task lint: :rubocop
+desc "Run RuboCop and RBS validate"
+task lint: :rubocop do
+  sh "bundle exec rbs -I sig validate"
+end
 
 desc "Report dependency freshness (libyears)"
 task :libyears do

@@ -19,7 +19,13 @@
       "preset": "recommended",
       "style": {
         "useImportType": "error",
-        "noNonNullAssertion": "off"
+        "noNonNullAssertion": "off",
+        "noExcessiveLinesPerFile": {
+          "level": "error",
+          "options": {
+            "maxLines": 300
+          }
+        }
       },
       "complexity": {
         "useOptionalChain": "off"
@@ -29,5 +35,27 @@
         "noUnusedFunctionParameters": "error"
       }
     }
-  }
+  },
+  "overrides": [
+    {
+      "includes": [
+        "src/git/sources.ts",
+        "src/literal/statement-surface.ts",
+        "src/manifest/format-manifest.ts",
+        "src/manifest/parse-statements.ts",
+        "src/manifest/parser.ts",
+        "src/registry/index.ts",
+        "src/render/provisioned.ts",
+        "src/resolve/project.ts",
+        "src/verify/project.ts"
+      ],
+      "linter": {
+        "rules": {
+          "style": {
+            "noExcessiveLinesPerFile": "off"
+          }
+        }
+      }
+    }
+  ]
 }

@@ -2,6 +2,11 @@
 
 ## Unreleased
 
+- Add `login` with passkey and ssh-agent modes; persist sessions in `.pray/session.json`.
+- Add `upgrade` via `npm install -g pray-cli@latest`.
+- Honor `update --major|--latest|--dry-run|--json`, `plan --remote`, and `outdated --remote`.
+- Implement `trust import-repo` and `trust import-registry` for local and http(s) sources.
+
 ## 1.5.2 (2026-07-29)
 
 - Put the Prayfile positioning line into the npm package description for registry search.

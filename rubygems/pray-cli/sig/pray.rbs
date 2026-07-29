@@ -1,0 +1,12 @@
+module Pray
+  VERSION: String
+  GENERATED_BY: String
+
+  class Error < StandardError
+    attr_reader kind: Symbol
+    attr_reader message: String
+
+    def exit_code: () -> Integer
+    def label: () -> String
+  end
+end

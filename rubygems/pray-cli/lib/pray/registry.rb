@@ -322,6 +322,19 @@ module Pray
       response.body
     end
 
+    def http_post(url, content_type, body)
+      uri = URI(url)
+      request = Net::HTTP::Post.new(uri)
+      request["Content-Type"] = content_type
+      request.body = body
+      response = http_request(uri) { |http| http.request(request) }
+      unless response.is_a?(Net::HTTPSuccess)
+        raise Error.resolution("HTTP request failed for #{url}: #{response.code}")
+      end
+
+      response.body
+    end
+
     def http_request(uri)
       Net::HTTP.start(
         uri.hostname,

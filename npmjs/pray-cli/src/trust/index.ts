@@ -1,54 +1,27 @@
-import { existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
-import { homedir } from "node:os";
-import { join } from "node:path";
-import { parse, stringify } from "smol-toml";
+import { stringify } from "smol-toml";
 import { PrayError } from "../errors.js";
-
-import { parseTrustPolicyValue } from "./parse.js";
-import type { TrustPolicy } from "./types.js";
+import { gitSourceCacheDirectory } from "../git/sources.js";
+import { importRegistryTrust } from "./import-registry.js";
+import { importSigningKeysFromRepository } from "./import-repo.js";
+import {
+  defaultTrustPolicy,
+  loadTrustPolicy,
+  saveTrustPolicy,
+  trustHome,
+  trustPolicyPath,
+} from "./store.js";
 
 export type { TrustPolicy, TrustRule } from "./types.js";
-
-export function trustHome(): string {
-  return process.env.PRAY_HOME ?? join(homedir(), ".pray");
-}
-
-export function trustPolicyPath(): string {
-  return join(trustHome(), "trust.toml");
-}
-
-export function loadTrustPolicy(): TrustPolicy {
-  const path = trustPolicyPath();
-  if (!existsSync(path)) {
-    return defaultTrustPolicy();
-  }
-  try {
-    return parseTrustPolicyValue(parse(readFileSync(path, "utf8")));
-  } catch (error) {
-    if (error instanceof PrayError) {
-      throw error;
-    }
-    const message = error instanceof Error ? error.message : String(error);
-    throw PrayError.parse("trust policy", message);
-  }
-}
-
-export function saveTrustPolicy(policy: TrustPolicy): void {
-  const path = trustPolicyPath();
-  mkdirSync(join(path, ".."), { recursive: true });
-  writeFileSync(path, `${stringify(policy)}\n`, "utf8");
-}
-
-export function defaultTrustPolicy(): TrustPolicy {
-  return {
-    default: { allow: true },
-    rules: [],
-  };
-}
+export {
+  defaultTrustPolicy,
+  loadTrustPolicy,
+  saveTrustPolicy,
+  trustHome,
+  trustPolicyPath,
+};
 
 export function listTrustPolicy(): string {
-  const policy = loadTrustPolicy();
-  return stringify(policy);
+  return stringify(loadTrustPolicy());
 }
 
 export function addSigningKey(fingerprint: string): void {
@@ -89,7 +62,10 @@ export function checkTrustPolicy(): string {
   return "trust check: no compromised key feed configured";
 }
 
-export function runTrustCommand(argumentsList: string[]): void {
+export async function runTrustCommand(
+  argumentsList: string[],
+  projectRoot: string,
+): Promise<void> {
   const [subcommand, ...rest] = argumentsList;
   switch (subcommand) {
     case "list":
@@ -128,14 +104,100 @@ export function runTrustCommand(argumentsList: string[]): void {
     case "check":
       process.stdout.write(`${checkTrustPolicy()}\n`);
       return;
-    case "import-repo":
-    case "import-registry":
-      throw PrayError.unsupported(
-        `${subcommand} is not implemented yet in pray-cli typescript`,
+    case "import-repo": {
+      const { sourceUrl, matchPrefix } = parseImportRepoArguments(rest);
+      const added = importSigningKeysFromRepository(
+        projectRoot,
+        sourceUrl,
+        matchPrefix,
       );
+      const cloneUrl = sourceUrl.replace(/^git\+/, "");
+      process.stdout.write(
+        `imported ${added} key(s) from ${gitSourceCacheDirectory(projectRoot, cloneUrl)}\n`,
+      );
+      return;
+    }
+    case "import-registry": {
+      const options = parseImportRegistryArguments(rest);
+      const result = await importRegistryTrust(
+        options.sourceUrl,
+        options.matchPrefix,
+        options.includeHostKey,
+      );
+      process.stdout.write(
+        `imported ${result.publishersAdded} publisher fingerprint(s) and ${result.hostKeysAdded} host key(s) for ${options.matchPrefix ?? options.sourceUrl}\n`,
+      );
+      return;
+    }
     default:
       throw PrayError.unsupported(
         `unknown trust subcommand: ${subcommand ?? "(none)"}`,
       );
   }
+}
+
+function parseImportRepoArguments(argumentsList: string[]): {
+  sourceUrl: string;
+  matchPrefix?: string;
+} {
+  const sourceUrl = argumentsList[0];
+  if (!sourceUrl) {
+    throw PrayError.unsupported("trust import-repo requires SOURCE_URL");
+  }
+  let matchPrefix: string | undefined;
+  for (let index = 1; index < argumentsList.length; index += 1) {
+    const argument = argumentsList[index]!;
+    if (argument === "--match-prefix") {
+      const value = argumentsList[index + 1];
+      if (!value) {
+        throw PrayError.unsupported("--match-prefix requires VALUE");
+      }
+      matchPrefix = value;
+      index += 1;
+      continue;
+    }
+    throw PrayError.unsupported(
+      `unknown trust import-repo argument: ${argument}`,
+    );
+  }
+  return { sourceUrl, matchPrefix };
+}
+
+function parseImportRegistryArguments(argumentsList: string[]): {
+  sourceUrl: string;
+  matchPrefix?: string;
+  includeHostKey: boolean;
+} {
+  const sourceUrl = argumentsList[0];
+  if (!sourceUrl) {
+    throw PrayError.unsupported("trust import-registry requires SOURCE_URL");
+  }
+  let matchPrefix: string | undefined;
+  let includeHostKey =
+    sourceUrl.startsWith("pray+ssh://") || sourceUrl.startsWith("ssh+pray://");
+  for (let index = 1; index < argumentsList.length; index += 1) {
+    const argument = argumentsList[index]!;
+    switch (argument) {
+      case "--match-prefix": {
+        const value = argumentsList[index + 1];
+        if (!value) {
+          throw PrayError.unsupported("--match-prefix requires VALUE");
+        }
+        matchPrefix = value;
+        index += 1;
+        break;
+      }
+      case "--host-key":
+        includeHostKey = true;
+        break;
+      case "--no-host-key":
+        includeHostKey = false;
+        break;
+      default:
+        throw PrayError.unsupported(
+          `unknown trust import-registry argument: ${argument}`,
+        );
+    }
+  }
+  return { sourceUrl, matchPrefix, includeHostKey };
 }

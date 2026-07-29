@@ -7,6 +7,8 @@ gemspec
 group :development do
   gem "rake", "~> 13.0"
   gem "libyear-bundler", "~> 0.9"
+  gem "polyrun", "~> 2.2"
+  gem "rbs", "~> 3.9"
   gem "standard", "~> 1.52"
   gem "standard-custom", "~> 1.0"
   gem "standard-performance", "~> 1.8"

@@ -121,9 +121,3 @@ function writeRegistryPackageMetadataLocal(
     "utf8",
   );
 }
-
-export async function loginCommand(): Promise<never> {
-  throw PrayError.unsupported(
-    "login requires passkey or SSH agent authentication and is not implemented yet in pray-cli typescript",
-  );
-}

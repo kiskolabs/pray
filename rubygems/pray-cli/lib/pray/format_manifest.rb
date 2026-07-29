@@ -1,9 +1,7 @@
 # frozen_string_literal: true
 
-require "set"
-
 module Pray
-  PackageFormatHint = Struct.new(:roles, :file_path, :exports, keyword_init: true) do
+  PackageFormatHint = Struct.new(:roles, :file_path, :exports) do
     def initialize(roles: [], file_path: nil, exports: [])
       super
     end

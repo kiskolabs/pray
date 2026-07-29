@@ -17,6 +17,8 @@ jobs:
           components: rustfmt, clippy, llvm-tools-preview
       - name: Check formatting
         run: cargo fmt --all --check
+      - name: Check source file LOC limits
+        run: make loc-check
       - name: Run Clippy
         run: cargo clippy --workspace --all-targets -- -D warnings
       - uses: EmbarkStudios/cargo-deny-action@v2
@@ -62,10 +64,12 @@ jobs:
         run: sudo apt-get update && sudo apt-get install -y zstd
       - name: Run Ruby lint
         working-directory: rubygems/pray-cli
-        run: bundle exec rake lint
-      - name: Run Ruby tests
+        run: make lint
+      - name: Run Ruby tests with coverage
         working-directory: rubygems/pray-cli
-        run: bundle exec rspec
+        env:
+          POLYRUN_COVERAGE: "1"
+        run: bundle exec polyrun parallel-rspec --workers 5 --merge-failures
 
   npm:
     runs-on: ubuntu-latest

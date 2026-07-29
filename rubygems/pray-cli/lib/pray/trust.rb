@@ -1,13 +1,16 @@
 # frozen_string_literal: true
 
 require "toml-rb"
+require "fileutils"
 
 module Pray
   TrustRule = Struct.new(
-    :match_prefix, :allow, :allowed_host_keys, :allowed_publishers
+    :match_prefix, :allow, :require_signed_commit,
+    :allowed_signing_keys, :allowed_host_keys, :allowed_publishers
   ) do
     def initialize(
-      match_prefix: nil, allow: true, allowed_host_keys: [], allowed_publishers: []
+      match_prefix: nil, allow: true, require_signed_commit: false,
+      allowed_signing_keys: [], allowed_host_keys: [], allowed_publishers: []
     )
       super
     end
@@ -18,6 +21,8 @@ module Pray
       super
     end
   end
+
+  CompromisedKeyEntry = Struct.new(:key, :reason, :reference, :reported_at, keyword_init: true)
 
   module Trust
     module_function
@@ -31,12 +36,12 @@ module Pray
       File.join(home, ".pray")
     end
 
-    def trust_policy_path
-      File.join(trust_home, "trust.toml")
+    def trust_policy_path(home = trust_home)
+      File.join(home, "trust.toml")
     end
 
-    def load_policy
-      path = trust_policy_path
+    def load_policy(home = trust_home)
+      path = trust_policy_path(home)
       return nil unless File.file?(path)
 
       parse_policy(TomlRB.load_file(path))
@@ -44,8 +49,14 @@ module Pray
       raise Error.parse("trust policy", "#{path}: #{error.message}")
     end
 
-    def load_policy_or_default
-      load_policy || TrustPolicy.new
+    def load_policy_or_default(home = trust_home)
+      load_policy(home) || TrustPolicy.new
+    end
+
+    def save_policy(policy, home = trust_home)
+      path = trust_policy_path(home)
+      FileUtils.mkdir_p(File.dirname(path))
+      File.write(path, "#{format_policy(policy)}\n")
     end
 
     def parse_policy(data)
@@ -59,6 +70,8 @@ module Pray
       TrustRule.new(
         match_prefix: data["match_prefix"],
         allow: data.fetch("allow", true),
+        require_signed_commit: data.fetch("require_signed_commit", false),
+        allowed_signing_keys: Array(data["allowed_signing_keys"]),
         allowed_host_keys: Array(data["allowed_host_keys"]),
         allowed_publishers: Array(data["allowed_publishers"])
       )
@@ -77,6 +90,23 @@ module Pray
         selected_length = prefix.length
       end
       selected || policy.default_rule
+    end
+
+    def mutable_rule_for_match_prefix!(policy, match_prefix)
+      existing = policy.rules.find { |rule| rule.match_prefix == match_prefix }
+      return existing if existing
+
+      rule = TrustRule.new(match_prefix: match_prefix)
+      policy.rules << rule
+      rule
+    end
+
+    def normalize_key(value)
+      value.strip.upcase
+    end
+
+    def fingerprint_matches?(allowed, candidate)
+      normalize_key(allowed) == candidate || candidate.end_with?(normalize_key(allowed))
     end
 
     def prepare_source_host_keys(sources)
@@ -109,16 +139,9 @@ module Pray
       )
     end
 
-    def normalize_key(value)
-      value.strip.upcase
-    end
-
-    def fingerprint_matches?(allowed, candidate)
-      normalize_key(allowed) == candidate || candidate.end_with?(normalize_key(allowed))
-    end
-
     def format_policy(policy)
-      lines = ["[default]", format_rule_lines(policy.default_rule)]
+      lines = ["[default]"]
+      lines.concat(format_rule_lines(policy.default_rule))
       policy.rules.each do |rule|
         lines << ""
         lines << "[[rules]]"
@@ -129,11 +152,50 @@ module Pray
     end
 
     def format_rule_lines(rule)
-      entries = []
-      entries << "allow = #{rule.allow}" unless rule.allow
-      entries << "allowed_host_keys = #{rule.allowed_host_keys.inspect}" unless rule.allowed_host_keys.empty?
-      entries << "allowed_publishers = #{rule.allowed_publishers.inspect}" unless rule.allowed_publishers.empty?
-      entries
+      [
+        "allow = #{rule.allow}",
+        "require_signed_commit = #{rule.require_signed_commit}",
+        "allowed_signing_keys = #{toml_array(rule.allowed_signing_keys)}",
+        "allowed_host_keys = #{toml_array(rule.allowed_host_keys)}",
+        "allowed_publishers = #{toml_array(rule.allowed_publishers)}"
+      ]
+    end
+
+    def toml_array(values)
+      "[#{values.map(&:inspect).join(", ")}]"
+    end
+
+    def format_rule_block(scope, rule)
+      lines = [
+        scope,
+        "  allow: #{rule.allow}",
+        "  require_signed_commit: #{rule.require_signed_commit}",
+        format_keyed_list("allowed_signing_keys", rule.allowed_signing_keys),
+        format_keyed_list("allowed_host_keys", rule.allowed_host_keys),
+        format_keyed_list("allowed_publishers", rule.allowed_publishers)
+      ]
+      "#{lines.join("\n")}\n"
+    end
+
+    def format_keyed_list(name, values)
+      return "  #{name}: []" if values.empty?
+
+      ["  #{name}:", *values.map { |value| "    - #{value}" }].join("\n")
+    end
+
+    def append_missing!(target, keys)
+      added = 0
+      keys.each do |key|
+        normalized = normalize_key(key)
+        next if normalized.empty?
+        next if target.any? { |existing| normalize_key(existing) == normalized }
+
+        target << normalized
+        added += 1
+      end
+      added
     end
   end
 end
+
+require_relative "trust_ops"

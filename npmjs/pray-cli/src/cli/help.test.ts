@@ -13,12 +13,23 @@ describe("help", () => {
     assert.match(text, /reproducible inference input/);
     assert.match(text, /pray help/);
     assert.match(text, /--no-input/);
+    assert.match(text, /upgrade/);
+    assert.match(text, /outdated \[--remote\]/);
   });
 
   it("includes offline flag for install help", () => {
     const text = commandHelpText("install");
     assert.ok(text);
     assert.match(text, /--offline/);
+  });
+
+  it("documents login and upgrade", () => {
+    const login = commandHelpText("login");
+    assert.ok(login);
+    assert.match(login, /--passkey-key|--ssh-agent/);
+    const upgrade = commandHelpText("upgrade");
+    assert.ok(upgrade);
+    assert.match(upgrade, /npm install -g pray-cli@latest/);
   });
 
   it("detects help subcommand targets", () => {

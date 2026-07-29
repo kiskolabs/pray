@@ -44,7 +44,7 @@ pray serve --root ./prayers --port 7429
 - `install`, `apply`, `plan`, `render`, `verify`, `drift`, `format`
 - `package`, `publish`, `serve`, `sync`, `vendor`, `clean`, `tree`
 - `list`, `outdated`, `explain`
-- `trust`, `confess`, `login` (login: not yet implemented)
+- `trust`, `confess`, `login`, `upgrade`
 
 ## Development
 
@@ -64,6 +64,6 @@ node bin/pray.js version
 
 ## Status
 
-Registry HTTP(S), git sources, local publish/serve/sync, vendor/tree, and trust policy editing are implemented. SSH registry (`pray+ssh://`), `serve --stdio`, and `login` remain planned.
+Registry HTTP(S), git sources, local publish/serve/sync, vendor/tree, login (passkey and ssh-agent), upgrade, update/plan/outdated remote flags, and trust import paths are implemented. SSH registry (`pray+ssh://`) and `serve --stdio` remain planned.
 
 See `SPEC.md` in the repository root for the normative specification.

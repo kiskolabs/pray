@@ -1,7 +1,7 @@
 # frozen_string_literal: true
 
 module Pray
-  DestinationEntry = Struct.new(:kind, :name, :path, keyword_init: true) do
+  DestinationEntry = Struct.new(:kind, :name, :path) do
     def self.package(name)
       new(kind: "package", name: name, path: nil)
     end

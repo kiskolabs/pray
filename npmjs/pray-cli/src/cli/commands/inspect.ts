@@ -1,17 +1,19 @@
 import { existsSync } from "node:fs";
 import { PrayError } from "../../errors.js";
-import {
-  buildLockfile,
-  lockfilesEquivalent,
-  readLockfile,
-} from "../../lockfile/index.js";
+import { buildLockfile, readLockfile } from "../../lockfile/index.js";
 import {
   defaultLockfilePath,
   defaultManifestPath,
 } from "../../lockfile/paths.js";
 import { renderProject } from "../../render/project.js";
+import { defaultResolveOptions } from "../../resolve/context.js";
 import { resolveProject } from "../../resolve/project.js";
 import { packageSourceSummary } from "../../tree/index.js";
+import { previewRemoteUpdates } from "./update.js";
+import {
+  printConstraintBlockedPackages,
+  printUpdateSummary,
+} from "./update-report.js";
 
 export async function runList(): Promise<void> {
   const project = await resolveProject(defaultManifestPath());
@@ -24,12 +26,36 @@ export async function runList(): Promise<void> {
   process.stdout.write(`${lines.join("\n")}\n`);
 }
 
-export async function runOutdated(): Promise<void> {
+export function parseOutdatedArguments(argumentsList: string[]): {
+  remote: boolean;
+} {
+  let remote = false;
+  for (const argument of argumentsList) {
+    if (argument === "--remote") {
+      remote = true;
+      continue;
+    }
+    throw PrayError.unsupported(`unknown outdated flag: ${argument}`);
+  }
+  return { remote };
+}
+
+export async function runOutdated(argumentsList: string[] = []): Promise<void> {
+  const { remote } = parseOutdatedArguments(argumentsList);
+  if (remote) {
+    await previewRemoteUpdates(undefined, false);
+    return;
+  }
+
   const lockfilePath = defaultLockfilePath(process.cwd());
   const previous = existsSync(lockfilePath)
     ? readLockfile(lockfilePath)
     : undefined;
-  const project = await resolveProject(defaultManifestPath());
+  const project = await resolveProject(defaultManifestPath(), {
+    ...defaultResolveOptions(),
+    refreshSourceRevisions: true,
+    ignoreLockedVersions: true,
+  });
   const rendered = renderProject(project);
   const latest = buildLockfile({
     manifestHash: project.manifestHash,
@@ -41,20 +67,19 @@ export async function runOutdated(): Promise<void> {
     sourceRevisions: project.sourceRevisions,
     sourceHostKeys: project.sourceHostKeys,
   });
-  if (previous && lockfilesEquivalent(previous, latest)) {
+  let reported = printUpdateSummary(
+    previous,
+    latest,
+    undefined,
+    project,
+    "Outdated packages",
+  );
+  reported =
+    printConstraintBlockedPackages(project, "Outdated packages", !reported) ||
+    reported;
+  if (!reported) {
+    process.stdout.write("Outdated packages\n");
     process.stdout.write("All packages up to date\n");
-    return;
-  }
-  process.stdout.write("Outdated packages\n");
-  for (const packageEntry of project.packages) {
-    if (
-      packageEntry.registryLatestVersion &&
-      packageEntry.registryLatestVersion !== packageEntry.spec.version
-    ) {
-      process.stdout.write(
-        `${packageEntry.declaration.name}: ${packageEntry.spec.version} -> ${packageEntry.registryLatestVersion}\n`,
-      );
-    }
   }
 }
 

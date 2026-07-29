@@ -49,9 +49,9 @@ module Pray
 
     def entry_fields(entry)
       if entry.kind == "package"
-        { "kind" => "package", "name" => entry.name }
+        {"kind" => "package", "name" => entry.name}
       else
-        { "kind" => "local", "path" => entry.path }
+        {"kind" => "local", "path" => entry.path}
       end
     end
 
