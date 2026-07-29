@@ -4,7 +4,7 @@ Ruby packages for the pray project.
 
 ## pray-cli
 
-Reference implementation of the `pray` CLI in Ruby. Resolves `Prayfile` dependencies, writes `Prayfile.lock`, renders managed guidance, and verifies drift.
+Ruby `pray` CLI. Resolves `Prayfile` dependencies, writes `Prayfile.lock`, renders managed guidance, and verifies drift.
 
 Install from this directory:
 
@@ -32,4 +32,4 @@ From the repository root:
 make ruby-test
 ```
 
-The executable name is `pray`, matching the Rust reference CLI.
+The executable name is `pray`, matching the Rust CLI.

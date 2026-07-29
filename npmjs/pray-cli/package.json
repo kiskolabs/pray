@@ -1,7 +1,7 @@
 {
   "name": "pray-cli",
   "version": "1.5.0",
-  "description": "TypeScript library and CLI for the Prayfile workflow",
+  "description": "TypeScript pray CLI and library for Prayfile: resolve, lock, render, verify, and publish inference input packages",
   "author": "Andrei Makarov <contact@kiskolabs.com>",
   "license": "MIT",
   "homepage": "https://pray.kisko.dev",
@@ -33,6 +33,7 @@
   },
   "scripts": {
     "build": "rm -rf dist && tsc -p tsconfig.build.json",
+    "prepublishOnly": "npm run build",
     "test": "npm run build && tsc -p tsconfig.test.json && node --test 'dist/**/*.test.js'",
     "typecheck": "tsc -p tsconfig.json --noEmit",
     "lint": "biome check . && npm run lint:cycles",
@@ -40,6 +41,9 @@
     "lint:cycles": "madge --circular --extensions ts --ts-config tsconfig.json src/index.ts src/cli/main.ts",
     "format": "biome format --write .",
     "format:check": "biome format ."
+  },
+  "publishConfig": {
+    "access": "public"
   },
   "dependencies": {
     "semver": "^7.7.2",

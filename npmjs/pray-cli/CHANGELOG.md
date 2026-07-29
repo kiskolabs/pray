@@ -2,6 +2,9 @@
 
 ## Unreleased
 
+- Sync `PACKAGE_VERSION` with the package version and add `prepublishOnly` build for npm publish.
+- Rework package description and README opener to match Prayfile positioning.
+
 ## 1.5.0 (2026-07-27)
 
 - Accept Gemfile-like Ruby surface sugar for Prayfile statements: `{…}` blocks, top-level `;`, and optional call parentheses.

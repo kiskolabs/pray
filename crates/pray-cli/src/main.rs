@@ -348,7 +348,7 @@ pub(crate) enum Command {
 }
 
 fn version_command() -> PrayResult<()> {
-    println!("{} {}", env!("CARGO_PKG_NAME"), env!("CARGO_PKG_VERSION"));
+    println!("pray {}", env!("CARGO_PKG_VERSION"));
     Ok(())
 }
 

@@ -1,8 +1,8 @@
 # pray-cli
 
-TypeScript client for the `pray` CLI and [Prayfile](https://pray.kisko.dev) workflow.
+TypeScript `pray` CLI and library for [Prayfile](https://pray.kisko.dev): a package manager for the language placed before inference.
 
-This npm package implements Prayfile parsing, registry and git source resolution, lockfile generation, managed rendering, verification, publishing, and distribution serving for Node.js workflows.
+Resolve, lock, render, verify, publish, and serve shared instructions, policies, templates, and related input as versioned packages. The installed executable is `pray`.
 
 **Website:** [pray.kisko.dev](https://pray.kisko.dev)
 

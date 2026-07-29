@@ -6,8 +6,11 @@ license.workspace = true
 authors.workspace = true
 repository.workspace = true
 homepage.workspace = true
-description = "Core library for Prayfile parsing, resolution, lockfiles, and registry artifacts"
-
+description = "Prayfile core: parse, resolve, lock, render, verify, and build distribution artifacts"
+readme = "README.md"
+documentation = "https://docs.rs/pray-core"
+keywords = ["pray", "prayfile", "agents", "inference", "lockfile"]
+categories = ["development-tools", "parser-implementations"]
 [features]
 default = ["auth"]
 auth = ["dep:rusqlite"]

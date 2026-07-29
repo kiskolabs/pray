@@ -2,6 +2,13 @@
 
 ## Unreleased
 
+- Publish the Rust CLI as crates.io package `pray-cli` (binary remains `pray`); `pray` is already taken on crates.io.
+- Add versioned workspace path dependencies so `pray-core`, `pray-transport`, and `pray-cli` can publish in order.
+- Add manual release scripts for crates.io, npmjs, RubyGems, and pray distribution-point publish under `scripts/release/`.
+- Point `pray upgrade` and install docs at `cargo install pray-cli`.
+- Sync the TypeScript `PACKAGE_VERSION` constant with the npm package version.
+- Align crates.io, npm, and RubyGems package descriptions and README openers around Prayfile positioning; drop “reference” from storefront wording.
+
 ## 1.5.0 (2026-07-27)
 
 - Accept Gemfile-like Ruby surface sugar for Prayfile statements: `{…}` blocks, top-level `;`, and optional call parentheses on keywords and symbol assignments.

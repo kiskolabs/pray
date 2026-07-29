@@ -1363,7 +1363,16 @@ dependencies = [
 ]
 
 [[package]]
-name = "pray"
+name = "pray-bench"
+version = "1.5.0"
+dependencies = [
+ "criterion",
+ "pray-core",
+ "tempfile",
+]
+
+[[package]]
+name = "pray-cli"
 version = "1.5.0"
 dependencies = [
  "base64",
@@ -1376,15 +1385,6 @@ dependencies = [
  "tar",
  "tokio",
  "zstd",
-]
-
-[[package]]
-name = "pray-bench"
-version = "1.5.0"
-dependencies = [
- "criterion",
- "pray-core",
- "tempfile",
 ]
 
 [[package]]

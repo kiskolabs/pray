@@ -16,13 +16,19 @@ The specification and the `pray` reference CLI evolve together. `SPEC.md` define
 
 The canonical GitHub repository is `kiskolabs/pray`.
 
-Install the Rust reference CLI as a system-wide binary with Cargo:
+Install the Rust `pray` CLI as a system-wide binary with Cargo:
 
 ```sh
-cargo install --git https://github.com/kiskolabs/pray --locked pray
+cargo install pray-cli --locked
 ```
 
-Cargo installs the `pray` executable into your user bin directory, typically `~/.cargo/bin`.
+The crates.io package is `pray-cli` (the name `pray` is already taken on crates.io). Cargo installs the `pray` executable into your user bin directory, typically `~/.cargo/bin`.
+
+From git:
+
+```sh
+cargo install --git https://github.com/kiskolabs/pray --locked pray-cli
+```
 
 If `~/.cargo/bin` is not already on your `PATH`, add this line to `~/.zshrc`, `~/.bashrc`, `~/.zprofile`, or `~/.bash_profile`:
 
@@ -954,7 +960,7 @@ Start with `SPEC.md` for:
 
 ### npm (Node.js)
 
-Install the TypeScript reference CLI from npm:
+Install the TypeScript `pray` CLI from npm:
 
 ```sh
 npm install -g pray-cli
@@ -970,7 +976,7 @@ The npm package lives in `npmjs/pray-cli` and implements Prayfile parsing, regis
 
 ### RubyGems (Ruby)
 
-Install the Ruby reference CLI:
+Install the Ruby `pray` CLI:
 
 ```sh
 gem install pray-cli
@@ -1008,9 +1014,9 @@ Confession submission should require explicit verification, signed payloads, rep
 
 - [GitHub](https://github.com/kiskolabs/pray)
 - [GitLab](https://gitlab.com/amkisko/pray)
-- [crates.io](https://crates.io/crates/pray)
-- [libraries.io](https://libraries.io/cargo/pray)
-- [Deps.dev](https://deps.dev/cargo/pray)
+- [crates.io](https://crates.io/crates/pray-cli)
+- [libraries.io](https://libraries.io/cargo/pray-cli)
+- [Deps.dev](https://deps.dev/cargo/pray-cli)
 - [SonarCloud](https://sonarcloud.io/project/overview?id=kiskolabs_pray)
 - [Snyk](https://snyk.io/test/github/kiskolabs/pray)
 - [Codecov](https://app.codecov.io/github/kiskolabs/pray)

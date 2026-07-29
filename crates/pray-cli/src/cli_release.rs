@@ -47,14 +47,7 @@ pub fn maybe_print_upgrade_notice(arguments: &[String]) {
 
 pub fn upgrade_command() -> PrayResult<()> {
     let status = Command::new("cargo")
-        .args([
-            "install",
-            "--git",
-            DEFAULT_REPOSITORY,
-            "--locked",
-            "--force",
-            "pray",
-        ])
+        .args(["install", "pray-cli", "--locked", "--force"])
         .status()
         .map_err(|error| {
             PrayError::Unsupported(format!(
