@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+## 1.6.0 (2026-07-29)
+
 - Warn when Prayfile still uses deprecated `target`, `output`, or `agent`; prefer `compose` / `tree` / `pray`. These forms will be removed in version 2.
 - Reject package dependency cycles during resolve with a clear resolution error.
 - Add parser property tests (`proptest`) and a local `cargo-fuzz` harness for Prayfile, prayspec, and package path validation.
