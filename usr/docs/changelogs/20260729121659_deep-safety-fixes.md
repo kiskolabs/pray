@@ -16,7 +16,7 @@
 
 ## Next
 
-- Follow with transitive resolve and transport unification once this branch is reviewed.
+- Follow-ups landed on feature/audit-followups-resolve-transport-patch; see usr/docs/changelogs/20260729122836_audit-followups-resolve-transport-patch.md.
 
 ## Source
 
