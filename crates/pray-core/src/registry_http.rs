@@ -4,12 +4,12 @@ use std::io::Read;
 use std::sync::OnceLock;
 use std::time::Duration;
 
-pub(crate) struct HttpResponse {
+pub struct HttpResponse {
     pub status: u16,
     pub body: Vec<u8>,
 }
 
-pub(crate) fn join_url(base: &str, path: &str) -> String {
+pub fn join_url(base: &str, path: &str) -> String {
     format!(
         "{}/{}",
         base.trim_end_matches('/'),
@@ -63,7 +63,7 @@ fn read_response_body(response: reqwest::blocking::Response) -> PrayResult<Vec<u
     Ok(body)
 }
 
-pub(crate) fn http_get(url: &str) -> PrayResult<Vec<u8>> {
+pub fn http_get(url: &str) -> PrayResult<Vec<u8>> {
     let response = http_request("GET", url, None, None, &[])?;
     if response.status / 100 != 2 {
         return Err(PrayError::Resolution(format!(
@@ -74,19 +74,16 @@ pub(crate) fn http_get(url: &str) -> PrayResult<Vec<u8>> {
     Ok(response.body)
 }
 
-pub(crate) fn http_get_with_headers(
-    url: &str,
-    headers: &[(&str, &str)],
-) -> PrayResult<(Vec<u8>, u16)> {
+pub fn http_get_with_headers(url: &str, headers: &[(&str, &str)]) -> PrayResult<(Vec<u8>, u16)> {
     let response = http_request("GET", url, None, None, headers)?;
     Ok((response.body, response.status))
 }
 
-pub(crate) fn http_post(url: &str, content_type: &str, body: &[u8]) -> PrayResult<HttpResponse> {
+pub fn http_post(url: &str, content_type: &str, body: &[u8]) -> PrayResult<HttpResponse> {
     http_request("POST", url, Some(content_type), Some(body), &[])
 }
 
-pub(crate) fn http_put(url: &str, content_type: &str, body: &[u8]) -> PrayResult<HttpResponse> {
+pub fn http_put(url: &str, content_type: &str, body: &[u8]) -> PrayResult<HttpResponse> {
     http_request("PUT", url, Some(content_type), Some(body), &[])
 }
 

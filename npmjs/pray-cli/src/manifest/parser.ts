@@ -5,8 +5,15 @@ import {
   stringFromValue,
 } from "../literal/call-parser.js";
 import { prepareParserLines } from "../literal/lines.js";
-import { StatementReader } from "../literal/statements.js";
 import { splitSymbolAssignment } from "../literal/statement-surface.js";
+import { StatementReader } from "../literal/statements.js";
+import { isPraySymbolKey } from "../substitute.js";
+import {
+  DEPRECATED_AGENT,
+  DEPRECATED_OUTPUT,
+  DEPRECATED_TARGET,
+  noteDeprecatedKeyword,
+} from "./deprecation.js";
 import {
   bindLocalEntry,
   bindPackageEntry,
@@ -19,12 +26,6 @@ import {
   upsertPackage,
 } from "./destination.js";
 import {
-  DEPRECATED_AGENT,
-  DEPRECATED_OUTPUT,
-  DEPRECATED_TARGET,
-  noteDeprecatedKeyword,
-} from "./deprecation.js";
-import {
   applyTargetStatement,
   parseGroupHeader,
   parseLocalDecl,
@@ -33,7 +34,6 @@ import {
   parseSource,
   parseTargetHeader,
 } from "./parse-statements.js";
-import { isPraySymbolKey } from "../substitute.js";
 import {
   type DestinationMode,
   defaultRenderPolicy,
@@ -317,7 +317,7 @@ class BlockParser {
           `invalid pray symbol key \`${key}\``,
         );
       }
-      if (Object.prototype.hasOwnProperty.call(manifest.symbols, key)) {
+      if (Object.hasOwn(manifest.symbols, key)) {
         throw PrayError.parse(
           PARSE_CONTEXT,
           `duplicate pray symbol \`${key}\``,

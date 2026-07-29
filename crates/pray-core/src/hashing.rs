@@ -14,7 +14,7 @@ pub fn sha256_prefixed(bytes: &[u8]) -> String {
     prefixed_hex_digest(Sha256::digest(bytes))
 }
 
-fn prefixed_hex_digest(digest: impl AsRef<[u8]>) -> String {
+pub(crate) fn prefixed_hex_digest(digest: impl AsRef<[u8]>) -> String {
     let digest = digest.as_ref();
     let mut output = String::with_capacity(7 + digest.len() * 2);
     output.push_str("sha256:");
