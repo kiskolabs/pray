@@ -4,14 +4,14 @@ require "spec_helper"
 require "json"
 
 RSpec.describe "shared fixture corpus" do
-  corpus_root = File.expand_path("../../../../testdata/shared/manifest", __dir__)
+  CORPUS_ROOT = File.expand_path("../../../../testdata/shared/manifest", __dir__)
 
-  Dir.children(corpus_root)
-    .select { |name| File.directory?(File.join(corpus_root, name)) }
+  Dir.children(CORPUS_ROOT)
+    .select { |name| File.directory?(File.join(CORPUS_ROOT, name)) }
     .sort
     .each do |case_name|
       it "parses #{case_name} against expected.json" do
-        dir = File.join(corpus_root, case_name)
+        dir = File.join(CORPUS_ROOT, case_name)
         text = File.read(File.join(dir, "Prayfile"))
         expected = JSON.parse(File.read(File.join(dir, "expected.json")))
         manifest = Pray.parse_manifest(text)
