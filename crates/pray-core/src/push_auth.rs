@@ -7,7 +7,12 @@ pub fn authorize_distribution_push(
     bind_host: &str,
     allow_open_push: bool,
     stdio_mode: bool,
+    authorization: Option<&str>,
 ) -> PrayResult<()> {
+    if let Some(token) = publish_bearer_token(authorization) {
+        return authorize_publish_token(root, &token);
+    }
+
     let stdio_mode = stdio_mode || std::env::var_os("PRAY_SERVE_STDIO").is_some();
     if stdio_mode {
         return authorize_ssh_push(root);
@@ -27,9 +32,41 @@ pub fn authorize_distribution_push(
     }
 
     Err(PrayError::Resolution(
-        "HTTP push requires configured ssh publishers, loopback bind, or --allow-open-push"
+        "HTTP push requires a publish token (Authorization: Bearer), configured ssh publishers, loopback bind, or --allow-open-push"
             .to_string(),
     ))
+}
+
+fn publish_bearer_token(authorization: Option<&str>) -> Option<String> {
+    #[cfg(feature = "auth")]
+    {
+        crate::auth_store::bearer_token_from_authorization(authorization)
+    }
+    #[cfg(not(feature = "auth"))]
+    {
+        let _ = authorization;
+        None
+    }
+}
+
+fn authorize_publish_token(root: &Path, token: &str) -> PrayResult<()> {
+    #[cfg(feature = "auth")]
+    {
+        let store = crate::auth_store::RegistryAuthStore::open(root)?;
+        match store.resolve_publish_token(token)? {
+            Some(_) => Ok(()),
+            None => Err(PrayError::Resolution(
+                "invalid or unknown publish token".to_string(),
+            )),
+        }
+    }
+    #[cfg(not(feature = "auth"))]
+    {
+        let _ = (root, token);
+        Err(PrayError::Unsupported(
+            "publish tokens require the auth feature".to_string(),
+        ))
+    }
 }
 
 fn publishers_configured(root: &Path) -> PrayResult<bool> {
@@ -54,7 +91,8 @@ mod tests {
             std::env::temp_dir().join(format!("pray-push-auth-loopback-{}", std::process::id()));
         let _ = fs::remove_dir_all(&root);
         fs::create_dir_all(&root).expect("temp root");
-        authorize_distribution_push(&root, "127.0.0.1", false, false).expect("loopback open push");
+        authorize_distribution_push(&root, "127.0.0.1", false, false, None)
+            .expect("loopback open push");
         let _ = fs::remove_dir_all(&root);
     }
 
@@ -64,10 +102,10 @@ mod tests {
             std::env::temp_dir().join(format!("pray-push-auth-public-{}", std::process::id()));
         let _ = fs::remove_dir_all(&root);
         fs::create_dir_all(&root).expect("temp root");
-        let error =
-            authorize_distribution_push(&root, "0.0.0.0", false, false).expect_err("public bind");
+        let error = authorize_distribution_push(&root, "0.0.0.0", false, false, None)
+            .expect_err("public bind");
         assert!(error.to_string().contains("--allow-open-push"));
-        authorize_distribution_push(&root, "0.0.0.0", true, false).expect("flag allows");
+        authorize_distribution_push(&root, "0.0.0.0", true, false, None).expect("flag allows");
         let _ = fs::remove_dir_all(&root);
     }
 }

@@ -1606,11 +1606,13 @@ Policy file location (reference CLI): `~/.pray/trust.toml`. Override with `PRAY_
 [default]
 allow = true
 require_signed_commit = false
+require_signed_packages = false
 allowed_signing_keys = []
 
 [[rules]]
 match_prefix = "https://github.com/example/"
 require_signed_commit = true
+require_signed_packages = true
 allowed_signing_keys = ["SHA256:ABCDEF..."]
 ```
 
@@ -1620,6 +1622,7 @@ When policy exists, the client may:
 
 - deny sources with `allow = false`
 - require `git verify-commit HEAD` when `require_signed_commit = true`
+- refuse remote registry packages without a signature when `require_signed_packages = true`
 - restrict signers to `allowed_signing_keys` when that list is non-empty
 - prompt for consent when HEAD has no verified-good signature and the signer is not already trusted
 
@@ -1627,7 +1630,7 @@ SSH-signed commits should use per-source `allowedSignersFile` values scoped to t
 
 For `pray+ssh` sources, trust rules may also set `allowed_host_keys` (server host key fingerprints) and `allowed_publishers` (SSH user key fingerprints allowed to publish). Package metadata should record `signer_fingerprint` separately from the human-readable `signer` label; signatures use the fingerprint when present.
 
-Reference CLI commands: `pray trust list|show|add-key|remove-key|set-signed|set-allow|import-repo|import-registry|check`. `pray trust import-registry` reads `v1/ssh_publishers.json` from a distribution point and records publisher fingerprints in `allowed_publishers` for the matching rule; for `pray+ssh` sources it also records the server host key in `allowed_host_keys` unless `--no-host-key` is passed. `pray trust check` compares trusted keys against a compromised-key feed (HTTP URL, local file, or git repository).
+Reference CLI commands: `pray trust list|show|add-key|remove-key|set-signed|set-require-signed-packages|set-allow|import-repo|import-registry|check`. `pray trust import-registry` reads `v1/ssh_publishers.json` from a distribution point and records publisher fingerprints in `allowed_publishers` for the matching rule; for `pray+ssh` sources it also records the server host key in `allowed_host_keys` unless `--no-host-key` is passed. `pray trust check` compares trusted keys against a compromised-key feed (HTTP URL, local file, or git repository). Distribution operators may mint scoped publish tokens with `pray token create --root PATH --email EMAIL` for `Authorization: Bearer` on HTTP push (`PRAY_PUBLISH_TOKEN`). Clients may run `pray search <query>` over a declared index without marketplace ranking.
 
 Global flags: `--trust` imports signer keys after interactive consent; `--global --trust` imports into `[default]`. `PRAY_TRUST_ASSUME_YES=1` auto-consents in non-interactive environments. `--rm` uses an ephemeral `PRAY_HOME` but still copies persistent trust policy into it.
 
@@ -2603,13 +2606,13 @@ Signature support remains optional in v1, but remote integrity requires artifact
 
 ## 60. Yanked packages
 
-Registries may mark versions as yanked.
+Registries may mark versions as yanked. The reference CLI flips the metadata flag with `pray yank <package> <version> --root PATH` (and `--undo` to clear). Artifact bytes stay immutable.
 
 Rules:
 
 - new resolution should not select yanked versions by default
 - existing lockfile may continue using yanked version with warning
-- strict mode may fail on yanked version
+- `pray install --strict` fails when a selected version is yanked
 - update should move away from yanked version when possible
 
 ---

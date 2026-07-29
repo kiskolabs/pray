@@ -1,5 +1,5 @@
 pub(crate) const WORKFLOW_COMMANDS: &[&str] = &[
-    "install [--locked|--frozen|--offline]  resolve, render, and write Prayfile.lock",
+    "install [--locked|--frozen|--offline|--strict]  resolve, render, and write Prayfile.lock",
     "plan [--remote]                        preview materialization changes",
     "apply                                  apply the current plan",
     "verify [--strict]                      check rendered output against the lockfile",
@@ -20,6 +20,8 @@ pub(crate) const PACKAGE_COMMANDS: &[&str] = &[
 #[cfg(feature = "auth")]
 pub(crate) const DISTRIBUTION_COMMANDS: &[&str] = &[
     "publish --root PATH [--server URL ...] [--signing-key PATH]",
+    "yank <package> <version> --root PATH [--undo]",
+    "token create|revoke --root PATH ...",
     "login --server URL --email EMAIL",
     "serve [--root PATH] [--host HOST] [--port PORT] [--stdio] [--allow-open-push]",
     "sync [--root PATH] [--peer URL ...]",
@@ -29,16 +31,18 @@ pub(crate) const DISTRIBUTION_COMMANDS: &[&str] = &[
 #[cfg(not(feature = "auth"))]
 pub(crate) const DISTRIBUTION_COMMANDS: &[&str] = &[
     "publish --root PATH [--server URL ...] [--signing-key PATH]",
+    "yank <package> <version> --root PATH [--undo]",
     "login --server URL --email EMAIL",
     "sync [--root PATH] [--peer URL ...]",
     "confess <package> | --from-lock SPAN_ID [--accepted|--rejected]",
 ];
 
 pub(crate) const TRUST_COMMANDS: &[&str] =
-    &["trust list|show|add-key|remove-key|set-signed|set-allow|import-repo|import-registry|check"];
+    &["trust list|show|add-key|remove-key|set-signed|set-require-signed-packages|set-allow|import-repo|import-registry|check"];
 
 pub(crate) const INSPECT_COMMANDS: &[&str] = &[
     "list                                   list declared packages",
+    "search <query> [--source|--root|--url]  find packages in a distribution index",
     "outdated [--remote]                    show constraint vs resolved versions",
     "explain <package>                      show why a package was selected",
     "tree                                   print the dependency tree",
@@ -68,10 +72,11 @@ pub(crate) fn command_help_text(command: &str) -> Option<&'static str> {
     match command {
         "install" => Some(
             "resolve packages, render targets, and update Prayfile.lock\n\n\
-             Usage: pray install [--locked|--frozen|--offline]\n\n\
+             Usage: pray install [--locked|--frozen|--offline|--strict]\n\n\
              --locked   require an existing lockfile\n\
              --frozen   require lockfile to match Prayfile exactly\n\
-             --offline  use cache only",
+             --offline  use cache only\n\
+             --strict   fail if a locked package version is yanked",
         ),
         "plan" => Some("preview install/apply changes\n\nUsage: pray plan [--remote]"),
         "apply" => Some("materialize the current resolution plan\n\nUsage: pray apply"),
@@ -112,6 +117,26 @@ pub(crate) fn command_help_text(command: &str) -> Option<&'static str> {
              Prefer --signing-key PATH or PRAY_SIGNING_KEY (32-byte ed25519 seed).\n\
              Without a signing key, publish records a legacy content digest.",
         ),
+        "yank" => Some(
+            "mark or unmark a published version as yanked in a distribution root\n\n\
+             Usage: pray yank <package> <version> --root PATH [--undo]\n\n\
+             Yank flips metadata only; artifact bytes stay immutable.\n\
+             New resolves skip yanked versions. Locked installs may continue with a warning;\n\
+             use pray install --strict to refuse them.",
+        ),
+        #[cfg(feature = "auth")]
+        "token" => Some(
+            "mint or revoke scoped publish tokens for a distribution root\n\n\
+             Usage: pray token create --root PATH --email EMAIL [--scope publish]\n\
+                    pray token revoke --root PATH TOKEN\n\n\
+             Use the printed token as PRAY_PUBLISH_TOKEN for pray publish --server.",
+        ),
+        "search" => Some(
+            "search a distribution index for package names\n\n\
+             Usage: pray search <query> [--source NAME | --root PATH | --url URL]\n\n\
+             Matches package names (substring, case-insensitive). Optional summaries come from\n\
+             package metadata when available. No ranking.",
+        ),
         "login" => Some(
             "authenticate to a registry server\n\n\
              Usage: pray login --server URL --email EMAIL \\\n\
@@ -133,8 +158,8 @@ pub(crate) fn command_help_text(command: &str) -> Option<&'static str> {
         "trust" => Some(
             "manage client trust policy for remote sources\n\n\
              Usage: pray trust <subcommand>\n\n\
-             Subcommands: list, show, add-key, remove-key, set-signed, set-allow, \
-             import-repo, import-registry, check",
+             Subcommands: list, show, add-key, remove-key, set-signed, \
+             set-require-signed-packages, set-allow, import-repo, import-registry, check",
         ),
         "list" => Some("list declared packages\n\nUsage: pray list"),
         "outdated" => Some(

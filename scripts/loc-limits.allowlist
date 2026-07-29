@@ -5,13 +5,13 @@ crates/pray-cli/src/apply_report.rs	531
 crates/pray-cli/src/auth_client.rs	413
 crates/pray-cli/src/server_http.rs	320
 crates/pray-cli/src/sync_command.rs	395
-crates/pray-cli/src/trust_command.rs	304
+crates/pray-cli/src/trust_command.rs	339
 crates/pray-core/src/derived_metadata.rs	335
 crates/pray-core/src/format_manifest.rs	337
 crates/pray-core/src/literal.rs	502
 crates/pray-core/src/lockfile.rs	368
 crates/pray-core/src/package_spec.rs	415
-crates/pray-core/src/registry.rs	451
+crates/pray-core/src/registry.rs	373
 crates/pray-core/src/resolve.rs	503
 crates/pray-core/src/resolve_git.rs	306
 crates/pray-core/src/statement_surface.rs	367

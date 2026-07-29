@@ -4,14 +4,15 @@ mod feed;
 mod git;
 mod home;
 mod import_registry;
+mod package_sign;
 mod policy;
 mod prompt;
 mod ssh_host;
 
 pub use commands::{
     add_allowed_signing_key, ensure_policy_file, import_signing_keys_from_repository, list_policy,
-    remove_allowed_signing_key, set_allow, set_require_signed_commit, show_policy_toml,
-    TrustListScope,
+    remove_allowed_signing_key, set_allow, set_require_signed_commit, set_require_signed_packages,
+    show_policy_toml, TrustListScope,
 };
 pub use enforce::{enforce_source_trust, env_truthy, gate_git_source, signer_matches_allowed};
 pub use feed::{
@@ -23,6 +24,7 @@ pub use home::{
     copy_trust_state, effective_trust_home, persistent_pray_home, prepare_ephemeral_home,
 };
 pub use import_registry::{fetch_ssh_publishers, import_registry_trust, ImportRegistryResult};
+pub use package_sign::enforce_require_signed_packages;
 pub use policy::{
     best_rule, load_policy, load_policy_or_default, normalize_key, save_policy, ClientTrustPolicy,
     ClientTrustRule,

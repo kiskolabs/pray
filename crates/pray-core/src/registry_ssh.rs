@@ -2,9 +2,10 @@ use crate::manifest::ManifestPackage;
 use crate::package_integrity::require_remote_integrity_fields;
 use crate::paths::remove_path_if_exists;
 use crate::registry::{
-    lockfile_signer_fingerprint, registry_latest_version_label, select_package_version,
-    ConfessionSubmission, RegistryPackageMetadata, RegistryPackageResolution,
+    lockfile_signer_fingerprint, registry_latest_version_label, ConfessionSubmission,
+    RegistryPackageMetadata, RegistryPackageResolution,
 };
+use crate::registry_select::{apply_yank_policy, select_package_version};
 use crate::resolve_context::PackageResolutionContext;
 use crate::{PrayError, PrayResult};
 use std::fs;
@@ -27,8 +28,14 @@ pub(crate) fn resolve_ssh_registry_package_root(
             &declaration.constraint,
             context.preferred_version.as_deref(),
         )?;
+        apply_yank_policy(&declaration.name, &selected, context.fail_on_yanked)?;
         let signer_fingerprint = lockfile_signer_fingerprint(&selected);
         require_remote_integrity_fields(&declaration.name, &selected.version, &selected)?;
+        crate::client_trust::enforce_require_signed_packages(
+            source_url,
+            &declaration.name,
+            &selected,
+        )?;
         crate::client_trust::gate_pray_ssh_publisher_optional(
             source_url,
             signer_fingerprint.as_deref(),

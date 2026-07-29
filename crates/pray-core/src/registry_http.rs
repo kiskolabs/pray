@@ -84,7 +84,16 @@ pub fn http_post(url: &str, content_type: &str, body: &[u8]) -> PrayResult<HttpR
 }
 
 pub fn http_put(url: &str, content_type: &str, body: &[u8]) -> PrayResult<HttpResponse> {
-    http_request("PUT", url, Some(content_type), Some(body), &[])
+    http_put_with_headers(url, content_type, body, &[])
+}
+
+pub fn http_put_with_headers(
+    url: &str,
+    content_type: &str,
+    body: &[u8],
+    headers: &[(&str, &str)],
+) -> PrayResult<HttpResponse> {
+    http_request("PUT", url, Some(content_type), Some(body), headers)
 }
 
 fn http_request(

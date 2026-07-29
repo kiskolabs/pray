@@ -11,6 +11,7 @@ pub(crate) enum Command {
         locked: bool,
         frozen: bool,
         offline: bool,
+        strict: bool,
     },
     Add {
         name: String,
@@ -49,6 +50,22 @@ pub(crate) enum Command {
         roots: Vec<PathBuf>,
         servers: Vec<String>,
         signing_key: Option<PathBuf>,
+    },
+    Yank {
+        package: String,
+        version: String,
+        root: PathBuf,
+        undo: bool,
+    },
+    #[cfg(feature = "auth")]
+    Token {
+        arguments: Vec<String>,
+    },
+    Search {
+        query: String,
+        source: Option<String>,
+        root: Option<PathBuf>,
+        url: Option<String>,
     },
     Login {
         servers: Vec<String>,

@@ -22,6 +22,8 @@ pub struct ClientTrustRule {
     #[serde(default)]
     pub require_signed_commit: bool,
     #[serde(default)]
+    pub require_signed_packages: bool,
+    #[serde(default)]
     pub allowed_signing_keys: Vec<String>,
     #[serde(default)]
     pub allowed_host_keys: Vec<String>,
@@ -35,6 +37,7 @@ impl Default for ClientTrustRule {
             match_prefix: None,
             allow: true,
             require_signed_commit: false,
+            require_signed_packages: false,
             allowed_signing_keys: Vec::new(),
             allowed_host_keys: Vec::new(),
             allowed_publishers: Vec::new(),
@@ -202,6 +205,10 @@ pub fn format_rule_block(scope: &str, rule: &ClientTrustRule) -> String {
     out.push_str(&format!(
         "  require_signed_commit: {}\n",
         rule.require_signed_commit
+    ));
+    out.push_str(&format!(
+        "  require_signed_packages: {}\n",
+        rule.require_signed_packages
     ));
     if rule.allowed_signing_keys.is_empty() {
         out.push_str("  allowed_signing_keys: []\n");

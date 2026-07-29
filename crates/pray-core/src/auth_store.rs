@@ -1,9 +1,13 @@
-#[path = "auth_store_support.rs"]
-mod support;
 #[path = "auth_store_keys.rs"]
 mod keys;
+#[path = "auth_store_support.rs"]
+mod support;
+#[path = "auth_store_tokens.rs"]
+mod tokens;
 
 use support::*;
+
+pub use tokens::{bearer_token_from_authorization, PublishTokenRecord, PUBLISH_SCOPE};
 
 use crate::auth::{
     AuthRegistrationResponse, AuthSessionKind, AuthSessionResponse, AuthVerificationResponse,
@@ -65,11 +69,7 @@ impl RegistryAuthStore {
             verification_code,
         })
     }
-    pub fn verify_email(
-        &self,
-        email: &str,
-        code: &str,
-    ) -> PrayResult<AuthVerificationResponse> {
+    pub fn verify_email(&self, email: &str, code: &str) -> PrayResult<AuthVerificationResponse> {
         validate_email(email)?;
         if code.trim().is_empty() {
             return Err(PrayError::Unsupported(
@@ -137,8 +137,7 @@ impl RegistryAuthStore {
         let Some((verified, policy)) = user else {
             return Err(PrayError::Resolution(format!("unknown user: {email}")));
         };
-        if !verified
-            && policy != email_confirmation_policy_text(EmailConfirmationPolicy::Optional)
+        if !verified && policy != email_confirmation_policy_text(EmailConfirmationPolicy::Optional)
         {
             return Err(PrayError::Resolution(format!(
                 "email confirmation required for {email}"
@@ -233,6 +232,14 @@ impl RegistryAuthStore {
             challenge TEXT NOT NULL,
             created_at INTEGER NOT NULL,
             used_at INTEGER,
+            FOREIGN KEY(email) REFERENCES users(email) ON DELETE CASCADE
+        );
+        CREATE TABLE IF NOT EXISTS publish_tokens (
+            token TEXT PRIMARY KEY,
+            email TEXT NOT NULL,
+            scopes TEXT NOT NULL,
+            created_at INTEGER NOT NULL,
+            last_used_at INTEGER,
             FOREIGN KEY(email) REFERENCES users(email) ON DELETE CASCADE
         );",
         )?;
