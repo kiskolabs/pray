@@ -96,3 +96,56 @@ pray "sample/common", path: "packages/common"
     let project = resolve_project(&root.join("Prayfile")).expect("acyclic resolve");
     assert_eq!(project.packages.len(), 2);
 }
+
+#[test]
+fn resolve_loads_transitive_path_dependency() {
+    let root = temporary_directory("pray-transitive-dep");
+    write_package(&root, "base", "1.0.0", Some("sample/common"));
+    write_package(&root, "common", "1.0.0", None);
+    fs::write(
+        root.join("Prayfile"),
+        r#"
+prayfile "1"
+target :tool_a do
+  output "INSTRUCTIONS.md"
+end
+pray "sample/base", path: "packages/base"
+"#,
+    )
+    .expect("Prayfile");
+
+    let project = resolve_project(&root.join("Prayfile")).expect("transitive resolve");
+    assert_eq!(project.packages.len(), 2);
+    assert!(project
+        .packages
+        .iter()
+        .any(|package| package.declaration.name == "sample/common" && !package.explicit));
+    assert!(project
+        .packages
+        .iter()
+        .any(|package| package.declaration.name == "sample/base" && package.explicit));
+}
+
+#[test]
+fn resolve_rejects_missing_transitive_path_dependency() {
+    let root = temporary_directory("pray-missing-transitive");
+    write_package(&root, "base", "1.0.0", Some("sample/missing"));
+    fs::write(
+        root.join("Prayfile"),
+        r#"
+prayfile "1"
+target :tool_a do
+  output "INSTRUCTIONS.md"
+end
+pray "sample/base", path: "packages/base"
+"#,
+    )
+    .expect("Prayfile");
+
+    let error = resolve_project(&root.join("Prayfile")).expect_err("missing transitive");
+    let message = error.to_string();
+    assert!(
+        message.contains("sample/missing") || message.contains("packages/missing"),
+        "unexpected error: {message}"
+    );
+}

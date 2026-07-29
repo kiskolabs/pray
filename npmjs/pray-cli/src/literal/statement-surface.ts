@@ -198,10 +198,7 @@ function leadingIdentifier(input: string): string | undefined {
   const first = ident[0];
   if (
     first === undefined ||
-    !(
-      (first >= "a" && first <= "z") ||
-      (first >= "A" && first <= "Z")
-    )
+    !((first >= "a" && first <= "z") || (first >= "A" && first <= "Z"))
   ) {
     return undefined;
   }

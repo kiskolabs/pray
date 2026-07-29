@@ -64,8 +64,8 @@ pub(crate) async fn synchronize_registry(
     peer_sources: Vec<String>,
 ) -> PrayResult<SyncSummary> {
     let registry = TransportRegistry::new();
-    let mut discovered_peers: BTreeSet<String> = peer_sources.iter().cloned().collect();
     let mut pending_peers: VecDeque<String> = peer_sources.into_iter().collect();
+    let mut visited_peers = BTreeSet::new();
     let mut known_peers = load_known_peer_records(root)?;
     let mut package_versions_by_name: BTreeMap<String, BTreeMap<String, RegistryPackageVersion>> =
         BTreeMap::new();
@@ -83,10 +83,15 @@ pub(crate) async fn synchronize_registry(
     }
 
     while let Some(peer_source) = pending_peers.pop_front() {
-        if !discovered_peers.contains(&peer_source) {
+        if !visited_peers.insert(peer_source.clone()) {
             continue;
         }
-        discovered_peers.remove(&peer_source);
+        if visited_peers.len() > pray_core::resource_limits::MAX_FEDERATION_PEERS {
+            return Err(PrayError::Resolution(format!(
+                "federation sync exceeded {} peers",
+                pray_core::resource_limits::MAX_FEDERATION_PEERS
+            )));
+        }
         peer_count += 1;
         let peer = federation_peer_config(&peer_source);
         let transport = registry.create(&peer).map_err(map_transport_error)?;
@@ -106,13 +111,12 @@ pub(crate) async fn synchronize_registry(
                 continue;
             }
             upsert_known_peer(&mut known_peers, discovered_peer.clone());
-            if !pending_peers
-                .iter()
-                .any(|queued| queued == &discovered_peer.url)
-                && !pending_peers.contains(&discovered_peer.url)
+            if !visited_peers.contains(&discovered_peer.url)
+                && !pending_peers
+                    .iter()
+                    .any(|queued| queued == &discovered_peer.url)
             {
                 pending_peers.push_back(discovered_peer.url.clone());
-                discovered_peers.insert(discovered_peer.url.clone());
             }
         }
 
@@ -220,15 +224,19 @@ pub(crate) async fn sync_package_from_peer(
                 metadata.name, local_version.version
             )));
         }
-        if let Some(tree_hash) = local_version.tree_hash.clone() {
-            verify_package_signature(
-                &metadata.name,
-                &local_version.version,
-                &local_version,
-                &bytes,
-                &tree_hash,
-            )?;
-        }
+        let tree_hash = local_version.tree_hash.as_ref().ok_or_else(|| {
+            PrayError::Integrity(format!(
+                "federation package {} {} is missing a tree hash",
+                metadata.name, local_version.version
+            ))
+        })?;
+        verify_package_signature(
+            &metadata.name,
+            &local_version.version,
+            &local_version,
+            &bytes,
+            tree_hash,
+        )?;
 
         if local_version.derived_metadata.is_none() {
             local_version.derived_metadata =

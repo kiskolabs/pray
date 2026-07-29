@@ -1,3 +1,5 @@
+use pray_core::cli_suggest::unknown_command_message;
+use pray_core::{PrayError, PrayResult};
 use std::io::{self, Write};
 
 const DOCS_URL: &str = "https://github.com/kiskolabs/pray";
@@ -196,4 +198,45 @@ fn command_help_text(command: &str) -> Option<&'static str> {
         ),
         _ => None,
     }
+}
+
+pub(crate) fn maybe_print_help(arguments: &[String]) -> PrayResult<Option<()>> {
+    if arguments.is_empty() {
+        print_concise_help();
+        return Ok(Some(()));
+    }
+
+    if arguments.len() == 1 && matches!(arguments[0].as_str(), "help" | "-h" | "--help") {
+        print_concise_help();
+        return Ok(Some(()));
+    }
+
+    if arguments[0] == "help" {
+        let target = arguments.get(1).map(String::as_str).unwrap_or("");
+        if matches!(target, "" | "-h" | "--help") {
+            print_concise_help();
+            return Ok(Some(()));
+        }
+        if print_command_help(target) {
+            return Ok(Some(()));
+        }
+        return Err(PrayError::Usage(unknown_command_message(target)));
+    }
+
+    if let Some(position) = arguments
+        .iter()
+        .position(|argument| argument == "--help" || argument == "-h")
+    {
+        if position == 0 {
+            print_concise_help();
+            return Ok(Some(()));
+        }
+        let command = &arguments[0];
+        if print_command_help(command) {
+            return Ok(Some(()));
+        }
+        return Err(PrayError::Usage(format!("unknown command: {command}")));
+    }
+
+    Ok(None)
 }

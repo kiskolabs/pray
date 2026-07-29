@@ -28,4 +28,4 @@ pub use policy::{
     ClientTrustRule,
 };
 pub use prompt::{prompt_import_signing_keys_for_source, prompt_untrusted_source_consent};
-pub use ssh_host::{gate_pray_ssh_host, gate_pray_ssh_publisher};
+pub use ssh_host::{gate_pray_ssh_host, gate_pray_ssh_publisher, gate_pray_ssh_publisher_optional};

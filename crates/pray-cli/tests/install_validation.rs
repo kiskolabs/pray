@@ -49,7 +49,6 @@ fn verify_warns_on_orphan_markers_and_strict_fails() {
 }
 
 #[test]
-#[ignore = "managed patching is not implemented yet"]
 fn install_preserves_unmanaged_content_when_patching_rendered_files() {
     let repo = temporary_directory("pray-install-patch-preserve");
     create_fixture(&repo);
@@ -76,7 +75,6 @@ fn install_preserves_unmanaged_content_when_patching_rendered_files() {
 }
 
 #[test]
-#[ignore = "conflict detection is not implemented yet"]
 fn install_rejects_conflicting_managed_changes_when_conflict_policy_is_fail() {
     let repo = temporary_directory("pray-install-conflict");
     create_fixture(&repo);

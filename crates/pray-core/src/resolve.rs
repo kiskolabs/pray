@@ -14,7 +14,7 @@ use crate::resolve_git_sources::{
 pub use crate::resolve_git::{discover_distribution_root, git_source_cache_directory};
 pub use crate::resolve_git_sources::refresh_git_sources;
 use crate::{PrayError, PrayResult};
-use std::collections::{BTreeMap, BTreeSet};
+use std::collections::BTreeMap;
 use std::fs;
 use std::path::{Path, PathBuf};
 
@@ -46,6 +46,8 @@ pub struct ResolvedPackage {
     pub signer_fingerprint: Option<String>,
     /// Highest non-yanked version in registry metadata when the package came from a registry source.
     pub registry_latest_version: Option<String>,
+    /// True when the package was declared in Prayfile; false for transitive dependencies.
+    pub explicit: bool,
 }
 
 #[derive(Debug, Clone)]
@@ -140,11 +142,9 @@ pub fn resolve_project_in_context(
         options,
     )?;
     let source_host_keys = prepare_pray_ssh_host_keys(&manifest.sources)?;
-    let mut packages = Vec::new();
-    let mut seen = BTreeSet::new();
-    let mut resolution_errors = Vec::new();
-    for declaration in &manifest.packages {
-        match resolve_package(
+    let mut queue = crate::resolve_queue::ResolveQueue::seed(&manifest.packages)?;
+    let outcome = queue.resolve_all(&manifest.packages, &sources, |declaration| {
+        resolve_package(
             project_root,
             &sources,
             &git_sources,
@@ -152,22 +152,17 @@ pub fn resolve_project_in_context(
             declaration,
             lockfile_hints.as_ref(),
             options,
-        ) {
-            Ok(package) => {
-                if !seen.insert(package.declaration.name.clone()) {
-                    return Err(PrayError::Resolution(format!(
-                        "duplicate package declaration: {}",
-                        package.declaration.name
-                    )));
-                }
-                packages.push(package);
-            }
-            Err(error) => resolution_errors.push(format!("{}: {error}", declaration.name)),
-        }
+        )
+    });
+    if !outcome.errors.is_empty() {
+        let message = outcome.errors.join("\n");
+        return Err(if outcome.saw_network_error {
+            PrayError::Network(message)
+        } else {
+            PrayError::Resolution(message)
+        });
     }
-    if !resolution_errors.is_empty() {
-        return Err(PrayError::Resolution(resolution_errors.join("\n")));
-    }
+    let packages = outcome.packages;
     let mut local_files = Vec::new();
     let mut local_errors = Vec::new();
     for local in &manifest.local {
@@ -179,7 +174,7 @@ pub fn resolve_project_in_context(
     if !local_errors.is_empty() {
         return Err(PrayError::Resolution(local_errors.join("\n")));
     }
-    reject_dependency_cycles(&packages)?;
+    crate::resolve_deps::reject_dependency_cycles(&packages)?;
     Ok(ResolvedProject {
         manifest_path: manifest_path.to_path_buf(),
         project_root: project_root.to_path_buf(),
@@ -200,28 +195,6 @@ pub fn resolve_project_in_context(
         source_host_keys,
         environment: options.environment.clone(),
     })
-}
-
-fn reject_dependency_cycles(packages: &[ResolvedPackage]) -> PrayResult<()> {
-    let mut edges = BTreeMap::new();
-    for package in packages {
-        edges.insert(
-            package.declaration.name.clone(),
-            package
-                .spec
-                .dependencies
-                .iter()
-                .map(|dependency| dependency.name.clone())
-                .collect(),
-        );
-    }
-    if let Some(cycle) = crate::dependency_graph::find_dependency_cycle(&edges) {
-        return Err(PrayError::Resolution(format!(
-            "dependency cycle detected: {}",
-            cycle.join(" -> ")
-        )));
-    }
-    Ok(())
 }
 
 fn resolve_package(
@@ -283,6 +256,7 @@ fn resolve_package(
         skill_files,
         signer_fingerprint,
         registry_latest_version,
+        explicit: false,
     })
 }
 
