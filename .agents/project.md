@@ -24,6 +24,8 @@ Use coverage tooling declared in this repository when validating coverage claims
 
 Prefer files around 150 lines or fewer when cohesion allows. Treat 300 lines as a hard upper bound for any source file unless a very small exception is clearly justified. When a file approaches that ceiling, split by semantic responsibility into separate modules, folders, or helpers rather than by arbitrary line count.
 
+Enforce with `make loc-check` (warn >=150, fail >300 unless ratcheted in `scripts/loc-limits.allowlist`). Language linters mirror the hard ceiling: RuboCop `Pray/FileLength` (Ruby), Biome `noExcessiveLinesPerFile` (TypeScript). Clippy has no file-LOC lint yet.
+
 Test coverage must follow `spec/README.md` guidelines.
 
 ## Shared instructions

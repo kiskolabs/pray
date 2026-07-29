@@ -27,7 +27,3 @@ We welcome the use of AI and automation tools to reduce toil, but you must stric
 
 - We encourage productive friction. Expect questions about your approach.
 - If a reviewer suggests a change, view it as mutual aid, not criticism.
-
-### 4. Releases
-
-Language-registry and distribution-point publishing is manual. See `docs/releasing.md` and `scripts/release/README.md`.
