@@ -10,7 +10,7 @@ use crate::server_federation::{
 use crate::server_html::{html_package_response, html_root_response};
 use crate::server_http::{
     decode_rpc_base64_body, http_response_to_rpc, http_to_rpc_request, rpc_response_to_http,
-    strip_query, write_response,
+    strip_query,
 };
 
 pub(crate) use crate::server_http::{response_with_status, Response};
@@ -24,10 +24,8 @@ use pray_core::{PrayError, PrayResult};
 use pray_transport::{PackageMetadata as TransportPackageMetadata, PackageVersion, PeerInfo};
 use std::collections::BTreeSet;
 use std::fs;
-use std::io::{BufRead, BufReader, Read, Write};
-use std::net::{TcpListener, TcpStream};
+use std::io::Write;
 use std::path::{Component, Path, PathBuf};
-use std::thread;
 
 #[derive(Debug, Clone)]
 pub struct ServeAuth {
@@ -52,75 +50,6 @@ impl ServeAuth {
             stdio_mode: true,
         }
     }
-}
-
-pub fn run_server(root: PathBuf, host: String, port: u16, allow_open_push: bool) -> PrayResult<()> {
-    let listener = TcpListener::bind((host.as_str(), port))?;
-    println!("Serving {} on http://{}:{}", root.display(), host, port);
-    let auth = ServeAuth::http(host, allow_open_push);
-    for connection in listener.incoming() {
-        let stream = connection?;
-        let root = root.clone();
-        let auth = auth.clone();
-        thread::spawn(move || {
-            if let Err(error) = handle_connection(root, auth, stream) {
-                eprintln!("serve error: {error}");
-            }
-        });
-    }
-    Ok(())
-}
-
-fn handle_connection(root: PathBuf, auth: ServeAuth, mut stream: TcpStream) -> PrayResult<()> {
-    let mut reader = BufReader::new(stream.try_clone()?);
-    let mut request_line = String::new();
-    if reader.read_line(&mut request_line)? == 0 {
-        return Ok(());
-    }
-    let request_line = request_line.trim_end_matches(['\r', '\n']);
-    if request_line.is_empty() {
-        return Ok(());
-    }
-    let mut parts = request_line.split_whitespace();
-    let method = parts
-        .next()
-        .ok_or_else(|| PrayError::Resolution("missing HTTP method".to_string()))?;
-    let path = parts
-        .next()
-        .ok_or_else(|| PrayError::Resolution("missing HTTP path".to_string()))?;
-
-    let mut content_length = 0usize;
-    loop {
-        let mut header_line = String::new();
-        reader.read_line(&mut header_line)?;
-        let trimmed = header_line.trim_end_matches(['\r', '\n']);
-        if trimmed.is_empty() {
-            break;
-        }
-        if let Some((name, value)) = trimmed.split_once(':') {
-            if name.eq_ignore_ascii_case("content-length") {
-                content_length = value
-                    .trim()
-                    .parse::<usize>()
-                    .map_err(|error| PrayError::Resolution(error.to_string()))?;
-            }
-        }
-    }
-
-    let mut body = vec![0; content_length];
-    if content_length > 0 {
-        reader.read_exact(&mut body)?;
-    }
-
-    let response = dispatch_http_request(&root, &auth, method, path, &body)?;
-
-    write_response(
-        &mut stream,
-        response.status,
-        &response.content_type,
-        response.body,
-    )?;
-    Ok(())
 }
 
 pub(crate) fn dispatch_http_request(

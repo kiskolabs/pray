@@ -76,7 +76,10 @@ pub(crate) fn map_transport_error(error: TransportError) -> PrayError {
             kind: "federation response",
             message: error.to_string(),
         },
-        TransportError::Io(error) => PrayError::Io(error),
+        TransportError::Network(message) | TransportError::Timeout(message) => {
+            PrayError::Network(message)
+        }
+        TransportError::Io(error) => PrayError::Network(error.to_string()),
         other => PrayError::Resolution(other.to_string()),
     }
 }
