@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+## 1.8.0 (2026-07-29)
+
 - Add `pray yank` / `--undo` to mark yanked versions in a distribution root (metadata only).
 - Keep locked yanked versions with a warning; `pray install --strict` refuses them; new resolves and `pray update` skip yanked versions.
 - Add HTML-free packaging smoke: publish `--root` → install → verify → yank.

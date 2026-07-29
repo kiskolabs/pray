@@ -1,6 +1,6 @@
 {
   "name": "pray-cli",
-  "version": "1.7.0",
+  "version": "1.8.0",
   "description": "Package manager for the language placed before inference — TypeScript Prayfile CLI and library",
   "author": "Andrei Makarov <contact@kiskolabs.com>",
   "license": "MIT",
