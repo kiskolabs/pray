@@ -45,6 +45,39 @@ fn drift_reports_position_changes_in_sections() {
     let stderr = String::from_utf8_lossy(&drift.stderr);
     assert!(stderr.contains("Managed span changes"));
     assert!(stderr.contains("position_drift"));
+    assert!(stderr.contains("position drift"));
+    assert!(stderr.contains("first marker"));
+    assert!(stderr.contains("cause:"));
+}
+
+#[test]
+fn install_groups_position_drift_with_local_cause() {
+    let repo = temporary_directory("pray-install-position-cause");
+    create_fixture(&repo);
+    assert!(run_pray(&repo, &["install"]).status.success());
+
+    let rendered_path = repo.join("INSTRUCTIONS.md");
+    let rendered = fs::read_to_string(&rendered_path).expect("rendered file exists");
+    let rendered = rendered.replace("Local guidance\n", "Local guidance\nExtra unmarked line\n");
+    fs::write(&rendered_path, rendered).expect("rendered file rewritten");
+
+    let install = run_pray(&repo, &["install"]);
+    assert!(install.status.success());
+    let stderr = String::from_utf8_lossy(&install.stderr);
+    let stdout = String::from_utf8_lossy(&install.stdout);
+    let combined = format!("{stdout}{stderr}");
+    assert!(combined.contains("position drift"));
+    assert!(combined.contains("cause:"));
+    assert!(combined.contains("INSTRUCTIONS.md:"));
+    assert!(
+        combined.contains(".agents/project.md:") || combined.contains("fresh composition"),
+        "expected local or fresh cause, got:\n{combined}"
+    );
+    let conflict_count = combined.matches("Conflict:").count();
+    assert_eq!(
+        conflict_count, 1,
+        "expected one grouped conflict, got:\n{combined}"
+    );
 }
 
 #[test]

@@ -1,10 +1,19 @@
-use crate::hashing::{checksum_managed_body_line_refs, normalize_line_endings, sha256_prefixed};
+mod format;
+mod integrity;
+pub mod position;
+
+use crate::hashing::{checksum_managed_body_line_refs, normalize_line_endings};
 use crate::lockfile::{Lockfile, ManagedSpanRecord};
-use crate::render::{expected_provisioned_bytes, render_project};
-use crate::resolve::{missing_local_embed_guidance, ResolvedProject};
+use crate::render::render_project;
+use crate::resolve::ResolvedProject;
 use crate::{PrayError, PrayResult};
+use format::format_drift_report;
+use integrity::{push_package_lock_findings, push_provisioned_and_local_findings};
+use position::{format_position_drift_message, summarize_position_drift};
 use std::collections::{BTreeMap, BTreeSet, HashSet};
 use std::fs;
+
+pub use format::format_verification_report;
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct VerificationFinding {
@@ -45,7 +54,7 @@ pub fn inspect_project(
     project: &ResolvedProject,
     lockfile: &Lockfile,
 ) -> PrayResult<VerificationReport> {
-    let (report, _) = collect_verification_report(project, lockfile)?;
+    let (report, _, _) = collect_verification_report(project, lockfile)?;
     Ok(report)
 }
 
@@ -66,12 +75,22 @@ pub fn verify_project(
     }
 }
 
+type CollectedVerification = (
+    VerificationReport,
+    BTreeMap<String, String>,
+    BTreeMap<String, String>,
+);
+
 fn collect_verification_report(
     project: &ResolvedProject,
     lockfile: &Lockfile,
-) -> PrayResult<(VerificationReport, BTreeMap<String, String>)> {
+) -> PrayResult<CollectedVerification> {
     let mut report = VerificationReport::default();
     let mut rendered_targets = BTreeMap::new();
+    let fresh_targets: BTreeMap<String, String> = render_project(project)?
+        .into_iter()
+        .map(|target| (target.path.to_string_lossy().to_string(), target.content))
+        .collect();
     if project.manifest_hash != lockfile.manifest_hash {
         report.findings.push(VerificationFinding {
             kind: "verify_error".to_string(),
@@ -81,51 +100,7 @@ fn collect_verification_report(
         });
     }
 
-    let mut locked_packages: BTreeMap<String, &crate::lockfile::LockedPackage> = lockfile
-        .package
-        .iter()
-        .map(|package| (package.name.clone(), package))
-        .collect();
-    for package in &project.packages {
-        match locked_packages.remove(&package.declaration.name) {
-            Some(locked) => {
-                if locked.tree_hash != package.tree_hash {
-                    report.findings.push(VerificationFinding {
-                        kind: "package_integrity".to_string(),
-                        message: format!(
-                            "Package `{}` no longer matches the locked tree hash. Run `pray install` to re-resolve packages.",
-                            package.declaration.name
-                        ),
-                    });
-                }
-                if locked.version != package.spec.version {
-                    report.findings.push(VerificationFinding {
-                        kind: "verify_error".to_string(),
-                        message: format!(
-                            "Package `{}` resolved to version {} but `Prayfile.lock` has {}. Run `pray install` to refresh the lockfile.",
-                            package.declaration.name, package.spec.version, locked.version
-                        ),
-                    });
-                }
-            }
-            None => report.findings.push(VerificationFinding {
-                kind: "verify_error".to_string(),
-                message: format!(
-                    "Package `{}` is declared in Prayfile but missing from `Prayfile.lock`. Run `pray install` to update the lockfile.",
-                    package.declaration.name
-                ),
-            }),
-        }
-    }
-    for locked in locked_packages.values() {
-        report.findings.push(VerificationFinding {
-            kind: "verify_error".to_string(),
-            message: format!(
-                "Package `{}` is in `Prayfile.lock` but not declared in Prayfile. Remove it from the lockfile with `pray install` or add it back to Prayfile.",
-                locked.name
-            ),
-        });
-    }
+    push_package_lock_findings(project, lockfile, &mut report.findings);
 
     let mut target_spans: BTreeMap<String, Vec<&ManagedSpanRecord>> = BTreeMap::new();
     for span in &lockfile.managed_span {
@@ -160,7 +135,7 @@ fn collect_verification_report(
                         target_path, span.id, span.package, span.export
                     ),
                 }),
-                Some((open_line, close_line, checksum)) => {
+                Some((_, _, checksum)) => {
                     if checksum != &span.ideal_checksum {
                         report.findings.push(VerificationFinding {
                             kind: "custom_implementation".to_string(),
@@ -170,81 +145,36 @@ fn collect_verification_report(
                             ),
                         });
                     }
-                    if *open_line != span.open_line || *close_line != span.close_line {
-                        report.findings.push(VerificationFinding {
-                            kind: "position_drift".to_string(),
-                            message: format!(
-                                "`{}` marker `{}` (`{}::{}`) moved to different lines. Run `pray install` to restore expected positions.",
-                                target_path, span.id, span.package, span.export
-                            ),
-                        });
-                    }
                 }
             }
+        }
+        let fresh_lines: Vec<&str> = fresh_targets
+            .get(&target_path)
+            .map(|fresh| fresh.lines().collect())
+            .unwrap_or_default();
+        if let Some(summary) = summarize_position_drift(
+            &target_path,
+            &spans,
+            &markers,
+            &lines,
+            fresh_targets
+                .contains_key(&target_path)
+                .then_some(fresh_lines.as_slice()),
+            &project.local_files,
+        ) {
+            report.findings.push(VerificationFinding {
+                kind: "position_drift".to_string(),
+                message: format_position_drift_message(&summary),
+            });
         }
         for finding in find_orphan_marker_findings_from_markers(&spans, &markers, &target_path) {
             report.findings.push(finding);
         }
     }
 
-    for package in &project.packages {
-        let Some(destination) = &package.declaration.file else {
-            continue;
-        };
-        let absolute = project.project_root.join(destination);
-        let Some(export_name) = package.selected_exports.iter().find(|name| {
-            package
-                .spec
-                .exports
-                .get(*name)
-                .is_some_and(|export| export.kind == "file")
-        }) else {
-            report.findings.push(VerificationFinding {
-                kind: "verify_error".to_string(),
-                message: format!(
-                    "Package `{}` declares file: \"{}\" but has no selected file export.",
-                    package.declaration.name, destination
-                ),
-            });
-            continue;
-        };
-        let source = package.root.join(&package.spec.exports[export_name].path);
-        if !absolute.exists() {
-            report.findings.push(VerificationFinding {
-                kind: "verify_error".to_string(),
-                message: format!(
-                    "Exclusive file `{}` from `{}` is missing. Run `pray install` to materialize it.",
-                    destination, package.declaration.name
-                ),
-            });
-            continue;
-        }
-        let destination_bytes = fs::read(&absolute)?;
-        let expected_bytes = expected_provisioned_bytes(&source, &project.manifest.symbols)?;
-        if sha256_prefixed(&destination_bytes) != sha256_prefixed(&expected_bytes) {
-            report.findings.push(VerificationFinding {
-                kind: "package_integrity".to_string(),
-                message: format!(
-                    "Exclusive file `{}` no longer matches package `{}`. Run `pray install` to restore it.",
-                    destination, package.declaration.name
-                ),
-            });
-        }
-    }
+    push_provisioned_and_local_findings(project, &mut report.findings)?;
 
-    for local in &project.local_files {
-        if local.optional {
-            continue;
-        }
-        if !project.project_root.join(&local.path).exists() {
-            report.findings.push(VerificationFinding {
-                kind: "verify_error".to_string(),
-                message: missing_local_embed_guidance(&local.manifest_path),
-            });
-        }
-    }
-
-    Ok((report, rendered_targets))
+    Ok((report, rendered_targets, fresh_targets))
 }
 
 pub fn find_orphan_marker_findings(
@@ -281,26 +211,26 @@ pub fn drift_project(
     project: &ResolvedProject,
     lockfile: &Lockfile,
 ) -> PrayResult<VerificationReport> {
-    let (mut report, rendered_targets) = collect_verification_report(project, lockfile)?;
+    let (mut report, rendered_targets, fresh_targets) =
+        collect_verification_report(project, lockfile)?;
 
-    let rendered = render_project(project)?;
     let lock_targets = lockfile_targets(lockfile);
-    for target in rendered {
-        let normalized_fresh = normalize_line_endings(&target.content);
+    for (path, fresh_content) in &fresh_targets {
+        let normalized_fresh = normalize_line_endings(fresh_content);
         let on_disk = rendered_targets
-            .get(target.path.to_string_lossy().as_ref())
+            .get(path)
             .map(|text| normalize_line_endings(text));
         let matches = on_disk.as_ref() == Some(&normalized_fresh);
         if !matches {
             report.findings.push(VerificationFinding {
                 kind: "renderer_drift".to_string(),
-                message: format!("{} differs from fresh render", target.path.display()),
+                message: format!("{path} differs from fresh render"),
             });
         }
-        if !lock_targets.contains(&target.path.to_string_lossy().to_string()) {
+        if !lock_targets.contains(path) {
             report.findings.push(VerificationFinding {
                 kind: "renderer_drift".to_string(),
-                message: format!("{} is not tracked in lockfile", target.path.display()),
+                message: format!("{path} is not tracked in lockfile"),
             });
         }
     }
@@ -367,54 +297,4 @@ fn lockfile_targets(lockfile: &Lockfile) -> BTreeSet<String> {
         .iter()
         .flat_map(|target| target.outputs.iter().cloned())
         .collect()
-}
-
-pub fn format_verification_report(report: &VerificationReport) -> String {
-    report
-        .findings
-        .iter()
-        .map(|finding| format!("{}: {}", finding.kind, finding.message))
-        .collect::<Vec<_>>()
-        .join("\n")
-}
-
-fn format_drift_report(report: &VerificationReport) -> String {
-    let mut sections: BTreeMap<&'static str, Vec<&VerificationFinding>> = BTreeMap::new();
-    for finding in &report.findings {
-        sections
-            .entry(drift_section_for_kind(&finding.kind))
-            .or_default()
-            .push(finding);
-    }
-
-    let ordered_sections = [
-        "Lockfile changes",
-        "Package changes",
-        "Managed span changes",
-        "Rendered file changes",
-        "Warnings",
-    ];
-    let mut lines = Vec::new();
-    for section in ordered_sections {
-        let Some(findings) = sections.get(section) else {
-            continue;
-        };
-        lines.push(section.to_string());
-        for finding in findings {
-            lines.push(format!("  {}: {}", finding.kind, finding.message));
-        }
-    }
-    lines.join("\n")
-}
-
-fn drift_section_for_kind(kind: &str) -> &'static str {
-    match kind {
-        "verify_error" => "Lockfile changes",
-        "package_integrity" => "Package changes",
-        "custom_implementation" | "removed_prayer" | "position_drift" | "orphan_marker" => {
-            "Managed span changes"
-        }
-        "renderer_drift" => "Rendered file changes",
-        _ => "Warnings",
-    }
 }

@@ -2,6 +2,12 @@
 
 ## Unreleased
 
+## 1.8.1 (2026-07-29)
+
+- Group `position_drift` findings per target in `pray verify`, `pray drift`, and install warnings.
+- Cite lock versus file marker lines and a `path:line` cause when unmarked preamble differs from compose sources.
+- Match the same grouped drift report in TypeScript and Ruby `pray-cli`.
+
 ## 1.8.0 (2026-07-29)
 
 - Add `pray yank` / `--undo` to mark yanked versions in a distribution root (metadata only).
