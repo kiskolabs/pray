@@ -2,7 +2,9 @@ use crate::Command;
 use pray_core::{PrayError, PrayResult};
 use std::path::PathBuf;
 
-pub(crate) fn parse_login_command(mut arguments: std::vec::IntoIter<String>) -> PrayResult<Command> {
+pub(crate) fn parse_login_command(
+    mut arguments: std::vec::IntoIter<String>,
+) -> PrayResult<Command> {
     let mut servers = Vec::new();
     let mut email = None;
     let mut credential_id = None;
@@ -97,7 +99,9 @@ pub(crate) fn parse_login_command(mut arguments: std::vec::IntoIter<String>) -> 
 }
 
 #[cfg(feature = "auth")]
-pub(crate) fn parse_serve_command(mut arguments: std::vec::IntoIter<String>) -> PrayResult<Command> {
+pub(crate) fn parse_serve_command(
+    mut arguments: std::vec::IntoIter<String>,
+) -> PrayResult<Command> {
     let mut root = PathBuf::from(".");
     let mut host = "127.0.0.1".to_string();
     let mut port = 7429u16;

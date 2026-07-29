@@ -1,6 +1,8 @@
 use crate::commands_materialize::install_command;
 use crate::lockfile_ops::build_lockfile;
-use crate::project_paths::{lockfile_path, manifest_path, resolve_project, resolve_project_with_options};
+use crate::project_paths::{
+    lockfile_path, manifest_path, resolve_project, resolve_project_with_options,
+};
 use crate::update_report::{
     merge_selected_package_update, print_constraint_blocked_packages, print_update_json_report,
     print_update_summary,

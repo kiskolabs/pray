@@ -127,10 +127,7 @@ impl RegistryAuthStore {
             enrolled: true,
         })
     }
-    pub fn login_with_passkey(
-        &self,
-        credential_id: &str,
-    ) -> PrayResult<AuthPasskeyLoginResponse> {
+    pub fn login_with_passkey(&self, credential_id: &str) -> PrayResult<AuthPasskeyLoginResponse> {
         validate_identifier(credential_id, "credential id")?;
         let connection = self.connection()?;
         let email: Option<String> = connection

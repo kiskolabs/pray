@@ -217,4 +217,3 @@ pub fn read_manifest_text(manifest_path: &Path) -> PrayResult<String> {
         }
     })
 }
-

@@ -15,7 +15,8 @@ pub fn render_project(project: &ResolvedProject) -> PrayResult<Vec<RenderedTarge
     for target in &project.manifest.targets {
         for output in &target.outputs {
             let relative = validate_project_relative_path(output)?;
-            let rendered_target = crate::render_compose::render_target(project, target, relative.as_path())?;
+            let rendered_target =
+                crate::render_compose::render_target(project, target, relative.as_path())?;
             if let Some(max_bytes) = target.max_bytes {
                 let size = rendered_target.content.len() as u64;
                 if size > max_bytes {

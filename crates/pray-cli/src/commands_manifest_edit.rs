@@ -5,7 +5,11 @@ use pray_core::resolve_context::ResolveOptions;
 use pray_core::{PrayError, PrayResult};
 use std::fs;
 
-pub(crate) fn add_command(name: String, constraint: Option<String>, path: Option<String>) -> PrayResult<()> {
+pub(crate) fn add_command(
+    name: String,
+    constraint: Option<String>,
+    path: Option<String>,
+) -> PrayResult<()> {
     let manifest_path = manifest_path();
     let manifest_text = read_manifest_text(&manifest_path)?;
     let manifest = parse_manifest(&manifest_text)?;
