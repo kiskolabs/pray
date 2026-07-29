@@ -1,6 +1,8 @@
 # frozen_string_literal: true
 
+require "fileutils"
 require "rubocop/rake_task"
+require_relative "lib/pray/version"
 
 RuboCop::RakeTask.new do |task|
   task.options = %w[--format progress]
@@ -12,6 +14,17 @@ task lint: :rubocop
 desc "Report dependency freshness (libyears)"
 task :libyears do
   sh "libyear-bundler --sort"
+end
+
+desc "Build pray-cli gem into pkg/"
+task :build do
+  FileUtils.mkdir_p("pkg")
+  sh "gem build pray-cli.gemspec --output pkg/pray-cli-#{Pray::VERSION}.gem"
+end
+
+desc "Push built gem to RubyGems (manual)"
+task release: :build do
+  sh "gem push pkg/pray-cli-#{Pray::VERSION}.gem"
 end
 
 task default: :lint

@@ -1,20 +1,24 @@
 [package]
-name = "pray"
+name = "pray-cli"
 version.workspace = true
 edition.workspace = true
 license.workspace = true
 authors.workspace = true
 repository.workspace = true
 homepage.workspace = true
-description = "Reference pray CLI for Prayfile install, publish, sync, and verification"
+description = "pray CLI for Prayfile: resolve, lock, render, verify, and publish inference input packages"
+readme = "README.md"
+documentation = "https://docs.rs/pray-cli"
+keywords = ["pray", "prayfile", "agents", "inference", "cli"]
+categories = ["command-line-utilities", "development-tools"]
 
 [features]
 default = ["auth"]
 auth = ["pray-core/auth"]
 
 [dependencies]
-pray-core = { path = "../pray-core", default-features = false }
-pray-transport = { path = "../pray-transport" }
+pray-core = { workspace = true }
+pray-transport = { workspace = true }
 base64 = "0.22"
 ed25519-dalek = "3"
 serde = { version = "1", features = ["derive"] }
@@ -23,6 +27,10 @@ tar = "0.4"
 zstd = "0.13"
 reqwest = { version = "0.13", default-features = false, features = ["json", "rustls"] }
 tokio = { version = "1", features = ["rt", "macros"] }
+
+[[bin]]
+name = "pray"
+path = "src/main.rs"
 
 [[test]]
 name = "auth"

@@ -1,3 +1,5 @@
 tmp
+pkg
+*.gem
 vendor/bundle
 .rspec_status

@@ -2,7 +2,7 @@ FROM rust:1.78-alpine AS builder
 RUN apk add --no-cache musl-dev pkgconfig openssl-dev git
 WORKDIR /src
 COPY . .
-RUN cargo build --release -p pray
+RUN cargo build --release -p pray-cli
 
 FROM alpine:3.20
 RUN apk add --no-cache ca-certificates

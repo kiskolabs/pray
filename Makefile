@@ -1,8 +1,12 @@
-.PHONY: build clean install bench bench-scaling ruby-test libyears libyears-rust libyears-ruby libyears-npm bump-homebrew
+.PHONY: build clean install bench bench-scaling ruby-test libyears libyears-rust libyears-ruby libyears-npm bump-homebrew \
+	release-dry-run release-crates release-npm release-rubygems release-distribution release-all
 
 HOMEBREW_TAP ?= $(abspath ../../amkisko/homebrew-tap)
 VERSION ?= $(shell sed -n 's/^version = "\(.*\)"/\1/p' Cargo.toml | head -1)
 TAG ?= v$(VERSION)
+ROOT ?= ./prayers
+SERVER ?=
+SIGNING_KEY ?=
 
 build:
 	cargo build --workspace
@@ -41,3 +45,29 @@ bump-homebrew:
 		--tag "$(TAG)" \
 		--repository kiskolabs/pray \
 		--commit
+
+# Manual release helpers. Language registries default to dry-run / build-only.
+# Use scripts/release/*.sh --publish (or make release-* with care) to push.
+release-dry-run:
+	./scripts/release/all.sh --dry-run
+
+release-crates:
+	./scripts/release/crates.sh --publish
+
+release-npm:
+	./scripts/release/npm.sh --publish
+
+release-rubygems:
+	./scripts/release/rubygems.sh --publish
+
+release-distribution:
+	@args="--root $(ROOT)"; \
+	if [ -n "$(SERVER)" ]; then args="$$args --server $(SERVER)"; fi; \
+	if [ -n "$(SIGNING_KEY)" ]; then args="$$args --signing-key $(SIGNING_KEY)"; fi; \
+	./scripts/release/distribution.sh $$args
+
+release-all:
+	@args="--publish --root $(ROOT)"; \
+	if [ -n "$(SERVER)" ]; then args="$$args --server $(SERVER)"; fi; \
+	if [ -n "$(SIGNING_KEY)" ]; then args="$$args --signing-key $(SIGNING_KEY)"; fi; \
+	./scripts/release/all.sh $$args

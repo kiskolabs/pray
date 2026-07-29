@@ -10,7 +10,7 @@ description = "Benchmarks for pray-core operations"
 publish = false
 
 [dependencies]
-pray-core = { path = "../pray-core" }
+pray-core = { workspace = true, features = ["auth"] }
 tempfile = "3"
 
 [dev-dependencies]

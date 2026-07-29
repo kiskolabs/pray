@@ -8,8 +8,8 @@ Gem::Specification.new do |spec|
   spec.authors = ["Andrei Makarov"]
   spec.email = ["contact@kiskolabs.com"]
 
-  spec.summary = "Ruby library and CLI for the Prayfile workflow"
-  spec.description = "Resolves Prayfile dependencies, locks versions, renders managed agent guidance, and consumes git and registry distribution points."
+  spec.summary = "Ruby pray CLI and library for the Prayfile workflow"
+  spec.description = "Resolve, lock, render, verify, and publish Prayfile inference input packages. Consumes path, git, and registry distribution points."
   spec.homepage = "https://pray.kisko.dev"
   spec.license = "MIT"
   spec.required_ruby_version = ">= 3.1.0"
@@ -35,7 +35,7 @@ Gem::Specification.new do |spec|
     "source_code_uri" => "https://github.com/kiskolabs/pray/tree/main/rubygems/pray-cli",
     "changelog_uri" => "https://github.com/kiskolabs/pray/blob/main/rubygems/pray-cli/CHANGELOG.md",
     "bug_tracker_uri" => "https://github.com/kiskolabs/pray/issues",
-    "documentation_uri" => "https://pray.kisko.dev",
+    "documentation_uri" => "https://github.com/kiskolabs/pray/tree/main/rubygems/pray-cli",
     "rubygems_mfa_required" => "true"
   }
 

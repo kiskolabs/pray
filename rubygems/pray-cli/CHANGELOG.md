@@ -2,6 +2,9 @@
 
 ## Unreleased
 
+- Add `rake build` / `rake release` for gem packaging and RubyGems push.
+- Rework gem summary, description, and README opener to match Prayfile positioning.
+
 ## 1.5.0 (2026-07-27)
 
 - Add `((pray:symbol))` templating with project-wide `pray do` / `template do` symbol maps.

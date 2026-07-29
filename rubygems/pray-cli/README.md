@@ -1,8 +1,8 @@
 # pray-cli
 
-Ruby client for the `pray` CLI and [Prayfile](https://pray.kisko.dev) workflow.
+Ruby `pray` CLI and library for [Prayfile](https://pray.kisko.dev): a package manager for the language placed before inference.
 
-Resolves `Prayfile` dependencies, writes `Prayfile.lock`, renders managed guidance into target files, and verifies drift. Consumes local path packages and git distribution repositories.
+Resolve, lock, render, verify, and publish shared instructions, policies, templates, and related input as versioned packages. Consumes path, git, and registry distribution points. The installed executable is `pray`.
 
 **Website:** [pray.kisko.dev](https://pray.kisko.dev)
 
@@ -25,8 +25,6 @@ cd rubygems/pray-cli
 bundle install
 bundle exec pray version
 ```
-
-The executable is named `pray`.
 
 ## Commands
 

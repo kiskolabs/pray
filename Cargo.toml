@@ -15,6 +15,10 @@ authors = ["Andrei Makarov <contact@kiskolabs.com>"]
 repository = "https://github.com/kiskolabs/pray"
 homepage = "https://pray.kisko.dev"
 
+[workspace.dependencies]
+pray-core = { version = "1.5.0", path = "crates/pray-core", default-features = false }
+pray-transport = { version = "1.5.0", path = "crates/pray-transport" }
+
 [profile.release]
 lto = "thin"
 codegen-units = 1

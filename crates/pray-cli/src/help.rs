@@ -192,7 +192,7 @@ fn command_help_text(command: &str) -> Option<&'static str> {
         "upgrade" => Some(
             "upgrade — install the latest pray CLI release\n\n\
              Usage: pray upgrade\n\n\
-             Runs `cargo install --git https://github.com/kiskolabs/pray --locked pray`.",
+             Runs `cargo install pray-cli --locked --force`.",
         ),
         _ => None,
     }
