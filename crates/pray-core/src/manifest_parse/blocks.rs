@@ -104,7 +104,11 @@ impl BlockParser<'_> {
         })
     }
 
-    pub(super) fn parse_file_block(&mut self, manifest: &mut Manifest, rest: &str) -> PrayResult<()> {
+    pub(super) fn parse_file_block(
+        &mut self,
+        manifest: &mut Manifest,
+        rest: &str,
+    ) -> PrayResult<()> {
         let is_block = rest.trim_end().ends_with("do");
         if !is_block {
             return Err(PrayError::Parse {
@@ -283,5 +287,4 @@ impl BlockParser<'_> {
             message: "missing 'end' for group block".to_string(),
         })
     }
-
 }

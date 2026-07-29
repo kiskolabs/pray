@@ -8,12 +8,8 @@ use crate::server_federation::{
     federation_discovery_response, federation_index_response_since, federation_package_response,
     federation_push_response,
 };
-use crate::server_http::{
-    decode_rpc_base64_body, http_response_to_rpc, response_with_status,
-};
-use crate::server_static::{
-    artifact_upload_response, confession_response, static_file_response,
-};
+use crate::server_http::{decode_rpc_base64_body, http_response_to_rpc, response_with_status};
+use crate::server_static::{artifact_upload_response, confession_response, static_file_response};
 use pray_core::ssh_rpc::{RpcRequest, RpcResponse, SSH_RPC_SPEC};
 use pray_core::{PrayError, PrayResult};
 use std::path::Path;

@@ -114,13 +114,9 @@ fn fish_script() -> String {
     ];
     for flag in GLOBAL_FLAGS {
         if let Some(name) = flag.strip_prefix("--") {
-            lines.push(format!(
-                "complete -c pray -l {name} -d 'Global option'"
-            ));
+            lines.push(format!("complete -c pray -l {name} -d 'Global option'"));
         } else if let Some(short) = flag.strip_prefix('-') {
-            lines.push(format!(
-                "complete -c pray -s {short} -d 'Global option'"
-            ));
+            lines.push(format!("complete -c pray -s {short} -d 'Global option'"));
         }
     }
     for command in command_words().split_whitespace() {

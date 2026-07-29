@@ -2,7 +2,9 @@ use crate::literal::{find_top_level, parse_literal, split_top_level, LiteralValu
 use crate::{PrayError, PrayResult};
 use std::collections::BTreeMap;
 
-pub(super) fn parse_call(rest: &str) -> PrayResult<(Vec<LiteralValue>, BTreeMap<String, LiteralValue>)> {
+pub(super) fn parse_call(
+    rest: &str,
+) -> PrayResult<(Vec<LiteralValue>, BTreeMap<String, LiteralValue>)> {
     let mut positional = Vec::new();
     let mut keywords = BTreeMap::new();
     for segment in split_top_level(rest.trim().trim_end_matches(','), ',') {

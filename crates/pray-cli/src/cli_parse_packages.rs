@@ -157,7 +157,9 @@ pub(crate) fn parse_unlock_command(arguments: std::vec::IntoIter<String>) -> Pra
     Ok(Command::Unlock { package })
 }
 
-pub(crate) fn parse_explain_command(mut arguments: std::vec::IntoIter<String>) -> PrayResult<Command> {
+pub(crate) fn parse_explain_command(
+    mut arguments: std::vec::IntoIter<String>,
+) -> PrayResult<Command> {
     let package = arguments
         .next()
         .ok_or_else(|| PrayError::Unsupported("explain requires a package name".to_string()))?;

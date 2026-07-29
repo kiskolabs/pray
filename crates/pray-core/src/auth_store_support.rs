@@ -13,11 +13,7 @@ pub(super) struct StoredChallenge {
 
 pub(super) fn validate_email(email: &str) -> PrayResult<()> {
     let email = email.trim();
-    if email.is_empty()
-        || !email.contains('@')
-        || email.starts_with('@')
-        || email.ends_with('@')
-    {
+    if email.is_empty() || !email.contains('@') || email.starts_with('@') || email.ends_with('@') {
         return Err(PrayError::Unsupported(
             "email must be a non-empty address".to_string(),
         ));
@@ -156,7 +152,10 @@ pub(super) fn mark_challenge_used(connection: &Connection, challenge_id: &str) -
     Ok(())
 }
 
-pub(super) fn load_passkey_public_key(connection: &Connection, credential_id: &str) -> PrayResult<String> {
+pub(super) fn load_passkey_public_key(
+    connection: &Connection,
+    credential_id: &str,
+) -> PrayResult<String> {
     let public_key: String = connection.query_row(
         "SELECT public_key FROM passkeys WHERE credential_id = ?1",
         rusqlite::params![credential_id],
@@ -174,13 +173,16 @@ pub(super) fn validate_signature(signature: &str) -> PrayResult<()> {
     Ok(())
 }
 
-pub(super) fn verify_signature(public_key: &str, message: &[u8], signature: &str) -> PrayResult<()> {
+pub(super) fn verify_signature(
+    public_key: &str,
+    message: &[u8],
+    signature: &str,
+) -> PrayResult<()> {
     let (_, key_bytes) = parse_ssh_ed25519_public_key(public_key)?;
-    let verifying_key =
-        VerifyingKey::from_bytes(&key_bytes).map_err(|error| PrayError::Parse {
-            kind: "public key",
-            message: error.to_string(),
-        })?;
+    let verifying_key = VerifyingKey::from_bytes(&key_bytes).map_err(|error| PrayError::Parse {
+        kind: "public key",
+        message: error.to_string(),
+    })?;
     let signature_bytes =
         STANDARD
             .decode(signature.as_bytes())
@@ -205,9 +207,9 @@ pub(super) fn parse_ssh_ed25519_public_key(public_key: &str) -> PrayResult<(Stri
             "unsupported public key algorithm: {algorithm}"
         )));
     }
-    let key_value = fields.next().ok_or_else(|| {
-        PrayError::Unsupported("public key must include key bytes".to_string())
-    })?;
+    let key_value = fields
+        .next()
+        .ok_or_else(|| PrayError::Unsupported("public key must include key bytes".to_string()))?;
     let blob = STANDARD
         .decode(key_value.as_bytes())
         .map_err(|error| PrayError::Parse {
@@ -223,14 +225,13 @@ pub(super) fn parse_ssh_ed25519_public_key(public_key: &str) -> PrayResult<(Stri
         });
     }
     let key_bytes = read_ssh_string(&mut cursor)?;
-    let key_bytes: [u8; 32] =
-        key_bytes
-            .as_slice()
-            .try_into()
-            .map_err(|_| PrayError::Parse {
-                kind: "public key",
-                message: "ed25519 public key must be 32 bytes".to_string(),
-            })?;
+    let key_bytes: [u8; 32] = key_bytes
+        .as_slice()
+        .try_into()
+        .map_err(|_| PrayError::Parse {
+            kind: "public key",
+            message: "ed25519 public key must be 32 bytes".to_string(),
+        })?;
     Ok((format!("ssh-ed25519 {key_value}"), key_bytes))
 }
 
@@ -265,7 +266,11 @@ pub(super) fn generate_verification_code(email: &str, timestamp: u64) -> String 
     format!("{:06}", numeric)
 }
 
-pub(super) fn generate_session_token(email: &str, kind: &AuthSessionKind, timestamp: u64) -> String {
+pub(super) fn generate_session_token(
+    email: &str,
+    kind: &AuthSessionKind,
+    timestamp: u64,
+) -> String {
     let payload = format!("{email}\0{}\0{timestamp}", auth_session_kind_text(kind));
     sha256_prefixed(payload.as_bytes())
 }
