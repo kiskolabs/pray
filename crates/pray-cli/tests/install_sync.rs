@@ -189,14 +189,13 @@ fn sync_recovers_after_peer_restart_and_leaves_no_partial_state() {
         ],
     );
     assert!(!failed_sync.status.success());
-    assert!(matches!(failed_sync.status.code(), Some(1) | Some(3)));
+    assert_eq!(failed_sync.status.code(), Some(7));
     let failed_stderr = String::from_utf8_lossy(&failed_sync.stderr);
     assert!(
-        failed_stderr.contains("Network error")
+        failed_stderr.contains("network error")
+            || failed_stderr.contains("Network error")
             || failed_stderr.contains("Connection refused")
             || failed_stderr.contains("timed out")
-            || failed_stderr.contains("No such file")
-            || failed_stderr.contains("resolution error")
     );
     assert_eq!(
         fs::read_to_string(downstream_root.join("v1/peers.json")).expect("peers after failure"),

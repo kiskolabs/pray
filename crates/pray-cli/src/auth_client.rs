@@ -207,7 +207,10 @@ where
     Response: for<'de> Deserialize<'de>,
 {
     let (host_port, path) = split_http_url(url)?;
-    let mut stream = TcpStream::connect((&host_port.0[..], host_port.1))?;
+    let mut stream = TcpStream::connect((&host_port.0[..], host_port.1))
+        .map_err(|error| PrayError::Network(error.to_string()))?;
+    let _ = stream.set_read_timeout(Some(std::time::Duration::from_secs(30)));
+    let _ = stream.set_write_timeout(Some(std::time::Duration::from_secs(30)));
     let body_text =
         serde_json::to_string(body).map_err(|error| PrayError::Manifest(error.to_string()))?;
     write!(
@@ -218,12 +221,15 @@ where
         host_port.1,
         body_text.len(),
         body_text
-    )?;
+    )
+    .map_err(|error| PrayError::Network(error.to_string()))?;
     let mut response = String::new();
-    stream.read_to_string(&mut response)?;
+    stream
+        .read_to_string(&mut response)
+        .map_err(|error| PrayError::Network(error.to_string()))?;
     let (status, response_body) = split_http_response(&response)?;
     if !(200..300).contains(&status) {
-        return Err(PrayError::Resolution(format!(
+        return Err(PrayError::Network(format!(
             "request to {url} failed with status {status}: {response_body}"
         )));
     }

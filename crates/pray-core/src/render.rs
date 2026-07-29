@@ -1,8 +1,9 @@
 use crate::destination::{package_bound_to_compose, package_bound_to_tree};
 use crate::environment::package_matches_environment;
 use crate::hashing::{checksum_managed_span_content, marker_id};
-use crate::lockfile::ManagedSpanRecord;
+use crate::lockfile::{Lockfile, ManagedSpanRecord};
 use crate::manifest::{DestinationEntry, DestinationMode};
+use crate::paths::validate_project_relative_path;
 use crate::resolve::ResolvedProject;
 use crate::substitute::substitute_pray_symbols;
 use crate::{PrayError, PrayResult};
@@ -19,10 +20,20 @@ pub struct RenderedTarget {
 pub fn render_project(project: &ResolvedProject) -> PrayResult<Vec<RenderedTarget>> {
     let mut rendered = Vec::new();
     for target in &project.manifest.targets {
-        let Some(output) = target.outputs.first() else {
-            continue;
-        };
-        rendered.push(render_target(project, target, Path::new(output))?);
+        for output in &target.outputs {
+            let relative = validate_project_relative_path(output)?;
+            let rendered_target = render_target(project, target, relative.as_path())?;
+            if let Some(max_bytes) = target.max_bytes {
+                let size = rendered_target.content.len() as u64;
+                if size > max_bytes {
+                    return Err(PrayError::Render(format!(
+                        "target `{}` output `{}` is {size} bytes; max_bytes is {max_bytes}",
+                        target.name, output
+                    )));
+                }
+            }
+            rendered.push(rendered_target);
+        }
     }
     Ok(rendered)
 }
@@ -31,8 +42,22 @@ pub fn write_rendered_targets(
     project: &ResolvedProject,
     rendered: &[RenderedTarget],
 ) -> PrayResult<()> {
+    write_rendered_targets_with_previous_lockfile(project, rendered, None)
+}
+
+pub fn write_rendered_targets_with_previous_lockfile(
+    project: &ResolvedProject,
+    rendered: &[RenderedTarget],
+    previous_lockfile: Option<&Lockfile>,
+) -> PrayResult<()> {
+    if project.manifest.render.conflict == "fail" {
+        if let Some(lockfile) = previous_lockfile {
+            crate::render_conflict::reject_managed_span_conflicts(&project.project_root, lockfile)?;
+        }
+    }
     for target in rendered {
-        let path = project.project_root.join(&target.path);
+        let relative = validate_project_relative_path(&target.path.to_string_lossy())?;
+        let path = relative.join_root(&project.project_root);
         if let Some(parent) = path.parent() {
             fs::create_dir_all(parent)?;
         }
@@ -78,7 +103,8 @@ pub fn planned_provisioned_files(
 
 pub fn materialize_provisioned_exports(project: &ResolvedProject) -> PrayResult<()> {
     for file in planned_provisioned_files(project)? {
-        let destination = project.project_root.join(&file.path);
+        let relative = validate_project_relative_path(&file.path.to_string_lossy())?;
+        let destination = relative.join_root(&project.project_root);
         if let Some(parent) = destination.parent() {
             fs::create_dir_all(parent)?;
         }
@@ -134,8 +160,9 @@ fn collect_exact_file_bindings(
                     source.display()
                 )));
             }
+            let relative = validate_project_relative_path(destination)?;
             planned.push(PlannedProvisionedFile {
-                path: PathBuf::from(destination),
+                path: relative.as_path().to_path_buf(),
                 source,
             });
             matched = true;
@@ -329,26 +356,30 @@ fn collect_tree_files(
 
 struct ContentBuilder {
     content: String,
+    next_line: usize,
 }
 
 impl ContentBuilder {
     fn with_capacity(capacity: usize) -> Self {
         Self {
             content: String::with_capacity(capacity),
+            next_line: 1,
         }
     }
 
     fn next_line_number(&self) -> usize {
-        self.content.matches('\n').count() + 1
+        self.next_line
     }
 
     fn append_line(&mut self, line: &str) {
         self.content.push_str(line);
         self.content.push('\n');
+        self.next_line += 1;
     }
 
     fn append_empty_line(&mut self) {
         self.content.push('\n');
+        self.next_line += 1;
     }
 
     fn append_body(&mut self, body: &str) {

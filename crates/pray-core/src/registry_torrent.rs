@@ -1,5 +1,6 @@
 use crate::hashing::sha256_prefixed;
 use crate::registry_http::{http_get, http_get_with_headers, join_url};
+use crate::resource_limits::MAX_TORRENT_ARTIFACT_BYTES;
 use crate::{PrayError, PrayResult};
 use serde::{Deserialize, Serialize};
 
@@ -41,6 +42,11 @@ impl TorrentManifest {
                 kind: "torrent manifest",
                 message: "piece size must be greater than zero".to_string(),
             });
+        }
+        if self.length > MAX_TORRENT_ARTIFACT_BYTES {
+            return Err(PrayError::Integrity(format!(
+                "torrent artifact length exceeds {MAX_TORRENT_ARTIFACT_BYTES} bytes"
+            )));
         }
         let expected_piece_count = if self.length == 0 {
             0
@@ -101,7 +107,11 @@ pub(crate) fn fetch_torrent_manifest(
             manifest.validate()?;
             Ok(Some(manifest))
         }
-        Err(PrayError::Resolution(message)) if message.contains("HTTP 404") => Ok(None),
+        Err(PrayError::Resolution(message) | PrayError::Network(message))
+            if message.contains("HTTP 404") =>
+        {
+            Ok(None)
+        }
         Err(error) => Err(error),
     }
 }
@@ -135,6 +145,11 @@ pub(crate) fn fetch_torrent_artifact(
             .collect()
     };
 
+    if manifest.length > MAX_TORRENT_ARTIFACT_BYTES {
+        return Err(PrayError::Integrity(format!(
+            "torrent artifact length exceeds {MAX_TORRENT_ARTIFACT_BYTES} bytes"
+        )));
+    }
     let mut bytes = vec![0u8; manifest.length];
     for piece in manifest.piece_ranges() {
         let piece_bytes = download_torrent_piece(&sources, &piece)?;

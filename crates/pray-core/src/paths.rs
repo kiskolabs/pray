@@ -2,6 +2,61 @@ use crate::{PrayError, PrayResult};
 use std::fs;
 use std::path::{Component, Path, PathBuf};
 
+/// Repository-relative path that cannot escape a project root when joined.
+#[derive(Debug, Clone, PartialEq, Eq, Hash)]
+pub struct ProjectRelativePath(PathBuf);
+
+impl ProjectRelativePath {
+    pub fn parse(value: &str) -> PrayResult<Self> {
+        let trimmed = value.trim();
+        if trimmed.is_empty() {
+            return Err(PrayError::Manifest(
+                "project path must not be empty".to_string(),
+            ));
+        }
+        let path = Path::new(trimmed);
+        if path.is_absolute() {
+            return Err(PrayError::Manifest(format!(
+                "project path must be repository-relative: {trimmed}"
+            )));
+        }
+        let mut relative = PathBuf::new();
+        for component in path.components() {
+            match component {
+                Component::Normal(part) => relative.push(part),
+                Component::CurDir => {}
+                _ => {
+                    return Err(PrayError::Manifest(format!(
+                        "project path escapes repository root: {trimmed}"
+                    )));
+                }
+            }
+        }
+        if relative.as_os_str().is_empty() {
+            return Err(PrayError::Manifest(format!(
+                "project path must be repository-relative: {trimmed}"
+            )));
+        }
+        Ok(Self(relative))
+    }
+
+    pub fn as_path(&self) -> &Path {
+        &self.0
+    }
+
+    pub fn as_str(&self) -> &str {
+        self.0.to_str().unwrap_or("")
+    }
+
+    pub fn join_root(&self, root: &Path) -> PathBuf {
+        root.join(&self.0)
+    }
+}
+
+pub fn validate_project_relative_path(value: &str) -> PrayResult<ProjectRelativePath> {
+    ProjectRelativePath::parse(value)
+}
+
 pub fn find_prayspec_file(root: &Path) -> PrayResult<PathBuf> {
     let mut prayspec_files = Vec::new();
     for entry in fs::read_dir(root)? {
@@ -123,5 +178,27 @@ mod tests {
     #[test]
     fn validate_package_relative_path_accepts_nested_file() {
         validate_package_relative_path(Path::new("exports/guidance.md")).expect("nested file");
+    }
+
+    #[test]
+    fn project_relative_path_rejects_parent_and_absolute() {
+        let parent = ProjectRelativePath::parse("../escape.md").expect_err("parent");
+        assert!(parent.to_string().contains("escapes repository root"));
+        let absolute = if cfg!(windows) {
+            ProjectRelativePath::parse(r"C:\escape.md")
+        } else {
+            ProjectRelativePath::parse("/tmp/escape.md")
+        }
+        .expect_err("absolute");
+        assert!(absolute.to_string().contains("repository-relative"));
+    }
+
+    #[test]
+    fn project_relative_path_joins_under_root() {
+        let relative = ProjectRelativePath::parse("docs/AGENTS.md").expect("relative");
+        assert_eq!(
+            relative.join_root(Path::new("/repo")),
+            PathBuf::from("/repo/docs/AGENTS.md")
+        );
     }
 }

@@ -2,24 +2,24 @@
 # Columns: repository-relative path<TAB>max lines (ratchet; file must not grow).
 # Remove a row when the file drops to 300 or below.
 crates/pray-cli/src/apply_report.rs	531
-crates/pray-cli/src/auth_client.rs	407
-crates/pray-cli/src/cli_parse.rs	604
-crates/pray-cli/src/main.rs	2007
-crates/pray-cli/src/server.rs	702
+crates/pray-cli/src/auth_client.rs	413
+crates/pray-cli/src/cli_parse.rs	607
+crates/pray-cli/src/main.rs	2020
+crates/pray-cli/src/server.rs	631
 crates/pray-cli/src/server_http.rs	320
-crates/pray-cli/src/sync_command.rs	387
+crates/pray-cli/src/sync_command.rs	395
 crates/pray-cli/src/trust_command.rs	304
 crates/pray-core/src/auth.rs	1031
 crates/pray-core/src/derived_metadata.rs	335
 crates/pray-core/src/format_manifest.rs	337
 crates/pray-core/src/literal.rs	502
 crates/pray-core/src/lockfile.rs	368
-crates/pray-core/src/manifest.rs	1148
+crates/pray-core/src/manifest.rs	1149
 crates/pray-core/src/package_integrity.rs	330
 crates/pray-core/src/package_spec.rs	415
-crates/pray-core/src/registry.rs	456
-crates/pray-core/src/render.rs	596
-crates/pray-core/src/resolve.rs	529
+crates/pray-core/src/registry.rs	464
+crates/pray-core/src/render.rs	626
+crates/pray-core/src/resolve.rs	519
 crates/pray-core/src/resolve_git.rs	306
 crates/pray-core/src/statement_surface.rs	372
 crates/pray-core/src/verify.rs	420

@@ -143,6 +143,7 @@ pub fn resolve_project_in_context(
     let mut packages = Vec::new();
     let mut seen = BTreeSet::new();
     let mut resolution_errors = Vec::new();
+    let mut saw_network_error = false;
     for declaration in &manifest.packages {
         match resolve_package(
             project_root,
@@ -162,11 +163,21 @@ pub fn resolve_project_in_context(
                 }
                 packages.push(package);
             }
-            Err(error) => resolution_errors.push(format!("{}: {error}", declaration.name)),
+            Err(error) => {
+                if matches!(error, PrayError::Network(_)) {
+                    saw_network_error = true;
+                }
+                resolution_errors.push(format!("{}: {error}", declaration.name));
+            }
         }
     }
     if !resolution_errors.is_empty() {
-        return Err(PrayError::Resolution(resolution_errors.join("\n")));
+        let message = resolution_errors.join("\n");
+        return Err(if saw_network_error {
+            PrayError::Network(message)
+        } else {
+            PrayError::Resolution(message)
+        });
     }
     let mut local_files = Vec::new();
     let mut local_errors = Vec::new();
@@ -179,7 +190,8 @@ pub fn resolve_project_in_context(
     if !local_errors.is_empty() {
         return Err(PrayError::Resolution(local_errors.join("\n")));
     }
-    reject_dependency_cycles(&packages)?;
+    crate::resolve_deps::reject_undeclared_dependencies(&packages)?;
+    crate::resolve_deps::reject_dependency_cycles(&packages)?;
     Ok(ResolvedProject {
         manifest_path: manifest_path.to_path_buf(),
         project_root: project_root.to_path_buf(),
@@ -200,28 +212,6 @@ pub fn resolve_project_in_context(
         source_host_keys,
         environment: options.environment.clone(),
     })
-}
-
-fn reject_dependency_cycles(packages: &[ResolvedPackage]) -> PrayResult<()> {
-    let mut edges = BTreeMap::new();
-    for package in packages {
-        edges.insert(
-            package.declaration.name.clone(),
-            package
-                .spec
-                .dependencies
-                .iter()
-                .map(|dependency| dependency.name.clone())
-                .collect(),
-        );
-    }
-    if let Some(cycle) = crate::dependency_graph::find_dependency_cycle(&edges) {
-        return Err(PrayError::Resolution(format!(
-            "dependency cycle detected: {}",
-            cycle.join(" -> ")
-        )));
-    }
-    Ok(())
 }
 
 fn resolve_package(
