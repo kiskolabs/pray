@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+## 1.5.1 (2026-07-29)
+
 - Add `rake build` / `rake release` for gem packaging and RubyGems push.
 - Rework gem summary, description, and README opener to match Prayfile positioning.
 

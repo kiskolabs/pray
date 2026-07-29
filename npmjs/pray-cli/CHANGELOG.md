@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+## 1.5.1 (2026-07-29)
+
 - Sync `PACKAGE_VERSION` with the package version and add `prepublishOnly` build for npm publish.
 - Rework package description and README opener to match Prayfile positioning.
 
