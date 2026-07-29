@@ -1,14 +1,13 @@
+use crate::help_text::{
+    command_help_text, DISTRIBUTION_COMMANDS, GLOBAL_OPTIONS, INSPECT_COMMANDS, META_COMMANDS,
+    PACKAGE_COMMANDS, TRUST_COMMANDS, WORKFLOW_COMMANDS,
+};
 use pray_core::cli_suggest::unknown_command_message;
 use pray_core::{PrayError, PrayResult};
 use std::io::{self, Write};
 
-const DOCS_URL: &str = "https://github.com/kiskolabs/pray";
-
 pub fn print_concise_help() {
-    let _ = writeln!(
-        io::stdout(),
-        "pray — reproducible inference input for projects"
-    );
+    let _ = writeln!(io::stdout(), "Usage: pray [OPTIONS] <COMMAND>");
     let _ = writeln!(io::stdout());
     let _ = writeln!(
         io::stdout(),
@@ -24,22 +23,20 @@ pub fn print_concise_help() {
     let _ = writeln!(io::stdout());
     print_command_groups();
     let _ = writeln!(io::stdout());
+    let _ = writeln!(io::stdout(), "Options:");
+    for line in GLOBAL_OPTIONS {
+        let _ = writeln!(io::stdout(), "  {line}");
+    }
+    let _ = writeln!(io::stdout());
     let _ = writeln!(
         io::stdout(),
-        "Run `pray help <command>` or `pray <command> --help` for one command."
-    );
-    let _ = writeln!(io::stdout(), "Documentation: {DOCS_URL}");
-    let _ = writeln!(
-        io::stdout(),
-        "Exit codes: 0 success; 2 usage/parse; 3 resolution; 4 integrity; 5 render; 6 verify; 8 unsupported."
+        "See 'pray help <command>' or 'pray <command> --help' for details on a command."
     );
 }
 
 pub fn print_command_help(command: &str) -> bool {
     if let Some(text) = command_help_text(command) {
         let _ = writeln!(io::stdout(), "{text}");
-        let _ = writeln!(io::stdout());
-        let _ = writeln!(io::stdout(), "Documentation: {DOCS_URL}");
         true
     } else {
         false
@@ -47,156 +44,23 @@ pub fn print_command_help(command: &str) -> bool {
 }
 
 fn print_command_groups() {
-    let _ = writeln!(io::stdout(), "Workflow:");
-    for line in WORKFLOW_COMMANDS {
-        let _ = writeln!(io::stdout(), "  {line}");
-    }
-    let _ = writeln!(io::stdout(), "Packages:");
-    for line in PACKAGE_COMMANDS {
-        let _ = writeln!(io::stdout(), "  {line}");
-    }
-    let _ = writeln!(io::stdout(), "Distribution:");
-    for line in DISTRIBUTION_COMMANDS {
-        let _ = writeln!(io::stdout(), "  {line}");
-    }
-    let _ = writeln!(io::stdout(), "Trust:");
-    for line in TRUST_COMMANDS {
-        let _ = writeln!(io::stdout(), "  {line}");
-    }
-    let _ = writeln!(io::stdout(), "Inspect:");
-    for line in INSPECT_COMMANDS {
-        let _ = writeln!(io::stdout(), "  {line}");
-    }
-    let _ = writeln!(io::stdout(), "Meta:");
-    for line in META_COMMANDS {
-        let _ = writeln!(io::stdout(), "  {line}");
-    }
-    let _ = writeln!(
-        io::stdout(),
-        "Global flags: --path PATH, --file-path PATH, --env NAME, --no-input (disable prompts), --rm (ephemeral home), --trust [--global]"
-    );
+    print_group("Workflow", WORKFLOW_COMMANDS);
+    let _ = writeln!(io::stdout());
+    print_group("Packages", PACKAGE_COMMANDS);
+    let _ = writeln!(io::stdout());
+    print_group("Distribution", DISTRIBUTION_COMMANDS);
+    let _ = writeln!(io::stdout());
+    print_group("Trust", TRUST_COMMANDS);
+    let _ = writeln!(io::stdout());
+    print_group("Inspect", INSPECT_COMMANDS);
+    let _ = writeln!(io::stdout());
+    print_group("Meta", META_COMMANDS);
 }
 
-const WORKFLOW_COMMANDS: &[&str] = &[
-    "install [--locked|--frozen|--offline]  resolve, render, and write Prayfile.lock",
-    "plan [--remote]                        preview materialization changes",
-    "apply                                  apply the current plan",
-    "verify [--strict]                      check rendered output against the lockfile",
-    "drift [--semantic]                     compare lockfile to current resolution",
-    "render [--check]                       render targets without updating the lockfile",
-    "format|fmt                             rewrite Prayfile to recommended destination DSL",
-];
-
-const PACKAGE_COMMANDS: &[&str] = &[
-    "add <name> [constraint] [--path PATH]",
-    "remove <name>",
-    "update [package] [--major] [--latest] [--dry-run] [--json]",
-    "unlock <package>",
-    "vendor                                 copy resolved packages locally",
-    "clean                                  remove local cache and vendor trees",
-];
-
-#[cfg(feature = "auth")]
-const DISTRIBUTION_COMMANDS: &[&str] = &[
-    "publish --root PATH [--server URL ...] [--signing-key PATH]",
-    "login --server URL --email EMAIL",
-    "serve [--root PATH] [--host HOST] [--port PORT] [--stdio] [--allow-open-push]",
-    "sync [--root PATH] [--peer URL ...]",
-    "confess <package> | --from-lock SPAN_ID [--accepted|--rejected]",
-];
-
-#[cfg(not(feature = "auth"))]
-const DISTRIBUTION_COMMANDS: &[&str] = &[
-    "publish --root PATH [--server URL ...] [--signing-key PATH]",
-    "login --server URL --email EMAIL",
-    "sync [--root PATH] [--peer URL ...]",
-    "confess <package> | --from-lock SPAN_ID [--accepted|--rejected]",
-];
-
-const TRUST_COMMANDS: &[&str] =
-    &["trust list|show|add-key|remove-key|set-signed|set-allow|import-repo|import-registry|check"];
-
-const INSPECT_COMMANDS: &[&str] = &[
-    "list                                   list declared packages",
-    "outdated [--remote]                      show constraint vs resolved versions",
-    "explain <package>                        show why a package was selected",
-    "tree                                     print the dependency tree",
-];
-
-const META_COMMANDS: &[&str] = &[
-    "init [--targets tool_a,tool_b]",
-    "prayer init                            scaffold a prayer package",
-    "repo init                              scaffold a distribution root",
-    "manifest                               print canonical Prayfile JSON",
-    "package                                build a distributable prayer archive",
-    "upgrade                                install the latest pray CLI release",
-    "version | -V | --version",
-];
-
-fn command_help_text(command: &str) -> Option<&'static str> {
-    match command {
-        "install" => Some(
-            "install — resolve packages, render targets, and update Prayfile.lock\n\n\
-             Usage: pray install [--locked|--frozen|--offline]\n\n\
-             --locked   require an existing lockfile\n\
-             --frozen   require lockfile to match Prayfile exactly\n\
-             --offline  use cache only",
-        ),
-        "verify" => Some(
-            "verify — check rendered files against Prayfile.lock\n\n\
-             Usage: pray verify [--strict]\n\n\
-             Without --strict, orphan-marker warnings print to stderr but exit 0.\n\
-             With --strict, any finding fails with exit code 6.",
-        ),
-        "drift" => Some(
-            "drift — report differences between lockfile and current resolution\n\n\
-             Usage: pray drift [--semantic]\n\n\
-             Exits with code 6 when drift is found.",
-        ),
-        "update" => Some(
-            "update — refresh package versions within constraints\n\n\
-             Usage: pray update [package] [--major] [--latest] [--dry-run] [--json]",
-        ),
-        "plan" => Some(
-            "plan — preview install/apply changes\n\n\
-             Usage: pray plan [--remote]",
-        ),
-        "apply" => Some("apply — materialize the current resolution plan\n\nUsage: pray apply"),
-        "trust" => Some(
-            "trust — manage client trust policy for remote sources\n\n\
-             Usage: pray trust <subcommand>\n\n\
-             Subcommands: list, show, add-key, remove-key, set-signed, set-allow, \
-             import-repo, import-registry, check",
-        ),
-        "init" => Some(
-            "init — create a starter Prayfile\n\n\
-             Usage: pray init [--targets tool_a,tool_b]",
-        ),
-        "add" => Some(
-            "add — declare a package in Prayfile\n\n\
-             Usage: pray add <name> [constraint] [--path PATH]",
-        ),
-        "publish" => Some(
-            "publish — upload packages to a registry or local root\n\n\
-             Usage: pray publish --root PATH [--server URL ...] [--signing-key PATH]\n\n\
-             Signatures:\n\
-             - Prefer a publisher signing key via --signing-key PATH or PRAY_SIGNING_KEY\n\
-               (32-byte ed25519 seed). Publish then records an ed25519 package signature\n\
-               and signer_public_key so installers can verify the publisher.\n\
-             - Without a signing key, publish records a legacy content digest so older\n\
-               registries keep working; prefer a signing key for publisher authenticity.",
-        ),
-        #[cfg(feature = "auth")]
-        "serve" => Some(
-            "serve — run a local registry server\n\n\
-             Usage: pray serve [--root PATH] [--host HOST] [--port PORT] [--stdio] [--allow-open-push]",
-        ),
-        "upgrade" => Some(
-            "upgrade — install the latest pray CLI release\n\n\
-             Usage: pray upgrade\n\n\
-             Runs `cargo install pray-cli --locked --force`.",
-        ),
-        _ => None,
+fn print_group(title: &str, lines: &[&str]) {
+    let _ = writeln!(io::stdout(), "{title}:");
+    for line in lines {
+        let _ = writeln!(io::stdout(), "  {line}");
     }
 }
 
@@ -235,7 +99,7 @@ pub(crate) fn maybe_print_help(arguments: &[String]) -> PrayResult<Option<()>> {
         if print_command_help(command) {
             return Ok(Some(()));
         }
-        return Err(PrayError::Usage(format!("unknown command: {command}")));
+        return Err(PrayError::Usage(unknown_command_message(command)));
     }
 
     Ok(None)

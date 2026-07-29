@@ -1,5 +1,3 @@
-const DOCS_URL = "https://github.com/kiskolabs/pray";
-
 const WORKFLOW_COMMANDS = [
   "install [--locked|--frozen|--offline]  resolve, render, and write Prayfile.lock",
   "plan [--remote]                        preview materialization changes",
@@ -11,10 +9,10 @@ const WORKFLOW_COMMANDS = [
 ];
 
 const PACKAGE_COMMANDS = [
-  "add <name> [constraint] [--path PATH]",
-  "remove <name>",
+  "add <name> [constraint] [--path PATH]  declare a package in Prayfile",
+  "remove <name>                          remove a package from Prayfile",
   "update [package] [--major] [--latest] [--dry-run] [--json]",
-  "unlock <package>",
+  "unlock <package>                       clear a locked package pin",
   "vendor                                 copy resolved packages locally",
   "clean                                  remove local cache and vendor trees",
 ];
@@ -33,88 +31,123 @@ const TRUST_COMMANDS = [
 
 const INSPECT_COMMANDS = [
   "list                                   list declared packages",
-  "outdated [--remote]                      show constraint vs resolved versions",
-  "explain <package>                        show why a package was selected",
-  "tree                                     print the dependency tree",
+  "outdated [--remote]                    show constraint vs resolved versions",
+  "explain <package>                      show why a package was selected",
+  "tree                                   print the dependency tree",
 ];
 
 const META_COMMANDS = [
-  "init [--targets tool_a,tool_b]",
+  "init [--targets tool_a,tool_b]         create a starter Prayfile",
   "prayer init                            scaffold a prayer package",
   "repo init                              scaffold a distribution root",
   "manifest                               print canonical Prayfile JSON",
   "package                                build a distributable prayer archive",
   "upgrade                                install the latest pray CLI release",
-  "version | -V | --version",
+  "version | -V | --version               print the pray CLI version",
+];
+
+const GLOBAL_OPTIONS = [
+  "--no-input            disable prompts",
+  "--rm                  use an ephemeral home directory",
+  "--trust [--global]    import trust on first use",
 ];
 
 const COMMAND_HELP: Record<string, string> = {
   install:
-    "install — resolve packages, render targets, and update Prayfile.lock\n\n" +
+    "resolve packages, render targets, and update Prayfile.lock\n\n" +
     "Usage: pray install [--locked|--frozen|--offline]\n\n" +
     "--locked   require an existing lockfile\n" +
     "--frozen   require lockfile to match Prayfile exactly\n" +
     "--offline  use cache only",
   verify:
-    "verify — check rendered files against Prayfile.lock\n\n" +
+    "check rendered files against Prayfile.lock\n\n" +
     "Usage: pray verify [--strict]\n\n" +
     "Without --strict, orphan-marker warnings print to stderr but exit 0.\n" +
     "With --strict, any finding fails with exit code 6.",
   drift:
-    "drift — report differences between lockfile and current resolution\n\n" +
+    "report differences between lockfile and current resolution\n\n" +
     "Usage: pray drift [--semantic]\n\n" +
     "Exits with code 6 when drift is found.",
+  render:
+    "render targets without updating the lockfile\n\n" +
+    "Usage: pray render [--check]",
+  format:
+    "rewrite Prayfile to recommended destination DSL\n\n" +
+    "Usage: pray format\n       pray fmt",
+  fmt:
+    "rewrite Prayfile to recommended destination DSL\n\n" +
+    "Usage: pray format\n       pray fmt",
   update:
-    "update — refresh package versions within constraints\n\n" +
+    "refresh package versions within constraints\n\n" +
     "Usage: pray update [package] [--major] [--latest] [--dry-run] [--json]",
-  plan: "plan — preview install/apply changes\n\nUsage: pray plan [--remote]",
+  plan: "preview install/apply changes\n\nUsage: pray plan [--remote]",
   outdated:
-    "outdated — show constraint vs resolved versions\n\n" +
+    "show constraint vs resolved versions\n\n" +
     "Usage: pray outdated [--remote]",
-  apply: "apply — materialize the current resolution plan\n\nUsage: pray apply",
+  apply: "materialize the current resolution plan\n\nUsage: pray apply",
+  add: "declare a package in Prayfile\n\nUsage: pray add <name> [constraint] [--path PATH]",
+  remove: "remove a package from Prayfile\n\nUsage: pray remove <name>",
+  unlock: "clear a locked package pin\n\nUsage: pray unlock <package>",
+  vendor: "copy resolved packages locally\n\nUsage: pray vendor",
+  clean: "remove local cache and vendor trees\n\nUsage: pray clean",
   login:
-    "login — authenticate to a registry server\n\n" +
+    "authenticate to a registry server\n\n" +
     "Usage: pray login --server URL --email EMAIL (--passkey-key PATH --credential-id ID | --ssh-agent --public-key PATH)",
   upgrade:
-    "upgrade — install the latest pray CLI release\n\n" +
+    "install the latest pray CLI release\n\n" +
     "Usage: pray upgrade\n\n" +
     "Runs `npm install -g pray-cli@latest`.",
   trust:
-    "trust — manage client trust policy for remote sources\n\n" +
+    "manage client trust policy for remote sources\n\n" +
     "Usage: pray trust <subcommand>\n\n" +
     "Subcommands: list, show, add-key, remove-key, set-signed, set-allow, import-repo, import-registry, check",
-  init: "init — create a starter Prayfile\n\nUsage: pray init [--targets tool_a,tool_b]",
-  add: "add — declare a package in Prayfile\n\nUsage: pray add <name> [constraint] [--path PATH]",
+  init: "create a starter Prayfile\n\nUsage: pray init [--targets tool_a,tool_b]",
   publish:
-    "publish — upload packages to a registry or local root\n\n" +
+    "upload packages to a registry or local root\n\n" +
     "Usage: pray publish --root PATH [--server URL ...]",
   serve:
-    "serve — run a local registry server\n\n" +
+    "run a local registry server\n\n" +
     "Usage: pray serve [--root PATH] [--host HOST] [--port PORT] [--stdio]",
+  sync:
+    "sync packages with peer registries\n\n" +
+    "Usage: pray sync [--root PATH] [--peer URL ...]",
+  confess:
+    "record an acceptance or rejection for a package confession\n\n" +
+    "Usage: pray confess <package> | --from-lock SPAN_ID [--accepted|--rejected]",
+  list: "list declared packages\n\nUsage: pray list",
+  explain: "show why a package was selected\n\nUsage: pray explain <package>",
+  tree: "print the dependency tree\n\nUsage: pray tree",
+  prayer: "scaffold a prayer package\n\nUsage: pray prayer init",
+  repo: "scaffold a distribution root\n\nUsage: pray repo init",
+  manifest: "print canonical Prayfile JSON\n\nUsage: pray manifest",
+  package: "build a distributable prayer archive\n\nUsage: pray package",
+  version:
+    "print the pray CLI version\n\n" +
+    "Usage: pray version\n       pray -V | --version",
+  help:
+    "show help for pray or one command\n\n" +
+    "Usage: pray help [command]\n       pray [command] --help",
 };
 
 function printCommandGroups(): string {
-  const lines = [
-    "Workflow:",
-    ...WORKFLOW_COMMANDS.map((line) => `  ${line}`),
-    "Packages:",
-    ...PACKAGE_COMMANDS.map((line) => `  ${line}`),
-    "Distribution:",
-    ...DISTRIBUTION_COMMANDS.map((line) => `  ${line}`),
-    "Trust:",
-    ...TRUST_COMMANDS.map((line) => `  ${line}`),
-    "Inspect:",
-    ...INSPECT_COMMANDS.map((line) => `  ${line}`),
-    "Meta:",
-    ...META_COMMANDS.map((line) => `  ${line}`),
-    "Global flags: --no-input (disable prompts), --rm (ephemeral home), --trust [--global]",
+  const groups: Array<[string, string[]]> = [
+    ["Workflow", WORKFLOW_COMMANDS],
+    ["Packages", PACKAGE_COMMANDS],
+    ["Distribution", DISTRIBUTION_COMMANDS],
+    ["Trust", TRUST_COMMANDS],
+    ["Inspect", INSPECT_COMMANDS],
+    ["Meta", META_COMMANDS],
   ];
-  return `${lines.join("\n")}\n`;
+  return groups
+    .map(([title, lines]) =>
+      [`${title}:`, ...lines.map((line) => `  ${line}`)].join("\n"),
+    )
+    .join("\n\n");
 }
 
 export function conciseHelpText(): string {
   return [
-    "pray — reproducible inference input for projects",
+    "Usage: pray [OPTIONS] <COMMAND>",
     "",
     "Declare shared instructions in Prayfile, lock versions, and render tool-specific output.",
     "",
@@ -126,9 +159,11 @@ export function conciseHelpText(): string {
     "  pray verify",
     "",
     printCommandGroups(),
-    "Run `pray help <command>` or `pray <command> --help` for one command.",
-    `Documentation: ${DOCS_URL}`,
-    "Exit codes: 0 success; 2 usage/parse; 3 resolution; 4 integrity; 5 render; 6 verify; 8 unsupported.",
+    "",
+    "Options:",
+    ...GLOBAL_OPTIONS.map((line) => `  ${line}`),
+    "",
+    "See 'pray help <command>' or 'pray <command> --help' for details on a command.",
     "",
   ].join("\n");
 }
@@ -136,11 +171,7 @@ export function conciseHelpText(): string {
 export const HELP_TEXT = conciseHelpText();
 
 export function commandHelpText(command: string): string | undefined {
-  const text = COMMAND_HELP[command];
-  if (!text) {
-    return undefined;
-  }
-  return `${text}\n\nDocumentation: ${DOCS_URL}\n`;
+  return COMMAND_HELP[command];
 }
 
 export type HelpDispatchResult = "printed" | "not_help";
@@ -169,7 +200,7 @@ export function maybePrintHelp(argumentsList: string[]): HelpDispatchResult {
     }
     const text = commandHelpText(target);
     if (text) {
-      process.stdout.write(text);
+      process.stdout.write(`${text}\n`);
       return "printed";
     }
     return "not_help";
@@ -185,7 +216,7 @@ export function maybePrintHelp(argumentsList: string[]): HelpDispatchResult {
     }
     const text = commandHelpText(argumentsList[0] ?? "");
     if (text) {
-      process.stdout.write(text);
+      process.stdout.write(`${text}\n`);
       return "printed";
     }
     return "not_help";

@@ -2,6 +2,12 @@
 
 ## Unreleased
 
+- Reshape CLI help around a `Usage` synopsis and `Options` block; drop documentation URL and exit-code footers from default help.
+- Add per-command help for every listed command so `pray help <command>` no longer reports known commands as unknown.
+- Point unknown-command errors at `pray --help`.
+- Add `pray completion bash|zsh|fish` for shell completion scripts.
+- Document CLI exit codes in `docs/cli-exit-codes.md` and SPEC section 66; add man page `docs/man/pray.1`.
+
 ## 1.6.0 (2026-07-29)
 
 - Warn when Prayfile still uses deprecated `target`, `output`, or `agent`; prefer `compose` / `tree` / `pray`. These forms will be removed in version 2.

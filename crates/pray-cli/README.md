@@ -28,6 +28,16 @@ pray publish --root ./prayers
 pray serve --root ./prayers --port 7429
 ```
 
+Shell completions:
+
+```sh
+pray completion bash > ~/.local/share/bash-completion/completions/pray
+pray completion zsh > ~/.zsh/completions/_pray
+pray completion fish > ~/.config/fish/completions/pray.fish
+```
+
+Man page (from a checkout): `man ./docs/man/pray.1`. Exit codes: `docs/cli-exit-codes.md`.
+
 ## Related crates
 
 - [pray-core](https://crates.io/crates/pray-core) — parsing, resolution, lockfiles, rendering

@@ -13,8 +13,10 @@ mod commands_materialize;
 mod commands_package;
 mod commands_update;
 mod commands_verify;
+mod completion;
 mod confess;
 mod help;
+mod help_text;
 mod invocation;
 mod lockfile_ops;
 mod materialize;
@@ -70,6 +72,7 @@ use commands_materialize::{apply_command, install_command};
 use commands_package::{format_command, login_command, package_command, vendor_command};
 use commands_update::{unlock_command, update_command};
 use commands_verify::{drift_command, render_command, verify_command};
+use completion::completion_command;
 use confess::confess_command;
 use help::maybe_print_help;
 use pray_core::client_trust::prepare_ephemeral_home;
@@ -216,6 +219,7 @@ fn run(arguments: Vec<String>) -> PrayResult<()> {
         Command::Trust { arguments } => trust_command::run_trust_command(arguments),
         Command::Upgrade => cli_release::upgrade_command(),
         Command::Version => version_command(),
+        Command::Completion { shell } => completion_command(&shell),
     };
 
     if result.is_ok() {

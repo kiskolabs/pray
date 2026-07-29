@@ -1,8 +1,8 @@
 pub const TOP_LEVEL_COMMANDS: &[&str] = &[
-    "add", "apply", "clean", "confess", "drift", "explain", "fmt", "format", "help", "init",
-    "install", "list", "login", "manifest", "outdated", "package", "plan", "prayer", "publish",
-    "remove", "render", "repo", "serve", "sync", "tree", "trust", "unlock", "update", "upgrade",
-    "vendor", "verify", "version",
+    "add", "apply", "clean", "completion", "confess", "drift", "explain", "fmt", "format", "help",
+    "init", "install", "list", "login", "manifest", "outdated", "package", "plan", "prayer",
+    "publish", "remove", "render", "repo", "serve", "sync", "tree", "trust", "unlock", "update",
+    "upgrade", "vendor", "verify", "version",
 ];
 
 pub fn unknown_command_message(command: &str) -> String {
@@ -10,6 +10,7 @@ pub fn unknown_command_message(command: &str) -> String {
     if let Some(suggestion) = suggest_command(command, TOP_LEVEL_COMMANDS) {
         message.push_str(&format!("\nDid you mean `{suggestion}`?"));
     }
+    message.push_str("\nSee 'pray --help'.");
     message
 }
 
@@ -73,5 +74,6 @@ mod tests {
         let message = unknown_command_message("instal");
         assert!(message.contains("unknown command: instal"));
         assert!(message.contains("Did you mean `install`?"));
+        assert!(message.contains("See 'pray --help'."));
     }
 }

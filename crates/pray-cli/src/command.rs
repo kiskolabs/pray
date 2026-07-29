@@ -94,4 +94,7 @@ pub(crate) enum Command {
     },
     Upgrade,
     Version,
+    Completion {
+        shell: String,
+    },
 }

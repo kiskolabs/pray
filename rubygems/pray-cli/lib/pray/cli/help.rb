@@ -3,8 +3,6 @@
 module Pray
   module CLI
     module Help
-      DOCS_URL = "https://github.com/kiskolabs/pray"
-
       WORKFLOW_COMMANDS = [
         "install [--locked|--frozen|--offline]  resolve, render, and write Prayfile.lock",
         "plan [--remote]                        preview materialization changes",
@@ -16,10 +14,10 @@ module Pray
       ].freeze
 
       PACKAGE_COMMANDS = [
-        "add <name> [constraint] [--path PATH]",
-        "remove <name>",
+        "add <name> [constraint] [--path PATH]  declare a package in Prayfile",
+        "remove <name>                          remove a package from Prayfile",
         "update [package] [--major] [--latest] [--dry-run] [--json]",
-        "unlock <package>",
+        "unlock <package>                       clear a locked package pin",
         "vendor                                 copy resolved packages locally",
         "clean                                  remove local cache and vendor trees"
       ].freeze
@@ -38,23 +36,29 @@ module Pray
 
       INSPECT_COMMANDS = [
         "list                                   list declared packages",
-        "outdated [--remote]                      show constraint vs resolved versions",
-        "explain <package>                        show why a package was selected",
-        "tree                                     print the dependency tree"
+        "outdated [--remote]                    show constraint vs resolved versions",
+        "explain <package>                      show why a package was selected",
+        "tree                                   print the dependency tree"
       ].freeze
 
       META_COMMANDS = [
-        "init [--targets tool_a,tool_b]",
+        "init [--targets tool_a,tool_b]         create a starter Prayfile",
         "prayer init                            scaffold a prayer package",
         "repo init                              scaffold a distribution root",
         "manifest                               print canonical Prayfile JSON",
         "package                                build a distributable prayer archive",
-        "version | -V | --version"
+        "version | -V | --version               print the pray CLI version"
+      ].freeze
+
+      GLOBAL_OPTIONS = [
+        "--no-input            disable prompts",
+        "--rm                  use an ephemeral home directory",
+        "--trust [--global]    import trust on first use"
       ].freeze
 
       COMMAND_HELP = {
         "install" => <<~TEXT.strip,
-          install — resolve packages, render targets, and update Prayfile.lock
+          resolve packages, render targets, and update Prayfile.lock
 
           Usage: pray install [--locked|--frozen|--offline]
 
@@ -63,7 +67,7 @@ module Pray
           --offline  use cache only
         TEXT
         "verify" => <<~TEXT.strip,
-          verify — check rendered files against Prayfile.lock
+          check rendered files against Prayfile.lock
 
           Usage: pray verify [--strict]
 
@@ -71,56 +75,120 @@ module Pray
           With --strict, any finding fails with exit code 6.
         TEXT
         "drift" => <<~TEXT.strip,
-          drift — report differences between lockfile and current resolution
+          report differences between lockfile and current resolution
 
           Usage: pray drift [--semantic]
 
           Exits with code 6 when drift is found.
         TEXT
+        "render" => <<~TEXT.strip,
+          render targets without updating the lockfile
+
+          Usage: pray render [--check]
+        TEXT
+        "format" => <<~TEXT.strip,
+          rewrite Prayfile to recommended destination DSL
+
+          Usage: pray format
+                 pray fmt
+        TEXT
+        "fmt" => <<~TEXT.strip,
+          rewrite Prayfile to recommended destination DSL
+
+          Usage: pray format
+                 pray fmt
+        TEXT
         "update" => <<~TEXT.strip,
-          update — refresh package versions within constraints
+          refresh package versions within constraints
 
           Usage: pray update [package] [--major] [--latest] [--dry-run] [--json]
         TEXT
         "plan" => <<~TEXT.strip,
-          plan — preview install/apply changes
+          preview install/apply changes
 
           Usage: pray plan [--remote]
         TEXT
-        "apply" => "apply — materialize the current resolution plan\n\nUsage: pray apply",
+        "apply" => "materialize the current resolution plan\n\nUsage: pray apply",
+        "add" => <<~TEXT.strip,
+          declare a package in Prayfile
+
+          Usage: pray add <name> [constraint] [--path PATH]
+        TEXT
+        "remove" => "remove a package from Prayfile\n\nUsage: pray remove <name>",
+        "unlock" => "clear a locked package pin\n\nUsage: pray unlock <package>",
+        "vendor" => "copy resolved packages locally\n\nUsage: pray vendor",
+        "clean" => "remove local cache and vendor trees\n\nUsage: pray clean",
+        "publish" => <<~TEXT.strip,
+          upload packages to a registry or local root
+
+          Usage: pray publish --root PATH [--server URL ...]
+        TEXT
+        "login" => <<~TEXT.strip,
+          authenticate to a registry server
+
+          Usage: pray login --server URL --email EMAIL
+        TEXT
+        "serve" => <<~TEXT.strip,
+          run a local registry server
+
+          Usage: pray serve [--root PATH] [--host HOST] [--port PORT] [--stdio]
+        TEXT
+        "sync" => <<~TEXT.strip,
+          sync packages with peer registries
+
+          Usage: pray sync [--root PATH] [--peer URL ...]
+        TEXT
+        "confess" => <<~TEXT.strip,
+          record an acceptance or rejection for a package confession
+
+          Usage: pray confess <package> | --from-lock SPAN_ID [--accepted|--rejected]
+        TEXT
         "trust" => <<~TEXT.strip,
-          trust — manage client trust policy for remote sources
+          manage client trust policy for remote sources
 
           Usage: pray trust <subcommand>
 
           Subcommands: list, show, add-key, remove-key, set-signed, set-allow, import-repo, import-registry, check
         TEXT
+        "list" => "list declared packages\n\nUsage: pray list",
+        "outdated" => <<~TEXT.strip,
+          show constraint vs resolved versions
+
+          Usage: pray outdated [--remote]
+        TEXT
+        "explain" => <<~TEXT.strip,
+          show why a package was selected
+
+          Usage: pray explain <package>
+        TEXT
+        "tree" => "print the dependency tree\n\nUsage: pray tree",
         "init" => <<~TEXT.strip,
-          init — create a starter Prayfile
+          create a starter Prayfile
 
           Usage: pray init [--targets tool_a,tool_b]
         TEXT
-        "add" => <<~TEXT.strip,
-          add — declare a package in Prayfile
+        "prayer" => "scaffold a prayer package\n\nUsage: pray prayer init",
+        "repo" => "scaffold a distribution root\n\nUsage: pray repo init",
+        "manifest" => "print canonical Prayfile JSON\n\nUsage: pray manifest",
+        "package" => "build a distributable prayer archive\n\nUsage: pray package",
+        "version" => <<~TEXT.strip,
+          print the pray CLI version
 
-          Usage: pray add <name> [constraint] [--path PATH]
+          Usage: pray version
+                 pray -V | --version
         TEXT
-        "publish" => <<~TEXT.strip,
-          publish — upload packages to a registry or local root
+        "help" => <<~TEXT.strip
+          show help for pray or one command
 
-          Usage: pray publish --root PATH [--server URL ...]
-        TEXT
-        "serve" => <<~TEXT.strip
-          serve — run a local registry server
-
-          Usage: pray serve [--root PATH] [--host HOST] [--port PORT] [--stdio]
+          Usage: pray help [command]
+                 pray [command] --help
         TEXT
       }.freeze
 
       module_function
 
       def print_concise_help
-        puts "pray — reproducible inference input for projects"
+        puts "Usage: pray [OPTIONS] <COMMAND>"
         puts
         puts "Declare shared instructions in Prayfile, lock versions, and render tool-specific output."
         puts
@@ -133,9 +201,10 @@ module Pray
         puts
         print_command_groups
         puts
-        puts "Run `pray help <command>` or `pray <command> --help` for one command."
-        puts "Documentation: #{DOCS_URL}"
-        puts "Exit codes: 0 success; 2 usage/parse; 3 resolution; 4 integrity; 5 render; 6 verify; 8 unsupported."
+        puts "Options:"
+        GLOBAL_OPTIONS.each { |line| puts "  #{line}" }
+        puts
+        puts "See 'pray help <command>' or 'pray <command> --help' for details on a command."
       end
 
       def print_command_help(command)
@@ -143,25 +212,26 @@ module Pray
         return false unless text
 
         puts text
-        puts
-        puts "Documentation: #{DOCS_URL}"
         true
       end
 
       def print_command_groups
-        puts "Workflow:"
-        WORKFLOW_COMMANDS.each { |line| puts "  #{line}" }
-        puts "Packages:"
-        PACKAGE_COMMANDS.each { |line| puts "  #{line}" }
-        puts "Distribution:"
-        DISTRIBUTION_COMMANDS.each { |line| puts "  #{line}" }
-        puts "Trust:"
-        TRUST_COMMANDS.each { |line| puts "  #{line}" }
-        puts "Inspect:"
-        INSPECT_COMMANDS.each { |line| puts "  #{line}" }
-        puts "Meta:"
-        META_COMMANDS.each { |line| puts "  #{line}" }
-        puts "Global flags: --no-input (disable prompts), --rm (ephemeral home), --trust [--global]"
+        print_group("Workflow", WORKFLOW_COMMANDS)
+        puts
+        print_group("Packages", PACKAGE_COMMANDS)
+        puts
+        print_group("Distribution", DISTRIBUTION_COMMANDS)
+        puts
+        print_group("Trust", TRUST_COMMANDS)
+        puts
+        print_group("Inspect", INSPECT_COMMANDS)
+        puts
+        print_group("Meta", META_COMMANDS)
+      end
+
+      def print_group(title, lines)
+        puts "#{title}:"
+        lines.each { |line| puts "  #{line}" }
       end
     end
   end

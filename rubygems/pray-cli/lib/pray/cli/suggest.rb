@@ -14,7 +14,8 @@ module Pray
       def unknown_command_message(command)
         message = "unknown command: #{command}"
         suggestion = suggest_command(command, TOP_LEVEL_COMMANDS)
-        suggestion ? "#{message}\nDid you mean `#{suggestion}`?" : message
+        message = "#{message}\nDid you mean `#{suggestion}`?" if suggestion
+        "#{message}\nSee 'pray --help'."
       end
 
       def suggest_command(input, candidates)

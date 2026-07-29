@@ -39,6 +39,7 @@ export function unknownCommandMessage(command: string): string {
   if (suggestion) {
     message += `\nDid you mean \`${suggestion}\`?`;
   }
+  message += "\nSee 'pray --help'.";
   return message;
 }
 

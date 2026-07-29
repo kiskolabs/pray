@@ -13,6 +13,7 @@ RSpec.describe "pray CLI suggestions" do
     expect(status.exitstatus).to eq(2)
     expect(stderr).to include("usage error:")
     expect(stderr).to include("Did you mean `install`?")
+    expect(stderr).to include("See 'pray --help'.")
     expect(stderr).not_to include("unsupported feature")
   end
 

@@ -58,6 +58,21 @@ Publish local prayer packages to a distribution point:
 
 See `scripts/release/README.md` for flags, credentials, and orchestration details.
 
+## Man page
+
+The committed man page is `docs/man/pray.1`. `cargo install` does not install it automatically.
+
+From a checkout:
+
+```sh
+man ./docs/man/pray.1
+# or
+install -d "$(manpath | cut -d: -f1)/man1"
+install -m 644 docs/man/pray.1 "$(manpath | cut -d: -f1)/man1/pray.1"
+```
+
+Exit codes for operators: `docs/cli-exit-codes.md` (normative table in SPEC.md section 66).
+
 ## After language registry publish
 
 1. Create a GitHub Release for `vX.Y.Z` so `pray` upgrade notices can resolve the latest tag.
