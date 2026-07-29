@@ -8,11 +8,11 @@ import { normalizeLineEndings } from "../hashing.js";
 import { readLockfile } from "../lockfile/index.js";
 import { defaultLockfilePath } from "../lockfile/paths.js";
 import type { Lockfile } from "../lockfile/types.js";
+import { emitDeprecationWarnings } from "../manifest/deprecation.js";
 import {
   exportKindMatchesRole,
   packageRoles,
 } from "../manifest/destination.js";
-import { emitDeprecationWarnings } from "../manifest/deprecation.js";
 import {
   manifestHash,
   parseManifest,
