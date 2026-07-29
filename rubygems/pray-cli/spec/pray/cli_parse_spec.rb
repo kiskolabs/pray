@@ -33,9 +33,31 @@ RSpec.describe Pray::CLI do
     end
 
     it "parses trust subcommands" do
-      expect(described_class.parse_command(["trust", "list"])).to eq([:trust_list])
-      expect(described_class.parse_command(["trust", "show", "https://registry.example"])).to eq(
-        [:trust_show, "https://registry.example"]
+      expect(described_class.parse_command(["trust", "list"])).to eq(
+        [:trust_list, {scope: :all, source_url: nil}]
+      )
+      expect(described_class.parse_command(["trust", "show"])).to eq([:trust_show])
+      expect(described_class.parse_command(["trust", "add-key", "sha256:abc", "--match-prefix", "https://x"])).to eq(
+        [:trust_add_key, {key: "sha256:abc", match_prefix: "https://x"}]
+      )
+    end
+
+    it "parses login confess and sync" do
+      expect(described_class.parse_command([
+        "login", "--server", "http://127.0.0.1:9", "--email", "a@b.c",
+        "--passkey-key", "key", "--credential-id", "cred"
+      ])).to eq([
+        :login,
+        {servers: ["http://127.0.0.1:9"], email: "a@b.c", mode: :passkey,
+         passkey_key: "key", credential_id: "cred"}
+      ])
+      expect(described_class.parse_command(["confess", "sample/base", "--accepted"])).to eq([
+        :confess,
+        {package: "sample/base", from_lock: nil, version: nil, accepted: true,
+         rejected: false, note: nil, url: nil}
+      ])
+      expect(described_class.parse_command(["sync", "--root", "dist", "--peer", "http://x"])).to eq(
+        [:sync, {root: "dist", peers: ["http://x"]}]
       )
     end
   end

@@ -3,7 +3,9 @@
 require "socket"
 require "fileutils"
 require "pathname"
+require "json"
 require_relative "path_safety"
+require_relative "serve_federation"
 
 module Pray
   module Serve
@@ -50,9 +52,9 @@ module Pray
       method, path, = request_line.split
       headers = read_headers(socket)
       body_length = headers["content-length"].to_i
-      socket.read(body_length) if body_length.positive?
+      body = body_length.positive? ? socket.read(body_length) : ""
 
-      response = dispatch_request(root, method, path)
+      response = dispatch_request(root, method, path, body)
       socket.print(response)
     end
 
@@ -68,8 +70,22 @@ module Pray
       headers
     end
 
-    def dispatch_request(root, method, path)
+    def dispatch_request(root, method, path, body = "")
       path = path.split("?", 2).first
+
+      case [method, path]
+      when ["GET", "/.well-known/pray-federation.json"]
+        return ServeFederation.discovery_response(root)
+      when ["GET", "/v1/sync/index"]
+        return ServeFederation.index_response(root)
+      when ["POST", "/v1/confessions"]
+        return ServeFederation.append_confession(root, body)
+      end
+
+      if method == "GET" && path.start_with?("/v1/sync/package/")
+        return ServeFederation.package_response(root, path)
+      end
+
       return not_found unless method == "GET"
 
       if path == "/"
@@ -81,8 +97,8 @@ module Pray
       return not_found unless File.file?(file_path)
 
       content_type = content_type_for(file_path)
-      body = File.binread(file_path)
-      ok_response(content_type, body)
+      file_body = File.binread(file_path)
+      ok_response(content_type, file_body)
     end
 
     def content_type_for(path)

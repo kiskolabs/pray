@@ -36,16 +36,26 @@ export async function httpPost(
   contentType: string,
   body: Buffer | string,
 ): Promise<void> {
+  await httpPostJson(url, contentType, body);
+}
+
+export async function httpPostJson(
+  url: string,
+  contentType: string,
+  body: Buffer | string,
+): Promise<Buffer> {
   const response = await fetch(url, {
     method: "POST",
     headers: { "Content-Type": contentType },
     body: typeof body === "string" ? body : new Uint8Array(body),
   });
+  const responseBody = Buffer.from(await response.arrayBuffer());
   if (!response.ok) {
     throw PrayError.resolution(
-      `HTTP request failed for ${url}: ${response.status}`,
+      `HTTP request failed for ${url}: ${response.status}: ${responseBody.toString("utf8")}`,
     );
   }
+  return responseBody;
 }
 
 export function joinUrl(base: string, path: string): string {

@@ -59,6 +59,18 @@ pray prayer init
 pray package
 ```
 
+Auth, trust, and federation:
+
+```bash
+pray login --server URL --email EMAIL --passkey-key PATH --credential-id ID
+pray confess sample/base --accepted
+pray sync --root PATH --peer URL
+pray trust list
+pray trust show
+pray trust add-key KEY --match-prefix PREFIX
+pray trust check [SOURCE]
+```
+
 Maintenance:
 
 ```bash
@@ -67,11 +79,11 @@ pray format
 pray clean
 ```
 
-Deferred in this release (clear unsupported errors): `login`, `confess`, `sync`, `trust`, `pray_ssh` sources, `serve --stdio`.
+Deferred in this release (clear unsupported errors): `pray_ssh` sources, `serve --stdio`, confess/sync over `pray+ssh`, trust `--host-key` for `pray+ssh`.
 
 Git sources clone into `.pray/cache/git`, discover distribution roots at `v1/packages` or `prayers/v1/packages`, and resolve packages through registry metadata.
 
-Local publish writes `v1/index.json`, package metadata, and `.praypkg` artifacts. `serve` exposes the distribution tree over HTTP.
+Local publish writes `v1/index.json`, package metadata, and `.praypkg` artifacts. `serve` exposes the distribution tree over HTTP, including federation discovery and sync endpoints.
 
 ## Layout
 
@@ -92,7 +104,14 @@ lib/pray/
 ## Tests
 
 ```bash
-bundle exec rspec
+make lint
+make test
+```
+
+Coverage-gated parallel run:
+
+```bash
+POLYRUN_COVERAGE=1 bundle exec polyrun parallel-rspec --workers 5 --merge-failures
 ```
 
 From the repository root:

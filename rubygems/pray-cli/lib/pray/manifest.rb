@@ -18,10 +18,9 @@ module Pray
     end
   end
 
-  ManifestSource = Struct.new(:name, :kind, :url, :subdir, :rev, :tag, keyword_init: true)
+  ManifestSource = Struct.new(:name, :kind, :url, :subdir, :rev, :tag)
   ManifestTarget = Struct.new(
-    :name, :outputs, :skills, :commands, :rules, :max_bytes, :mode, :scoped, :entries,
-    keyword_init: true
+    :name, :outputs, :skills, :commands, :rules, :max_bytes, :mode, :scoped, :entries
   ) do
     def initialize(
       name:, outputs: [], skills: [], commands: [], rules: [], max_bytes: nil,
@@ -33,8 +32,7 @@ module Pray
 
   ManifestPackage = Struct.new(
     :name, :constraint, :source, :exports, :targets, :features, :groups, :optional,
-    :path, :git, :tag, :rev, :tarball, :oci, :file, :roles, :bound,
-    keyword_init: true
+    :path, :git, :tag, :rev, :tarball, :oci, :file, :roles, :bound
   ) do
     def initialize(
       name:, constraint: "*", source: nil, exports: [], targets: [], features: [], groups: [],
@@ -45,7 +43,7 @@ module Pray
     end
   end
 
-  ManifestLocal = Struct.new(:path, :position, :optional, :bound, keyword_init: true) do
+  ManifestLocal = Struct.new(:path, :position, :optional, :bound) do
     def initialize(path:, position: "after", optional: false, bound: false)
       super
     end
@@ -235,7 +233,7 @@ module Pray
           end
           parse_destination_block(manifest, Regexp.last_match(1), "compose")
         when /\A(?:tree|folder|skills) (.+)\z/
-          if (statement.start_with?("folder ") || statement.start_with?("skills ")) &&
+          if statement.start_with?("folder ", "skills ") &&
               !statement.end_with?(" do")
             raise Error.parse("manifest", "top-level folder/skills must use a tree block")
           end
@@ -307,7 +305,7 @@ module Pray
 
       def parse_destination_block(manifest, rest, mode)
         unless rest.rstrip.end_with?("do")
-          label = mode == "compose" ? "compose" : "tree"
+          label = (mode == "compose") ? "compose" : "tree"
           raise Error.parse("manifest", "#{label} must use a block")
         end
 

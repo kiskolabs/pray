@@ -44,6 +44,7 @@ const META_COMMANDS = [
   "repo init                              scaffold a distribution root",
   "manifest                               print canonical Prayfile JSON",
   "package                                build a distributable prayer archive",
+  "upgrade                                install the latest pray CLI release",
   "version | -V | --version",
 ];
 
@@ -67,7 +68,17 @@ const COMMAND_HELP: Record<string, string> = {
     "update — refresh package versions within constraints\n\n" +
     "Usage: pray update [package] [--major] [--latest] [--dry-run] [--json]",
   plan: "plan — preview install/apply changes\n\nUsage: pray plan [--remote]",
+  outdated:
+    "outdated — show constraint vs resolved versions\n\n" +
+    "Usage: pray outdated [--remote]",
   apply: "apply — materialize the current resolution plan\n\nUsage: pray apply",
+  login:
+    "login — authenticate to a registry server\n\n" +
+    "Usage: pray login --server URL --email EMAIL (--passkey-key PATH --credential-id ID | --ssh-agent --public-key PATH)",
+  upgrade:
+    "upgrade — install the latest pray CLI release\n\n" +
+    "Usage: pray upgrade\n\n" +
+    "Runs `npm install -g pray-cli@latest`.",
   trust:
     "trust — manage client trust policy for remote sources\n\n" +
     "Usage: pray trust <subcommand>\n\n" +

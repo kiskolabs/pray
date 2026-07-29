@@ -2,6 +2,11 @@
 
 ## Unreleased
 
+- Run tests with polyrun parallel RSpec, coverage gate, Makefile lint/test, and RBS validate.
+- Implement HTTP `login` (passkey and ssh-agent), `confess`, and `sync`.
+- Implement full `trust` CLI against `trust.toml` (list/show/add-key/remove-key/set-*/import-*/check).
+- Serve federation discovery, sync index/package, and confession submit over HTTP.
+
 ## 1.5.2 (2026-07-29)
 
 - Put the Prayfile positioning line into the gem summary for RubyGems search.

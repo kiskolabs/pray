@@ -53,6 +53,34 @@ export function pessimisticConstraintForVersion(version: string): string {
   return `~> ${parsed.major}.${parsed.minor}`;
 }
 
+export function latestConstraintForPackage(
+  currentConstraint: string,
+  latestVersion: string,
+): string {
+  const normalized = normalizeVersionConstraint(currentConstraint);
+  if (normalized === "*") {
+    return "*";
+  }
+  if (normalized.startsWith("~")) {
+    return pessimisticConstraintForVersion(latestVersion);
+  }
+  if (normalized.startsWith("^")) {
+    const parsed = semver.parse(latestVersion);
+    if (!parsed) {
+      throw PrayError.resolution(`invalid version ${latestVersion}`);
+    }
+    return `^${parsed.major}.${parsed.minor}`;
+  }
+  if (normalized.startsWith("=") || semver.valid(currentConstraint.trim())) {
+    return `=${latestVersion}`;
+  }
+  return pessimisticConstraintForVersion(latestVersion);
+}
+
+export function versionIsGreaterThan(left: string, right: string): boolean {
+  return semver.gt(left, right);
+}
+
 function rubyPessimisticToSemver(constraint: string): string {
   const text = constraint.trim().replace(/^~>\s*/, "");
   const parts = text.split(".");

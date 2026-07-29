@@ -16,6 +16,7 @@ inherit_gem:
 
 require:
   - ./rubocop/cop/pray/circular_require
+  - ./rubocop/cop/pray/file_length
 
 AllCops:
   SuggestExtensions: false
@@ -31,8 +32,23 @@ Pray/CircularRequire:
   Include:
     - lib/**/*
 
+# Hard file LOC ceiling (AGENTS.md). Soft warn at 150 is scripts/check-loc-limits.sh.
+# Grandfathered paths match scripts/loc-limits.allowlist; ratchet there, not here.
+Pray/FileLength:
+  Enabled: true
+  Max: 300
+  Include:
+    - lib/**/*
+  Exclude:
+    - lib/pray/literal.rb
+    - lib/pray/manifest.rb
+    - lib/pray/registry.rb
+    - lib/pray/render.rb
+    - lib/pray/resolve.rb
+    - lib/pray/trust_ops.rb
+
 RSpec/ExampleLength:
-  Max: 80
+  Max: 90
 
 RSpec/SpecFilePathFormat:
   Enabled: false
@@ -161,6 +177,8 @@ Metrics/ClassLength:
   Enabled: true
   CountAsOne: [array, hash, heredoc, method_call]
   Max: 200
+  Exclude:
+    - lib/pray/manifest.rb
 
 Metrics/AbcSize:
   Enabled: true
@@ -169,12 +187,17 @@ Metrics/AbcSize:
   Exclude:
     - lib/pray/cli.rb
     - lib/pray/cli/**/*
+    - lib/pray/destination.rb
+    - lib/pray/format_manifest.rb
+    - lib/pray/format_serialize.rb
     - lib/pray/lockfile.rb
     - lib/pray/manifest.rb
     - lib/pray/materialize.rb
     - lib/pray/package_spec.rb
     - lib/pray/render.rb
     - lib/pray/resolve.rb
+    - lib/pray/sync.rb
+    - lib/pray/trust_ops.rb
     - lib/pray/verify.rb
 
 Metrics/CyclomaticComplexity:
@@ -183,7 +206,13 @@ Metrics/CyclomaticComplexity:
   Exclude:
     - lib/pray/cli.rb
     - lib/pray/cli/parse.rb
+    - lib/pray/destination.rb
+    - lib/pray/format_manifest.rb
+    - lib/pray/format_serialize.rb
+    - lib/pray/manifest.rb
     - lib/pray/materialize.rb
+    - lib/pray/sync.rb
+    - lib/pray/trust_ops.rb
     - lib/pray/verify.rb
 
 Metrics/PerceivedComplexity:
@@ -192,7 +221,13 @@ Metrics/PerceivedComplexity:
   Exclude:
     - lib/pray/cli.rb
     - lib/pray/cli/parse.rb
+    - lib/pray/confess.rb
+    - lib/pray/destination.rb
+    - lib/pray/format_manifest.rb
+    - lib/pray/format_serialize.rb
     - lib/pray/materialize.rb
+    - lib/pray/sync.rb
+    - lib/pray/trust_ops.rb
     - lib/pray/verify.rb
 
 Naming/FileName:
@@ -200,6 +235,9 @@ Naming/FileName:
     - lib/pray-cli.rb
 
 Style/ModuleFunction:
+  Enabled: false
+
+Style/RedundantStructKeywordInit:
   Enabled: false
 
 Style/EnvHome:

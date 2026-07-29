@@ -1,5 +1,8 @@
 # frozen_string_literal: true
 
+require_relative "parse_trust"
+require_relative "parse_auth"
+
 module Pray
   module CLI
     def parse_command(arguments)
@@ -57,16 +60,16 @@ module Pray
       when "format", "fmt" then [:format]
       when "package" then [:package]
       when "publish" then [:publish, parse_publish_arguments(arguments)]
-      when "login" then [:unsupported, "login"]
+      when "login" then [:login, parse_login_arguments(arguments)]
       when "serve" then [:serve, parse_serve_arguments(arguments)]
-      when "confess" then [:unsupported, "confess"]
+      when "confess" then [:confess, parse_confess_arguments(arguments)]
       when "list" then [:list]
       when "outdated" then [:outdated, arguments]
       when "explain" then [:explain, arguments.shift]
       when "vendor" then [:vendor]
       when "clean" then [:clean]
       when "tree" then [:tree]
-      when "sync" then [:unsupported, "sync"]
+      when "sync" then [:sync, parse_sync_arguments(arguments)]
       when "trust" then parse_trust_command(arguments)
       when "version", "-V", "--version" then [:version]
       else
@@ -128,16 +131,6 @@ module Pray
         end
       end
       options
-    end
-
-    def parse_trust_command(arguments)
-      subcommand = arguments.shift || "list"
-      case subcommand
-      when "list" then [:trust_list]
-      when "show" then [:trust_show, arguments.shift]
-      else
-        raise Error.unsupported("trust #{subcommand} is not implemented yet in pray-cli Ruby")
-      end
     end
   end
 end

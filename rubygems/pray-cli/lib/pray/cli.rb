@@ -12,6 +12,7 @@ require_relative "cli/commands/workflow"
 require_relative "cli/commands/packages"
 require_relative "cli/commands/distribution"
 require_relative "cli/commands/trust"
+require_relative "cli/commands/auth"
 require_relative "cli/commands/meta"
 
 module Pray
@@ -89,14 +90,24 @@ module Pray
       in [:publish, publish_args] then publish_command(**publish_args)
       in [:unsupported, name] then raise Error.unsupported("#{name} is not implemented yet in pray-cli Ruby")
       in [:serve, serve_args] then serve_command(**serve_args)
+      in [:login, login_args] then login_command(**login_args)
+      in [:confess, confess_args] then confess_command(**confess_args)
+      in [:sync, sync_args] then sync_command(**sync_args)
       in [:list] then list_command
       in [:outdated, arguments] then outdated_command(arguments)
       in [:explain, name] then explain_command(name)
       in [:vendor] then raise Error.unsupported("vendor is not implemented yet in pray-cli Ruby")
       in [:clean] then clean_command
       in [:tree] then tree_command
-      in [:trust_list] then trust_list_command
-      in [:trust_show, source_url] then trust_show_command(source_url)
+      in [:trust_list, options] then trust_list_command(**options)
+      in [:trust_show] then trust_show_command
+      in [:trust_add_key, options] then trust_add_key_command(**options)
+      in [:trust_remove_key, options] then trust_remove_key_command(**options)
+      in [:trust_set_signed, options] then trust_set_signed_command(**options)
+      in [:trust_set_allow, options] then trust_set_allow_command(**options)
+      in [:trust_import_repo, options] then trust_import_repo_command(**options)
+      in [:trust_import_registry, options] then trust_import_registry_command(**options)
+      in [:trust_check, source] then trust_check_command(source)
       in [:version] then version_command
       end
     end

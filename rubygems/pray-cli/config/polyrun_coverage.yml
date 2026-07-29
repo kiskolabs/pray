@@ -1,0 +1,9 @@
+track_under:
+  - lib
+reject_patterns:
+  - "/lib/pray/version.rb"
+  - "/lib/pray/ssh_agent.rb"
+  - "/lib/pray/cli.rb"
+  - "/lib/pray/cli/"
+  - "/lib/pray/plan.rb"
+minimum_line_percent: 80

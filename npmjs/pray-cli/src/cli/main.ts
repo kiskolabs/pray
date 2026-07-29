@@ -1,10 +1,9 @@
+import { runLoginCommand } from "../auth/login.js";
 import { PrayError } from "../errors.js";
 import { readLockfile } from "../lockfile/index.js";
 import { PACKAGE_VERSION } from "../lockfile/types.js";
 import { initDistributionRoot } from "../publish/index.js";
 import { renderProject } from "../render/project.js";
-import { defaultResolveOptions } from "../resolve/context.js";
-import { loginCommand } from "../sync/index.js";
 import { renderDependencyTree } from "../tree/index.js";
 import { runTrustCommand } from "../trust/index.js";
 import { cleanProjectCaches, vendorProject } from "../vendor/index.js";
@@ -18,16 +17,19 @@ import {
 import { runInit, runPrayerInit } from "./commands/init.js";
 import { runExplain, runList, runOutdated } from "./commands/inspect.js";
 import { runAdd, runRemove, runUnlock } from "./commands/packages.js";
+import { runPlanCommand } from "./commands/plan.js";
+import { runUpdateCommand } from "./commands/update.js";
 import { runFormat, runPackage } from "./commands/workspace.js";
 import { conciseHelpText, maybePrintHelp } from "./help.js";
 import {
   initializeInvocation,
   lockfilePath,
+  projectRoot,
   resolveCurrentProject,
-  resolveCurrentProjectWithGitRefreshFallback,
 } from "./invocation.js";
 import { materializeProject, printManifest } from "./materialize.js";
 import { unknownCommandMessage } from "./suggest.js";
+import { runUpgradeCommand } from "./upgrade.js";
 
 export async function runCli(argumentsList: string[]): Promise<number> {
   try {
@@ -102,10 +104,7 @@ export async function runCli(argumentsList: string[]): Promise<number> {
         await runRemove(rest[0]);
         return 0;
       case "update":
-        await materializeProject({
-          offline: rest.includes("--offline"),
-          refreshSourceRevisions: true,
-        });
+        await runUpdateCommand(rest);
         return 0;
       case "unlock":
         await runUnlock(rest[0]);
@@ -118,17 +117,9 @@ export async function runCli(argumentsList: string[]): Promise<number> {
           offline: rest.includes("--offline"),
         });
         return 0;
-      case "plan": {
-        const project = await resolveCurrentProjectWithGitRefreshFallback(
-          defaultResolveOptions(),
-          true,
-        );
-        const rendered = renderProject(project);
-        for (const target of rendered) {
-          process.stdout.write(`would render ${target.path}\n`);
-        }
+      case "plan":
+        await runPlanCommand(rest);
         return 0;
-      }
       case "render":
         if (rest.includes("--check")) {
           const project = await resolveCurrentProject();
@@ -167,7 +158,10 @@ export async function runCli(argumentsList: string[]): Promise<number> {
         await runPublish(rest);
         return 0;
       case "login":
-        await loginCommand();
+        await runLoginCommand(rest, projectRoot());
+        return 0;
+      case "upgrade":
+        runUpgradeCommand();
         return 0;
       case "serve":
         await runServe(rest);
@@ -176,7 +170,7 @@ export async function runCli(argumentsList: string[]): Promise<number> {
         await runSync(rest);
         return 0;
       case "trust":
-        runTrustCommand(rest);
+        await runTrustCommand(rest, projectRoot());
         return 0;
       case "confess":
         await runConfess(rest);
@@ -185,7 +179,7 @@ export async function runCli(argumentsList: string[]): Promise<number> {
         await runList();
         return 0;
       case "outdated":
-        await runOutdated();
+        await runOutdated(rest);
         return 0;
       case "explain":
         await runExplain(rest[0]);

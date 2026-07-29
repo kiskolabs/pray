@@ -40,6 +40,9 @@ Gem::Specification.new do |spec|
   }
 
   spec.add_dependency "toml-rb", "~> 4.0"
+  spec.add_dependency "base64", "~> 0.2"
 
   spec.add_development_dependency "rspec", "~> 3.13"
+  spec.add_development_dependency "polyrun", "~> 2.2"
+  spec.add_development_dependency "rbs", "~> 3.9"
 end
