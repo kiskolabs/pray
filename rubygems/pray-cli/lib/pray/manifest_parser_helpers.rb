@@ -55,34 +55,40 @@ module Pray
           raise Error.parse("manifest", "source requires a name and url, path:, or git:")
         end
 
-        name = string_from_value(values.first)
-        if keywords["path"]
-          kind = "path"
-          url = string_from_value(keywords["path"])
-        elsif keywords["git"]
-          kind = "git"
-          url = string_from_value(keywords["git"])
-          url = "git+#{url}" unless url.start_with?("git+")
-        else
-          url = string_from_value(values[1])
-          kind = if url.start_with?("git+")
-            "git"
-          elsif url.start_with?("pray+ssh://", "ssh+pray://")
-            "pray_ssh"
-          else
-            "registry"
-          end
-        end
-
+        kind, url = source_kind_and_url(values, keywords)
         ManifestSource.new(
-          name: name,
+          name: string_from_value(values.first),
           kind: kind,
           url: url,
-          subdir: keywords["subdir"]&.then { |value| string_from_value(value) } ||
-            keywords["distribution"]&.then { |value| string_from_value(value) },
-          rev: keywords["rev"]&.then { |value| string_from_value(value) },
-          tag: keywords["tag"]&.then { |value| string_from_value(value) }
+          subdir: keyword_string(keywords, "subdir") || keyword_string(keywords, "distribution"),
+          rev: keyword_string(keywords, "rev"),
+          tag: keyword_string(keywords, "tag")
         )
+      end
+
+      def source_kind_and_url(values, keywords)
+        if keywords["path"]
+          return ["path", string_from_value(keywords["path"])]
+        end
+        if keywords["git"]
+          url = string_from_value(keywords["git"])
+          url = "git+#{url}" unless url.start_with?("git+")
+          return ["git", url]
+        end
+
+        url = string_from_value(values[1])
+        [infer_source_kind(url), url]
+      end
+
+      def infer_source_kind(url)
+        return "git" if url.start_with?("git+")
+        return "pray_ssh" if url.start_with?("pray+ssh://", "ssh+pray://")
+
+        "registry"
+      end
+
+      def keyword_string(keywords, key)
+        keywords[key]&.then { |value| string_from_value(value) }
       end
 
       def parse_target_header(rest)
@@ -117,24 +123,12 @@ module Pray
         values, keywords = parse_call(rest)
         raise Error.parse("manifest", "agent missing name") if values.empty?
 
-        name = string_from_value(values[0])
-        constraint = if values[1]
-          Constraint.normalize_version_constraint(string_from_value(values[1]))
-        else
-          "*"
-        end
-        exports = keyword_array(keywords, "exports")
-        if (export = keywords["export"]&.as_string)
-          exports << export unless exports.include?(export)
-        end
         file = keywords["file"]&.as_string
-        roles = []
-        roles << "file" if file
         ManifestPackage.new(
-          name: name,
-          constraint: constraint,
+          name: string_from_value(values[0]),
+          constraint: package_constraint(values),
           source: keywords["source"]&.as_string,
-          exports: exports,
+          exports: package_exports(keywords),
           targets: keyword_array(keywords, "targets"),
           features: keyword_array(keywords, "features"),
           optional: keywords["optional"]&.as_bool || false,
@@ -145,9 +139,23 @@ module Pray
           tarball: keywords["tarball"]&.as_string,
           oci: keywords["oci"]&.as_string,
           file: file,
-          roles: roles,
+          roles: file ? ["file"] : [],
           bound: false
         )
+      end
+
+      def package_constraint(values)
+        return "*" unless values[1]
+
+        Constraint.normalize_version_constraint(string_from_value(values[1]))
+      end
+
+      def package_exports(keywords)
+        exports = keyword_array(keywords, "exports")
+        if (export = keywords["export"]&.as_string)
+          exports << export unless exports.include?(export)
+        end
+        exports
       end
 
       def parse_local_decl(rest)

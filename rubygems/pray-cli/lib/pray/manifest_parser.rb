@@ -42,59 +42,80 @@ module Pray
         when /\Asource (.+)\z/
           manifest.sources << parse_source(Regexp.last_match(1))
         when /\Atarget (.+)\z/
-          raise Error.parse("manifest", "target must use a block") if !allow_target && !statement.end_with?(" do")
-
-          manifest.note_deprecated_keyword("target")
-          target, is_block = parse_target_header(Regexp.last_match(1))
-          manifest.targets << target
-          parse_target_block(manifest, manifest.targets.length - 1) if is_block
+          apply_legacy_target(manifest, statement, Regexp.last_match(1), allow_target)
         when /\Agroup (.+)\z/
-          group_names, is_block = parse_group_header(Regexp.last_match(1))
-          raise Error.parse("manifest", "group must use a block") unless is_block
-          if @group_stack.any?
-            raise Error.parse("manifest", "nested group blocks are not supported")
-          end
-
-          @group_stack.push(group_names)
-          parse_group_block(manifest)
-          @group_stack.pop
+          apply_group(manifest, Regexp.last_match(1))
         when "pray do", "template do"
           parse_symbols_block(manifest)
         when /\A(?:compose|output) (.+)\z/
-          if statement.start_with?("output ")
-            unless statement.end_with?(" do")
-              raise Error.parse(
-                "manifest",
-                "top-level output must use a compose block (output \"path\" do ... end)"
-              )
-            end
-            manifest.note_deprecated_keyword("output")
-          end
-          parse_destination_block(manifest, Regexp.last_match(1), "compose")
+          apply_compose_or_output(manifest, statement, Regexp.last_match(1))
         when /\A(?:tree|folder|skills) (.+)\z/
-          if statement.start_with?("folder ", "skills ") &&
-              !statement.end_with?(" do")
-            raise Error.parse("manifest", "top-level folder/skills must use a tree block")
-          end
-          parse_destination_block(manifest, Regexp.last_match(1), "tree")
+          apply_tree_or_folder(manifest, statement, Regexp.last_match(1))
         when /\Afile (.+)\z/
           parse_file_block(manifest, Regexp.last_match(1))
         when /\Aagent (.+)\z/
-          manifest.note_deprecated_keyword("agent")
-          Destination.upsert_package(manifest, parse_package_with_groups(Regexp.last_match(1)))
+          apply_agent_package(manifest, Regexp.last_match(1))
         when /\Apackage (.+)\z/
           Destination.upsert_package(manifest, parse_package_with_groups(Regexp.last_match(1)))
         when /\A(?:pray|use|include) (.+)\z/
           apply_pray_statement(manifest, Regexp.last_match(1), nil)
         when /\Alocal (.+)\z/
-          local = parse_local_decl(Regexp.last_match(1))
-          local.bound = false
-          Destination.upsert_local(manifest, local)
+          apply_unbound_local(manifest, Regexp.last_match(1))
         when /\Arender (.+)\z/
           manifest.render = parse_render_policy(Regexp.last_match(1))
         else
           raise Error.parse("manifest", "unrecognized statement: #{statement}")
         end
+      end
+
+      def apply_legacy_target(manifest, statement, rest, allow_target)
+        raise Error.parse("manifest", "target must use a block") if !allow_target && !statement.end_with?(" do")
+
+        manifest.note_deprecated_keyword("target")
+        target, is_block = parse_target_header(rest)
+        manifest.targets << target
+        parse_target_block(manifest, manifest.targets.length - 1) if is_block
+      end
+
+      def apply_group(manifest, rest)
+        group_names, is_block = parse_group_header(rest)
+        raise Error.parse("manifest", "group must use a block") unless is_block
+        raise Error.parse("manifest", "nested group blocks are not supported") if @group_stack.any?
+
+        @group_stack.push(group_names)
+        parse_group_block(manifest)
+        @group_stack.pop
+      end
+
+      def apply_compose_or_output(manifest, statement, rest)
+        if statement.start_with?("output ")
+          unless statement.end_with?(" do")
+            raise Error.parse(
+              "manifest",
+              "top-level output must use a compose block (output \"path\" do ... end)"
+            )
+          end
+          manifest.note_deprecated_keyword("output")
+        end
+        parse_destination_block(manifest, rest, "compose")
+      end
+
+      def apply_tree_or_folder(manifest, statement, rest)
+        if statement.start_with?("folder ", "skills ") && !statement.end_with?(" do")
+          raise Error.parse("manifest", "top-level folder/skills must use a tree block")
+        end
+        parse_destination_block(manifest, rest, "tree")
+      end
+
+      def apply_agent_package(manifest, rest)
+        manifest.note_deprecated_keyword("agent")
+        Destination.upsert_package(manifest, parse_package_with_groups(rest))
+      end
+
+      def apply_unbound_local(manifest, rest)
+        local = parse_local_decl(rest)
+        local.bound = false
+        Destination.upsert_local(manifest, local)
       end
 
       def parse_package_with_groups(rest)
