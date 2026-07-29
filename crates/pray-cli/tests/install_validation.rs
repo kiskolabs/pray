@@ -49,7 +49,6 @@ fn verify_warns_on_orphan_markers_and_strict_fails() {
 }
 
 #[test]
-#[ignore = "managed patching is not implemented yet"]
 fn install_preserves_unmanaged_content_when_patching_rendered_files() {
     let repo = temporary_directory("pray-install-patch-preserve");
     create_fixture(&repo);

@@ -1,8 +1,12 @@
-use crate::hashing::sha256_prefixed;
+use crate::hashing::{prefixed_hex_digest, sha256_prefixed};
 use crate::registry_http::{http_get, http_get_with_headers, join_url};
 use crate::resource_limits::MAX_TORRENT_ARTIFACT_BYTES;
 use crate::{PrayError, PrayResult};
 use serde::{Deserialize, Serialize};
+use sha2::{Digest, Sha256};
+use std::fs::{self, OpenOptions};
+use std::io::{Seek, SeekFrom, Write};
+use std::path::Path;
 
 const TORRENT_MANIFEST_SPEC: &str = "pray-torrent-v1";
 
@@ -116,10 +120,13 @@ pub(crate) fn fetch_torrent_manifest(
     }
 }
 
-pub(crate) fn fetch_torrent_artifact(
+/// Streams verified torrent pieces into `destination`, then returns the artifact bytes for
+/// integrity checks that still require an in-memory view.
+pub(crate) fn fetch_torrent_artifact_to_path(
     source_url: &str,
     artifact_path: &str,
     manifest: &TorrentManifest,
+    destination: &Path,
 ) -> PrayResult<Vec<u8>> {
     let artifact_url = if manifest.artifact_url.starts_with("http://")
         || manifest.artifact_url.starts_with("https://")
@@ -150,7 +157,18 @@ pub(crate) fn fetch_torrent_artifact(
             "torrent artifact length exceeds {MAX_TORRENT_ARTIFACT_BYTES} bytes"
         )));
     }
-    let mut bytes = vec![0u8; manifest.length];
+    if let Some(parent) = destination.parent() {
+        fs::create_dir_all(parent)?;
+    }
+    let mut file = OpenOptions::new()
+        .create(true)
+        .write(true)
+        .truncate(true)
+        .open(destination)?;
+    file.set_len(manifest.length as u64)?;
+
+    let mut digest = Sha256::new();
+    let mut written = 0usize;
     for piece in manifest.piece_ranges() {
         let piece_bytes = download_torrent_piece(&sources, &piece)?;
         if sha256_prefixed(&piece_bytes) != piece.hash {
@@ -159,16 +177,27 @@ pub(crate) fn fetch_torrent_artifact(
                 piece.start, piece.end
             )));
         }
-        bytes[piece.start..=piece.end].copy_from_slice(&piece_bytes);
+        file.seek(SeekFrom::Start(piece.start as u64))?;
+        file.write_all(&piece_bytes)?;
+        digest.update(&piece_bytes);
+        written = written.saturating_add(piece_bytes.len());
     }
+    file.flush()?;
+    drop(file);
 
-    if sha256_prefixed(&bytes) != manifest.artifact_hash {
+    if written != manifest.length {
+        return Err(PrayError::Integrity(format!(
+            "torrent artifact length mismatch for {artifact_path}: wrote {written}, expected {}",
+            manifest.length
+        )));
+    }
+    let computed = prefixed_hex_digest(digest.finalize());
+    if computed != manifest.artifact_hash {
         return Err(PrayError::Integrity(format!(
             "torrent artifact hash mismatch for {artifact_path}"
         )));
     }
-
-    Ok(bytes)
+    fs::read(destination).map_err(PrayError::from)
 }
 
 fn download_torrent_piece(sources: &[String], piece: &TorrentPieceRange) -> PrayResult<Vec<u8>> {

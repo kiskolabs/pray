@@ -35,8 +35,8 @@ Futile or non-protective coverage: ignored conflict/patch and scaling tests; mut
 
 ## Next
 
-- Remaining after feature/deep-safety-fixes: work-queue transitive resolve, unified bounded transport, managed-patch install, stream-to-temp torrent promote, nightly fuzz, blocking mutants baseline.
-- See usr/docs/issues/20260729121659_deep-safety-fixes.md for what already landed.
+- Remaining after resolve/transport/patch follow-ups: nightly fuzz, blocking mutants baseline.
+- See usr/docs/issues/20260729121659_deep-safety-fixes.md and usr/docs/issues/20260729122836_audit-followups-resolve-transport-patch.md for what already landed.
 
 ## Source
 
