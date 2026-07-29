@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+## 1.5.1 (2026-07-29)
+
 - Publish the Rust CLI as crates.io package `pray-cli` (binary remains `pray`); `pray` is already taken on crates.io.
 - Add versioned workspace path dependencies so `pray-core`, `pray-transport`, and `pray-cli` can publish in order.
 - Add manual release scripts for crates.io, npmjs, RubyGems, and pray distribution-point publish under `scripts/release/`.
