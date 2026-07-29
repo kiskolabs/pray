@@ -10,11 +10,15 @@ pub fn is_pray_symbol_key(key: &str) -> bool {
     if key.is_empty() {
         return false;
     }
-    key.chars()
-        .all(|character| character.is_ascii_alphanumeric() || matches!(character, '.' | '_' | '/' | '-'))
+    key.chars().all(|character| {
+        character.is_ascii_alphanumeric() || matches!(character, '.' | '_' | '/' | '-')
+    })
 }
 
-pub fn substitute_pray_symbols(text: &str, symbols: &BTreeMap<String, String>) -> PrayResult<String> {
+pub fn substitute_pray_symbols(
+    text: &str,
+    symbols: &BTreeMap<String, String>,
+) -> PrayResult<String> {
     let mut output = String::with_capacity(text.len());
     let mut rest = text;
 
@@ -73,9 +77,6 @@ mod tests {
         let mut symbols = BTreeMap::new();
         symbols.insert("email".to_string(), "a@example.com".to_string());
         let text = "(( pray:email )) ((pray : email))";
-        assert_eq!(
-            substitute_pray_symbols(text, &symbols).expect("ok"),
-            text
-        );
+        assert_eq!(substitute_pray_symbols(text, &symbols).expect("ok"), text);
     }
 }

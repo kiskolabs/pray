@@ -12,6 +12,7 @@ import {
   exportKindMatchesRole,
   packageRoles,
 } from "../manifest/destination.js";
+import { emitDeprecationWarnings } from "../manifest/deprecation.js";
 import {
   manifestHash,
   parseManifest,
@@ -47,6 +48,7 @@ export async function resolveProject(
     ? readLockfile(lockfilePath)
     : undefined;
   const manifest = parseManifest(readManifestText(manifestPath));
+  emitDeprecationWarnings(manifest.deprecatedKeywords);
   const environment =
     options.environment ?? activeInvocationContext()?.environment;
   validateEnvironment(manifest, environment);

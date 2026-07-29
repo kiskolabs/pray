@@ -51,6 +51,7 @@ module Pray
       lockfile_hints = File.exist?(lockfile_path) ? Pray.read_lockfile(lockfile_path) : nil
       manifest_text = Pray.read_manifest_text(manifest_path)
       manifest = Pray.parse_manifest(manifest_text)
+      manifest.deprecation_warnings.each { |warning| warn(warning) }
       Environment.validate_environment(manifest, options.environment)
       manifest_hash = manifest.manifest_hash
       sources = source_map(manifest.sources)

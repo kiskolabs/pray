@@ -1,0 +1,5 @@
+prayfile "1"
+target :tool_a do
+  output "INSTRUCTIONS.md"
+end
+pray "sample/base", "~> 1.0"

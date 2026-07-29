@@ -2,6 +2,12 @@
 
 ## Unreleased
 
+- Warn when Prayfile still uses deprecated `target`, `output`, or `agent`; prefer `compose` / `tree` / `pray`. These forms will be removed in version 2.
+- Reject package dependency cycles during resolve with a clear resolution error.
+- Add parser property tests (`proptest`) and a local `cargo-fuzz` harness for Prayfile, prayspec, and package path validation.
+- Harden `.praypkg` unpack path-escape coverage and grow the shared/conformance fixture trees.
+- Add CLI exit-code, signature negative-path, and network unreachable failure tests; soft Rust coverage floor in CI.
+
 ## 1.5.2 (2026-07-29)
 
 - Put the Prayfile positioning line into crates.io, npm, and RubyGems package descriptions so registry search finds “language before inference”.

@@ -90,6 +90,8 @@ export interface Manifest {
   local: ManifestLocal[];
   symbols: Record<string, string>;
   render: RenderPolicy;
+  /** Deprecated Prayfile keywords encountered while parsing (`target`, `output`, `agent`). */
+  deprecatedKeywords?: string[];
 }
 
 export const defaultRenderPolicy = (): RenderPolicy => ({

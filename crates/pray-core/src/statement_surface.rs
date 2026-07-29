@@ -66,17 +66,15 @@ fn expand_brace_block(statement: &str) -> Option<Vec<String>> {
 }
 
 fn split_brace_header(after_keyword: &str) -> Option<(String, &str)> {
-    if after_keyword.starts_with('{') {
-        return Some((String::new(), &after_keyword[1..]));
+    if let Some(rest) = after_keyword.strip_prefix('{') {
+        return Some((String::new(), rest));
     }
     if after_keyword.starts_with('(') {
         let close = matching_close_paren(after_keyword)?;
         let trailing = after_keyword[close + 1..].trim_start();
-        if !trailing.starts_with('{') {
-            return None;
-        }
+        let rest = trailing.strip_prefix('{')?;
         let args = after_keyword[1..close].trim().to_string();
-        return Some((args, &trailing[1..]));
+        return Some((args, rest));
     }
     let first = after_keyword.chars().next()?;
     if first != '"' && first != '\'' && first != ':' {
@@ -162,11 +160,7 @@ fn leading_identifier(input: &str) -> Option<&str> {
         return None;
     }
     let ident = &trimmed[..end];
-    if !ident
-        .chars()
-        .next()?
-        .is_ascii_alphabetic()
-    {
+    if !ident.chars().next()?.is_ascii_alphabetic() {
         return None;
     }
     Some(ident)
@@ -289,7 +283,7 @@ impl SurfaceStatementReader {
         }
     }
 
-    pub fn next(&mut self) -> Option<String> {
+    pub fn next_pending(&mut self) -> Option<String> {
         self.pending.pop_front()
     }
 
@@ -342,7 +336,8 @@ mod tests {
 
     #[test]
     fn expands_compose_brace_block() {
-        let parts = expand_statement_surface(r#"compose("AGENTS.md"){ pray "sample/base", "~> 1.0" }"#);
+        let parts =
+            expand_statement_surface(r#"compose("AGENTS.md"){ pray "sample/base", "~> 1.0" }"#);
         assert_eq!(
             parts,
             vec![

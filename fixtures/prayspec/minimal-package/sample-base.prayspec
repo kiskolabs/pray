@@ -1,0 +1,6 @@
+Package::Specification.new do |spec|
+  spec.name = "sample/base"
+  spec.version = "1.0.0"
+  spec.summary = "shared guidance"
+  spec.files = ["README.md"]
+end

@@ -1490,7 +1490,11 @@ fn resolve_project_with_git_refresh_fallback(
 
 fn load_manifest() -> PrayResult<pray_core::manifest::Manifest> {
     let text = read_manifest_text(&manifest_path())?;
-    parse_manifest(&text)
+    let manifest = parse_manifest(&text)?;
+    for warning in manifest.deprecation_warnings() {
+        eprintln!("{warning}");
+    }
+    Ok(manifest)
 }
 
 fn default_output_for_target(target: &str) -> String {

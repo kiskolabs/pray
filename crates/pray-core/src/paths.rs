@@ -101,4 +101,27 @@ mod tests {
             PathBuf::from("v1/artifacts/sample/base/1.0.0/package.praypkg")
         );
     }
+
+    #[test]
+    fn validate_package_relative_path_rejects_parent_escape() {
+        let error =
+            validate_package_relative_path(Path::new("../escape.md")).expect_err("parent escape");
+        assert!(error.to_string().contains("escapes package root"));
+    }
+
+    #[test]
+    fn validate_package_relative_path_rejects_absolute() {
+        let absolute = if cfg!(windows) {
+            Path::new(r"C:\escape.md")
+        } else {
+            Path::new("/escape.md")
+        };
+        let error = validate_package_relative_path(absolute).expect_err("absolute");
+        assert!(error.to_string().contains("must be relative"));
+    }
+
+    #[test]
+    fn validate_package_relative_path_accepts_nested_file() {
+        validate_package_relative_path(Path::new("exports/guidance.md")).expect("nested file");
+    }
 }

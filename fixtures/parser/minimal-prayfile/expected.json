@@ -1,0 +1,5 @@
+{
+  "prayfile_version": "1",
+  "package_names": ["sample/base"],
+  "target_names": ["tool_a"]
+}

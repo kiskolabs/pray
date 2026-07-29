@@ -427,8 +427,7 @@ fn render_scoped_compose(
                 if local.content.is_empty() && local.optional {
                     continue;
                 }
-                let content =
-                    substitute_pray_symbols(&local.content, &project.manifest.symbols)?;
+                let content = substitute_pray_symbols(&local.content, &project.manifest.symbols)?;
                 builder.append_body(&content);
                 builder.append_empty_line();
             }

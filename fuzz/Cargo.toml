@@ -1,0 +1,33 @@
+[package]
+name = "pray-fuzz"
+version = "0.0.0"
+publish = false
+edition = "2021"
+
+[package.metadata]
+cargo-fuzz = true
+
+[dependencies]
+libfuzzer-sys = "0.4"
+pray-core = { path = "../crates/pray-core", default-features = false }
+
+[[bin]]
+name = "parse_manifest"
+path = "fuzz_targets/parse_manifest.rs"
+test = false
+doc = false
+bench = false
+
+[[bin]]
+name = "parse_package_spec"
+path = "fuzz_targets/parse_package_spec.rs"
+test = false
+doc = false
+bench = false
+
+[[bin]]
+name = "validate_package_path"
+path = "fuzz_targets/validate_package_path.rs"
+test = false
+doc = false
+bench = false

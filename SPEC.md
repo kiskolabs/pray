@@ -658,6 +658,8 @@ Supported source kinds: `registry`, `static_index`, `git`, `path`, `tarball`, `o
 
 Optional grouping for legacy Prayfiles and selective apply. Not required when using top-level `compose` / `tree` / `pray …, file:`.
 
+Deprecated in prayfile `"1"`: implementations should warn that `target` and nested `output` will be removed in version 2. Prefer `compose` / `tree`. Top-level `output "path" do … end` (compose alias) is likewise deprecated in favor of `compose`.
+
 ```manifest
 target :tool_a do
   output "INSTRUCTIONS.md"
@@ -717,7 +719,7 @@ pray "amkisko/community-security", "~> 1.0", file: "SECURITY.md"
 pray ".agents/project.md"
 ```
 
-Aliases: `use`, `include`. Legacy `agent` / `package` remain valid.
+Aliases: `use`, `include`. Legacy `agent` / `package` remain valid in prayfile `"1"`. Implementations should warn that `agent` is deprecated and will be removed in version 2; prefer `pray`.
 
 Forms:
 
