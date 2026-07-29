@@ -21,6 +21,29 @@ pub struct Manifest {
     #[serde(default, skip_serializing_if = "BTreeMap::is_empty")]
     pub symbols: BTreeMap<String, String>,
     pub render: RenderPolicy,
+    /// Deprecated Prayfile keywords encountered while parsing (`target`, `output`, `agent`).
+    #[serde(default, skip)]
+    pub deprecated_keywords: Vec<String>,
+}
+
+impl Manifest {
+    pub fn note_deprecated_keyword(&mut self, keyword: &str) {
+        if !crate::deprecation::is_deprecated_prayfile_keyword(keyword) {
+            return;
+        }
+        if self
+            .deprecated_keywords
+            .iter()
+            .any(|existing| existing == keyword)
+        {
+            return;
+        }
+        self.deprecated_keywords.push(keyword.to_string());
+    }
+
+    pub fn deprecation_warnings(&self) -> Vec<String> {
+        crate::deprecation::deprecation_warnings_for(&self.deprecated_keywords)
+    }
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
@@ -258,6 +281,7 @@ impl<'a> BlockParser<'a> {
                     message: "target must use a block".to_string(),
                 });
             }
+            manifest.note_deprecated_keyword(crate::deprecation::DEPRECATED_TARGET);
             let (target, is_block) = parse_target_header(rest)?;
             manifest.targets.push(target);
             if is_block {
@@ -286,6 +310,7 @@ impl<'a> BlockParser<'a> {
             return Ok(());
         }
         if let Some(rest) = statement.strip_prefix("agent ") {
+            manifest.note_deprecated_keyword(crate::deprecation::DEPRECATED_AGENT);
             crate::destination::upsert_package(manifest, self.parse_package_with_groups(rest)?)?;
             return Ok(());
         }
@@ -309,13 +334,16 @@ impl<'a> BlockParser<'a> {
             .strip_prefix("compose ")
             .or_else(|| statement.strip_prefix("output "))
         {
-            if statement.starts_with("output ") && !statement.ends_with(" do") {
-                return Err(PrayError::Parse {
-                    kind: "manifest",
-                    message:
-                        "top-level output must use a compose block (output \"path\" do ... end)"
-                            .to_string(),
-                });
+            if statement.starts_with("output ") {
+                if !statement.ends_with(" do") {
+                    return Err(PrayError::Parse {
+                        kind: "manifest",
+                        message:
+                            "top-level output must use a compose block (output \"path\" do ... end)"
+                                .to_string(),
+                    });
+                }
+                manifest.note_deprecated_keyword(crate::deprecation::DEPRECATED_OUTPUT);
             }
             self.parse_destination_block(manifest, rest, DestinationMode::Compose)?;
             return Ok(());
@@ -602,9 +630,16 @@ impl<'a> BlockParser<'a> {
             if statement == "end" {
                 return Ok(());
             }
+            if let Some(rest) = statement.strip_prefix("agent ") {
+                manifest.note_deprecated_keyword(crate::deprecation::DEPRECATED_AGENT);
+                crate::destination::upsert_package(
+                    manifest,
+                    self.parse_package_with_groups(rest)?,
+                )?;
+                continue;
+            }
             if let Some(rest) = statement
-                .strip_prefix("agent ")
-                .or_else(|| statement.strip_prefix("package "))
+                .strip_prefix("package ")
                 .or_else(|| statement.strip_prefix("pray "))
                 .or_else(|| statement.strip_prefix("use "))
             {
@@ -642,11 +677,10 @@ impl<'a> BlockParser<'a> {
             if statement == "end" {
                 return Ok(());
             }
-            let target = manifest
-                .targets
-                .get_mut(target_index)
-                .ok_or_else(|| PrayError::Manifest("target index out of range".to_string()))?;
-            apply_target_statement(target, statement)?;
+            if manifest.targets.get(target_index).is_none() {
+                return Err(PrayError::Manifest("target index out of range".to_string()));
+            }
+            apply_target_statement(manifest, target_index, statement)?;
         }
         Err(PrayError::Parse {
             kind: "manifest",
@@ -655,7 +689,7 @@ impl<'a> BlockParser<'a> {
     }
 
     fn next_statement(&mut self) -> PrayResult<Option<String>> {
-        if let Some(pending) = self.surface.next() {
+        if let Some(pending) = self.surface.next_pending() {
             return Ok(Some(pending));
         }
         while self.cursor < self.lines.len() {
@@ -678,7 +712,7 @@ impl<'a> BlockParser<'a> {
                 statement.push_str(next);
             }
             self.surface.push_raw(statement);
-            if let Some(normalized) = self.surface.next() {
+            if let Some(normalized) = self.surface.next_pending() {
                 return Ok(Some(normalized));
             }
         }
@@ -975,7 +1009,18 @@ fn string_from_literal(input: &str) -> PrayResult<String> {
     string_from_value(&parse_literal(input)?)
 }
 
-fn apply_target_statement(target: &mut ManifestTarget, statement: String) -> PrayResult<()> {
+fn apply_target_statement(
+    manifest: &mut Manifest,
+    target_index: usize,
+    statement: String,
+) -> PrayResult<()> {
+    if statement.starts_with("output ") {
+        manifest.note_deprecated_keyword(crate::deprecation::DEPRECATED_OUTPUT);
+    }
+    let target = manifest
+        .targets
+        .get_mut(target_index)
+        .ok_or_else(|| PrayError::Manifest("target index out of range".to_string()))?;
     if let Some(rest) = statement.strip_prefix("output ") {
         target.outputs.push(string_from_literal(rest)?);
         return Ok(());

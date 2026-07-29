@@ -398,9 +398,7 @@ end
         resolve_project_in_context(&root.join("Prayfile"), &root, &ResolveOptions::default())
             .expect("resolve");
     let rendered = render_project(&project).expect("render");
-    assert!(rendered[0]
-        .content
-        .contains("Contact contact@example.com"));
+    assert!(rendered[0].content.contains("Contact contact@example.com"));
     assert!(!rendered[0].content.contains("((pray:support_email))"));
 }
 

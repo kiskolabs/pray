@@ -53,6 +53,10 @@ name = "install_network"
 required-features = ["auth"]
 
 [[test]]
+name = "network_failure"
+required-features = ["auth"]
+
+[[test]]
 name = "install_network_support"
 required-features = ["auth"]
 

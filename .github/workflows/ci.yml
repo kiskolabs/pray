@@ -14,7 +14,7 @@ jobs:
           fetch-depth: 0  # Shallow clones should be disabled for a better relevancy of analysis
       - uses: dtolnay/rust-toolchain@stable
         with:
-          components: rustfmt, clippy
+          components: rustfmt, clippy, llvm-tools-preview
       - name: Check formatting
         run: cargo fmt --all --check
       - name: Run Clippy
@@ -28,6 +28,22 @@ jobs:
         run: cargo machete
       - name: Run Rust tests
         run: cargo test --workspace
+      - name: Install cargo-llvm-cov
+        uses: taiki-e/install-action@v2
+        with:
+          tool: cargo-llvm-cov
+      - name: Rust coverage soft floor
+        run: cargo llvm-cov --workspace --lcov --output-path lcov.info --fail-under-lines 20
+      - name: Install cargo-mutants
+        uses: taiki-e/install-action@v2
+        with:
+          tool: cargo-mutants
+      - name: Mutation smoke on parser and integrity
+        continue-on-error: true
+        run: >
+          cargo mutants -p pray-core --timeout 30 --jobs 2
+          -e 'manifest.rs' -e 'package_spec.rs' -e 'dependency_graph.rs'
+          -e 'package_integrity.rs' -e 'package_archive.rs' -e 'paths.rs'
       - uses: SonarSource/sonarqube-scan-action@7006c4492b2e0ee0f816d36501671557c97f5995 # v8.1.0
         continue-on-error: true
         env:

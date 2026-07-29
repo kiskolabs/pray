@@ -3,3 +3,10 @@
 /Cargo.lock
 /*.praypkg
 .DS_Store
+/fuzz/artifacts
+/fuzz/corpus
+/fuzz/coverage
+/fuzz/target
+/fuzz/Cargo.lock
+/lcov.info
+/coverage/

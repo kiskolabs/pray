@@ -9,8 +9,8 @@ fn workspace_root() -> PathBuf {
     PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("../..")
 }
 
-fn fixture_dir(name: &str) -> PathBuf {
-    workspace_root().join("testdata/shared/manifest").join(name)
+fn corpus_root() -> PathBuf {
+    workspace_root().join("testdata/shared/manifest")
 }
 
 #[derive(Debug, Deserialize)]
@@ -110,12 +110,32 @@ fn assert_matches_expected(manifest: &Manifest, expected: &ExpectedCorpus) {
 }
 
 #[test]
-fn shared_compose_tree_file_corpus_parses() {
-    let dir = fixture_dir("compose-tree-file");
-    let text = fs::read_to_string(dir.join("Prayfile")).expect("Prayfile");
-    let expected_text = fs::read_to_string(dir.join("expected.json")).expect("expected.json");
-    let expected: ExpectedCorpus =
-        serde_json::from_str(&expected_text).expect("expected.json parses");
-    let manifest = parse_manifest(&text).expect("manifest parses");
-    assert_matches_expected(&manifest, &expected);
+fn shared_manifest_corpus_cases_parse() {
+    let root = corpus_root();
+    let mut cases = Vec::new();
+    for entry in fs::read_dir(&root).expect("corpus root") {
+        let entry = entry.expect("corpus entry");
+        if entry.file_type().expect("type").is_dir() {
+            cases.push(entry.file_name());
+        }
+    }
+    cases.sort();
+    assert!(
+        !cases.is_empty(),
+        "expected at least one shared corpus case under {}",
+        root.display()
+    );
+
+    for case in cases {
+        let dir = root.join(&case);
+        let text = fs::read_to_string(dir.join("Prayfile"))
+            .unwrap_or_else(|error| panic!("Prayfile in {:?}: {error}", case));
+        let expected_text = fs::read_to_string(dir.join("expected.json"))
+            .unwrap_or_else(|error| panic!("expected.json in {:?}: {error}", case));
+        let expected: ExpectedCorpus = serde_json::from_str(&expected_text)
+            .unwrap_or_else(|error| panic!("expected.json parses in {:?}: {error}", case));
+        let manifest = parse_manifest(&text)
+            .unwrap_or_else(|error| panic!("manifest parses in {:?}: {error}", case));
+        assert_matches_expected(&manifest, &expected);
+    }
 }

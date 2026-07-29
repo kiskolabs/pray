@@ -19,6 +19,12 @@ import {
   upsertPackage,
 } from "./destination.js";
 import {
+  DEPRECATED_AGENT,
+  DEPRECATED_OUTPUT,
+  DEPRECATED_TARGET,
+  noteDeprecatedKeyword,
+} from "./deprecation.js";
+import {
   applyTargetStatement,
   parseGroupHeader,
   parseLocalDecl,
@@ -100,6 +106,10 @@ class BlockParser {
       if (!allowTarget && !statement.endsWith(" do")) {
         throw PrayError.parse(PARSE_CONTEXT, "target must use a block");
       }
+      manifest.deprecatedKeywords = noteDeprecatedKeyword(
+        manifest.deprecatedKeywords,
+        DEPRECATED_TARGET,
+      );
       const { target, isBlock } = parseTargetHeader(
         statement.slice("target ".length),
       );
@@ -129,6 +139,10 @@ class BlockParser {
       return;
     }
     if (statement.startsWith("agent ")) {
+      manifest.deprecatedKeywords = noteDeprecatedKeyword(
+        manifest.deprecatedKeywords,
+        DEPRECATED_AGENT,
+      );
       upsertPackage(
         manifest,
         this.parsePackageWithGroups(statement.slice("agent ".length)),
@@ -157,10 +171,16 @@ class BlockParser {
       }
     }
     if (statement.startsWith("compose ") || statement.startsWith("output ")) {
-      if (statement.startsWith("output ") && !statement.endsWith(" do")) {
-        throw PrayError.parse(
-          PARSE_CONTEXT,
-          'top-level output must use a compose block (output "path" do ... end)',
+      if (statement.startsWith("output ")) {
+        if (!statement.endsWith(" do")) {
+          throw PrayError.parse(
+            PARSE_CONTEXT,
+            'top-level output must use a compose block (output "path" do ... end)',
+          );
+        }
+        manifest.deprecatedKeywords = noteDeprecatedKeyword(
+          manifest.deprecatedKeywords,
+          DEPRECATED_OUTPUT,
         );
       }
       const rest = statement.startsWith("compose ")
@@ -466,7 +486,18 @@ class BlockParser {
       if (statement === "end") {
         return;
       }
-      const prefix = ["agent ", "package ", "pray ", "use "].find((candidate) =>
+      if (statement.startsWith("agent ")) {
+        manifest.deprecatedKeywords = noteDeprecatedKeyword(
+          manifest.deprecatedKeywords,
+          DEPRECATED_AGENT,
+        );
+        upsertPackage(
+          manifest,
+          this.parsePackageWithGroups(statement.slice("agent ".length)),
+        );
+        continue;
+      }
+      const prefix = ["package ", "pray ", "use "].find((candidate) =>
         statement.startsWith(candidate),
       );
       if (prefix) {
@@ -499,6 +530,12 @@ class BlockParser {
       }
       if (statement === "end") {
         return;
+      }
+      if (statement.startsWith("output ")) {
+        manifest.deprecatedKeywords = noteDeprecatedKeyword(
+          manifest.deprecatedKeywords,
+          DEPRECATED_OUTPUT,
+        );
       }
       const target = manifest.targets[targetIndex];
       if (!target) {

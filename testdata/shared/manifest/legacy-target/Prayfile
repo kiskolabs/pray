@@ -1,0 +1,9 @@
+prayfile "1"
+
+target :tool_a do
+  output "INSTRUCTIONS.md"
+  skills ".agents/skills"
+end
+
+pray "sample/base", "~> 1.4", path: "packages/base", exports: ["testing-basics"]
+local ".agents/project.md"

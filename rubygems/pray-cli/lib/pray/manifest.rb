@@ -53,6 +53,7 @@ module Pray
 
   Manifest = Struct.new(
     :prayfile_version, :sources, :targets, :packages, :local, :symbols, :render,
+    :deprecated_keywords,
     keyword_init: true
   ) do
     def initialize(
@@ -62,9 +63,30 @@ module Pray
       packages: [],
       local: [],
       symbols: {},
-      render: RenderPolicy.default
+      render: RenderPolicy.default,
+      deprecated_keywords: []
     )
       super
+    end
+
+    def note_deprecated_keyword(keyword)
+      return unless %w[target output agent].include?(keyword)
+      self.deprecated_keywords ||= []
+      deprecated_keywords << keyword unless deprecated_keywords.include?(keyword)
+    end
+
+    def deprecation_warnings
+      replacements = {
+        "target" => "compose` / `tree",
+        "output" => "compose",
+        "agent" => "pray"
+      }
+      (deprecated_keywords || []).filter_map do |keyword|
+        replacement = replacements[keyword]
+        next unless replacement
+
+        "warning: `#{keyword}` is deprecated and will be removed in version 2; prefer `#{replacement}`"
+      end
     end
 
     def canonicalized
@@ -73,6 +95,7 @@ module Pray
         copy.targets = targets.sort_by(&:name)
         copy.packages = packages.sort_by { |package| [package.name, package.source.to_s, package.constraint] }
         copy.local = local.sort_by(&:path)
+        copy.deprecated_keywords = []
       end
     end
 
@@ -184,6 +207,7 @@ module Pray
         when /\Atarget (.+)\z/
           raise Error.parse("manifest", "target must use a block") if !allow_target && !statement.end_with?(" do")
 
+          manifest.note_deprecated_keyword("target")
           target, is_block = parse_target_header(Regexp.last_match(1))
           manifest.targets << target
           parse_target_block(manifest, manifest.targets.length - 1) if is_block
@@ -200,11 +224,14 @@ module Pray
         when "pray do", "template do"
           parse_symbols_block(manifest)
         when /\A(?:compose|output) (.+)\z/
-          if statement.start_with?("output ") && !statement.end_with?(" do")
-            raise Error.parse(
-              "manifest",
-              "top-level output must use a compose block (output \"path\" do ... end)"
-            )
+          if statement.start_with?("output ")
+            unless statement.end_with?(" do")
+              raise Error.parse(
+                "manifest",
+                "top-level output must use a compose block (output \"path\" do ... end)"
+              )
+            end
+            manifest.note_deprecated_keyword("output")
           end
           parse_destination_block(manifest, Regexp.last_match(1), "compose")
         when /\A(?:tree|folder|skills) (.+)\z/
@@ -215,7 +242,10 @@ module Pray
           parse_destination_block(manifest, Regexp.last_match(1), "tree")
         when /\Afile (.+)\z/
           parse_file_block(manifest, Regexp.last_match(1))
-        when /\A(?:agent|package) (.+)\z/
+        when /\Aagent (.+)\z/
+          manifest.note_deprecated_keyword("agent")
+          Destination.upsert_package(manifest, parse_package_with_groups(Regexp.last_match(1)))
+        when /\Apackage (.+)\z/
           Destination.upsert_package(manifest, parse_package_with_groups(Regexp.last_match(1)))
         when /\A(?:pray|use|include) (.+)\z/
           apply_pray_statement(manifest, Regexp.last_match(1), nil)
@@ -258,7 +288,10 @@ module Pray
       def parse_group_block(manifest)
         while (statement = next_statement)
           return if statement == "end"
-          if (match = statement.match(/\A(?:agent|package|pray|use|include) (.+)\z/))
+          if (match = statement.match(/\Aagent (.+)\z/))
+            manifest.note_deprecated_keyword("agent")
+            Destination.upsert_package(manifest, parse_package_with_groups(match[1]))
+          elsif (match = statement.match(/\A(?:package|pray|use|include) (.+)\z/))
             Destination.upsert_package(manifest, parse_package_with_groups(match[1]))
           elsif /\Agroup (.+)\z/.match?(statement)
             raise Error.parse("manifest", "nested group blocks are not supported")
@@ -289,7 +322,12 @@ module Pray
         while (statement = next_statement)
           return if statement == "end"
 
-          if (match = statement.match(/\A(?:pray|use|include|agent|package) (.+)\z/))
+          if (match = statement.match(/\Aagent (.+)\z/))
+            manifest.note_deprecated_keyword("agent")
+            apply_pray_statement(manifest, match[1], index)
+            next
+          end
+          if (match = statement.match(/\A(?:pray|use|include|package) (.+)\z/))
             apply_pray_statement(manifest, match[1], index)
             next
           end
@@ -323,7 +361,20 @@ module Pray
             end
             return
           end
-          if (match = statement.match(/\A(?:pray|use|include|agent|package) (.+)\z/))
+          if (match = statement.match(/\Aagent (.+)\z/))
+            manifest.note_deprecated_keyword("agent")
+            package = parse_package_with_groups(match[1])
+            if package.file
+              raise Error.parse("manifest", "file: keyword is invalid inside a file block")
+            end
+            package.file = file_path
+            package.bound = true
+            package.roles << "file" unless package.roles.include?("file")
+            Destination.upsert_package(manifest, package)
+            saw_package = true
+            next
+          end
+          if (match = statement.match(/\A(?:pray|use|include|package) (.+)\z/))
             package = parse_package_with_groups(match[1])
             if package.file
               raise Error.parse("manifest", "file: keyword is invalid inside a file block")
@@ -393,6 +444,7 @@ module Pray
           target = manifest.targets[target_index]
           raise Error.manifest("target index out of range") unless target
 
+          manifest.note_deprecated_keyword("output") if statement.start_with?("output ")
           apply_target_statement(target, statement)
         end
         raise Error.parse("manifest", "missing 'end' for target block")

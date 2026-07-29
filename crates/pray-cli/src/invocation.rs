@@ -36,7 +36,16 @@ pub fn resolve_current_project(options: &ResolveOptions) -> PrayResult<ResolvedP
     if options.environment.is_none() {
         options.environment = context.environment.clone();
     }
-    resolve_project_in_context(&context.manifest_path, &context.project_root, &options)
+    let project =
+        resolve_project_in_context(&context.manifest_path, &context.project_root, &options)?;
+    emit_deprecation_warnings(&project.manifest);
+    Ok(project)
+}
+
+fn emit_deprecation_warnings(manifest: &pray_core::manifest::Manifest) {
+    for warning in manifest.deprecation_warnings() {
+        eprintln!("{warning}");
+    }
 }
 
 fn invocation_context() -> ProjectInvocationContext {

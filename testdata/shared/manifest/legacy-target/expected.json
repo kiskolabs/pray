@@ -1,0 +1,26 @@
+{
+  "targets": [
+    {
+      "name": "tool_a",
+      "mode": "legacy",
+      "scoped": false,
+      "outputs": ["INSTRUCTIONS.md"],
+      "skills": [".agents/skills"],
+      "entries": []
+    }
+  ],
+  "packages": [
+    {
+      "name": "sample/base",
+      "bound": false,
+      "roles": [],
+      "path": "packages/base"
+    }
+  ],
+  "local": [
+    {
+      "path": ".agents/project.md",
+      "bound": false
+    }
+  ]
+}

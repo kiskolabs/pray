@@ -1,5 +1,6 @@
 .PHONY: build clean install bench bench-scaling ruby-test libyears libyears-rust libyears-ruby libyears-npm bump-homebrew \
-	release-dry-run release-crates release-npm release-rubygems release-distribution release-all
+	release-dry-run release-crates release-npm release-rubygems release-distribution release-all \
+	coverage coverage-rust mutants fuzz-build
 
 HOMEBREW_TAP ?= $(abspath ../../amkisko/homebrew-tap)
 VERSION ?= $(shell sed -n 's/^version = "\(.*\)"/\1/p' Cargo.toml | head -1)
@@ -25,6 +26,20 @@ bench:
 
 bench-scaling:
 	cargo test -p pray-bench -- --ignored --nocapture
+
+coverage: coverage-rust
+
+coverage-rust:
+	cargo llvm-cov --workspace --summary-only --fail-under-lines 20
+
+mutants:
+	cargo mutants -p pray-core --timeout 60 \
+		-e 'manifest.rs' -e 'package_spec.rs' -e 'dependency_graph.rs' \
+		-e 'resolve.rs' -e 'hashing.rs' -e 'package_integrity.rs' \
+		-e 'package_archive.rs' -e 'paths.rs'
+
+fuzz-build:
+	cargo +nightly fuzz build --fuzz-dir fuzz
 
 libyears: libyears-rust libyears-ruby libyears-npm
 

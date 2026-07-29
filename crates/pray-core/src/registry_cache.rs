@@ -1,12 +1,12 @@
 use crate::hashing::sha256_prefixed;
 use crate::manifest::ManifestPackage;
+use crate::package_archive::unpack_praypkg;
 use crate::package_integrity::{require_remote_integrity_fields, verify_package_signature};
 use crate::package_spec::parse_package_spec;
 use crate::paths::{find_prayspec_file, validate_package_relative_path};
 use crate::registry::{RegistryPackageResolution, RegistryPackageVersion};
 use crate::registry_http::http_get;
 use crate::{PrayError, PrayResult};
-use std::collections::BTreeSet;
 use std::fs;
 use std::path::{Path, PathBuf};
 
@@ -208,47 +208,4 @@ pub(crate) fn read_local_registry_artifact_bytes(
             ))
         }
     })
-}
-
-pub(crate) fn unpack_praypkg(artifact_bytes: &[u8], output_directory: &Path) -> PrayResult<()> {
-    let cursor = std::io::Cursor::new(artifact_bytes);
-    let decoder = zstd::stream::read::Decoder::new(cursor)
-        .map_err(|error| PrayError::Integrity(error.to_string()))?;
-    let mut archive = tar::Archive::new(decoder);
-    let mut written_paths = BTreeSet::new();
-
-    for entry in archive
-        .entries()
-        .map_err(|error| PrayError::Integrity(error.to_string()))?
-    {
-        let mut entry = entry.map_err(|error| PrayError::Integrity(error.to_string()))?;
-        let entry_type = entry.header().entry_type();
-        if entry_type.is_dir() {
-            continue;
-        }
-        if entry_type.is_symlink() || entry_type.is_hard_link() || !entry_type.is_file() {
-            return Err(PrayError::Integrity(
-                "unsupported package archive entry type".to_string(),
-            ));
-        }
-        let path = entry
-            .path()
-            .map_err(|error| PrayError::Integrity(error.to_string()))?
-            .into_owned();
-        validate_package_relative_path(&path)?;
-        if !written_paths.insert(path.clone()) {
-            return Err(PrayError::Integrity(format!(
-                "duplicate package archive path: {}",
-                path.display()
-            )));
-        }
-        let destination = output_directory.join(&path);
-        if let Some(parent) = destination.parent() {
-            fs::create_dir_all(parent)?;
-        }
-        let mut destination_file = fs::File::create(&destination)?;
-        std::io::copy(&mut entry, &mut destination_file)
-            .map_err(|error| PrayError::Integrity(error.to_string()))?;
-    }
-    Ok(())
 }

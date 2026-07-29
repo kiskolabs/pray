@@ -111,6 +111,7 @@ pub fn recommend_manifest(
     };
     omit_context_resolved_exports(&mut recommended);
     omit_default_sources(&mut recommended);
+    recommended.deprecated_keywords.clear();
     recommended
 }
 
@@ -173,6 +174,7 @@ fn migrate_legacy_manifest(
         local: manifest.local.clone(),
         symbols: manifest.symbols.clone(),
         render: manifest.render.clone(),
+        deprecated_keywords: Vec::new(),
     };
 
     apply_format_hints(&mut next.packages, hints);
