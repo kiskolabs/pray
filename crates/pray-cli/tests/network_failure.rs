@@ -27,13 +27,12 @@ pray "sample/base", "~> 1.4"
 
     let failed = run_pray(&repo, &["install"]);
     assert!(!failed.status.success());
-    assert!(matches!(failed.status.code(), Some(1) | Some(3)));
+    assert_eq!(failed.status.code(), Some(7));
     let stderr = String::from_utf8_lossy(&failed.stderr);
     assert!(
-        stderr.contains("Network error")
+        stderr.contains("network error")
             || stderr.contains("Connection refused")
             || stderr.contains("timed out")
-            || stderr.contains("resolution error")
             || stderr.contains("error sending request"),
         "unexpected stderr: {stderr}"
     );
@@ -60,13 +59,12 @@ fn publish_fails_against_unreachable_http_server() {
     let server_url = format!("http://127.0.0.1:{port}");
     let failed = run_pray(&source_repo, &["publish", "--server", &server_url]);
     assert!(!failed.status.success());
-    assert!(matches!(failed.status.code(), Some(1) | Some(3) | Some(8)));
+    assert!(matches!(failed.status.code(), Some(7) | Some(8)));
     let stderr = String::from_utf8_lossy(&failed.stderr);
     assert!(
-        stderr.contains("Network error")
+        stderr.contains("network error")
             || stderr.contains("Connection refused")
             || stderr.contains("timed out")
-            || stderr.contains("resolution error")
             || stderr.contains("error sending request")
             || stderr.contains("unsupported feature"),
         "unexpected stderr: {stderr}"
@@ -103,14 +101,13 @@ fn sync_fails_when_peer_returns_before_listen() {
         ],
     );
     assert!(!failed.status.success());
-    assert!(matches!(failed.status.code(), Some(1) | Some(3)));
+    assert_eq!(failed.status.code(), Some(7));
     let stderr = String::from_utf8_lossy(&failed.stderr);
     assert!(
-        stderr.contains("Network error")
+        stderr.contains("network error")
             || stderr.contains("Connection refused")
             || stderr.contains("timed out")
-            || stderr.contains("resolution error")
-            || stderr.contains("No such file"),
+            || stderr.contains("Network error"),
         "unexpected stderr: {stderr}"
     );
 }

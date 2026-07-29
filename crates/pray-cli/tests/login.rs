@@ -55,12 +55,13 @@ fn login_recovers_after_auth_server_restart_and_persists_session() {
         ],
     );
     assert!(!failed_login.status.success());
-    assert!(matches!(failed_login.status.code(), Some(1) | Some(3)));
+    assert_eq!(failed_login.status.code(), Some(7));
     let failed_stderr = String::from_utf8_lossy(&failed_login.stderr);
     assert!(
         failed_stderr.contains("Connection refused")
             || failed_stderr.contains("timed out")
             || failed_stderr.contains("Network error")
+            || failed_stderr.contains("network error")
     );
     assert!(!session_path.exists());
 

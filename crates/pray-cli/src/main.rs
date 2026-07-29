@@ -20,6 +20,8 @@ mod server_html;
 #[cfg(feature = "auth")]
 mod server_http;
 #[cfg(feature = "auth")]
+mod server_listen;
+#[cfg(feature = "auth")]
 mod server_stdio;
 mod sync_command;
 mod sync_peers;
@@ -50,7 +52,7 @@ use pray_core::lockfile::{
 };
 use pray_core::manifest::{parse_manifest, read_manifest_text, replace_package_declaration};
 use pray_core::registry::{version_is_greater_than, RegistryIndex, RegistryPackageMetadata};
-use pray_core::render::{render_project, write_rendered_targets};
+use pray_core::render::{render_project, write_rendered_targets_with_previous_lockfile};
 use pray_core::resolve::ResolvedProject;
 use pray_core::resolve_context::ResolveOptions;
 use pray_core::ssh_identity::active_ssh_user_fingerprint;
@@ -179,7 +181,8 @@ fn run(arguments: Vec<String>) -> PrayResult<()> {
             host,
             port,
             stdio,
-        } => serve_command(root, host, port, stdio),
+            allow_open_push,
+        } => serve_command(root, host, port, stdio, allow_open_push),
         Command::Confess {
             package,
             from_lock,
@@ -316,6 +319,7 @@ pub(crate) enum Command {
         host: String,
         port: u16,
         stdio: bool,
+        allow_open_push: bool,
     },
     Confess {
         package: Option<String>,
@@ -723,7 +727,7 @@ fn unlock_command(package: String) -> PrayResult<()> {
     let merged_lockfile =
         merge_selected_package_update(&previous_lockfile, &updated_lockfile, &package);
     write_lockfile(&lockfile_path(), &merged_lockfile)?;
-    write_rendered_targets(&project, &rendered)?;
+    write_rendered_targets_with_previous_lockfile(&project, &rendered, Some(&previous_lockfile))?;
     println!("Unlocked {package}");
     Ok(())
 }
@@ -861,7 +865,7 @@ fn materialize_command(
             ensure_rendered_outputs_current(&project, &rendered)?;
             return Ok(None);
         }
-        write_rendered_targets(&project, &rendered)?;
+        write_rendered_targets_with_previous_lockfile(&project, &rendered, Some(&lockfile))?;
         return Ok(None);
     }
 
@@ -879,7 +883,7 @@ fn materialize_command(
         None
     };
     write_lockfile_if_changed(&lockfile_path, &lockfile)?;
-    write_rendered_targets(&project, &rendered)?;
+    write_rendered_targets_with_previous_lockfile(&project, &rendered, previous_lockfile.as_ref())?;
     if !silent_report {
         if let (Some(preview), Some(mode)) = (&preview, report_mode) {
             print_materialization_report(preview, mode);
@@ -1038,11 +1042,17 @@ fn explain_command(package_name: String) -> PrayResult<()> {
 }
 
 #[cfg(feature = "auth")]
-fn serve_command(root: PathBuf, host: String, port: u16, stdio: bool) -> PrayResult<()> {
+fn serve_command(
+    root: PathBuf,
+    host: String,
+    port: u16,
+    stdio: bool,
+    allow_open_push: bool,
+) -> PrayResult<()> {
     if stdio {
         server_stdio::run_stdio_server(root)
     } else {
-        server::run_server(root, host, port, false)
+        server_listen::run_server(root, host, port, allow_open_push)
     }
 }
 
@@ -1351,9 +1361,10 @@ fn render_command(check_only: bool) -> PrayResult<()> {
         ensure_rendered_outputs_current(&project, &rendered)?;
         return Ok(());
     }
+    let previous_lockfile = read_lockfile(&lockfile_path()).ok();
     let lockfile = build_lockfile(&project, &rendered)?;
     write_lockfile(&lockfile_path(), &lockfile)?;
-    write_rendered_targets(&project, &rendered)?;
+    write_rendered_targets_with_previous_lockfile(&project, &rendered, previous_lockfile.as_ref())?;
     Ok(())
 }
 

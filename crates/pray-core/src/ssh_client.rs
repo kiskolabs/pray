@@ -1,5 +1,4 @@
-use crate::client_trust::{effective_trust_home, gate_pray_ssh_host, gate_pray_ssh_publisher};
-use crate::ssh_identity::active_ssh_user_fingerprint;
+use crate::client_trust::{effective_trust_home, gate_pray_ssh_host};
 use crate::ssh_rpc::{call_stdio, RpcRequest, RpcResponse, SSH_RPC_SPEC};
 use crate::{PrayError, PrayResult};
 use serde_json::Value;
@@ -213,9 +212,6 @@ pub fn with_pray_ssh_session<T>(
     let target = parse_pray_ssh_url(source_url)?;
     let home = effective_trust_home()?;
     let _host_key = gate_pray_ssh_host(&home, source_url, &target.host, target.port)?;
-    if let Some(publisher) = active_ssh_user_fingerprint() {
-        gate_pray_ssh_publisher(&home, source_url, &publisher)?;
-    }
     let mut session = SshRpcSession::connect(&target)?;
     operation(&mut session)
 }

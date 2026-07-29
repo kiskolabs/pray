@@ -131,14 +131,13 @@ fn install_recovers_after_distribution_point_restart_and_consumes_published_pack
 
     let failed_install = run_pray(&consumer_repo, &["install"]);
     assert!(!failed_install.status.success());
-    assert!(matches!(failed_install.status.code(), Some(1) | Some(3)));
+    assert_eq!(failed_install.status.code(), Some(7));
     let failed_stderr = String::from_utf8_lossy(&failed_install.stderr);
     assert!(
         failed_stderr.contains("Network error")
+            || failed_stderr.contains("network error")
             || failed_stderr.contains("Connection refused")
             || failed_stderr.contains("timed out")
-            || failed_stderr.contains("resolution error")
-            || failed_stderr.contains("No such file")
     );
     assert!(!consumer_repo.join("Prayfile.lock").exists());
     assert!(!consumer_repo.join("INSTRUCTIONS.md").exists());

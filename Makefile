@@ -38,9 +38,9 @@ coverage-rust:
 
 mutants:
 	cargo mutants -p pray-core --timeout 60 \
-		-e 'manifest.rs' -e 'package_spec.rs' -e 'dependency_graph.rs' \
-		-e 'resolve.rs' -e 'hashing.rs' -e 'package_integrity.rs' \
-		-e 'package_archive.rs' -e 'paths.rs'
+		-f 'manifest.rs' -f 'package_spec.rs' -f 'dependency_graph.rs' \
+		-f 'resolve.rs' -f 'hashing.rs' -f 'package_integrity.rs' \
+		-f 'package_archive.rs' -f 'paths.rs'
 
 fuzz-build:
 	cargo +nightly fuzz build --fuzz-dir fuzz

@@ -1,15 +1,26 @@
 use crate::paths::validate_package_relative_path;
+use crate::resource_limits::{
+    MAX_ARCHIVE_ENTRIES, MAX_ARCHIVE_ENTRY_BYTES, MAX_ARCHIVE_TOTAL_BYTES,
+};
 use crate::{PrayError, PrayResult};
 use std::collections::BTreeSet;
 use std::fs;
+use std::io::Read;
 use std::path::Path;
 
 pub(crate) fn unpack_praypkg(artifact_bytes: &[u8], output_directory: &Path) -> PrayResult<()> {
+    if artifact_bytes.len() as u64 > MAX_ARCHIVE_TOTAL_BYTES {
+        return Err(PrayError::Integrity(format!(
+            "package archive exceeds {MAX_ARCHIVE_TOTAL_BYTES} bytes"
+        )));
+    }
     let cursor = std::io::Cursor::new(artifact_bytes);
     let decoder = zstd::stream::read::Decoder::new(cursor)
         .map_err(|error| PrayError::Integrity(error.to_string()))?;
     let mut archive = tar::Archive::new(decoder);
     let mut written_paths = BTreeSet::new();
+    let mut total_bytes = 0u64;
+    let mut entry_count = 0usize;
 
     for entry in archive
         .entries()
@@ -25,6 +36,12 @@ pub(crate) fn unpack_praypkg(artifact_bytes: &[u8], output_directory: &Path) -> 
                 "unsupported package archive entry type".to_string(),
             ));
         }
+        entry_count += 1;
+        if entry_count > MAX_ARCHIVE_ENTRIES {
+            return Err(PrayError::Integrity(format!(
+                "package archive exceeds {MAX_ARCHIVE_ENTRIES} entries"
+            )));
+        }
         let path = entry
             .path()
             .map_err(|error| PrayError::Integrity(error.to_string()))?
@@ -36,13 +53,35 @@ pub(crate) fn unpack_praypkg(artifact_bytes: &[u8], output_directory: &Path) -> 
                 path.display()
             )));
         }
+        let size = entry.header().size().unwrap_or(0);
+        if size > MAX_ARCHIVE_ENTRY_BYTES {
+            return Err(PrayError::Integrity(format!(
+                "package archive entry exceeds {MAX_ARCHIVE_ENTRY_BYTES} bytes: {}",
+                path.display()
+            )));
+        }
+        total_bytes = total_bytes.saturating_add(size);
+        if total_bytes > MAX_ARCHIVE_TOTAL_BYTES {
+            return Err(PrayError::Integrity(format!(
+                "package archive exceeds {MAX_ARCHIVE_TOTAL_BYTES} decompressed bytes"
+            )));
+        }
         let destination = output_directory.join(&path);
         if let Some(parent) = destination.parent() {
             fs::create_dir_all(parent)?;
         }
         let mut destination_file = fs::File::create(&destination)?;
-        std::io::copy(&mut entry, &mut destination_file)
-            .map_err(|error| PrayError::Integrity(error.to_string()))?;
+        let copied = std::io::copy(
+            &mut (&mut entry).take(MAX_ARCHIVE_ENTRY_BYTES.saturating_add(1)),
+            &mut destination_file,
+        )
+        .map_err(|error| PrayError::Integrity(error.to_string()))?;
+        if copied > MAX_ARCHIVE_ENTRY_BYTES {
+            return Err(PrayError::Integrity(format!(
+                "package archive entry exceeds {MAX_ARCHIVE_ENTRY_BYTES} bytes: {}",
+                path.display()
+            )));
+        }
     }
     Ok(())
 }
@@ -129,5 +168,16 @@ mod tests {
         unpack_praypkg(&artifact, &output).expect("safe unpack");
         let text = fs::read_to_string(output.join("exports/guidance.md")).expect("read");
         assert_eq!(text, "safe\n");
+    }
+
+    #[test]
+    fn unpack_praypkg_rejects_oversized_compressed_artifact() {
+        let oversized = vec![0u8; (MAX_ARCHIVE_TOTAL_BYTES as usize) + 1];
+        let output = temporary_directory("pray-archive-oversize");
+        let error = unpack_praypkg(&oversized, &output).expect_err("oversize");
+        assert!(
+            error.to_string().contains("exceeds"),
+            "unexpected error: {error}"
+        );
     }
 }

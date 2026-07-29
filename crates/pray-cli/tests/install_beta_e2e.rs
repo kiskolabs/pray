@@ -72,13 +72,13 @@ fn beta_e2e_publishes_consumes_and_syncs_across_workspaces() {
 
     let failed_install = run_pray(&consumer_repo, &["install"]);
     assert!(!failed_install.status.success());
-    assert!(matches!(failed_install.status.code(), Some(1) | Some(3)));
+    assert_eq!(failed_install.status.code(), Some(7));
     let failed_stderr = String::from_utf8_lossy(&failed_install.stderr);
     assert!(
         failed_stderr.contains("Connection refused")
             || failed_stderr.contains("timed out")
             || failed_stderr.contains("Network error")
-            || failed_stderr.contains("resolution error")
+            || failed_stderr.contains("network error")
     );
     assert!(!consumer_repo.join("Prayfile.lock").exists());
     assert!(!consumer_repo.join("INSTRUCTIONS.md").exists());

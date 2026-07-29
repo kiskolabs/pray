@@ -96,3 +96,28 @@ pray "sample/common", path: "packages/common"
     let project = resolve_project(&root.join("Prayfile")).expect("acyclic resolve");
     assert_eq!(project.packages.len(), 2);
 }
+
+#[test]
+fn resolve_rejects_undeclared_required_dependency() {
+    let root = temporary_directory("pray-undeclared-dep");
+    write_package(&root, "base", "1.0.0", Some("sample/missing"));
+    fs::write(
+        root.join("Prayfile"),
+        r#"
+prayfile "1"
+target :tool_a do
+  output "INSTRUCTIONS.md"
+end
+pray "sample/base", path: "packages/base"
+"#,
+    )
+    .expect("Prayfile");
+
+    let error = resolve_project(&root.join("Prayfile")).expect_err("undeclared");
+    let message = error.to_string();
+    assert!(
+        message.contains("undeclared package dependencies"),
+        "unexpected error: {message}"
+    );
+    assert!(message.contains("sample/missing"));
+}

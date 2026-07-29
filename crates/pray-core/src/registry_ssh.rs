@@ -29,6 +29,10 @@ pub(crate) fn resolve_ssh_registry_package_root(
         )?;
         let signer_fingerprint = lockfile_signer_fingerprint(&selected);
         require_remote_integrity_fields(&declaration.name, &selected.version, &selected)?;
+        crate::client_trust::gate_pray_ssh_publisher_optional(
+            source_url,
+            signer_fingerprint.as_deref(),
+        )?;
         if let Some(vendored_root) = crate::registry_cache::try_vendored_package_root(
             project_root,
             &declaration.name,
