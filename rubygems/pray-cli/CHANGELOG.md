@@ -2,6 +2,10 @@
 
 ## Unreleased
 
+## 1.5.2 (2026-07-29)
+
+- Put the Prayfile positioning line into the gem summary for RubyGems search.
+
 ## 1.5.1 (2026-07-29)
 
 - Add `rake build` / `rake release` for gem packaging and RubyGems push.

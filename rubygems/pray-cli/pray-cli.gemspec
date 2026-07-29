@@ -8,8 +8,8 @@ Gem::Specification.new do |spec|
   spec.authors = ["Andrei Makarov"]
   spec.email = ["contact@kiskolabs.com"]
 
-  spec.summary = "Ruby pray CLI and library for the Prayfile workflow"
-  spec.description = "Resolve, lock, render, verify, and publish Prayfile inference input packages. Consumes path, git, and registry distribution points."
+  spec.summary = "Package manager for the language placed before inference (Prayfile)"
+  spec.description = "Ruby Prayfile CLI and library: resolve, lock, render, verify, and publish inference input packages. Consumes path, git, and registry distribution points."
   spec.homepage = "https://pray.kisko.dev"
   spec.license = "MIT"
   spec.required_ruby_version = ">= 3.1.0"
