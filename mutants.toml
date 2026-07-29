@@ -1,8 +1,18 @@
 # Scoped mutation testing for crash and integrity surfaces.
 # Run: make mutants
 # Or: cargo mutants -p pray-core --timeout 60 \
-#   -e 'manifest.rs' -e 'package_spec.rs' -e 'dependency_graph.rs' \
-#   -e 'resolve.rs' -e 'hashing.rs' -e 'package_integrity.rs' \
-#   -e 'package_archive.rs' -e 'paths.rs'
+#   -f 'manifest.rs' -f 'package_spec.rs' -f 'dependency_graph.rs' \
+#   -f 'resolve.rs' -f 'hashing.rs' -f 'package_integrity.rs' \
+#   -f 'package_archive.rs' -f 'paths.rs'
 
 timeout_multiplier = 2.0
+examine_globs = [
+  "src/manifest.rs",
+  "src/package_spec.rs",
+  "src/dependency_graph.rs",
+  "src/resolve.rs",
+  "src/hashing.rs",
+  "src/package_integrity.rs",
+  "src/package_archive.rs",
+  "src/paths.rs",
+]

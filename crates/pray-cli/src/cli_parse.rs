@@ -425,6 +425,7 @@ fn parse_serve_command(mut arguments: std::vec::IntoIter<String>) -> PrayResult<
     let mut host = "127.0.0.1".to_string();
     let mut port = 7429u16;
     let mut stdio = false;
+    let mut allow_open_push = false;
     while let Some(argument) = arguments.next() {
         match argument.as_str() {
             "--root" => {
@@ -454,6 +455,7 @@ fn parse_serve_command(mut arguments: std::vec::IntoIter<String>) -> PrayResult<
                     .map_err(|error| PrayError::Unsupported(error.to_string()))?;
             }
             "--stdio" => stdio = true,
+            "--allow-open-push" => allow_open_push = true,
             other if other.starts_with("--") => {
                 return Err(PrayError::Unsupported(format!(
                     "unknown serve flag: {other}"
@@ -471,6 +473,7 @@ fn parse_serve_command(mut arguments: std::vec::IntoIter<String>) -> PrayResult<
         host,
         port,
         stdio,
+        allow_open_push,
     })
 }
 

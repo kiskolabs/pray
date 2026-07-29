@@ -44,8 +44,8 @@ jobs:
         continue-on-error: true
         run: >
           cargo mutants -p pray-core --timeout 30 --jobs 2
-          -e 'manifest.rs' -e 'package_spec.rs' -e 'dependency_graph.rs'
-          -e 'package_integrity.rs' -e 'package_archive.rs' -e 'paths.rs'
+          -f 'manifest.rs' -f 'package_spec.rs' -f 'dependency_graph.rs'
+          -f 'package_integrity.rs' -f 'package_archive.rs' -f 'paths.rs'
       - uses: SonarSource/sonarqube-scan-action@7006c4492b2e0ee0f816d36501671557c97f5995 # v8.1.0
         continue-on-error: true
         env:

@@ -1,9 +1,8 @@
+use crate::resource_limits::MAX_HTTP_RESPONSE_BYTES;
 use crate::{PrayError, PrayResult};
 use std::io::Read;
 use std::sync::OnceLock;
 use std::time::Duration;
-
-pub(crate) const MAX_HTTP_RESPONSE_BYTES: u64 = 64 * 1024 * 1024;
 
 pub(crate) struct HttpResponse {
     pub status: u16,
@@ -27,11 +26,11 @@ fn http_client() -> PrayResult<&'static reqwest::blocking::Client> {
         .timeout(Duration::from_secs(60))
         .redirect(reqwest::redirect::Policy::limited(5))
         .build()
-        .map_err(|error| PrayError::Resolution(error.to_string()))?;
+        .map_err(|error| PrayError::Network(error.to_string()))?;
     let _ = CLIENT.set(client);
     CLIENT
         .get()
-        .ok_or_else(|| PrayError::Resolution("HTTP client unavailable".to_string()))
+        .ok_or_else(|| PrayError::Network("HTTP client unavailable".to_string()))
 }
 
 fn ensure_http_url(url: &str) -> PrayResult<()> {
@@ -47,7 +46,7 @@ fn ensure_http_url(url: &str) -> PrayResult<()> {
 fn read_response_body(response: reqwest::blocking::Response) -> PrayResult<Vec<u8>> {
     let length = response.content_length();
     if length.is_some_and(|value| value > MAX_HTTP_RESPONSE_BYTES) {
-        return Err(PrayError::Resolution(format!(
+        return Err(PrayError::Network(format!(
             "HTTP response exceeds {MAX_HTTP_RESPONSE_BYTES} bytes"
         )));
     }
@@ -55,9 +54,9 @@ fn read_response_body(response: reqwest::blocking::Response) -> PrayResult<Vec<u
     let mut limited = response.take(MAX_HTTP_RESPONSE_BYTES.saturating_add(1));
     limited
         .read_to_end(&mut body)
-        .map_err(|error| PrayError::Resolution(error.to_string()))?;
+        .map_err(|error| PrayError::Network(error.to_string()))?;
     if body.len() as u64 > MAX_HTTP_RESPONSE_BYTES {
-        return Err(PrayError::Resolution(format!(
+        return Err(PrayError::Network(format!(
             "HTTP response exceeds {MAX_HTTP_RESPONSE_BYTES} bytes"
         )));
     }
@@ -121,7 +120,7 @@ fn http_request(
     }
     let response = request
         .send()
-        .map_err(|error| PrayError::Resolution(error.to_string()))?;
+        .map_err(|error| PrayError::Network(error.to_string()))?;
     let status = response.status().as_u16();
     let body = read_response_body(response)?;
     Ok(HttpResponse { status, body })

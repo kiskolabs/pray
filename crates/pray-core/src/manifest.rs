@@ -257,6 +257,7 @@ impl<'a> BlockParser<'a> {
         if manifest.prayfile_version.is_empty() {
             return Err(PrayError::Manifest("missing prayfile version".to_string()));
         }
+        crate::manifest_validate::validate_manifest_semantics(&manifest)?;
         Ok(manifest)
     }
 
