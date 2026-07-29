@@ -51,11 +51,11 @@
   },
   "devDependencies": {
     "@biomejs/biome": "^2.0.0",
-    "@types/node": "^22.15.0",
+    "@types/node": "^26.1.2",
     "@types/semver": "^7.7.0",
     "libyear": "^0.9.3",
     "madge": "^8.0.0",
-    "typescript": "^5.8.3"
+    "typescript": "^7.0.2"
   },
   "overrides": {
     "brace-expansion": ">=5.0.8"
