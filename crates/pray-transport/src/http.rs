@@ -1,8 +1,21 @@
 use crate::types::*;
 use async_trait::async_trait;
+use pray_core::PrayError;
 use reqwest::Client;
 use serde::{Deserialize, Serialize};
 use std::time::Duration;
+
+fn map_core_fetch_error(error: PrayError, artifact_name: &str) -> TransportError {
+    let is_network = matches!(error, PrayError::Network(_));
+    let message = error.to_string();
+    if message.contains("404") {
+        TransportError::NotFound(format!("Artifact not found: {artifact_name}"))
+    } else if is_network || message.contains("network error") {
+        TransportError::Network(message)
+    } else {
+        TransportError::InvalidResponse(message)
+    }
+}
 
 /// HTTP transport configuration
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -189,48 +202,22 @@ impl TransportAdapter for HttpTransport {
     }
 
     async fn fetch_artifact(&self, peer: &PeerConfig, artifact: &ArtifactRef) -> Result<Vec<u8>> {
-        let artifact_url =
-            if artifact.url.starts_with("http://") || artifact.url.starts_with("https://") {
-                artifact.url.clone()
-            } else {
-                let base = peer
-                    .url
-                    .as_ref()
-                    .ok_or_else(|| TransportError::InvalidResponse("Missing URL".to_string()))?;
-                format!(
-                    "{}/{}",
-                    base.trim_end_matches('/'),
-                    artifact.url.trim_start_matches('/')
-                )
-            };
-
-        let response = self
-            .client
-            .get(&artifact_url)
-            .send()
-            .await
-            .map_err(|e| TransportError::Network(format!("HTTP request failed: {}", e)))?;
-
-        if !response.status().is_success() {
-            if response.status().as_u16() == 404 {
-                return Err(TransportError::NotFound(format!(
-                    "Artifact not found: {}",
-                    artifact.url
-                )));
+        let base = peer
+            .url
+            .clone()
+            .ok_or_else(|| TransportError::InvalidResponse("Missing URL".to_string()))?;
+        let artifact_path = artifact.url.clone();
+        let artifact_name = artifact.url.clone();
+        tokio::task::spawn_blocking(move || {
+            if artifact_path.starts_with("http://") || artifact_path.starts_with("https://") {
+                return pray_core::fetch::http_get(&artifact_path)
+                    .map_err(|error| map_core_fetch_error(error, &artifact_name));
             }
-            return Err(TransportError::Network(format!(
-                "HTTP {} {}",
-                response.status().as_u16(),
-                response.status().canonical_reason().unwrap_or("")
-            )));
-        }
-
-        let bytes = response
-            .bytes()
-            .await
-            .map_err(|e| TransportError::Network(format!("Failed to read response: {}", e)))?;
-
-        Ok(bytes.to_vec())
+            pray_core::fetch::download_registry_artifact(&base, &artifact_path)
+                .map_err(|error| map_core_fetch_error(error, &artifact_name))
+        })
+        .await
+        .map_err(|error| TransportError::Network(format!("fetch join failed: {error}")))?
     }
 
     async fn push_package(&self, peer: &PeerConfig, metadata: &PackageMetadata) -> Result<()> {
