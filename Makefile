@@ -16,7 +16,7 @@ clean:
 	cargo clean
 
 install:
-	cargo install --path crates/pray-cli --locked
+	cargo install --path crates/pray-cli --locked --force
 
 ruby-test:
 	cd rubygems/pray-cli && bundle install && make test
