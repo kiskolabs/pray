@@ -15,7 +15,6 @@ crates/pray-core/src/registry.rs	373
 crates/pray-core/src/resolve.rs	503
 crates/pray-core/src/resolve_git.rs	306
 crates/pray-core/src/statement_surface.rs	367
-crates/pray-core/src/verify.rs	420
 crates/pray-transport/src/torrent.rs	545
 npmjs/pray-cli/src/git/sources.ts	325
 npmjs/pray-cli/src/literal/statement-surface.ts	352
@@ -25,7 +24,6 @@ npmjs/pray-cli/src/manifest/parser.ts	547
 npmjs/pray-cli/src/registry/index.ts	377
 npmjs/pray-cli/src/render/provisioned.ts	307
 npmjs/pray-cli/src/resolve/project.ts	386
-npmjs/pray-cli/src/verify/project.ts	310
 rubygems/pray-cli/lib/pray/literal.rb	382
 rubygems/pray-cli/lib/pray/registry.rb	355
 rubygems/pray-cli/lib/pray/render.rb	360

@@ -20,7 +20,7 @@ module Pray
     module_function
 
     def inspect_project(project, lockfile)
-      collect_verification_report(project, lockfile).first
+      collect_verification_report(project, lockfile)[0]
     end
 
     def verify_project(project, lockfile, strict: false)
@@ -35,21 +35,21 @@ module Pray
     end
 
     def drift_project(project, lockfile)
-      report, rendered_targets = collect_verification_report(project, lockfile)
-      Render.render_project(project).each do |target|
-        normalized_fresh = Hashing.normalize_line_endings(target.content)
-        on_disk = rendered_targets[target.path]
+      report, rendered_targets, fresh_targets = collect_verification_report(project, lockfile)
+      fresh_targets.each do |path, fresh_content|
+        normalized_fresh = Hashing.normalize_line_endings(fresh_content)
+        on_disk = rendered_targets[path]
         on_disk = Hashing.normalize_line_endings(on_disk) if on_disk
         unless on_disk == normalized_fresh
           report.findings << VerificationFinding.new(
             kind: "renderer_drift",
-            message: "#{target.path} differs from fresh render"
+            message: "#{path} differs from fresh render"
           )
         end
-        unless lockfile_targets(lockfile).include?(target.path)
+        unless lockfile_targets(lockfile).include?(path)
           report.findings << VerificationFinding.new(
             kind: "renderer_drift",
-            message: "#{target.path} is not tracked in lockfile"
+            message: "#{path} is not tracked in lockfile"
           )
         end
       end
@@ -64,6 +64,7 @@ module Pray
     def collect_verification_report(project, lockfile)
       report = VerificationReport.new
       rendered_targets = {}
+      fresh_targets = Render.render_project(project).to_h { |target| [target.path, target.content] }
 
       if project.manifest_hash != lockfile.manifest_hash
         report.findings << VerificationFinding.new(
@@ -125,20 +126,29 @@ module Pray
               message: "`#{target_path}` is missing managed marker `#{span.id}` for `#{span.package}::#{span.export}`. Run `pray install` to restore the managed span."
             )
           else
-            open_line, close_line, checksum = marker
+            _open_line, _close_line, checksum = marker
             if checksum != span.ideal_checksum
               report.findings << VerificationFinding.new(
                 kind: "custom_implementation",
                 message: "`#{target_path}` marker `#{span.id}` (`#{span.package}::#{span.export}`) was edited. Restore the managed block or run `pray install` to regenerate it."
               )
             end
-            if open_line != span.open_line || close_line != span.close_line
-              report.findings << VerificationFinding.new(
-                kind: "position_drift",
-                message: "`#{target_path}` marker `#{span.id}` (`#{span.package}::#{span.export}`) moved to different lines. Run `pray install` to restore expected positions."
-              )
-            end
           end
+        end
+        fresh_lines = fresh_targets[target_path]&.lines(chomp: true)
+        summary = VerifyPosition.summarize_position_drift(
+          target_path,
+          spans,
+          markers,
+          lines,
+          fresh_lines,
+          project.local_files
+        )
+        if summary
+          report.findings << VerificationFinding.new(
+            kind: "position_drift",
+            message: VerifyPosition.format_position_drift_message(summary)
+          )
         end
         find_orphan_marker_findings(spans, markers, target_path).each do |finding|
           report.findings << finding
@@ -155,7 +165,7 @@ module Pray
         )
       end
 
-      [report, rendered_targets]
+      [report, rendered_targets, fresh_targets]
     end
 
     def find_orphan_marker_findings(spans, markers, target_path)

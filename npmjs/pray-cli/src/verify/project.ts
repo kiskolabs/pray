@@ -1,16 +1,17 @@
 import { existsSync, readFileSync } from "node:fs";
 import { resolve } from "node:path";
 import { PrayError } from "../errors.js";
-import {
-  checksumManagedBodyLineRefs,
-  normalizeLineEndings,
-  sha256Prefixed,
-} from "../hashing.js";
+import { normalizeLineEndings, sha256Prefixed } from "../hashing.js";
 import type { Lockfile, ManagedSpanRecord } from "../lockfile/types.js";
 import { renderProject } from "../render/project.js";
 import { expectedProvisionedBytes } from "../render/provisioned.js";
 import { missingLocalEmbedGuidance } from "../resolve/project.js";
 import type { ResolvedProject } from "../resolve/types.js";
+import { markerPositions } from "./markers.js";
+import {
+  formatPositionDriftMessage,
+  summarizePositionDrift,
+} from "./position.js";
 
 export interface VerificationFinding {
   kind: string;
@@ -47,28 +48,27 @@ export function driftProject(
   project: ResolvedProject,
   lockfile: Lockfile,
 ): VerificationReport {
-  const { report, renderedTargets } = collectVerificationReport(
+  const { report, renderedTargets, freshTargets } = collectVerificationReport(
     project,
     lockfile,
   );
-  const rendered = renderProject(project);
   const lockTargets = new Set(
     lockfile.target.flatMap((target) => target.outputs),
   );
 
-  for (const target of rendered) {
-    const normalizedFresh = normalizeLineEndings(target.content);
-    const onDisk = renderedTargets.get(target.path);
+  for (const [path, freshContent] of freshTargets.entries()) {
+    const normalizedFresh = normalizeLineEndings(freshContent);
+    const onDisk = renderedTargets.get(path);
     if (!onDisk || normalizeLineEndings(onDisk) !== normalizedFresh) {
       report.findings.push({
         kind: "renderer_drift",
-        message: `${target.path} differs from fresh render`,
+        message: `${path} differs from fresh render`,
       });
     }
-    if (!lockTargets.has(target.path)) {
+    if (!lockTargets.has(path)) {
       report.findings.push({
         kind: "renderer_drift",
-        message: `${target.path} is not tracked in lockfile`,
+        message: `${path} is not tracked in lockfile`,
       });
     }
   }
@@ -92,9 +92,16 @@ function formatDriftReport(report: VerificationReport): string {
 function collectVerificationReport(
   project: ResolvedProject,
   lockfile: Lockfile,
-): { report: VerificationReport; renderedTargets: Map<string, string> } {
+): {
+  report: VerificationReport;
+  renderedTargets: Map<string, string>;
+  freshTargets: Map<string, string>;
+} {
   const report: VerificationReport = { findings: [] };
   const renderedTargets = new Map<string, string>();
+  const freshTargets = new Map(
+    renderProject(project).map((target) => [target.path, target.content]),
+  );
 
   if (project.manifestHash !== lockfile.manifest_hash) {
     report.findings.push({
@@ -172,15 +179,21 @@ function collectVerificationReport(
           message: `\`${targetPath}\` marker \`${span.id}\` (\`${span.package}::${span.export}\`) was edited. Restore the managed block or run \`pray install\` to regenerate it.`,
         });
       }
-      if (
-        marker.openLine !== span.open_line ||
-        marker.closeLine !== span.close_line
-      ) {
-        report.findings.push({
-          kind: "position_drift",
-          message: `\`${targetPath}\` marker \`${span.id}\` (\`${span.package}::${span.export}\`) moved to different lines. Run \`pray install\` to restore expected positions.`,
-        });
-      }
+    }
+    const fresh = freshTargets.get(targetPath);
+    const summary = summarizePositionDrift(
+      targetPath,
+      spans,
+      markers,
+      lines,
+      fresh?.split("\n"),
+      project.localFiles,
+    );
+    if (summary) {
+      report.findings.push({
+        kind: "position_drift",
+        message: formatPositionDriftMessage(summary),
+      });
     }
     const trackedIds = new Set(spans.map((span) => span.id));
     for (const markerId of markers.keys()) {
@@ -209,7 +222,7 @@ function collectVerificationReport(
     }
   }
 
-  return { report, renderedTargets };
+  return { report, renderedTargets, freshTargets };
 }
 
 function verifyExclusiveFileBinding(
@@ -256,55 +269,4 @@ function verifyExclusiveFileBinding(
 
 function isWarning(finding: VerificationFinding): boolean {
   return finding.kind === "orphan_marker";
-}
-
-function markerPositions(
-  lines: string[],
-): Map<string, { openLine: number; closeLine: number; checksum: string }> {
-  const markers = new Map<
-    string,
-    { openLine: number; closeLine: number; checksum: string }
-  >();
-  let active: { id: string; openLine: number; body: string[] } | undefined;
-
-  for (let index = 0; index < lines.length; index += 1) {
-    const line = lines[index]!;
-    const parsed = parseMarker(line);
-    if (!parsed) {
-      active?.body.push(line);
-      continue;
-    }
-    if (parsed === "ignore") {
-      continue;
-    }
-    if (!active) {
-      active = { id: parsed, openLine: index + 1, body: [] };
-      continue;
-    }
-    if (active.id === parsed) {
-      markers.set(active.id, {
-        openLine: active.openLine,
-        closeLine: index + 1,
-        checksum: checksumManagedBodyLineRefs(active.body),
-      });
-      active = undefined;
-    }
-  }
-
-  return markers;
-}
-
-function parseMarker(line: string): string | "ignore" | undefined {
-  const trimmed = line.trim();
-  if (!trimmed.startsWith("<!-- pray:") || !trimmed.endsWith(" -->")) {
-    return undefined;
-  }
-  const id = trimmed.slice("<!-- pray:".length, -" -->".length);
-  if (id === "0 ignore-comments") {
-    return "ignore";
-  }
-  if (/^[a-z0-9]+$/.test(id)) {
-    return id;
-  }
-  return undefined;
 }
