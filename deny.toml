@@ -1,8 +1,5 @@
 [advisories]
-ignore = [
-  # Dev-only via criterion in pray-bench; upgrade when criterion pulls crossbeam-epoch >=0.9.20.
-  { id = "RUSTSEC-2026-0204", reason = "transitive dev-dependency through criterion in pray-bench" },
-]
+ignore = []
 
 [licenses]
 allow = [

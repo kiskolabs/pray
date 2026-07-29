@@ -9,10 +9,10 @@ jobs:
   rust:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v7
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           fetch-depth: 0  # Shallow clones should be disabled for a better relevancy of analysis
-      - uses: dtolnay/rust-toolchain@stable
+      - uses: dtolnay/rust-toolchain@4cda84d5c5c54efe2404f9d843567869ab1699d4 # stable
         with:
           components: rustfmt, clippy, llvm-tools-preview
       - name: Check formatting
@@ -21,7 +21,7 @@ jobs:
         run: make loc-check
       - name: Run Clippy
         run: cargo clippy --workspace --all-targets -- -D warnings
-      - uses: EmbarkStudios/cargo-deny-action@v2
+      - uses: EmbarkStudios/cargo-deny-action@3c6349835b2b7b196a839186cb8b78e02f7b5f25 # v2
         with:
           command: check advisories licenses bans sources
       - name: Install cargo-machete
@@ -31,13 +31,13 @@ jobs:
       - name: Run Rust tests
         run: cargo test --workspace
       - name: Install cargo-llvm-cov
-        uses: taiki-e/install-action@v2
+        uses: taiki-e/install-action@18b1216eba7f8039b0f8d131d5473787f0edce68 # v2
         with:
           tool: cargo-llvm-cov
       - name: Rust coverage soft floor
         run: cargo llvm-cov --workspace --lcov --output-path lcov.info --fail-under-lines 20
       - name: Install cargo-mutants
-        uses: taiki-e/install-action@v2
+        uses: taiki-e/install-action@18b1216eba7f8039b0f8d131d5473787f0edce68 # v2
         with:
           tool: cargo-mutants
       - name: Mutation smoke on parser and integrity
@@ -54,14 +54,17 @@ jobs:
   ruby:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v7
-      - uses: ruby/setup-ruby@v1
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: ruby/setup-ruby@95ef2b042f9d7a56d8268cba8559e2842e2ad01b # v1
         with:
           ruby-version: "3.4"
           bundler-cache: true
           working-directory: rubygems/pray-cli
       - name: Install archive tools
         run: sudo apt-get update && sudo apt-get install -y zstd
+      - name: Audit Ruby dependencies
+        working-directory: rubygems/pray-cli
+        run: bundle exec bundler-audit check --update
       - name: Run Ruby lint
         working-directory: rubygems/pray-cli
         run: make lint
@@ -74,8 +77,8 @@ jobs:
   npm:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v7
-      - uses: actions/setup-node@v7
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7
         with:
           node-version: "22"
           cache: npm
@@ -85,6 +88,12 @@ jobs:
       - name: Install npm dependencies
         working-directory: npmjs/pray-cli
         run: npm ci
+      - name: Audit production npm dependencies
+        working-directory: npmjs/pray-cli
+        run: npm audit --omit=dev
+      - name: Audit all npm dependencies
+        working-directory: npmjs/pray-cli
+        run: npm audit
       - name: Run npm tests
         working-directory: npmjs/pray-cli
         run: npm test
