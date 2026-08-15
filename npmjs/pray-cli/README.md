@@ -10,6 +10,8 @@ Resolve, lock, render, verify, publish, and serve shared instructions, policies,
 
 **Repository:** [kiskolabs/pray](https://github.com/kiskolabs/pray)
 
+**Package:** [npmjs.com/package/pray-cli](https://www.npmjs.com/package/pray-cli)
+
 **Community docs:** [CHANGELOG.md](CHANGELOG.md) · [LICENSE.md](LICENSE.md) · [SECURITY.md](SECURITY.md)
 
 ## Install

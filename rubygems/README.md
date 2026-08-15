@@ -14,7 +14,7 @@ bundle install
 bundle exec pray version
 ```
 
-Or install as a gem:
+Or install as a gem from [RubyGems](https://rubygems.org/gems/pray-cli):
 
 ```bash
 gem install pray-cli
