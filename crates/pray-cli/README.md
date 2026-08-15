@@ -48,3 +48,6 @@ Man page (from a checkout): `man ./docs/man/pray.1`. Exit codes: `docs/cli-exit-
 - Spec: [SPEC.md](https://github.com/kiskolabs/pray/blob/main/SPEC.md)
 - Homepage: [pray.kisko.dev](https://pray.kisko.dev)
 - Repository: [kiskolabs/pray](https://github.com/kiskolabs/pray)
+- crates.io: [pray-cli](https://crates.io/crates/pray-cli)
+- npm: [pray-cli](https://www.npmjs.com/package/pray-cli)
+- RubyGems: [pray-cli](https://rubygems.org/gems/pray-cli)

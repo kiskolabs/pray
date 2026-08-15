@@ -10,6 +10,8 @@ Resolve, lock, render, verify, and publish shared instructions, policies, templa
 
 **Repository:** [kiskolabs/pray](https://github.com/kiskolabs/pray)
 
+**Package:** [rubygems.org/gems/pray-cli](https://rubygems.org/gems/pray-cli)
+
 **Community docs:** [CHANGELOG.md](CHANGELOG.md) · [LICENSE.md](LICENSE.md) · [SECURITY.md](SECURITY.md)
 
 ## Install

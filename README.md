@@ -22,7 +22,7 @@ Install the Rust `pray` CLI as a system-wide binary with Cargo:
 cargo install pray-cli --locked
 ```
 
-The crates.io package is `pray-cli` (the name `pray` is already taken on crates.io). Cargo installs the `pray` executable into your user bin directory, typically `~/.cargo/bin`.
+The [crates.io](https://crates.io/crates/pray-cli) package is `pray-cli` (the name `pray` is already taken on crates.io). Cargo installs the `pray` executable into your user bin directory, typically `~/.cargo/bin`.
 
 From git:
 
@@ -970,7 +970,7 @@ Start with `SPEC.md` for:
 
 ### npm (Node.js)
 
-Install the TypeScript `pray` CLI from npm:
+Install the TypeScript `pray` CLI from [npm](https://www.npmjs.com/package/pray-cli):
 
 ```sh
 npm install -g pray-cli
@@ -986,7 +986,7 @@ The npm package lives in `npmjs/pray-cli` and implements Prayfile parsing, regis
 
 ### RubyGems (Ruby)
 
-Install the Ruby `pray` CLI:
+Install the Ruby `pray` CLI from [RubyGems](https://rubygems.org/gems/pray-cli):
 
 ```sh
 gem install pray-cli
@@ -1025,6 +1025,8 @@ Confession submission should require explicit verification, signed payloads, rep
 - [GitHub](https://github.com/kiskolabs/pray)
 - [GitLab](https://gitlab.com/amkisko/pray)
 - [crates.io](https://crates.io/crates/pray-cli)
+- [npm](https://www.npmjs.com/package/pray-cli)
+- [RubyGems](https://rubygems.org/gems/pray-cli)
 - [libraries.io](https://libraries.io/cargo/pray-cli)
 - [Deps.dev](https://deps.dev/cargo/pray-cli)
 - [SonarCloud](https://sonarcloud.io/project/overview?id=kiskolabs_pray)
