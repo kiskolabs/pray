@@ -71,7 +71,7 @@ install -d "$(manpath | cut -d: -f1)/man1"
 install -m 644 docs/man/pray.1 "$(manpath | cut -d: -f1)/man1/pray.1"
 ```
 
-Exit codes for operators: `docs/cli-exit-codes.md` (normative table in SPEC.md section 66).
+Exit codes for operators: `docs/cli-exit-codes.md` (normative table in RFC 0040).
 
 ## After language registry publish
 

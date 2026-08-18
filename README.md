@@ -8,7 +8,7 @@ It lets projects declare shared instructions, policies, memories, templates, rev
 
 The goal is simple: treat pre-inference input as a dependency.
 
-The specification and the `pray` reference CLI evolve together. `SPEC.md` defines the current contracts.
+The specification and the `pray` reference CLI evolve together. Numbered RFCs under `rfcs/` define the current contracts (RFC 0001, RFC 0111).
 
 **Website:** [pray.kisko.dev](https://pray.kisko.dev)
 
@@ -876,7 +876,7 @@ App: Prayer::Context.for(:inference).to_s  # example API; not normative yet
 
 * prayers remain data — no arbitrary package code execution in the gem either
 * lockfile managed span records remain authoritative for verify/drift
-* the gem should not fork marker or checksum rules; it implements the same contracts as `README.md` and `SPEC.md`
+* the gem should not fork marker or checksum rules; it implements the same contracts as `README.md` and `rfcs/`
 * gem name and API are not finalized; `prayer`, `prayfile`, and `prayers` are candidates
 
 ## Is the specification final?
@@ -939,32 +939,31 @@ Avoid bundled binary assets.
 
 | Path             | Purpose                                 |
 | ---------------- | --------------------------------------- |
-| `SPEC.md`        | Normative specification                 |
+| `rfcs/`          | Normative specification (RFC 0111)      |
 | `AGENTS.md`      | Contributor and inference tool workflow |
 | `spec/README.md` | Test coverage guidelines                |
 
 ## Read the specification
 
-Start with `SPEC.md` for:
+Start with `rfcs/README.md` for:
 
-* file formats
-* resolver behaviour
-* lockfile semantics
-* checksum verification
-* local cache behaviour
-* package structure
-* distribution point API
-* publishing and signing policy
-* confession feedback policy
-* built-in serving behaviour
-* registry design
-* rendering targets
-* render marker rules
-* formatting behaviour
-* managed span records (ideal checksums and line positions)
-* plan/apply behaviour
-* verify and drift detection
-* CLI commands
+* file formats (RFC 0010, RFC 0011)
+* resolver and lockfile behaviour (RFC 0020)
+* checksum verification (RFC 0050)
+* local cache behaviour (RFC 0070)
+* package structure (RFC 0011)
+* distribution point API (RFC 0060)
+* publishing and signing policy (RFC 0050)
+* confession feedback policy (RFC 0050)
+* built-in serving behaviour (RFC 0060)
+* registry design (RFC 0060)
+* rendering targets and markers (RFC 0030)
+* formatting behaviour (RFC 0040)
+* managed span records (RFC 0020, RFC 0030)
+* plan/apply behaviour (RFC 0030, RFC 0040)
+* verify and drift detection (RFC 0030)
+* CLI commands (RFC 0040)
+* ownership of generated output (RFC 0031)
 
 ## Additional packaging
 

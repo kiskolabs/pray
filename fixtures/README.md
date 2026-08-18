@@ -1,6 +1,6 @@
 # Conformance fixtures
 
-Layout follows SPEC.md section 73. Each pack holds inputs and expected diagnostics or lock/render slices for independent implementations.
+Layout follows RFC 0100. Each pack holds inputs and expected diagnostics or lock/render slices for independent implementations.
 
 ```
 fixtures/

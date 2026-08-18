@@ -19,6 +19,6 @@ pray-core = { version = "1.5", default-features = false }
 
 ## Links
 
-- Spec: [SPEC.md](https://github.com/kiskolabs/pray/blob/main/SPEC.md)
+- Spec: [rfcs/](https://github.com/kiskolabs/pray/blob/main/rfcs/README.md)
 - CLI: [pray-cli](https://crates.io/crates/pray-cli)
 - Homepage: [pray.kisko.dev](https://pray.kisko.dev)

@@ -2,6 +2,12 @@
 
 ## Unreleased
 
+- Retire `SPEC.md`. Numbered RFCs under `rfcs/` are the product contract (RFC 0111).
+- Add RFC process (RFC 0001), template, and id claims in `rfcs/ids/NNNN`.
+- Record shipped design as Stable Standards Track RFCs 0010, 0011, 0020, 0030, 0031, 0040, 0050, and 0060.
+- Record Informational Stable RFCs 0002, 0070, and 0101.
+- Record Experimental follow-ons RFC 0100, 0102, 0104, and 0108.
+
 ## 1.8.1 (2026-07-29)
 
 - Group `position_drift` findings per target in `pray verify`, `pray drift`, and install warnings.

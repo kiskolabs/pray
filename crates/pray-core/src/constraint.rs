@@ -1,7 +1,7 @@
 use crate::{PrayError, PrayResult};
 use semver::{Version, VersionReq};
 
-/// Normalizes a Prayfile version constraint per SPEC §16.
+/// Normalizes a Prayfile version constraint per RFC 0010 §16.
 ///
 /// Bare semver strings such as `1.0.0` are exact pins (`=1.0.0`), not caret ranges.
 pub fn normalize_version_constraint(constraint: &str) -> String {
