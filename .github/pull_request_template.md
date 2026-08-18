@@ -22,4 +22,4 @@ Please include a summary of the change and the issue it resolves.
 
 - [ ] Breaking change (fix or feature that would cause existing functionality to not work as expected)
 
-- [ ] Specification change ([SPEC.md](SPEC.md))
+- [ ] Specification change (`rfcs/`, cite `RFC-NNNN`)

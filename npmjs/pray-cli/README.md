@@ -68,4 +68,4 @@ node bin/pray.js version
 
 Registry HTTP(S), git sources, local publish/serve/sync, vendor/tree, login (passkey and ssh-agent), upgrade, update/plan/outdated remote flags, and trust import paths are implemented. SSH registry (`pray+ssh://`) and `serve --stdio` remain planned.
 
-See `SPEC.md` in the repository root for the normative specification.
+See `rfcs/` in the repository for the normative specification.

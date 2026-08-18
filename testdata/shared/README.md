@@ -14,4 +14,4 @@ Current cases:
 - `compose-tree-file` — compose, tree, and file-bound package surfaces
 - `legacy-target` — classic `target` / `output` / unbound package declaration
 
-Fuller conformance packs also start under `fixtures/` (SPEC.md section 73).
+Fuller conformance packs also start under `fixtures/` (RFC 0100).

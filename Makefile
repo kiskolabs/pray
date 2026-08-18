@@ -1,4 +1,4 @@
-.PHONY: build clean install bench bench-scaling ruby-test loc-check libyears libyears-rust libyears-ruby libyears-npm bump-homebrew \
+.PHONY: build clean install bench bench-scaling ruby-test loc-check rfc-ids libyears libyears-rust libyears-ruby libyears-npm bump-homebrew \
 	release-dry-run release-crates release-npm release-rubygems release-distribution release-all \
 	coverage coverage-rust mutants fuzz-build
 
@@ -24,6 +24,9 @@ ruby-test:
 # Soft warn at 150 LOC; hard fail above 300 unless ratcheted in scripts/loc-limits.allowlist.
 loc-check:
 	./scripts/check-loc-limits.sh
+
+rfc-ids:
+	cargo test -p pray-core --test rfc_ids
 
 bench:
 	cargo bench -p pray-bench

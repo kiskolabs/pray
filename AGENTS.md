@@ -10,7 +10,7 @@ To change shared guidance, update `Prayfile` and run `pray install`.
 ### .agents/project.md
 Repository for the pray open specification and the reference CLI.
 
-Read `README.md` for project positioning and `SPEC.md` for the normative Prayfile, prayspec, lockfile, distribution point, and CLI design.
+Read `README.md` for project positioning and `rfcs/` for the normative Prayfile, prayspec, lockfile, distribution point, and CLI design (RFC 0111).
 
 ## Project intent
 

@@ -15,7 +15,7 @@ pub(crate) fn select_package_version(
             .find(|version| version.version == preferred_version)
         {
             if version_satisfies(&version.version, constraint)? {
-                // SPEC §60: existing lockfile may continue using a yanked version.
+                // RFC 0050: existing lockfile may continue using a yanked version.
                 return Ok(version.clone());
             }
             // Prayfile constraint changed; fall through to the highest satisfying version.

@@ -22,4 +22,4 @@ Examples:
 - `pray verify --strict` with findings → exit 6
 - Unreachable registry host → exit 7
 
-Normative mapping: SPEC.md section 66. Man page: `docs/man/pray.1` (EXIT STATUS). Concise `pray --help` does not list these codes; use this page or the man page.
+Normative mapping: RFC 0040. Man page: `docs/man/pray.1` (EXIT STATUS). Concise `pray --help` does not list these codes; use this page or the man page.

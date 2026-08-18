@@ -45,7 +45,7 @@ Man page (from a checkout): `man ./docs/man/pray.1`. Exit codes: `docs/cli-exit-
 
 ## Links
 
-- Spec: [SPEC.md](https://github.com/kiskolabs/pray/blob/main/SPEC.md)
+- Spec: [rfcs/](https://github.com/kiskolabs/pray/blob/main/rfcs/README.md)
 - Homepage: [pray.kisko.dev](https://pray.kisko.dev)
 - Repository: [kiskolabs/pray](https://github.com/kiskolabs/pray)
 - crates.io: [pray-cli](https://crates.io/crates/pray-cli)

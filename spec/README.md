@@ -19,7 +19,7 @@ Do not write tests that only assert implementation details.
 
 Avoid:
 
-- file, page, content, ordering, and regex assertions on rendered output unless `SPEC.md` requires exact bytes
+- file, page, content, ordering, and regex assertions on rendered output unless an RFC requires exact bytes
 - duplicate coverage of the same contract in multiple test files
 - tests that pass regardless of behavior change
 

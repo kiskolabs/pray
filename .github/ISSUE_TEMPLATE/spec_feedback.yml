@@ -1,6 +1,6 @@
 name: Specification Feedback
-description: Propose a change or clarification to SPEC.md.
-title: "[Spec]: "
+description: Propose a change or clarification to a contract RFC.
+title: "[RFC]: "
 labels: ["spec", "triage"]
 body:
   - type: markdown
@@ -9,9 +9,9 @@ body:
   - type: textarea
     id: section
     attributes:
-      label: SPEC.md Section or Topic
-      description: Cite the relevant section when possible.
-      placeholder: e.g. lockfile hashing, render targets, distribution point API
+      label: RFC number or topic
+      description: Cite the RFC when possible (for example RFC 0020 lockfile hashing).
+      placeholder: e.g. RFC 0020 lockfile hashing, RFC 0030 render targets, RFC 0060 distribution
     validations:
       required: true
   - type: textarea

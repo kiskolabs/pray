@@ -88,4 +88,4 @@ A successful run produces:
 - Keep supporting files close to `SKILL.md`.
 - Include examples only when they help use or review the skill.
 - Use `render mode: :managed` for repository-shared output.
-- Use `conflict: :fail` unless there is a strong reason to do otherwise.
+- Use `conflict: :fail`.

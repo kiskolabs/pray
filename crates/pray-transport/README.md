@@ -13,6 +13,6 @@ pray-transport = "1.5"
 
 ## Links
 
-- Spec: [SPEC.md](https://github.com/kiskolabs/pray/blob/main/SPEC.md)
+- Spec: [rfcs/](https://github.com/kiskolabs/pray/blob/main/rfcs/README.md)
 - Core: [pray-core](https://crates.io/crates/pray-core)
 - Homepage: [pray.kisko.dev](https://pray.kisko.dev)
