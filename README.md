@@ -62,6 +62,22 @@ The lockfile records the resolved state, including checksums of original source 
 
 Rendered files contain only the material intended to affect inference, plus compact citation markers that point back to `Prayfile.lock`.
 
+## Why use this with Git, Mercurial, Subversion, or CVS?
+
+CVS, Git, Mercurial, and Subversion record the history of one working tree: commits, branches, diffs, blame, and rollback of that tree.
+
+Shared inference input has a different unit of work. The same fragment may need to appear in many repositories, composed with local text, constrained to a version range, and verified as a span inside a file those tools already track.
+
+Nested-project features pin whole trees or paths. Git submodules record a gitlink to another repository commit. Mercurial subrepos record nested state in `.hgsubstate`. Subversion `svn:externals` maps a local path to a URL and ideally a revision; since 1.6 a file external can pull one whole file from the same repository. CVS modules maps checkout names to directories or files inside one CVSROOT. Git subtree copies another project's tree into a subdirectory of this repository.
+
+Prayfile resolves a version range across packages, composes named exports into one `AGENTS.md`, reconstructs and checksums a managed span, and uses the same composition recipe on a Git working tree or an SVN working tree.
+
+That is the same split Bundler and Cargo already make with Git. A gem or crate can live in a Git repository; `Gemfile.lock` still records `revision`, and `Cargo.lock` still records the git commit, so later installs fetch that revision even if the branch moved. `Prayfile.lock` plays that role for inference input. Git remains a source and a history store. `Prayfile.lock` is the resolver record.
+
+Commit `Prayfile`, `Prayfile.lock`, and usually the rendered target files in this project's VCS. The VCS reviews those diffs. `pray plan`, `pray apply`, and `pray verify` decide the rendered bytes.
+
+`pray publish` and `pray sync` can record updates through Git, Mercurial, or a configured command backend. Git and Mercurial working trees are auto-detected for that recording. Subversion and CVS record through the command backend when a team needs it.
+
 ## What problem does Prayfile solve?
 
 Prayfile solves reproducible composition and synchronization of shared inference input material across repositories, teams, and tools.
