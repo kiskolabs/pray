@@ -48,11 +48,19 @@ Test coverage must follow `spec/README.md` guidelines.
 - keep the idea that code reflects user experience, so readability, structure, and clarity are product qualities, not optional polish;
 - pull request description should include answers to questions: what problem is solved, why it matters, how the solution works, and any relevant context; if the change is non-trivial, include reproduction steps or a changelog entry with intent;
 - pull request checklist: changelog entry with intent or reproduction steps when relevant, test coverage, and quality checks done;
-- suggest updating usr/docs/changelogs with a short summary and PR link only when the change is significant enough to be mentioned; changelog files should use `usr/docs/changelogs/#{date +"%Y%m%d%H%M%S"}_<title>.md`;
-- when documenting ideas, issues, user requests, new features, bugfixes, chores, etc., use `usr/docs/issues/#{date +"%Y%m%d%H%M%S"}_<title>.md`;
+- follow docs-conventions for usr/docs trace filenames and layout;
 - validation output must list exact commands run and observed results, and never claim tests pass unless they were executed and passed;
 - ignore style-only dust unless it harms correctness, operability, maintainability, or auditability under realistic load.
 <!-- pray:9068e4a2 -->
+
+<!-- pray:781b7711 -->
+## Credentials and Secrets
+
+- Prefer a secret store or OS credential helper over embedding live secrets in config files, scripts, or documentation. Named managers (for example 1Password, Bitwarden, KeePassXC) are fine; the requirement is isolation, not a specific vendor.
+- Config and project files may hold references (vault paths, item ids, redacted fingerprints). They must not hold live tokens, API keys, passwords, or client secrets.
+- Do not pass secrets on command lines or in other process-visible arguments. Prefer secret-store lookup, short-lived credentials, or stdin/file descriptors that do not persist in shell history.
+- Do not commit secrets, paste them into issues or pull requests, or write them to logs. Rotate anything that may have been exposed.
+<!-- pray:781b7711 -->
 
 <!-- pray:bfe6ff38 -->
 - `docs/` is for human-facing documentation: setup guides, architecture, migration notes, and operator material meant for users and contributors without agent context; use stable descriptive filenames;
@@ -74,6 +82,29 @@ Do not open drive-by dependency hunts; record only issues encountered while doin
 
 For proactive selection, alteration, and audit rules, use `dependency-policy` and the dependency-audit skill.
 <!-- pray:edcc5f67 -->
+
+<!-- pray:3ac5d6ce -->
+## Dependency policy
+
+Rules for adding, changing, or removing third-party packages. Apply across languages. Names vary by ecosystem; concepts do not.
+
+Terminology:
+
+- package manifest — declares intent (`gemspec`, `package.json`, `Cargo.toml`, `mix.exs`, etc.)
+- lockfile — pins the resolved graph CI and developers install
+- registry — published versions consumers resolve (`RubyGems`, `npm`, `crates.io`, `Hex`, etc.)
+- hot path — code on the security, auth, crypto, IO, or request/response boundary users rely on
+
+Stop until one of these applies before adding a dependency:
+
+- stdlib or the framework for this tree already covers it;
+- an installed transitive dependency already covers it without a second library for the same job;
+- the feature needs a new package and tests will prove behavior.
+
+Run the dependency-audit skill when adding, replacing, or removing a direct dependency; when asked for a dependency audit; before a release that changes hot-path packages; or after a published advisory names a package in the graph.
+
+Related: `dependency-issues` records upstream defects found during real work; `minimal-implementation` covers YAGNI before adding deps; `engineering-audit` covers code and pipeline review.
+<!-- pray:3ac5d6ce -->
 
 <!-- pray:cd3045de -->
 - use Rust and Cargo features according to the versions declared in the repository;
@@ -158,7 +189,32 @@ Examples:
 
 Read once for marketing odor, once for negation-led sentences, once for stray em dashes, and once for paragraphs that break on clause instead of on scene; keep live notes and metadata honest and plain.
 - repo trace under usr/docs/issues, usr/docs/tasks, and usr/docs/changelogs: plain prose readable without a rendered preview—no markdown tables, bold, italic, or other styling; prioritize factual accuracy over presentation.
+- Ease, lexical diversity, coherence, mechanics, and claim integrity are separate constructs. Automated matches, readability grades, similarity, and model preference are review prompts; rewrite for meaning.
+- Keep agency on the person who acts. Tools and process nouns do mechanical work.
+- One sentence holds one beat. Consecutive short sentences that only restated the same beat are a punchline stack.
+- For material external claims, quotations, dates, or research summaries, use the claims-audit skill.
 <!-- pray:ca94e22d -->
+
+<!-- pray:d893ab3d -->
+## Claims and testimony
+
+Treat checkable facts, quotations, dates, quantities, and causal statements as claims. Treat author memory and clearly framed interpretation as testimony.
+
+- Inventing scenes, sources, numbers, or quotations is out of scope.
+- A link or citation in the text is not verification. The cited passage must support the claim's scope, date, population, and causal strength.
+- If a material external claim cannot be checked in this run, mark it unverifiable rather than rounding it to certainty.
+- Run the claims-audit skill when asked to verify, fact-check, or research checkable claims, or when prose under edit states material external facts, quotations, dates, or research summaries.
+
+Related: `writing-prose` covers voice and quality constructs; `engineering-audit` covers code and pipeline behavior.
+<!-- pray:d893ab3d -->
+
+<!-- pray:b1ea9b07 -->
+## RFC process
+
+Significant user-facing contract changes start as an RFC. Skip a bugfix, typo, or refactor that leaves those contracts in place.
+
+Claim `rfcs/ids/NNNN` before writing `rfcs/NNNN-slug.md`. Copy `rfcs/0000-template.md`. Omit unused header fields and empty sections. Implementation PRs cite `RFC-NNNN`. Numbering bands, isolation, and extra product tests live in `rfcs/README.md`. Follow the rfc-process skill. Product RFCs specify a design. Version numbers belong in changelogs. Keep existing RFC numbers.
+<!-- pray:b1ea9b07 -->
 
 <!-- pray:08c294fb -->
 ## Likely rejected changes
@@ -179,9 +235,8 @@ Verify the change is wanted, discuss first for unconfirmed larger features, desc
 <!-- pray:48e8a6b3 -->
 ## Collaboration workflow
 
-- keep human-facing documentation in `docs/`;
-- keep durable agent and engineering trace in `usr/docs/`; use folders such as `usr/docs/changelogs`, `usr/docs/issues`, `usr/docs/plan`, `usr/docs/tasks`, and `usr/docs/ideas`;
 - agent-assisted work with ongoing project value must leave a trace in the repo;
 - store only specific, decision-bearing, high-signal material; do not commit generic notes, copied chat logs, or filler;
-- use the lightest process that preserves traceability; design-only work does not need branch ceremony unless implementation work starts.
+- use the lightest process that preserves traceability; design-only work does not need branch ceremony unless implementation work starts;
+- follow docs-conventions for docs/ versus usr/docs/ layout.
 <!-- pray:48e8a6b3 -->
