@@ -3,16 +3,16 @@ mod check;
 use check::check_rfc_tree;
 use std::fs;
 use std::path::{Path, PathBuf};
-use std::time::{SystemTime, UNIX_EPOCH};
+use std::sync::atomic::{AtomicU64, Ordering};
+
+static SCRATCH_SEQUENCE: AtomicU64 = AtomicU64::new(0);
 
 fn scratch() -> PathBuf {
+    let sequence = SCRATCH_SEQUENCE.fetch_add(1, Ordering::Relaxed);
     let root = std::env::temp_dir().join(format!(
         "pray-rfc-ids-{}-{}",
         std::process::id(),
-        SystemTime::now()
-            .duration_since(UNIX_EPOCH)
-            .expect("clock")
-            .as_nanos()
+        sequence
     ));
     fs::create_dir_all(&root).expect("scratch");
     root
