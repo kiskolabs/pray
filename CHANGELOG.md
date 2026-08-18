@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+## 1.9.0 (2026-08-18)
+
 - BREAKING: TypeScript and Ruby `pray-cli` reject render conflict values other than `fail`. Manifest schema enums the same.
 - Document how Prayfile sits beside Git, Mercurial, Subversion, and CVS.
 - Retire `SPEC.md`. Numbered RFCs under `rfcs/` are the product contract (RFC 0111).
