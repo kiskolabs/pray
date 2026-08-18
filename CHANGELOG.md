@@ -2,6 +2,7 @@
 
 ## Unreleased
 
+- BREAKING: TypeScript and Ruby `pray-cli` reject render conflict values other than `fail`. Manifest schema enums the same.
 - Retire `SPEC.md`. Numbered RFCs under `rfcs/` are the product contract (RFC 0111).
 - Add RFC process (RFC 0001), template, and id claims in `rfcs/ids/NNNN`.
 - Record shipped design as Stable Standards Track RFCs 0010, 0011, 0020, 0030, 0031, 0040, 0050, and 0060.

@@ -108,7 +108,7 @@ end
         let error = parse_manifest(
             r#"
 prayfile "1"
-render conflict: :overwrite
+        render conflict: :warn
 target :tool_a do
   output "INSTRUCTIONS.md"
 end

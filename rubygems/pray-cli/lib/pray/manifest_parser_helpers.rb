@@ -170,9 +170,16 @@ module Pray
 
       def parse_render_policy(rest)
         _, keywords = parse_call(rest)
+        conflict = keywords["conflict"]&.as_string || "fail"
+        unless conflict == "fail"
+          raise Error.unsupported(
+            "render conflict :#{conflict} is not implemented; only :fail is supported"
+          )
+        end
+
         RenderPolicy.new(
           mode: keywords["mode"]&.as_string || "managed",
-          conflict: keywords["conflict"]&.as_string || "fail",
+          conflict: conflict,
           churn: keywords["churn"]&.as_string || "minimal",
           header: keyword_bool(keywords, "header", true),
           section_markers: keyword_bool(keywords, "section_markers", true),

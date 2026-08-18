@@ -318,6 +318,18 @@ RSpec.describe "Pray parser" do
     expect(manifest.symbols["security_email"]).to eq("b@example.com")
   end
 
+  it "rejects unimplemented render conflict policy" do
+    expect do
+      Pray.parse_manifest(<<~PRAYFILE)
+        prayfile "1"
+        render conflict: :warn
+        target :tool_a do
+          output "INSTRUCTIONS.md"
+        end
+      PRAYFILE
+    end.to raise_error(Pray::Error, /only :fail is supported/)
+  end
+
   it "rejects duplicate pray symbols" do
     expect do
       Pray.parse_manifest(<<~PRAYFILE)
