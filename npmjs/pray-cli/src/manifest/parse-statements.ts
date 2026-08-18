@@ -21,7 +21,6 @@ import type {
   ManifestPackage,
   ManifestSource,
   ManifestTarget,
-  RenderPolicy,
 } from "./types.js";
 
 const PARSE_CONTEXT = "manifest";
@@ -235,43 +234,7 @@ export function parseLocalDecl(rest: string): ManifestLocal {
   };
 }
 
-export function parseRenderPolicy(rest: string): RenderPolicy {
-  const { keywords } = parseCall(rest);
-  return {
-    mode: keywords.has("mode")
-      ? (stringFromValue(
-          keywordValue(keywords, "mode", PARSE_CONTEXT),
-          PARSE_CONTEXT,
-        ) as RenderPolicy["mode"])
-      : "managed",
-    conflict: keywords.has("conflict")
-      ? (stringFromValue(
-          keywordValue(keywords, "conflict", PARSE_CONTEXT),
-          PARSE_CONTEXT,
-        ) as RenderPolicy["conflict"])
-      : "fail",
-    churn: keywords.has("churn")
-      ? (stringFromValue(
-          keywordValue(keywords, "churn", PARSE_CONTEXT),
-          PARSE_CONTEXT,
-        ) as RenderPolicy["churn"])
-      : "minimal",
-    header: keywords.has("header")
-      ? (literalAsBool(keywordValue(keywords, "header", PARSE_CONTEXT)) ?? true)
-      : true,
-    sectionMarkers: keywords.has("section_markers")
-      ? (literalAsBool(
-          keywordValue(keywords, "section_markers", PARSE_CONTEXT),
-        ) ?? true)
-      : true,
-    lineEndings: keywords.has("line_endings")
-      ? (stringFromValue(
-          keywordValue(keywords, "line_endings", PARSE_CONTEXT),
-          PARSE_CONTEXT,
-        ) as RenderPolicy["lineEndings"])
-      : "lf",
-  };
-}
+export { parseRenderPolicy } from "./parse-render-policy.js";
 
 export function applyTargetStatement(
   target: ManifestTarget,

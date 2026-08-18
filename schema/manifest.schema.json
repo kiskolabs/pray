@@ -298,7 +298,7 @@
         },
         "conflict": {
           "type": "string",
-          "minLength": 1
+          "enum": ["fail"]
         },
         "churn": {
           "type": "string",

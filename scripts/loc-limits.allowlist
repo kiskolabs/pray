@@ -19,7 +19,6 @@ crates/pray-transport/src/torrent.rs	545
 npmjs/pray-cli/src/git/sources.ts	325
 npmjs/pray-cli/src/literal/statement-surface.ts	352
 npmjs/pray-cli/src/manifest/format-manifest.ts	392
-npmjs/pray-cli/src/manifest/parse-statements.ts	314
 npmjs/pray-cli/src/manifest/parser.ts	547
 npmjs/pray-cli/src/registry/index.ts	377
 npmjs/pray-cli/src/render/provisioned.ts	307

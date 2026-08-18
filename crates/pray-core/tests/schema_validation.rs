@@ -79,6 +79,20 @@ fn parsed_example_manifests_validate_against_manifest_schema() {
 }
 
 #[test]
+fn manifest_schema_rejects_non_fail_conflict() {
+    let validator = load_validator("manifest.schema.json");
+    let path = workspace_root().join("examples/simple-project/Prayfile");
+    let manifest_text = fs::read_to_string(&path).expect("read prayfile");
+    let manifest = parse_manifest(&manifest_text).expect("parse prayfile");
+    let mut value = serde_json::to_value(manifest.canonicalized()).expect("serialize manifest");
+    value["render"]["conflict"] = serde_json::json!("warn");
+    assert!(
+        !validator.is_valid(&value),
+        "manifest schema should reject conflict warn"
+    );
+}
+
+#[test]
 fn parsed_example_package_spec_validates_against_package_schema() {
     let validator = load_validator("package.schema.json");
     let path = workspace_root().join("examples/simple-project/packages/base/sample-base.prayspec");

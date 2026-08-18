@@ -7,7 +7,7 @@ export type SourceKind =
 
 export type RenderMode = "managed" | "verbatim";
 
-export type RenderConflict = "fail" | "warn" | "merge";
+export type RenderConflict = "fail";
 
 export type RenderChurn = "minimal" | "full";
 

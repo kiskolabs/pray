@@ -256,6 +256,23 @@ compose("AGENTS.md"){
     assert.equal(manifest.packages[0]?.name, "sample/base");
   });
 
+  it("rejects unimplemented render conflict policy", () => {
+    assert.throws(
+      () =>
+        parseManifest(`
+prayfile "1"
+render conflict: :warn
+target :tool_a do
+  output "INSTRUCTIONS.md"
+end
+`),
+      (error: unknown) =>
+        error instanceof PrayError &&
+        error.kind === "unsupported" &&
+        error.message.includes("only :fail is supported"),
+    );
+  });
+
   it("parses ruby surface semicolon do/end one-liner", () => {
     const manifest = parseManifest(`
 prayfile "1"
