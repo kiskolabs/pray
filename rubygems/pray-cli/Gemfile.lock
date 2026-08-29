@@ -15,7 +15,7 @@ GEM
       thor (~> 1.0)
     citrus (3.0.2)
     diff-lcs (1.6.2)
-    json (2.21.1)
+    json (2.21.2)
     language_server-protocol (3.17.0.6)
     libyear-bundler (0.9.3)
       bundler (>= 1.14, < 5)
@@ -101,6 +101,7 @@ PLATFORMS
 
 DEPENDENCIES
   bundler-audit (~> 0.9)
+  json (>= 2.21.2)
   libyear-bundler (~> 0.9)
   polyrun (~> 2.2)
   pray-cli!
@@ -120,7 +121,7 @@ CHECKSUMS
   bundler-audit (0.9.3) sha256=81c8766c71e47d0d28a0f98c7eed028539f21a6ea3cd8f685eb6f42333c9b4e9
   citrus (3.0.2) sha256=4ec2412fc389ad186735f4baee1460f7900a8e130ffe3f216b30d4f9c684f650
   diff-lcs (1.6.2) sha256=9ae0d2cba7d4df3075fe8cd8602a8604993efc0dfa934cff568969efb1909962
-  json (2.21.1) sha256=13a43df75d95641443f5702dff350f237164a9d811ff0f2c2800d4d980220583
+  json (2.21.2) sha256=1f1d3b7cf2b3ba1a69beca0bb6db13d5438b80bff3cd54cdaaa620b9b07c1c6a
   language_server-protocol (3.17.0.6) sha256=5ef2c0c138f8267e1bc631d3328347d354f96724b0af22f2c79516120443b7f0
   libyear-bundler (0.9.3) sha256=c54dcd768dd02d2371f763aebfadefa856d3aaee23a0137e6cfec79d1fdfca15
   lint_roller (1.1.0) sha256=2c0c845b632a7d172cb849cc90c1bce937a28c5c8ccccb50dfd46a485003cc87
