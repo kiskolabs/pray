@@ -81,6 +81,32 @@ fn install_groups_position_drift_with_local_cause() {
 }
 
 #[test]
+fn install_records_patched_marker_positions_so_verify_passes() {
+    let repo = temporary_directory("pray-install-lock-positions");
+    create_fixture(&repo);
+    assert!(run_pray(&repo, &["install"]).status.success());
+
+    let rendered_path = repo.join("INSTRUCTIONS.md");
+    let rendered = fs::read_to_string(&rendered_path).expect("rendered file exists");
+    let rendered = rendered.replace("Local guidance\n", "Local guidance\nExtra unmarked line\n");
+    fs::write(&rendered_path, rendered).expect("rendered file rewritten");
+
+    let install = run_pray(&repo, &["install"]);
+    assert!(
+        install.status.success(),
+        "install failed:\n{}",
+        String::from_utf8_lossy(&install.stderr)
+    );
+
+    let verify = run_pray(&repo, &["verify"]);
+    assert!(
+        verify.status.success(),
+        "verify failed:\n{}",
+        String::from_utf8_lossy(&verify.stderr)
+    );
+}
+
+#[test]
 fn drift_semantic_summarizes_package_version_changes() {
     let repo = temporary_directory("pray-drift-semantic");
     create_fixture(&repo);

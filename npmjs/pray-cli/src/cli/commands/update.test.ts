@@ -37,4 +37,13 @@ describe("update flags", () => {
         error.message.includes("--json is not supported with --dry-run"),
     );
   });
+
+  it("rejects latest dry-run with json", async () => {
+    await assert.rejects(
+      () => runUpdateCommand(["--latest", "--dry-run", "--json"]),
+      (error: unknown) =>
+        error instanceof PrayError &&
+        error.message.includes("--json is not supported with --dry-run"),
+    );
+  });
 });

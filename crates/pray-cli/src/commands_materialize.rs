@@ -10,7 +10,9 @@ use crate::project_paths::{
     lockfile_path, manifest_path, resolve_project_with_git_refresh_fallback,
 };
 use pray_core::lockfile::{read_lockfile, write_lockfile_if_changed};
-use pray_core::render::{render_project, write_rendered_targets_with_previous_lockfile};
+use pray_core::render::{
+    layout_rendered_targets, render_project, write_rendered_targets_with_previous_lockfile,
+};
 use pray_core::resolve::ResolvedProject;
 use pray_core::resolve_context::ResolveOptions;
 use pray_core::PrayResult;
@@ -69,12 +71,13 @@ pub(crate) fn materialize_command(
         return Ok(None);
     }
 
-    let lockfile = build_lockfile(&project, &rendered)?;
+    let laid_out = layout_rendered_targets(&project, &rendered)?;
+    let lockfile = build_lockfile(&project, &laid_out)?;
     let previous_lockfile = read_lockfile(&lockfile_path).ok();
     let preview = if report_mode.is_some() {
         Some(build_materialization_preview(
             &project,
-            &rendered,
+            &laid_out,
             &lockfile,
             &lockfile_path,
             previous_lockfile.as_ref(),

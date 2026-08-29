@@ -131,6 +131,23 @@ RSpec.describe "Pray parser" do
     expect(reparsed.packages.first).to eq(manifest.packages.first)
   end
 
+  it "rewrites every matching declaration and keeps indent" do
+    text = <<~PRAYFILE
+      prayfile "1"
+      compose "AGENTS.md" do
+        pray "sample/base", "~> 1.0"
+      end
+      tree ".agents/skills" do
+        pray "sample/base", "~> 1.0", export: "testing-basics"
+      end
+    PRAYFILE
+    package = Pray::ManifestPackage.new(name: "sample/base", constraint: "~> 1.1")
+    updated = Pray.replace_package_declaration(text, package)
+    expect(updated).to include('  pray "sample/base", "~> 1.1"')
+    expect(updated).to include('  pray "sample/base", "~> 1.1", export: "testing-basics"')
+    expect(updated).not_to include("~> 1.0")
+  end
+
   it "parses pray ssh source url" do
     manifest = Pray.parse_manifest(<<~PRAYFILE)
       prayfile "1"

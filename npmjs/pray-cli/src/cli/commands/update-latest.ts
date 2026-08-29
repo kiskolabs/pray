@@ -5,6 +5,7 @@ import {
 } from "../../constraint.js";
 import { PrayError } from "../../errors.js";
 import { readLockfile } from "../../lockfile/index.js";
+import { parseManifest } from "../../manifest/index.js";
 import { replacePackageDeclaration } from "../../manifest/package-declaration.js";
 import { defaultResolveOptions } from "../../resolve/context.js";
 import {
@@ -20,6 +21,7 @@ import {
 export async function updateLatestCommand(
   packageName: string | undefined,
   json: boolean,
+  dryRun = false,
 ): Promise<void> {
   const path = manifestPath();
   let manifestText = readFileSync(path, "utf8");
@@ -85,14 +87,21 @@ export async function updateLatestCommand(
     process.stdout.write(
       "All package constraints already allow registry latest versions\n",
     );
-  } else {
-    if (!json) {
-      for (const update of manifestUpdates) {
-        process.stdout.write(
-          `Prayfile: ${update.name} constraint ${update.from_constraint} -> ${update.to_constraint} (registry latest ${update.registry_latest_version})\n`,
-        );
-      }
+  } else if (!json) {
+    for (const update of manifestUpdates) {
+      process.stdout.write(
+        `Prayfile: ${update.name} constraint ${update.from_constraint} -> ${update.to_constraint} (registry latest ${update.registry_latest_version})\n`,
+      );
     }
+  }
+
+  if (manifestUpdates.length > 0) {
+    parseManifest(manifestText);
+  }
+  if (dryRun) {
+    return;
+  }
+  if (manifestUpdates.length > 0) {
     writeFileSync(path, manifestText, "utf8");
   }
 

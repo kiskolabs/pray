@@ -1,6 +1,8 @@
 # CHANGELOG
 
-## Unreleased
+## 1.9.1 (2026-08-29)
+
+- Rewrite every matching `pray` line when a package constraint is updated, keeping indent and extra keywords.
 
 ## 1.7.0 (2026-07-29)
 
