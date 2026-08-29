@@ -21,6 +21,13 @@ updates:
       npm:
         patterns:
           - "*"
+    ignore:
+      # madge@8.0.0 still declares peerOptional typescript@^5.4.4 (pahen/madge#462).
+      - dependency-name: typescript
+        update-types: ["version-update:semver-major"]
+      # Keep Node types on the CI runtime (Node 22 in .github/workflows/ci.yml).
+      - dependency-name: "@types/node"
+        update-types: ["version-update:semver-major"]
   - package-ecosystem: bundler
     directory: /rubygems/pray-cli
     open-pull-requests-limit: 10

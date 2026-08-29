@@ -9,11 +9,8 @@ static SCRATCH_SEQUENCE: AtomicU64 = AtomicU64::new(0);
 
 fn scratch() -> PathBuf {
     let sequence = SCRATCH_SEQUENCE.fetch_add(1, Ordering::Relaxed);
-    let root = std::env::temp_dir().join(format!(
-        "pray-rfc-ids-{}-{}",
-        std::process::id(),
-        sequence
-    ));
+    let root =
+        std::env::temp_dir().join(format!("pray-rfc-ids-{}-{}", std::process::id(), sequence));
     fs::create_dir_all(&root).expect("scratch");
     root
 }
