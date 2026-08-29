@@ -10,7 +10,9 @@ use crate::update_report::{
 use pray_core::constraint::{latest_constraint_for_package, version_satisfies};
 use pray_core::lockfile::{read_lockfile, write_lockfile};
 use pray_core::manifest::{parse_manifest, read_manifest_text, replace_package_declaration};
-use pray_core::render::{render_project, write_rendered_targets_with_previous_lockfile};
+use pray_core::render::{
+    layout_rendered_targets, render_project, write_rendered_targets_with_previous_lockfile,
+};
 use pray_core::resolve_context::ResolveOptions;
 use pray_core::{PrayError, PrayResult};
 use std::fs;
@@ -38,15 +40,15 @@ pub(crate) fn update_command(
                 "major updates are not supported with --dry-run".to_string(),
             ));
         }
-        return update_latest_command(package, json);
+        return update_latest_command(package, json, false);
     }
     if latest {
-        if dry_run {
+        if dry_run && json {
             return Err(PrayError::Unsupported(
-                "--latest is not supported with --dry-run".to_string(),
+                "--json is not supported with --dry-run".to_string(),
             ));
         }
-        return update_latest_command(package, json);
+        return update_latest_command(package, json, dry_run);
     }
 
     if dry_run {
@@ -56,7 +58,7 @@ pub(crate) fn update_command(
     update_command_with_manifest_constraints(package, json, Vec::new())
 }
 
-fn update_latest_command(package: Option<String>, json: bool) -> PrayResult<()> {
+fn update_latest_command(package: Option<String>, json: bool, dry_run: bool) -> PrayResult<()> {
     let manifest_path = manifest_path();
     let manifest_text = read_manifest_text(&manifest_path)?;
     let preview_options = constraint_preview_options();
@@ -140,16 +142,23 @@ fn update_latest_command(package: Option<String>, json: bool) -> PrayResult<()> 
             return Ok(());
         }
         println!("All package constraints already allow registry latest versions");
-    } else {
-        if !json {
-            for (name, previous_constraint, new_constraint, registry_latest_version) in
-                &manifest_updates
-            {
-                println!(
-                    "Prayfile: {name} constraint {previous_constraint} -> {new_constraint} (registry latest {registry_latest_version})"
-                );
-            }
+    } else if !json {
+        for (name, previous_constraint, new_constraint, registry_latest_version) in
+            &manifest_updates
+        {
+            println!(
+                "Prayfile: {name} constraint {previous_constraint} -> {new_constraint} (registry latest {registry_latest_version})"
+            );
         }
+    }
+
+    if !manifest_updates.is_empty() {
+        parse_manifest(&updated_text)?;
+    }
+    if dry_run {
+        return Ok(());
+    }
+    if !manifest_updates.is_empty() {
         fs::write(&manifest_path, updated_text)?;
     }
 
@@ -239,7 +248,8 @@ pub(crate) fn unlock_command(package: String) -> PrayResult<()> {
     options.unlocked_packages.insert(package.clone());
     let project = resolve_project_with_options(&manifest_path(), &options)?;
     let rendered = render_project(&project)?;
-    let updated_lockfile = build_lockfile(&project, &rendered)?;
+    let laid_out = layout_rendered_targets(&project, &rendered)?;
+    let updated_lockfile = build_lockfile(&project, &laid_out)?;
     let merged_lockfile =
         merge_selected_package_update(&previous_lockfile, &updated_lockfile, &package);
     write_lockfile(&lockfile_path(), &merged_lockfile)?;
@@ -257,11 +267,7 @@ pub(crate) fn constraint_preview_options() -> ResolveOptions {
 }
 
 pub(crate) fn remote_preview_options() -> ResolveOptions {
-    ResolveOptions {
-        refresh_source_revisions: true,
-        ignore_locked_versions: true,
-        ..ResolveOptions::default()
-    }
+    constraint_preview_options()
 }
 
 pub(crate) fn preview_remote_updates(selected_package: Option<&str>, json: bool) -> PrayResult<()> {
@@ -273,7 +279,8 @@ pub(crate) fn preview_remote_updates(selected_package: Option<&str>, json: bool)
     let previous_lockfile = read_lockfile(&lockfile_path()).ok();
     let project = resolve_project_with_options(&manifest_path(), &remote_preview_options())?;
     let rendered = render_project(&project)?;
-    let updated_lockfile = build_lockfile(&project, &rendered)?;
+    let laid_out = layout_rendered_targets(&project, &rendered)?;
+    let updated_lockfile = build_lockfile(&project, &laid_out)?;
     if print_update_summary(
         previous_lockfile.as_ref(),
         &updated_lockfile,

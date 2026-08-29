@@ -62,14 +62,14 @@ export async function runUpdateCommand(argumentsList: string[]): Promise<void> {
         "major updates are not supported with --dry-run",
       );
     }
-    await updateLatestCommand(flags.packageName, flags.json);
+    await updateLatestCommand(flags.packageName, flags.json, false);
     return;
   }
   if (flags.latest) {
-    if (flags.dryRun) {
-      throw PrayError.unsupported("--latest is not supported with --dry-run");
+    if (flags.dryRun && flags.json) {
+      throw PrayError.unsupported("--json is not supported with --dry-run");
     }
-    await updateLatestCommand(flags.packageName, flags.json);
+    await updateLatestCommand(flags.packageName, flags.json, flags.dryRun);
     return;
   }
   if (flags.dryRun) {

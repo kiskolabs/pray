@@ -1,6 +1,11 @@
 # CHANGELOG
 
-## Unreleased
+## 1.9.1 (2026-08-29)
+
+- Rewrite every matching `pray` line when `pray update --latest` moves a package constraint, keeping indent and extra keywords.
+- Preview those constraint moves with `pray update --latest --dry-run` without writing Prayfile.
+- Record lock marker positions from the file `pray install` wrote so `pray verify` matches after local unmarked text or marker order differs.
+- Keep `pray install --locked` on a fresh compose so a changed local compose source still needs an install.
 
 ## 1.9.0 (2026-08-18)
 

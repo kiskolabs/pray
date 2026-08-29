@@ -1,6 +1,9 @@
 # CHANGELOG
 
-## Unreleased
+## 1.9.1 (2026-08-29)
+
+- Rewrite every matching `pray` line when `pray update --latest` moves a package constraint, keeping indent and extra keywords.
+- Preview those constraint moves with `pray update --latest --dry-run` without writing Prayfile.
 
 ## 1.7.0 (2026-07-29)
 

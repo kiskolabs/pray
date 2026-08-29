@@ -1,5 +1,7 @@
 # frozen_string_literal: true
 
+require_relative "manifest_constraint"
+
 module Pray
   module ManifestMethods
     module_function
@@ -37,13 +39,15 @@ module Pray
         "package \"#{name}\"", "package '#{name}'"
       ]
       lines = text.lines.map(&:chomp)
-      index = lines.index { |line|
-        trimmed = line.lstrip
-        prefixes.any? { |prefix| trimmed.start_with?(prefix) }
-      }
-      raise Error.manifest("package #{name} not found in manifest") unless index
+      replaced = 0
+      lines.each_index do |index|
+        trimmed = lines[index].lstrip
+        next unless prefixes.any? { |prefix| trimmed.start_with?(prefix) }
 
-      lines[index] = format_package_declaration(package)
+        lines[index] = rewrite_constraint_on_line(lines[index], package.constraint)
+        replaced += 1
+      end
+      raise Error.manifest("package #{name} not found in manifest") if replaced.zero?
       output = lines.join("\n")
       output += "\n" if text.end_with?("\n") && !output.end_with?("\n")
       output

@@ -33,7 +33,7 @@ pub fn render_project(project: &ResolvedProject) -> PrayResult<Vec<RenderedTarge
 }
 
 pub use crate::render_write::{
-    write_rendered_targets, write_rendered_targets_with_previous_lockfile,
+    layout_rendered_targets, write_rendered_targets, write_rendered_targets_with_previous_lockfile,
 };
 
 pub use crate::render_provisioned::{

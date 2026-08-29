@@ -14,7 +14,7 @@ use crate::project_paths::{
 use crate::update_report::{print_constraint_blocked_packages, print_update_summary};
 use pray_core::lockfile::read_lockfile;
 use pray_core::registry::version_is_greater_than;
-use pray_core::render::render_project;
+use pray_core::render::{layout_rendered_targets, render_project};
 use pray_core::resolve_context::ResolveOptions;
 use pray_core::{PrayError, PrayResult};
 use std::path::Path;
@@ -39,11 +39,12 @@ pub(crate) fn plan_command(remote: bool) -> PrayResult<()> {
         resolve_project_for_materialization(&options, false, false)?
     };
     let rendered = render_project(&project)?;
-    let lockfile = build_lockfile(&project, &rendered)?;
+    let laid_out = layout_rendered_targets(&project, &rendered)?;
+    let lockfile = build_lockfile(&project, &laid_out)?;
     let previous_lockfile = read_lockfile(&lockfile_path()).ok();
     let preview = build_materialization_preview(
         &project,
-        &rendered,
+        &laid_out,
         &lockfile,
         &lockfile_path(),
         previous_lockfile.as_ref(),
@@ -100,7 +101,8 @@ pub(crate) fn outdated_command(remote: bool) -> PrayResult<()> {
     let previous_lockfile = read_lockfile(&lockfile_path()).ok();
     let project = resolve_project_with_options(&manifest_path(), &constraint_preview_options())?;
     let rendered = render_project(&project)?;
-    let latest_lockfile = build_lockfile(&project, &rendered)?;
+    let laid_out = layout_rendered_targets(&project, &rendered)?;
+    let latest_lockfile = build_lockfile(&project, &laid_out)?;
     let mut reported = print_update_summary(
         previous_lockfile.as_ref(),
         &latest_lockfile,

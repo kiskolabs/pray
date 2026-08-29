@@ -71,16 +71,23 @@ pub fn replace_package_declaration(text: &str, package: &ManifestPackage) -> Pra
         format!("package '{name}'"),
     ];
     let mut lines: Vec<String> = text.lines().map(|line| line.to_string()).collect();
-    let index = lines
-        .iter()
-        .position(|line| {
-            let trimmed = line.trim_start();
-            prefixes
-                .iter()
-                .any(|prefix| trimmed.starts_with(prefix.as_str()))
-        })
-        .ok_or_else(|| PrayError::Manifest(format!("package {name} not found in manifest")))?;
-    lines[index] = format_package_declaration(package);
+    let mut replaced = 0usize;
+    for line in &mut lines {
+        let trimmed = line.trim_start();
+        if prefixes
+            .iter()
+            .any(|prefix| trimmed.starts_with(prefix.as_str()))
+        {
+            *line =
+                crate::manifest_constraint::rewrite_constraint_on_line(line, &package.constraint)?;
+            replaced += 1;
+        }
+    }
+    if replaced == 0 {
+        return Err(PrayError::Manifest(format!(
+            "package {name} not found in manifest"
+        )));
+    }
     let mut output = lines.join("\n");
     if text.ends_with('\n') && !output.ends_with('\n') {
         output.push('\n');
@@ -94,4 +101,35 @@ fn format_string_keyword_list(values: &[String]) -> String {
         .map(|value| format!("\"{value}\""))
         .collect::<Vec<_>>()
         .join(", ")
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::manifest::ManifestPackage;
+
+    fn package(constraint: &str) -> ManifestPackage {
+        ManifestPackage {
+            name: "sample/base".to_string(),
+            constraint: constraint.to_string(),
+            ..Default::default()
+        }
+    }
+
+    #[test]
+    fn rewrites_every_matching_declaration_and_keeps_indent() {
+        let text = r#"
+prayfile "1"
+compose "AGENTS.md" do
+  pray "sample/base", "~> 1.0"
+end
+tree ".agents/skills" do
+  pray "sample/base", "~> 1.0", export: "testing-basics"
+end
+"#;
+        let updated = replace_package_declaration(text, &package("~> 1.1")).expect("replace");
+        assert!(updated.contains(r#"  pray "sample/base", "~> 1.1""#));
+        assert!(updated.contains(r#"  pray "sample/base", "~> 1.1", export: "testing-basics""#));
+        assert!(!updated.contains("~> 1.0"));
+    }
 }

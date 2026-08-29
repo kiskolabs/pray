@@ -1,4 +1,5 @@
 import { PrayError } from "../errors.js";
+import { rewriteConstraintOnLine } from "./package-constraint.js";
 import type { ManifestPackage } from "./types.js";
 
 function formatStringKeywordList(values: string[]): string {
@@ -71,14 +72,17 @@ export function replacePackageDeclaration(
     `package '${name}'`,
   ];
   const lines = text.split(/\r?\n/);
-  const index = lines.findIndex((line) => {
+  let replaced = 0;
+  for (const [index, line] of lines.entries()) {
     const trimmed = line.trimStart();
-    return prefixes.some((prefix) => trimmed.startsWith(prefix));
-  });
-  if (index === -1) {
+    if (prefixes.some((prefix) => trimmed.startsWith(prefix))) {
+      lines[index] = rewriteConstraintOnLine(line, packageEntry.constraint);
+      replaced += 1;
+    }
+  }
+  if (replaced === 0) {
     throw PrayError.manifest(`package ${name} not found in manifest`);
   }
-  lines[index] = formatPackageDeclaration(packageEntry);
   let output = lines.join("\n");
   if (text.endsWith("\n") && !output.endsWith("\n")) {
     output += "\n";
