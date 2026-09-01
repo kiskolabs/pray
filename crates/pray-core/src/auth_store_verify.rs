@@ -1,7 +1,7 @@
 use super::secrets::*;
 use super::support::*;
 use super::RegistryAuthStore;
-use crate::auth::AuthVerificationResponse;
+use crate::auth::{AuthSessionKind, AuthVerificationResponse};
 use crate::{PrayError, PrayResult};
 use rusqlite::OptionalExtension;
 
@@ -39,9 +39,12 @@ impl RegistryAuthStore {
             "UPDATE email_verification_codes SET verified_at = ?2 WHERE email = ?1",
             rusqlite::params![email, timestamp],
         )?;
+        let session = self.issue_session(email, AuthSessionKind::Email)?;
         Ok(AuthVerificationResponse {
             email: email.to_string(),
             verified: true,
+            token: session.token,
+            kind: AuthSessionKind::Email,
         })
     }
 }

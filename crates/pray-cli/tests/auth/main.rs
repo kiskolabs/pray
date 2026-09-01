@@ -1,14 +1,20 @@
 use base64::{engine::general_purpose::STANDARD, Engine as _};
-use ed25519_dalek::{Signer, SigningKey};
+use ed25519_dalek::Signer;
 use pray_core::auth::RegistryAuthStore;
 use pray_core::trust::EmailConfirmationPolicy;
 use pray_core::PrayError;
 use std::fs;
-use std::io::{Read, Write};
 use std::net::{TcpListener, TcpStream};
 use std::process::{Command, Stdio};
 use std::thread;
 use std::time::Duration;
+
+mod support;
+
+use support::{
+    extract_json_string, fetch_http_post, fetch_http_post_with_authorization, latest_delivery_code,
+    signing_key_from_seed, ssh_public_key_text,
+};
 
 #[test]
 fn exercises_registration_session_passkey_and_ssh_key_over_http() {
@@ -55,13 +61,13 @@ fn exercises_registration_session_passkey_and_ssh_key_over_http() {
     let signing_key = signing_key_from_seed(7);
     let public_key = ssh_public_key_text(&signing_key);
 
-    let store = RegistryAuthStore::open(&registry_root).expect("open auth store");
-    let register = store
-        .register_email("alice@example.com", EmailConfirmationPolicy::Required)
-        .expect("register");
-    assert!(!register.verified);
-    let code = register.verification_code.expect("verification code");
-    assert!(code.starts_with("sha256:"));
+    let register = fetch_http_post(
+        &format!("{base_url}/v1/auth/register"),
+        r#"{"email":"alice@example.com"}"#,
+    );
+    assert_eq!(register.status, 201);
+    assert!(!register.body.contains("verification_code"));
+    let code = latest_delivery_code(&registry_root, "alice@example.com");
 
     let verify = fetch_http_post(
         &format!("{base_url}/v1/auth/verify"),
@@ -69,6 +75,9 @@ fn exercises_registration_session_passkey_and_ssh_key_over_http() {
     );
     assert_eq!(verify.status, 200);
     assert!(verify.body.contains("\"verified\":true"));
+    let token = extract_json_string(&verify.body, "token");
+    assert!(token.starts_with("sha256:"));
+    assert_eq!(extract_json_string(&verify.body, "kind"), "email");
 
     let session = fetch_http_post(
         &format!("{base_url}/v1/auth/session"),
@@ -76,15 +85,24 @@ fn exercises_registration_session_passkey_and_ssh_key_over_http() {
     );
     assert_eq!(session.status, 403);
 
-    let passkey_enroll = store
-        .enroll_passkey(
-            "alice@example.com",
-            "credential-1",
-            &public_key,
-            Some("laptop passkey"),
-        )
-        .expect("passkey enrollment");
-    assert!(passkey_enroll.enrolled);
+    let unauthenticated = fetch_http_post(
+        &format!("{base_url}/v1/auth/passkeys/enroll"),
+        &format!(
+            r#"{{"email":"alice@example.com","credential_id":"credential-1","public_key":"{}"}}"#,
+            public_key
+        ),
+    );
+    assert_eq!(unauthenticated.status, 403);
+
+    let passkey_enroll = fetch_http_post_with_authorization(
+        &format!("{base_url}/v1/auth/passkeys/enroll"),
+        &format!(
+            r#"{{"email":"alice@example.com","credential_id":"credential-1","public_key":"{}"}}"#,
+            public_key
+        ),
+        Some(&token),
+    );
+    assert_eq!(passkey_enroll.status, 200);
 
     let passkey_challenge = fetch_http_post(
         &format!("{base_url}/v1/auth/passkeys/challenge"),
@@ -112,10 +130,15 @@ fn exercises_registration_session_passkey_and_ssh_key_over_http() {
     );
     assert!(extract_json_string(&passkey_login.body, "token").starts_with("sha256:"));
 
-    let ssh_enroll = store
-        .enroll_ssh_key("alice@example.com", &public_key, Some("workstation"))
-        .expect("ssh enrollment");
-    assert!(ssh_enroll.enrolled);
+    let ssh_enroll = fetch_http_post_with_authorization(
+        &format!("{base_url}/v1/auth/ssh-keys/enroll"),
+        &format!(
+            r#"{{"email":"alice@example.com","public_key":"{}"}}"#,
+            public_key
+        ),
+        Some(&token),
+    );
+    assert_eq!(ssh_enroll.status, 200);
 
     let ssh_challenge = fetch_http_post(
         &format!("{base_url}/v1/auth/ssh-keys/challenge"),
@@ -202,66 +225,6 @@ fn rejects_invalid_passkey_and_ssh_signatures() {
         )
         .expect_err("invalid ssh signature should fail");
     assert!(matches!(ssh_error, PrayError::Verify(_)));
-}
-
-struct HttpResponse {
-    status: u16,
-    body: String,
-}
-
-fn fetch_http_post(url: &str, body: &str) -> HttpResponse {
-    let url = url.strip_prefix("http://").expect("http url");
-    let (host_port, path) = url.split_once('/').unwrap_or((url, ""));
-    let (host, port) = host_port.split_once(':').expect("host and port");
-    let mut stream =
-        TcpStream::connect((host, port.parse::<u16>().expect("port"))).expect("connect");
-    let request_path = format!("/{}", path);
-    write!(
-        stream,
-        "POST {} HTTP/1.1\r\nHost: {}\r\nContent-Type: application/json\r\nContent-Length: {}\r\nConnection: close\r\n\r\n{}",
-        request_path,
-        host_port,
-        body.len(),
-        body
-    )
-    .expect("write request");
-    let mut response = String::new();
-    stream.read_to_string(&mut response).expect("read response");
-    let mut sections = response.splitn(2, "\r\n\r\n");
-    let header = sections.next().unwrap_or_default();
-    let body = sections.next().unwrap_or_default().to_string();
-    let status = header
-        .lines()
-        .next()
-        .and_then(|line| line.split_whitespace().nth(1))
-        .and_then(|status| status.parse::<u16>().ok())
-        .expect("status code");
-    HttpResponse { status, body }
-}
-
-fn extract_json_string(text: &str, key: &str) -> String {
-    let value: serde_json::Value = serde_json::from_str(text).expect("json body");
-    value
-        .get(key)
-        .and_then(serde_json::Value::as_str)
-        .expect("json string")
-        .to_string()
-}
-
-fn ssh_public_key_text(signing_key: &SigningKey) -> String {
-    let mut blob = Vec::new();
-    write_ssh_string(&mut blob, b"ssh-ed25519");
-    write_ssh_string(&mut blob, &signing_key.verifying_key().to_bytes());
-    format!("ssh-ed25519 {}", STANDARD.encode(blob))
-}
-
-fn write_ssh_string(buffer: &mut Vec<u8>, bytes: &[u8]) {
-    buffer.extend_from_slice(&(bytes.len() as u32).to_be_bytes());
-    buffer.extend_from_slice(bytes);
-}
-
-fn signing_key_from_seed(seed: u8) -> SigningKey {
-    SigningKey::from_bytes(&[seed; 32])
 }
 
 fn temporary_directory(prefix: &str) -> std::path::PathBuf {

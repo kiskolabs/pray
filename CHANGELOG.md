@@ -8,6 +8,8 @@
 - Install registry packages through a staging directory, then rename into cache.
 - Resolve packages from a matching source namespace or sole source without an explicit `source:` on Ruby `pray-cli`.
 - Keep verification secrets out of public registration responses and require a trusted workflow for session and key enrollment.
+- Deliver email verification codes to an owner-only file under the registry `.pray` directory; successful verify returns a bearer session.
+- Enroll passkeys and SSH keys only with that bearer token. Email-only session creation stays closed.
 - Generate authentication secrets from the operating system, store bearer-token hashes, and reject expired credentials.
 - Move login sessions from repositories to the user Pray home with owner-only permissions and automatic migration.
 - Reject manifest and federation paths outside their roots, require registry integrity hashes, and recheck cached package trees.
