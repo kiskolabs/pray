@@ -1,4 +1,5 @@
 import { PrayError } from "../errors.js";
+import { readBoundedHttpBody } from "./body.js";
 
 export async function httpGet(url: string): Promise<Buffer> {
   const response = await fetch(url);
@@ -7,7 +8,7 @@ export async function httpGet(url: string): Promise<Buffer> {
       `HTTP request failed for ${url}: ${response.status}`,
     );
   }
-  return Buffer.from(await response.arrayBuffer());
+  return readBoundedHttpBody(response);
 }
 
 export async function httpGetText(url: string): Promise<string> {
@@ -49,7 +50,7 @@ export async function httpPostJson(
     headers: { "Content-Type": contentType },
     body: typeof body === "string" ? body : new Uint8Array(body),
   });
-  const responseBody = Buffer.from(await response.arrayBuffer());
+  const responseBody = await readBoundedHttpBody(response);
   if (!response.ok) {
     throw PrayError.resolution(
       `HTTP request failed for ${url}: ${response.status}: ${responseBody.toString("utf8")}`,

@@ -1,0 +1,3 @@
+prayfile "1"
+
+pray "team/input", path: "../outside"

@@ -1,5 +1,6 @@
 /target
 /.pray/cache
+/.pray/session.json
 /Cargo.lock
 /*.praypkg
 .DS_Store

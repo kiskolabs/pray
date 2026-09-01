@@ -1,10 +1,8 @@
-import { existsSync, mkdirSync, readFileSync, rmSync } from "node:fs";
+import { existsSync, readFileSync } from "node:fs";
 import { join } from "node:path";
 import semver from "semver";
-import { unpackPraypkg } from "../archive/praypkg.js";
 import { versionSatisfies } from "../constraint.js";
 import { PrayError } from "../errors.js";
-import { sha256Hex, sha256Prefixed } from "../hashing.js";
 import {
   httpGet,
   httpGetText,
@@ -17,6 +15,17 @@ import {
   parsePackageSpec,
   treeHashForRoot,
 } from "../package-spec/index.js";
+import {
+  rejectAbsoluteArtifactPath,
+  resolveDistributionPath,
+  validatePackageName,
+} from "../sync/path-safety.js";
+import { registryCacheDirectory } from "./cache.js";
+import { installArtifactToCache, requireIntegrityFields } from "./install.js";
+
+export { registryCacheDirectory } from "./cache.js";
+export { registryArtifactSignature } from "./signature.js";
+
 import type {
   RegistryPackageMetadata,
   RegistryPackageResolution,
@@ -36,6 +45,7 @@ export async function resolveRegistryPackageRoot(
     declaration.constraint,
     options.preferredVersion,
   );
+  requireIntegrityFields(declaration.name, selected);
   const cacheDirectory = registryCacheDirectory(
     projectRoot,
     sourceUrl,
@@ -58,13 +68,8 @@ export async function resolveRegistryPackageRoot(
     );
   }
 
-  if (existsSync(cacheDirectory)) {
-    rmSync(cacheDirectory, { recursive: true, force: true });
-  }
-  mkdirSync(cacheDirectory, { recursive: true });
-
   const artifactBytes = await readArtifactBytes(sourceUrl, selected.artifact);
-  validateAndUnpack(cacheDirectory, declaration, selected, artifactBytes);
+  installArtifactToCache(cacheDirectory, declaration, selected, artifactBytes);
 
   return {
     root: cacheDirectory,
@@ -101,6 +106,7 @@ export async function resolveLocalRegistryPackageRoot(
     declaration.constraint,
     options.preferredVersion,
   );
+  requireIntegrityFields(declaration.name, selected);
   const cacheDirectory = registryCacheDirectory(
     projectRoot,
     sourceKey,
@@ -123,13 +129,8 @@ export async function resolveLocalRegistryPackageRoot(
     );
   }
 
-  if (existsSync(cacheDirectory)) {
-    rmSync(cacheDirectory, { recursive: true, force: true });
-  }
-  mkdirSync(cacheDirectory, { recursive: true });
-
   const artifactBytes = readLocalArtifactBytes(sourceRoot, selected.artifact);
-  validateAndUnpack(cacheDirectory, declaration, selected, artifactBytes);
+  installArtifactToCache(cacheDirectory, declaration, selected, artifactBytes);
 
   return {
     root: cacheDirectory,
@@ -147,6 +148,7 @@ export async function fetchPackageMetadata(
   sourceUrl: string,
   packageName: string,
 ): Promise<RegistryPackageMetadata> {
+  validatePackageName(packageName);
   if (isLocalSourceUrl(sourceUrl)) {
     const metadataPath = join(
       sourceUrl,
@@ -247,84 +249,6 @@ export function registryLatestVersionLabel(
   return highest?.version;
 }
 
-export function registryCacheDirectory(
-  projectRoot: string,
-  sourceKey: string,
-  packageName: string,
-  version: string,
-  artifactHash?: string,
-): string {
-  const identifier = [
-    sourceKey,
-    packageName,
-    version,
-    artifactHash ?? "no-artifact-hash",
-  ].join(":");
-  const digest = sha256Hex(identifier).slice(0, 16);
-  return join(
-    projectRoot,
-    ".pray",
-    "cache",
-    "registry",
-    packageName.replaceAll("/", "-"),
-    version,
-    digest,
-  );
-}
-
-export function registryArtifactSignature(
-  artifactBytes: Buffer,
-  treeHash: string,
-  signer: string,
-): string {
-  const payload = Buffer.concat([
-    artifactBytes,
-    Buffer.from("\0"),
-    Buffer.from(treeHash, "utf8"),
-    Buffer.from("\0"),
-    Buffer.from(signer, "utf8"),
-  ]);
-  return sha256Prefixed(payload);
-}
-
-function validateAndUnpack(
-  cacheDirectory: string,
-  declaration: ManifestPackage,
-  selected: RegistryPackageVersion,
-  artifactBytes: Buffer,
-): void {
-  if (selected.artifactHash) {
-    const artifactHash = sha256Prefixed(artifactBytes);
-    if (artifactHash !== selected.artifactHash) {
-      throw PrayError.integrity(
-        `package artifact hash mismatch for ${declaration.name} ${selected.version}`,
-      );
-    }
-  }
-
-  unpackPraypkg(artifactBytes, cacheDirectory);
-  const specPath = findPrayspecFile(cacheDirectory);
-  const spec = parsePackageSpec(readFileSync(specPath, "utf8"));
-  if (spec.name !== declaration.name) {
-    throw PrayError.resolution(
-      `package path ${cacheDirectory} declares ${spec.name}, expected ${declaration.name}`,
-    );
-  }
-  if (spec.version !== selected.version) {
-    throw PrayError.resolution(
-      `package ${declaration.name} version ${spec.version} does not match registry version ${selected.version}`,
-    );
-  }
-  if (selected.treeHash) {
-    const treeHash = treeHashForRoot(cacheDirectory, spec);
-    if (treeHash !== selected.treeHash) {
-      throw PrayError.integrity(
-        `package tree hash mismatch for ${declaration.name} ${selected.version}`,
-      );
-    }
-  }
-}
-
 function cacheReady(
   cacheDirectory: string,
   selected: RegistryPackageVersion,
@@ -335,7 +259,11 @@ function cacheReady(
   try {
     const specPath = findPrayspecFile(cacheDirectory);
     const spec = parsePackageSpec(readFileSync(specPath, "utf8"));
-    return spec.version === selected.version;
+    return (
+      spec.version === selected.version &&
+      selected.treeHash !== undefined &&
+      treeHashForRoot(cacheDirectory, spec) === selected.treeHash
+    );
   } catch {
     return false;
   }
@@ -348,22 +276,18 @@ async function readArtifactBytes(
   if (isLocalSourceUrl(sourceUrl)) {
     return readLocalArtifactBytes(sourceUrl, artifact);
   }
-  if (artifact.startsWith("http://") || artifact.startsWith("https://")) {
-    return httpGet(artifact);
-  }
+  rejectAbsoluteArtifactPath(artifact);
   return httpGet(joinUrl(sourceUrl, artifact));
 }
 
 function readLocalArtifactBytes(sourceRoot: string, artifact: string): Buffer {
-  if (artifact.startsWith("http://") || artifact.startsWith("https://")) {
-    throw PrayError.unsupported(
-      "remote artifact URLs in local distribution require async fetch",
+  if (artifact.startsWith("file://")) {
+    return readFileSync(
+      resolveDistributionPath(sourceRoot, artifact.slice("file://".length)),
     );
   }
-  if (artifact.startsWith("file://")) {
-    return readFileSync(artifact.slice("file://".length));
-  }
-  const path = join(sourceRoot, artifact);
+  rejectAbsoluteArtifactPath(artifact);
+  const path = resolveDistributionPath(sourceRoot, artifact);
   if (!existsSync(path)) {
     throw PrayError.resolution(`package artifact missing at ${path}`);
   }

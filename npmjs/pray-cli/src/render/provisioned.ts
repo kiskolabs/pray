@@ -3,6 +3,7 @@ import { basename, resolve } from "node:path";
 import { packageMatchesEnvironment } from "../environment.js";
 import { PrayError } from "../errors.js";
 import { packageBoundToTree } from "../manifest/destination.js";
+import { validateProjectRelativePath } from "../manifest/validate.js";
 import type { ResolvedPackage, ResolvedProject } from "../resolve/types.js";
 import { substitutePraySymbols } from "../substitute.js";
 
@@ -64,9 +65,9 @@ function dedupeByPath(
   }
   return result;
 }
-
 export function materializeProvisionedExports(project: ResolvedProject): void {
   for (const file of plannedProvisionedFiles(project)) {
+    validateProjectRelativePath(file.path);
     const destination = resolve(project.projectRoot, file.path);
     mkdirSync(resolve(destination, ".."), { recursive: true });
     writeProvisionedFile(
@@ -76,7 +77,6 @@ export function materializeProvisionedExports(project: ResolvedProject): void {
     );
   }
 }
-
 export function expectedProvisionedBytes(
   source: string,
   symbols: Record<string, string>,

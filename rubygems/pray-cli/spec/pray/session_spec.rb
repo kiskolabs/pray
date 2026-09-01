@@ -6,7 +6,14 @@ require "fileutils"
 RSpec.describe Pray::Session do
   let(:workspace) { Dir.mktmpdir("pray-session-") }
 
-  after { FileUtils.rm_rf(workspace) }
+  around do |example|
+    original_home = ENV["PRAY_HOME"]
+    ENV["PRAY_HOME"] = File.join(workspace, "user-home")
+    example.run
+  ensure
+    original_home ? ENV["PRAY_HOME"] = original_home : ENV.delete("PRAY_HOME")
+    FileUtils.rm_rf(workspace)
+  end
 
   it "upserts sessions by server url and keeps the latest signer" do
     first = described_class.persist(

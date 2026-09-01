@@ -1,3 +1,4 @@
+use super::secrets::generate_auth_challenge;
 use super::support::*;
 use super::RegistryAuthStore;
 use crate::auth::{
@@ -38,16 +39,20 @@ impl RegistryAuthStore {
         validate_identifier(credential_id, "credential id")?;
         validate_identifier(challenge_id, "challenge id")?;
         validate_signature(signature)?;
-        let connection = self.connection()?;
+        let mut connection = self.connection()?;
         let email: String = connection.query_row(
             "SELECT email FROM passkeys WHERE credential_id = ?1",
             rusqlite::params![credential_id],
             |row| row.get(0),
         )?;
-        let challenge = load_challenge(&connection, challenge_id, &email, "passkey")?;
         let public_key = load_passkey_public_key(&connection, credential_id)?;
-        verify_signature(&public_key, challenge.challenge.as_bytes(), signature)?;
-        mark_challenge_used(&connection, challenge_id)?;
+        consume_challenge(
+            &mut connection,
+            challenge_id,
+            &email,
+            "passkey",
+            |message| verify_signature(&public_key, message.as_bytes(), signature),
+        )?;
         let session = self.issue_session(&email, AuthSessionKind::Passkey)?;
         Ok(AuthPasskeyLoginResponse {
             email,
@@ -85,7 +90,7 @@ impl RegistryAuthStore {
         validate_public_key(public_key)?;
         validate_identifier(challenge_id, "challenge id")?;
         validate_signature(signature)?;
-        let connection = self.connection()?;
+        let mut connection = self.connection()?;
         let (public_key, _) = parse_ssh_ed25519_public_key(public_key)?;
         let fingerprint = ssh_key_fingerprint(&public_key);
         let email: String = connection.query_row(
@@ -93,9 +98,13 @@ impl RegistryAuthStore {
             rusqlite::params![fingerprint],
             |row| row.get(0),
         )?;
-        let challenge = load_challenge(&connection, challenge_id, &email, "ssh_key")?;
-        verify_signature(&public_key, challenge.challenge.as_bytes(), signature)?;
-        mark_challenge_used(&connection, challenge_id)?;
+        consume_challenge(
+            &mut connection,
+            challenge_id,
+            &email,
+            "ssh_key",
+            |message| verify_signature(&public_key, message.as_bytes(), signature),
+        )?;
         let session = self.issue_session(&email, AuthSessionKind::SshKey)?;
         Ok(AuthSshKeyLoginResponse {
             email,
@@ -114,42 +123,24 @@ impl RegistryAuthStore {
         validate_public_key(public_key)?;
         let connection = self.connection()?;
         ensure_user_can_authenticate(&connection, email)?;
+        reject_credential_reassignment(
+            &connection,
+            "passkeys",
+            "credential_id",
+            credential_id,
+            email,
+        )?;
         let timestamp = current_unix_timestamp()?;
         connection.execute(
         "INSERT INTO passkeys (credential_id, email, public_key, label, created_at, last_used_at)
          VALUES (?1, ?2, ?3, ?4, ?5, NULL)
-         ON CONFLICT(credential_id) DO UPDATE SET email = excluded.email, public_key = excluded.public_key, label = excluded.label",
+         ON CONFLICT(credential_id) DO UPDATE SET public_key = excluded.public_key, label = excluded.label",
         rusqlite::params![credential_id, email, public_key, label.unwrap_or(""), timestamp],
     )?;
         Ok(AuthPasskeyEnrollmentResponse {
             email: email.to_string(),
             credential_id: credential_id.to_string(),
             enrolled: true,
-        })
-    }
-    pub fn login_with_passkey(&self, credential_id: &str) -> PrayResult<AuthPasskeyLoginResponse> {
-        validate_identifier(credential_id, "credential id")?;
-        let connection = self.connection()?;
-        let email: Option<String> = connection
-            .query_row(
-                "SELECT email FROM passkeys WHERE credential_id = ?1",
-                rusqlite::params![credential_id],
-                |row| row.get(0),
-            )
-            .optional()?;
-        let Some(email) = email else {
-            return Err(PrayError::Resolution(format!(
-                "unknown passkey credential: {credential_id}"
-            )));
-        };
-        let session = self.issue_session(&email, AuthSessionKind::Passkey)?;
-        connection.execute(
-            "UPDATE passkeys SET last_used_at = ?2 WHERE credential_id = ?1",
-            rusqlite::params![credential_id, current_unix_timestamp()?],
-        )?;
-        Ok(AuthPasskeyLoginResponse {
-            email,
-            token: session.token,
         })
     }
     pub fn enroll_ssh_key(
@@ -164,11 +155,18 @@ impl RegistryAuthStore {
         ensure_user_can_authenticate(&connection, email)?;
         let (public_key, _) = parse_ssh_ed25519_public_key(public_key)?;
         let fingerprint = ssh_key_fingerprint(&public_key);
+        reject_credential_reassignment(
+            &connection,
+            "ssh_keys",
+            "fingerprint",
+            &fingerprint,
+            email,
+        )?;
         let timestamp = current_unix_timestamp()?;
         connection.execute(
         "INSERT INTO ssh_keys (fingerprint, email, public_key, label, created_at, last_used_at)
          VALUES (?1, ?2, ?3, ?4, ?5, NULL)
-         ON CONFLICT(fingerprint) DO UPDATE SET email = excluded.email, public_key = excluded.public_key, label = excluded.label",
+         ON CONFLICT(fingerprint) DO UPDATE SET public_key = excluded.public_key, label = excluded.label",
         rusqlite::params![fingerprint, email, public_key, label.unwrap_or(""), timestamp],
     )?;
         Ok(AuthSshKeyEnrollmentResponse {
@@ -177,31 +175,56 @@ impl RegistryAuthStore {
             enrolled: true,
         })
     }
-    pub fn login_with_ssh_key(&self, public_key: &str) -> PrayResult<AuthSshKeyLoginResponse> {
-        validate_public_key(public_key)?;
-        let connection = self.connection()?;
-        let (public_key, _) = parse_ssh_ed25519_public_key(public_key)?;
-        let fingerprint = ssh_key_fingerprint(&public_key);
-        let email: Option<String> = connection
+}
+
+fn consume_challenge(
+    connection: &mut rusqlite::Connection,
+    challenge_id: &str,
+    email: &str,
+    kind: &str,
+    verify: impl FnOnce(&str) -> PrayResult<()>,
+) -> PrayResult<()> {
+    let transaction =
+        connection.transaction_with_behavior(rusqlite::TransactionBehavior::Immediate)?;
+    let challenge = load_challenge(&transaction, challenge_id, email, kind)?;
+    verify(&challenge.challenge)?;
+    mark_challenge_used(&transaction, challenge_id)?;
+    transaction.commit()?;
+    Ok(())
+}
+
+fn reject_credential_reassignment(
+    connection: &rusqlite::Connection,
+    table: &str,
+    column: &str,
+    identity: &str,
+    email: &str,
+) -> PrayResult<()> {
+    let existing: Option<String> = match (table, column) {
+        ("passkeys", "credential_id") => connection
             .query_row(
-                "SELECT email FROM ssh_keys WHERE fingerprint = ?1",
-                rusqlite::params![fingerprint],
+                "SELECT email FROM passkeys WHERE credential_id = ?1",
+                rusqlite::params![identity],
                 |row| row.get(0),
             )
-            .optional()?;
-        let Some(email) = email else {
-            return Err(PrayError::Resolution(format!(
-                "unknown ssh key fingerprint: {fingerprint}"
-            )));
-        };
-        let session = self.issue_session(&email, AuthSessionKind::SshKey)?;
-        connection.execute(
-            "UPDATE ssh_keys SET last_used_at = ?2 WHERE fingerprint = ?1",
-            rusqlite::params![fingerprint, current_unix_timestamp()?],
-        )?;
-        Ok(AuthSshKeyLoginResponse {
-            email,
-            token: session.token,
-        })
+            .optional()?,
+        ("ssh_keys", "fingerprint") => connection
+            .query_row(
+                "SELECT email FROM ssh_keys WHERE fingerprint = ?1",
+                rusqlite::params![identity],
+                |row| row.get(0),
+            )
+            .optional()?,
+        _ => {
+            return Err(PrayError::Unsupported(
+                "unknown authenticator table".to_string(),
+            ))
+        }
+    };
+    match existing {
+        Some(owner) if owner != email => Err(PrayError::Resolution(
+            "authenticator already enrolled for another user".to_string(),
+        )),
+        _ => Ok(()),
     }
 }

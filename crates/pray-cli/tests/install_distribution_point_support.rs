@@ -52,6 +52,7 @@ pub fn run_pray_login_ssh_agent(
             "--ssh-agent",
         ])
         .current_dir(repo)
+        .env("PRAY_HOME", repo.join(".pray-user"))
         .env("SSH_AUTH_SOCK", ssh_auth_sock)
         .output()
         .expect("run ssh-agent login");
