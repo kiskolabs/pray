@@ -2,28 +2,30 @@
 
 ## Dependency
 
-chacha20 0.10.1, pulled in by rand 0.10.2. The workspace does not declare chacha20 directly.
+chacha20 was locked at 0.10.1 through rand 0.10.2. The workspace does not declare chacha20 directly.
 
 ## Symptom
 
-cargo publish --dry-run for pray-core warned that package chacha20 v0.10.1 in Cargo.lock is yanked on crates.io.
+cargo publish --locked for pray-core warned that package chacha20 v0.10.1 in Cargo.lock is yanked on crates.io. make release-all was interrupted during pray-core verify before upload.
 
 ## Evidence
 
-crates.io lists chacha20 0.10.1 and 0.10.0 as yanked. chacha20 0.10.2 is published and not yanked. rand 0.10.2 is the newest rand and still depends on the yanked 0.10.1 line in this lockfile.
+crates.io lists chacha20 0.10.1 as yanked by newpavlov on 2026-08-27, with a null yank message. chacha20 0.10.0 is also yanked. chacha20 0.10.2 was published the same day and is not yanked. The 0.10.2 release notes fix use of an SSE4.1 intrinsic in the SSE2 backend of RNG and legacy 64-bit counter variants.
 
-Observed during make release-dry-run while preparing 1.9.2.
+cargo update -p chacha20 --precise 0.10.2 moved Cargo.lock to 0.10.2. cargo deny check advisories completed with advisories ok. cargo publish -p pray-core --dry-run --locked --allow-dirty packaged pray-core 1.9.2 and aborted the upload with no yanked-crate warning.
 
 ## Suggested fix
 
-Run cargo update -p chacha20 to 0.10.2 if the rand 0.10 constraint allows it. If rand pins 0.10.1 exactly, wait for a rand release that moves the dependency, or patch. Do not add a direct chacha20 dependency only to silence the warning.
+Keep chacha20 at 0.10.2 or later within the existing rand 0.10 constraint. No source patch or direct chacha20 dependency is needed.
 
 ## Next
 
-Leave the yank warning out of the 1.9.2 publish blockers. Revisit on the next lockfile refresh or if cargo deny starts rejecting yanked crates.
+Commit the lockfile before cargo publish --locked. v1.9.2 currently points at d6cb296, which still has chacha20 0.10.1. Move that tag onto the lockfile commit if the GitHub tag should match the crate that gets published.
 
 ## Source
 
-crates.io crate chacha20.
+crates.io crate chacha20 0.10.1 yank action and 0.10.2 version metadata.
+https://github.com/RustCrypto/stream-ciphers/commit/6b236b758a0279f64d777797514813b2cb572c8b
+https://github.com/RustCrypto/stream-ciphers/pull/580
 Cargo.lock rand 0.10.2.
 usr/docs/issues/20260901170644_prepare-1-9-2-release.md
