@@ -1,0 +1,3 @@
+prayfile "1"
+
+local "../outside.md"

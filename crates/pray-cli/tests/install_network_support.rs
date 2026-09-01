@@ -20,6 +20,7 @@ pub fn run_pray(repo: &Path, arguments: &[&str]) -> std::process::Output {
     Command::new(env!("CARGO_BIN_EXE_pray"))
         .args(arguments)
         .current_dir(repo)
+        .env("PRAY_HOME", repo.join(".pray-user"))
         .output()
         .expect("run pray command")
 }
@@ -44,6 +45,7 @@ pub fn run_pray_login_passkey(
             private_key_path.to_str().expect("private key path"),
         ])
         .current_dir(repo)
+        .env("PRAY_HOME", repo.join(".pray-user"))
         .output()
         .expect("run passkey login");
     assert!(

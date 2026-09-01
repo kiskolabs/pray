@@ -6,6 +6,7 @@ require "uri"
 require "fileutils"
 require "pathname"
 require_relative "path_safety"
+require_relative "http_body"
 
 module Pray
   RegistryPackageVersion = Struct.new(
@@ -33,12 +34,15 @@ module Pray
   )
 
   module Registry
+    extend RegistryIntegrity
+
     module_function
 
     def resolve_registry_package_root(project_root, source_url, declaration, preferred_version: nil, offline: false)
       metadata = fetch_package_metadata(source_url, declaration.name)
       registry_latest_version = registry_latest_version_label(metadata)
       selected = select_package_version(metadata, declaration.constraint, preferred_version)
+      require_integrity_fields!(declaration.name, selected)
       cache_directory = registry_cache_directory(
         project_root,
         source_url,
@@ -57,11 +61,10 @@ module Pray
 
       raise Error.resolution(offline_package_error(declaration.name, selected.version)) if offline
 
-      FileUtils.rm_rf(cache_directory) if File.exist?(cache_directory)
-      FileUtils.mkdir_p(cache_directory)
-
       artifact_bytes = read_artifact_bytes(source_url, selected.artifact)
-      validate_and_unpack(cache_directory, declaration, selected, artifact_bytes, source_url: source_url)
+      RegistryInstall.install_artifact_to_cache(
+        cache_directory, declaration, selected, artifact_bytes, source_url: source_url
+      )
 
       RegistryPackageResolution.new(
         root: cache_directory,
@@ -83,6 +86,7 @@ module Pray
       metadata = parse_metadata(File.read(metadata_path, encoding: "UTF-8"))
       registry_latest_version = registry_latest_version_label(metadata)
       selected = select_package_version(metadata, declaration.constraint, preferred_version)
+      require_integrity_fields!(declaration.name, selected)
       cache_directory = registry_cache_directory(
         project_root,
         source_key,
@@ -101,11 +105,10 @@ module Pray
 
       raise Error.resolution(offline_package_error(declaration.name, selected.version)) if offline
 
-      FileUtils.rm_rf(cache_directory) if File.exist?(cache_directory)
-      FileUtils.mkdir_p(cache_directory)
-
       artifact_bytes = read_local_artifact_bytes(source_root, selected.artifact)
-      validate_and_unpack(cache_directory, declaration, selected, artifact_bytes, source_url: source_root)
+      RegistryInstall.install_artifact_to_cache(
+        cache_directory, declaration, selected, artifact_bytes, source_url: source_root
+      )
 
       RegistryPackageResolution.new(
         root: cache_directory,
@@ -177,51 +180,13 @@ module Pray
       Gem::Version.new(left) <=> Gem::Version.new(right)
     end
 
-    def validate_and_unpack(cache_directory, declaration, selected, artifact_bytes, source_url: nil)
-      if selected.artifact_hash
-        artifact_hash = Hashing.sha256_prefixed(artifact_bytes)
-        if artifact_hash != selected.artifact_hash
-          raise Error.integrity(
-            "package artifact hash mismatch for #{declaration.name} #{selected.version}"
-          )
-        end
-      end
-
-      verify_registry_signature!(declaration, selected, artifact_bytes)
-      Trust.verify_publisher_fingerprint!(source_url, selected) if source_url
-
-      Archive.unpack_praypkg(artifact_bytes, cache_directory)
-      spec_path = Resolve.find_prayspec_file(cache_directory)
-      spec = Pray.parse_package_spec(File.read(spec_path)).canonicalized
-      if spec.name != declaration.name
-        raise Error.resolution(
-          "package path #{cache_directory.inspect} declares #{spec.name.inspect}, expected #{declaration.name.inspect}"
-        )
-      end
-      if spec.version != selected.version
-        raise Error.resolution(
-          "package #{declaration.name} version #{spec.version} does not match registry version #{selected.version}"
-        )
-      end
-      if selected.tree_hash
-        actual_tree_hash = spec.tree_hash_for_root(cache_directory)
-        if actual_tree_hash != selected.tree_hash
-          raise Error.integrity(
-            "package tree hash mismatch for #{declaration.name} #{selected.version}"
-          )
-        end
-      end
-    end
-
     def read_local_artifact_bytes(source_root, artifact)
-      if artifact.start_with?("http://", "https://")
-        return http_get(artifact)
-      end
       if artifact.start_with?("file://")
         path = PathSafety.join_under_root(source_root, artifact.delete_prefix("file://"))
         raise Error.resolution("package artifact path escapes distribution root") unless path
         return File.binread(path)
       end
+      reject_absolute_artifact!(artifact)
 
       path = PathSafety.join_under_root(source_root, artifact)
       raise Error.resolution("package artifact path escapes distribution root") unless path
@@ -233,17 +198,14 @@ module Pray
     def read_artifact_bytes(source_url, artifact)
       return read_local_artifact_bytes(source_url, artifact) if local_source?(source_url)
 
+      reject_absolute_artifact!(artifact)
       http_get(join_url(source_url, artifact))
     end
 
-    def cache_ready?(cache_directory, selected)
-      return false unless File.directory?(cache_directory)
+    def reject_absolute_artifact!(artifact)
+      return unless artifact.match?(%r{\A[a-z][a-z0-9+.-]*:}i)
 
-      spec_path = Resolve.find_prayspec_file(cache_directory)
-      spec = Pray.parse_package_spec(File.read(spec_path)).canonicalized
-      spec.version == selected.version
-    rescue Errno::ENOENT, Errno::ENOTDIR, SystemCallError
-      false
+      raise Error.integrity("remote artifact path must be relative: #{artifact}")
     end
 
     def registry_metadata_path(source_root, package_name)
@@ -301,12 +263,7 @@ module Pray
 
     def http_get(url)
       uri = URI(url)
-      response = http_request(uri) { |http| http.get(uri.request_uri) }
-      unless response.is_a?(Net::HTTPSuccess)
-        raise Error.resolution("HTTP request failed for #{url}: #{response.code}")
-      end
-
-      response.body
+      bounded_http_exchange(uri, Net::HTTP::Get.new(uri), "HTTP request failed for #{url}")
     end
 
     def http_put(url, content_type, body)
@@ -314,12 +271,7 @@ module Pray
       request = Net::HTTP::Put.new(uri)
       request["Content-Type"] = content_type
       request.body = body
-      response = http_request(uri) { |http| http.request(request) }
-      unless response.is_a?(Net::HTTPSuccess)
-        raise Error.resolution("HTTP upload failed for #{url}: #{response.code}")
-      end
-
-      response.body
+      bounded_http_exchange(uri, request, "HTTP upload failed for #{url}")
     end
 
     def http_post(url, content_type, body)
@@ -327,12 +279,23 @@ module Pray
       request = Net::HTTP::Post.new(uri)
       request["Content-Type"] = content_type
       request.body = body
-      response = http_request(uri) { |http| http.request(request) }
-      unless response.is_a?(Net::HTTPSuccess)
-        raise Error.resolution("HTTP request failed for #{url}: #{response.code}")
-      end
+      bounded_http_exchange(uri, request, "HTTP request failed for #{url}")
+    end
 
-      response.body
+    def bounded_http_exchange(uri, request, failure_message)
+      body = nil
+      code = nil
+      success = false
+      http_request(uri) do |http|
+        http.request(request) do |response|
+          success = response.is_a?(Net::HTTPSuccess)
+          code = response.code
+          body = HttpBody.read_response!(response)
+        end
+      end
+      raise Error.resolution("#{failure_message}: #{code}") unless success
+
+      body
     end
 
     def http_request(uri)

@@ -1,6 +1,15 @@
-import { existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
+import {
+  chmodSync,
+  existsSync,
+  mkdirSync,
+  readFileSync,
+  renameSync,
+  rmSync,
+  writeFileSync,
+} from "node:fs";
 import { join } from "node:path";
 import { PrayError } from "../errors.js";
+import { trustHome } from "../trust/store.js";
 
 export interface SessionFile {
   server_url: string;
@@ -16,8 +25,8 @@ type SessionDocument =
       sessions: SessionFile[];
     };
 
-export function sessionFilePath(root: string): string {
-  return join(root, ".pray", "session.json");
+export function sessionFilePath(_root: string): string {
+  return join(trustHome(), "session.json");
 }
 
 export function persistSession(
@@ -26,6 +35,7 @@ export function persistSession(
 ): SessionFile {
   const path = sessionFilePath(root);
   mkdirSync(join(path, ".."), { recursive: true });
+  migrateLegacySession(root, path);
   const sessions = loadSessions(path) ?? [];
   const existingIndex = sessions.findIndex(
     (entry) => entry.server_url === session.server_url,
@@ -37,8 +47,33 @@ export function persistSession(
   }
   const document: SessionDocument =
     sessions.length === 1 ? sessions[0]! : { sessions };
-  writeFileSync(path, `${JSON.stringify(document, null, 2)}\n`, "utf8");
+  writeSessionDocument(path, document);
   return session;
+}
+
+function migrateLegacySession(root: string, path: string): void {
+  const legacyPath = join(root, ".pray", "session.json");
+  if (!existsSync(legacyPath) || legacyPath === path) return;
+  const sessions = loadSessions(path) ?? [];
+  for (const legacy of loadSessions(legacyPath) ?? []) {
+    if (!sessions.some((entry) => entry.server_url === legacy.server_url)) {
+      sessions.push(legacy);
+    }
+  }
+  const document: SessionDocument =
+    sessions.length === 1 ? sessions[0]! : { sessions };
+  writeSessionDocument(path, document);
+  rmSync(legacyPath);
+}
+
+function writeSessionDocument(path: string, document: SessionDocument): void {
+  const temporaryPath = `${path}.tmp-${process.pid}`;
+  writeFileSync(temporaryPath, `${JSON.stringify(document, null, 2)}\n`, {
+    encoding: "utf8",
+    mode: 0o600,
+  });
+  chmodSync(temporaryPath, 0o600);
+  renameSync(temporaryPath, path);
 }
 
 export function loadSessions(path: string): SessionFile[] | undefined {

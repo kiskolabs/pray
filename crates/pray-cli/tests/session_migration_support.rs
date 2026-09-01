@@ -15,6 +15,7 @@ pub fn run_pray(repo: &std::path::Path, arguments: &[&str]) -> Output {
     Command::new(env!("CARGO_BIN_EXE_pray"))
         .args(arguments)
         .current_dir(repo)
+        .env("PRAY_HOME", repo.join(".pray-user"))
         .output()
         .expect("run pray command")
 }

@@ -1,6 +1,6 @@
+use super::secrets::*;
 use super::support::*;
 use super::RegistryAuthStore;
-use crate::hashing::sha256_prefixed;
 use crate::{PrayError, PrayResult};
 use rusqlite::OptionalExtension;
 
@@ -49,12 +49,13 @@ impl RegistryAuthStore {
             return Err(PrayError::Resolution(format!("unknown user: {email}")));
         }
         let timestamp = current_unix_timestamp()?;
-        let token = generate_publish_token(email, &scopes.join(","), timestamp);
+        let token = generate_publish_token()?;
+        let stored_token = stored_token(&token);
         let connection = self.connection()?;
         connection.execute(
             "INSERT INTO publish_tokens (token, email, scopes, created_at, last_used_at)
              VALUES (?1, ?2, ?3, ?4, ?4)",
-            rusqlite::params![token, email, scopes.join(","), timestamp],
+            rusqlite::params![stored_token, email, scopes.join(","), timestamp],
         )?;
         Ok(PublishTokenRecord {
             email: email.to_string(),
@@ -69,16 +70,20 @@ impl RegistryAuthStore {
         }
         self.ensure_publish_tokens_table()?;
         let connection = self.connection()?;
-        let row: Option<(String, String)> = connection
+        let stored_token = stored_token(token);
+        let row: Option<(String, String, u64)> = connection
             .query_row(
-                "SELECT email, scopes FROM publish_tokens WHERE token = ?1",
-                rusqlite::params![token],
-                |row| Ok((row.get(0)?, row.get(1)?)),
+                "SELECT email, scopes, created_at FROM publish_tokens WHERE token = ?1",
+                rusqlite::params![stored_token],
+                |row| Ok((row.get(0)?, row.get(1)?, row.get(2)?)),
             )
             .optional()?;
-        let Some((email, scopes_text)) = row else {
+        let Some((email, scopes_text, created_at)) = row else {
             return Ok(None);
         };
+        if record_expired(created_at, PUBLISH_TOKEN_TTL_SECONDS)? {
+            return Ok(None);
+        }
         let scopes = parse_scopes(&scopes_text);
         if !scopes.iter().any(|scope| scope == PUBLISH_SCOPE) {
             return Err(PrayError::Resolution(
@@ -88,7 +93,7 @@ impl RegistryAuthStore {
         let timestamp = current_unix_timestamp()?;
         connection.execute(
             "UPDATE publish_tokens SET last_used_at = ?2 WHERE token = ?1",
-            rusqlite::params![token, timestamp],
+            rusqlite::params![stored_token, timestamp],
         )?;
         Ok(Some(PublishTokenRecord {
             email,
@@ -100,9 +105,10 @@ impl RegistryAuthStore {
     pub fn revoke_publish_token(&self, token: &str) -> PrayResult<()> {
         self.ensure_publish_tokens_table()?;
         let connection = self.connection()?;
+        let stored_token = stored_token(token);
         let deleted = connection.execute(
             "DELETE FROM publish_tokens WHERE token = ?1",
-            rusqlite::params![token],
+            rusqlite::params![stored_token],
         )?;
         if deleted == 0 {
             return Err(PrayError::Resolution("publish token not found".to_string()));
@@ -153,12 +159,4 @@ fn parse_scopes(scopes_text: &str) -> Vec<String> {
         .filter(|scope| !scope.is_empty())
         .map(|scope| scope.to_ascii_lowercase())
         .collect()
-}
-
-fn generate_publish_token(email: &str, scopes: &str, timestamp: u64) -> String {
-    let payload = format!(
-        "{email}\0publish-token\0{scopes}\0{timestamp}\0{}",
-        std::process::id()
-    );
-    sha256_prefixed(payload.as_bytes())
 }

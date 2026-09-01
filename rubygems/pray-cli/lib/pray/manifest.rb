@@ -5,6 +5,7 @@ require_relative "manifest_formatter"
 require_relative "manifest_parser_helpers"
 require_relative "manifest_parser_blocks"
 require_relative "manifest_parser"
+require_relative "path_safety"
 
 module Pray
   RenderPolicy = Struct.new(
@@ -118,7 +119,22 @@ module Pray
 
     def parse_manifest(text)
       lines = Literal.prepare_parser_lines(text)
-      BlockParser.new(lines).parse_root
+      manifest = BlockParser.new(lines).parse_root
+      validate_manifest_paths!(manifest)
+      manifest
+    end
+
+    def validate_manifest_paths!(manifest)
+      manifest.targets.each do |target|
+        (target.outputs + target.skills + target.commands + target.rules).each do |path|
+          PathSafety.validate_project_relative_path!(path)
+        end
+      end
+      manifest.packages.each do |package|
+        PathSafety.validate_project_relative_path!(package.path) if package.path
+        PathSafety.validate_project_relative_path!(package.file) if package.file
+      end
+      manifest.local.each { |local| PathSafety.validate_project_relative_path!(local.path) }
     end
   end
 

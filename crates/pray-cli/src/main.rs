@@ -1,5 +1,6 @@
 mod apply_report;
 mod auth_client;
+mod auth_session_store;
 mod cli_parse;
 mod cli_parse_auth;
 mod cli_parse_packages;
@@ -30,6 +31,8 @@ mod revision_backend;
 mod server;
 #[cfg(feature = "auth")]
 mod server_auth;
+#[cfg(feature = "auth")]
+mod server_auth_delivery;
 #[cfg(feature = "auth")]
 mod server_federation;
 #[cfg(feature = "auth")]

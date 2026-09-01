@@ -1,5 +1,25 @@
 # CHANGELOG
 
+## 1.9.2 (2026-09-01)
+
+- Fix Ruby `pray install` unpack of `.praypkg` archives from git and registry sources.
+- Treat empty or corrupt registry cache directories as missing so the next install unpacks again.
+- Reject `.praypkg` members that escape the package root or exceed size limits on Ruby and TypeScript CLIs.
+- Install registry packages through a staging directory, then rename into cache.
+- Resolve packages from a matching source namespace or sole source without an explicit `source:` on Ruby `pray-cli`.
+- Keep verification secrets out of public registration responses and require a trusted workflow for session and key enrollment.
+- Deliver email verification codes to an owner-only file under the registry `.pray` directory; successful verify returns a bearer session.
+- Enroll passkeys and SSH keys only with that bearer token. Email-only session creation stays closed.
+- Generate authentication secrets from the operating system, store bearer-token hashes, and reject expired credentials.
+- Move login sessions from repositories to the user Pray home with owner-only permissions and automatic migration.
+- Reject manifest and federation paths outside their roots, require registry integrity hashes, and recheck cached package trees.
+- Bound server requests, connections, timeouts, federation peers, and archive expansion; expose server readiness and request identifiers.
+- Cap TypeScript and Ruby registry downloads at the same 64 MiB response ceiling as Rust.
+- Store hashed email verification secrets, hide why verify failed, and stop after a small number of guesses.
+- Unpack `.praypkg` tar members in the Ruby and TypeScript CLIs without handing the archive to system tar.
+- Reject absolute artifact URLs; check a present registry signature on TypeScript install.
+- Gate Rust, TypeScript, and Ruby line coverage and make the Rust security-boundary mutation smoke blocking.
+
 ## 1.9.1 (2026-08-29)
 
 - Rewrite every matching `pray` line when `pray update --latest` moves a package constraint, keeping indent and extra keywords.

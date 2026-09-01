@@ -3,6 +3,7 @@ import { resolve } from "node:path";
 import { normalizeLineEndings } from "../hashing.js";
 import { targetMode, targetScoped } from "../manifest/destination.js";
 import type { ManifestTarget } from "../manifest/types.js";
+import { validateProjectRelativePath } from "../manifest/validate.js";
 import type { ResolvedProject } from "../resolve/types.js";
 import { renderLegacyCompose } from "./legacy.js";
 import { materializeProvisionedExports } from "./provisioned.js";
@@ -26,6 +27,7 @@ export function writeRenderedTargets(
   rendered: RenderedTarget[],
 ): void {
   for (const target of rendered) {
+    validateProjectRelativePath(target.path);
     const path = resolve(project.projectRoot, target.path);
     mkdirSync(resolve(path, ".."), { recursive: true });
     writeFileSync(path, target.content, "utf8");

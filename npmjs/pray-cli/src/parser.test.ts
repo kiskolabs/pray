@@ -5,6 +5,21 @@ import { parseManifest } from "./manifest/index.js";
 import { parsePackageSpec } from "./package-spec/index.js";
 
 describe("parser", () => {
+  it("rejects project paths that escape the repository", () => {
+    assert.throws(
+      () =>
+        parseManifest(`
+prayfile "1"
+compose "../outside.md" do
+end
+`),
+      (error: unknown) =>
+        error instanceof PrayError &&
+        error.kind === "manifest" &&
+        error.message.includes("escapes repository root"),
+    );
+  });
+
   it("parses minimal manifest example", () => {
     const manifest = parseManifest(`
 prayfile "1"

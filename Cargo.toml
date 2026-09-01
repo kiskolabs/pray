@@ -8,7 +8,7 @@ members = [
 resolver = "2"
 
 [workspace.package]
-version = "1.9.1"
+version = "1.9.2"
 edition = "2021"
 license = "MIT"
 authors = ["Andrei Makarov <contact@kiskolabs.com>"]
@@ -16,8 +16,8 @@ repository = "https://github.com/kiskolabs/pray"
 homepage = "https://pray.kisko.dev"
 
 [workspace.dependencies]
-pray-core = { version = "1.9.1", path = "crates/pray-core", default-features = false }
-pray-transport = { version = "1.9.1", path = "crates/pray-transport" }
+pray-core = { version = "1.9.2", path = "crates/pray-core", default-features = false }
+pray-transport = { version = "1.9.2", path = "crates/pray-transport" }
 
 [profile.release]
 lto = "thin"

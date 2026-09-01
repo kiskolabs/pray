@@ -3,6 +3,16 @@
 require "spec_helper"
 
 RSpec.describe "Pray parser" do
+  it "rejects project paths that escape the repository" do
+    expect do
+      Pray.parse_manifest(<<~PRAYFILE)
+        prayfile "1"
+        compose "../outside.md" do
+        end
+      PRAYFILE
+    end.to raise_error(Pray::Error, /escapes repository root/)
+  end
+
   it "parses minimal manifest example" do
     manifest = Pray.parse_manifest(<<~PRAYFILE)
       prayfile "1"
