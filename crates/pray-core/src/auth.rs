@@ -87,6 +87,8 @@ pub struct AuthRegistrationResponse {
 pub struct AuthVerificationResponse {
     pub email: String,
     pub verified: bool,
+    pub token: String,
+    pub kind: AuthSessionKind,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]

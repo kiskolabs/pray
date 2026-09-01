@@ -24,6 +24,15 @@ fn registers_and_verifies_email_with_required_confirmation() {
         .verify_email("alice@example.com", code)
         .expect("verify");
     assert!(verification.verified);
+    assert!(verification.token.starts_with("sha256:"));
+    assert_eq!(verification.kind, AuthSessionKind::Email);
+    assert_eq!(
+        store
+            .resolve_session(&verification.token)
+            .expect("resolve")
+            .map(|session| session.email),
+        Some("alice@example.com".to_string())
+    );
     assert!(store
         .user_verified("alice@example.com")
         .expect("user state"));

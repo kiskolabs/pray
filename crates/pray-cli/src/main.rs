@@ -32,6 +32,8 @@ mod server;
 #[cfg(feature = "auth")]
 mod server_auth;
 #[cfg(feature = "auth")]
+mod server_auth_delivery;
+#[cfg(feature = "auth")]
 mod server_federation;
 #[cfg(feature = "auth")]
 mod server_html;

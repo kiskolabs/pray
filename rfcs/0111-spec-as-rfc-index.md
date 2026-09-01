@@ -30,6 +30,7 @@ Open `rfcs/README.md` for types, statuses, numbering, and the current set. Open 
 - RFC 0031: ownership zones
 - RFC 0040: CLI verbs, config, environment, exit codes
 - RFC 0050: security and trust
+- RFC 0051: registry authentication delivery and enrollment
 - RFC 0060: static registry and sources
 - RFC 0070: reference implementation and operator layout
 - RFC 0100: conformance fixtures

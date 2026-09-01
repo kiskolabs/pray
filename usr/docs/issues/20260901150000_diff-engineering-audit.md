@@ -58,7 +58,7 @@ Boundary and control: zstd and tar are commanded processes. Encoding.default_int
 
 ## Next
 
-D-001 through D-003 and D-005 through D-012 are implemented on this branch. D-004 stays: keep 403 on email-only session issue and unauthenticated enroll until out-of-band verify delivery exists.
+D-001 through D-012 are implemented on this branch. D-004: verification codes are delivered to `.pray/verification-deliveries.jsonl`, verify mints an email session, enroll requires that bearer, and email-only session issue stays 403. RFC 0051.
 
 Remaining residuals: Ruby trust feed GET still buffers the full body; unpack still expands full zstd then tar in TypeScript and Ruby; no shared sparse or symlink hostile-archive fixture across the three clients.
 
