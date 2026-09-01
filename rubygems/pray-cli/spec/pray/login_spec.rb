@@ -7,8 +7,16 @@ require_relative "../support/http_fixture_server"
 
 RSpec.describe Pray::AuthClient do
   let(:workspace) { Dir.mktmpdir("pray-login-") }
+  let(:pray_home) { File.join(workspace, "user-home") }
 
-  after { FileUtils.rm_rf(workspace) }
+  around do |example|
+    original_home = ENV["PRAY_HOME"]
+    ENV["PRAY_HOME"] = pray_home
+    example.run
+  ensure
+    original_home ? ENV["PRAY_HOME"] = original_home : ENV.delete("PRAY_HOME")
+    FileUtils.rm_rf(workspace)
+  end
 
   it "persists a passkey session after challenge and login" do
     seed = OpenSSL::Random.random_bytes(32)
@@ -35,7 +43,9 @@ RSpec.describe Pray::AuthClient do
     )
     expect(session.email).to eq("dev@example.com")
     expect(session.kind).to eq("passkey")
-    expect(File.read(File.join(workspace, ".pray", "session.json"))).to include("tok-1")
+    session_path = File.join(pray_home, "session.json")
+    expect(File.read(session_path)).to include("tok-1")
+    expect(File.stat(session_path).mode & 0o777).to eq(0o600)
   ensure
     HttpFixtureServer.stop(fixture) if fixture
   end

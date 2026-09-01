@@ -18,7 +18,6 @@ module Pray
       project.manifest.targets.each do |target|
         output = target.outputs.first
         next unless output
-
         rendered << render_target(project, target, output)
       end
       rendered
@@ -26,6 +25,7 @@ module Pray
 
     def write_rendered_targets(project, rendered)
       rendered.each do |target|
+        PathSafety.validate_project_relative_path!(target.path)
         path = File.join(project.project_root, target.path)
         FileUtils.mkdir_p(File.dirname(path))
         File.write(path, target.content)
@@ -36,6 +36,7 @@ module Pray
     def materialize_provisioned_exports(project)
       symbols = project.manifest.symbols || {}
       planned_provisioned_files(project).each do |file|
+        PathSafety.validate_project_relative_path!(file.path)
         destination = File.join(project.project_root, file.path)
         FileUtils.mkdir_p(File.dirname(destination))
         write_provisioned_file(file.source, destination, symbols)
@@ -76,7 +77,6 @@ module Pray
       if target.scoped && target.mode == "compose"
         return render_scoped_compose(project, target, output)
       end
-
       render_legacy_compose(project, target, output)
     end
 

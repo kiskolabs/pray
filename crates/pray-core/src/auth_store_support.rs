@@ -1,3 +1,4 @@
+use super::secrets::{record_expired, AUTH_CHALLENGE_TTL_SECONDS};
 use crate::auth::AuthSessionKind;
 use crate::hashing::sha256_prefixed;
 use crate::trust::EmailConfirmationPolicy;
@@ -92,13 +93,6 @@ pub(super) fn current_unix_timestamp() -> PrayResult<u64> {
         .map(|duration| duration.as_secs())
 }
 
-pub(super) fn generate_auth_challenge(kind: &str, subject: &str) -> PrayResult<String> {
-    let timestamp = current_unix_timestamp()?;
-    Ok(sha256_prefixed(
-        format!("{kind}\0{subject}\0{timestamp}").as_bytes(),
-    ))
-}
-
 pub(super) fn generate_challenge_id(
     email: &str,
     subject: &str,
@@ -133,14 +127,24 @@ pub(super) fn load_challenge(
     email: &str,
     kind: &str,
 ) -> PrayResult<StoredChallenge> {
-    let challenge: Option<StoredChallenge> = connection
+    let challenge: Option<(StoredChallenge, u64)> = connection
     .query_row(
-        "SELECT challenge FROM auth_challenges WHERE challenge_id = ?1 AND email = ?2 AND kind = ?3 AND used_at IS NULL",
+        "SELECT challenge, created_at FROM auth_challenges WHERE challenge_id = ?1 AND email = ?2 AND kind = ?3 AND used_at IS NULL",
         rusqlite::params![challenge_id, email, kind],
-        |row| Ok(StoredChallenge { challenge: row.get(0)? }),
+        |row| Ok((StoredChallenge { challenge: row.get(0)? }, row.get(1)?)),
     )
     .optional()?;
-    challenge.ok_or_else(|| PrayError::Resolution(format!("challenge not found for {email}")))
+    let Some((challenge, created_at)) = challenge else {
+        return Err(PrayError::Resolution(format!(
+            "challenge not found for {email}"
+        )));
+    };
+    if record_expired(created_at, AUTH_CHALLENGE_TTL_SECONDS)? {
+        return Err(PrayError::Resolution(format!(
+            "challenge expired for {email}"
+        )));
+    }
+    Ok(challenge)
 }
 
 pub(super) fn mark_challenge_used(connection: &Connection, challenge_id: &str) -> PrayResult<()> {
@@ -256,23 +260,6 @@ pub(super) fn read_u32_from_slice(cursor: &mut &[u8]) -> PrayResult<u32> {
     Ok(u32::from_be_bytes(
         length_bytes.try_into().expect("length bytes"),
     ))
-}
-
-pub(super) fn generate_verification_code(email: &str, timestamp: u64) -> String {
-    let payload = format!("{email}\0{timestamp}");
-    let hash = sha256_prefixed(payload.as_bytes());
-    let hex = hash.trim_start_matches("sha256:");
-    let numeric = u32::from_str_radix(&hex[..8], 16).unwrap_or(0) % 1_000_000;
-    format!("{:06}", numeric)
-}
-
-pub(super) fn generate_session_token(
-    email: &str,
-    kind: &AuthSessionKind,
-    timestamp: u64,
-) -> String {
-    let payload = format!("{email}\0{}\0{timestamp}", auth_session_kind_text(kind));
-    sha256_prefixed(payload.as_bytes())
 }
 
 pub fn ssh_public_key_fingerprint_text(public_key: &str) -> PrayResult<String> {

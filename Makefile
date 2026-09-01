@@ -37,7 +37,7 @@ bench-scaling:
 coverage: coverage-rust
 
 coverage-rust:
-	cargo llvm-cov --workspace --summary-only --fail-under-lines 20
+	cargo llvm-cov --workspace --summary-only --fail-under-lines 65
 
 mutants:
 	cargo mutants -p pray-core --timeout 60 \

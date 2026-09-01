@@ -3,7 +3,7 @@
 require "json"
 require "open3"
 require "fileutils"
-require "tempfile"
+require_relative "archive_unpack"
 
 module Pray
   module Archive
@@ -23,15 +23,20 @@ module Pray
           File.binwrite(destination, File.binread(File.join(package.root, file)))
         end
 
-        tar_bytes, status = Open3.capture2("tar", "-cf", "-", "-C", staging, ".")
-        raise Error.integrity("failed to build package tar archive") unless status.success?
+        with_binary_process_encoding do
+          tar_bytes, status = Open3.capture2(
+            {"COPYFILE_DISABLE" => "1"},
+            "tar", "-cf", "-", "-C", staging, "."
+          )
+          raise Error.integrity("failed to build package tar archive") unless status.success?
 
-        zstd_bytes, status = Open3.capture2("zstd", "-q", "-c", stdin_data: tar_bytes)
-        unless status.success?
-          raise Error.unsupported("zstd is required to build package archives")
+          zstd_bytes, status = Open3.capture2("zstd", "-q", "-c", stdin_data: tar_bytes)
+          unless status.success?
+            raise Error.unsupported("zstd is required to build package archives")
+          end
+
+          zstd_bytes
         end
-
-        zstd_bytes
       end
     end
 
@@ -41,14 +46,7 @@ module Pray
     end
 
     def unpack_praypkg(artifact_bytes, output_directory)
-      FileUtils.mkdir_p(output_directory)
-      tar_bytes, status = Open3.capture2("zstd", "-d", "-q", "-c", stdin_data: artifact_bytes)
-      unless status.success?
-        raise Error.unsupported("zstd is required to unpack package archives")
-      end
-
-      _stdout, _stderr, status = Open3.capture3("tar", "-xf", "-", "-C", output_directory, stdin_data: tar_bytes)
-      raise Error.integrity("failed to unpack package archive") unless status.success?
+      ArchiveUnpack.unpack_praypkg(artifact_bytes, output_directory)
     end
 
     def package_archive_path(package_name, version)
@@ -63,6 +61,10 @@ module Pray
         "tree_hash" => package.tree_hash,
         "exports" => package.selected_exports
       )
+    end
+
+    def with_binary_process_encoding(&block)
+      ArchiveUnpack.with_binary_process_encoding(&block)
     end
   end
 end

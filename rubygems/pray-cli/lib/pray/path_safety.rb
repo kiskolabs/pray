@@ -37,5 +37,39 @@ module Pray
 
       cleaned
     end
+
+    def validate_archive_member_path!(path)
+      cleaned = path.to_s.delete_prefix("./")
+      if cleaned.empty? || Pathname.new(cleaned).absolute? || cleaned.start_with?("/")
+        raise Error.integrity("package path must be relative: #{path}")
+      end
+
+      cleaned.split("/").each do |part|
+        next if part.empty? || part == "."
+
+        if part == ".." || part.include?("\0")
+          raise Error.integrity("package path escapes package root: #{path}")
+        end
+      end
+
+      cleaned
+    end
+
+    def validate_project_relative_path!(value)
+      path = value.to_s.strip
+      windows_absolute = path.match?(/\A(?:[A-Za-z]:[\\\/]|[\\\/]{2})/)
+      if path.empty? || Pathname.new(path).absolute? || windows_absolute
+        raise Error.manifest("project path must be repository-relative: #{value}")
+      end
+      parts = path.tr("\\", "/").split("/")
+      if parts.include?("..") || path.include?("\0")
+        raise Error.manifest("project path escapes repository root: #{value}")
+      end
+      if parts.all? { |part| part.empty? || part == "." }
+        raise Error.manifest("project path must be repository-relative: #{value}")
+      end
+
+      path
+    end
   end
 end

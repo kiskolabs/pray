@@ -1,5 +1,6 @@
 mod apply_report;
 mod auth_client;
+mod auth_session_store;
 mod cli_parse;
 mod cli_parse_auth;
 mod cli_parse_packages;

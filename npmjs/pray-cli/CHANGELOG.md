@@ -1,5 +1,15 @@
 # CHANGELOG
 
+## 1.9.2 (2026-09-01)
+
+- Align package version with the 1.9.2 release.
+- Reject `.praypkg` members that escape the package root or exceed size limits; unpack through staging into cache.
+- Move login sessions to the user Pray home with owner-only permissions and migrate legacy repository sessions.
+- Reject manifest and federation paths outside their roots; require registry hashes and recheck cached package trees.
+- Bound server requests, connections, timeouts, and federation peers; expose readiness and per-request identifiers.
+- Cap registry downloads at 64 MiB; unpack `.praypkg` tar members without system tar; reject absolute artifact URLs and check a present registry signature.
+- Enforce a measured line-coverage floor in CI.
+
 ## 1.9.1 (2026-08-29)
 
 - Rewrite every matching `pray` line when `pray update --latest` moves a package constraint, keeping indent and extra keywords.

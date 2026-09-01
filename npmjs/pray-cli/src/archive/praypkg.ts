@@ -1,8 +1,10 @@
 import { spawnSync } from "node:child_process";
 import {
   copyFileSync,
+  lstatSync,
   mkdirSync,
   mkdtempSync,
+  readdirSync,
   readFileSync,
   rmSync,
   writeFileSync,
@@ -12,6 +14,9 @@ import { basename, dirname, join, resolve } from "node:path";
 import { PrayError } from "../errors.js";
 import { findPrayspecFile } from "../package-spec/index.js";
 import type { ResolvedPackage } from "../resolve/types.js";
+import { MAX_ARCHIVE_TOTAL_BYTES } from "../resource-limits.js";
+import { validateArchiveMemberPath } from "./path-safety.js";
+import { extractTarArchive } from "./tar.js";
 
 export function buildPackageArchiveBytes(
   packageEntry: ResolvedPackage,
@@ -44,14 +49,21 @@ export function unpackPraypkg(
   artifactBytes: Buffer,
   outputDirectory: string,
 ): void {
-  mkdirSync(outputDirectory, { recursive: true });
-  const tarBytes = runCommand("zstd", ["-d", "-q", "-c"], artifactBytes);
-  const result = spawnSync("tar", ["-xf", "-", "-C", outputDirectory], {
-    input: tarBytes,
-  });
-  if (result.status !== 0) {
-    throw PrayError.integrity("failed to unpack package archive");
+  if (artifactBytes.byteLength > MAX_ARCHIVE_TOTAL_BYTES) {
+    throw PrayError.integrity(
+      `package archive exceeds ${MAX_ARCHIVE_TOTAL_BYTES} bytes`,
+    );
   }
+
+  const tarBytes = runCommand("zstd", ["-d", "-q", "-c"], artifactBytes);
+  if (tarBytes.byteLength > MAX_ARCHIVE_TOTAL_BYTES) {
+    throw PrayError.integrity(
+      `package archive exceeds ${MAX_ARCHIVE_TOTAL_BYTES} decompressed bytes`,
+    );
+  }
+
+  extractTarArchive(tarBytes, outputDirectory);
+  rejectUnsafeExtractedTree(outputDirectory);
 }
 
 export function packageArchivePath(
@@ -80,6 +92,28 @@ function packageMetadataJson(packageEntry: ResolvedPackage): string {
   });
 }
 
+function rejectUnsafeExtractedTree(outputDirectory: string): void {
+  const stack = [outputDirectory];
+  while (stack.length > 0) {
+    const current = stack.pop();
+    if (current === undefined) {
+      continue;
+    }
+    for (const entry of readdirSync(current, { withFileTypes: true })) {
+      const fullPath = join(current, entry.name);
+      if (entry.isDirectory()) {
+        stack.push(fullPath);
+        continue;
+      }
+      if (lstatSync(fullPath).isSymbolicLink()) {
+        throw PrayError.integrity("unsupported package archive entry type");
+      }
+      const relative = fullPath.slice(outputDirectory.length + 1);
+      validateArchiveMemberPath(relative);
+    }
+  }
+}
+
 function runCommand(
   program: string,
   argumentsList: string[],
@@ -88,7 +122,8 @@ function runCommand(
   const result = spawnSync(program, argumentsList, {
     input,
     encoding: "buffer",
-    maxBuffer: 64 * 1024 * 1024,
+    env: { ...process.env, COPYFILE_DISABLE: "1" },
+    maxBuffer: MAX_ARCHIVE_TOTAL_BYTES,
   });
   if ((result.error as NodeJS.ErrnoException | undefined)?.code === "ENOENT") {
     throw PrayError.unsupported(
@@ -98,7 +133,7 @@ function runCommand(
   if (result.status !== 0) {
     const message = result.stderr?.toString("utf8").trim();
     throw PrayError.integrity(
-      message.length > 0 ? message : `${program} failed`,
+      message && message.length > 0 ? message : `${program} failed`,
     );
   }
   return result.stdout as Buffer;

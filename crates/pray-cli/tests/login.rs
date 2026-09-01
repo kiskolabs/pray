@@ -38,7 +38,7 @@ fn login_recovers_after_auth_server_restart_and_persists_session() {
         write_private_key_file(&client_repo, "login-recovery-passkey.bin", &signing_key);
     let port = find_free_port();
     let server_url = format!("http://127.0.0.1:{port}");
-    let session_path = client_repo.join(".pray/session.json");
+    let session_path = client_repo.join(".pray-user/session.json");
 
     let failed_login = run_pray(
         &client_repo,
@@ -166,6 +166,7 @@ fn login_supports_multiple_auth_origins() {
             private_key_path.to_str().expect("private key path"),
         ])
         .current_dir(&client_repo)
+        .env("PRAY_HOME", client_repo.join(".pray-user"))
         .output()
         .expect("run multi-origin login");
     assert!(
@@ -175,7 +176,7 @@ fn login_supports_multiple_auth_origins() {
     );
 
     let session_text =
-        fs::read_to_string(client_repo.join(".pray/session.json")).expect("session file");
+        fs::read_to_string(client_repo.join(".pray-user/session.json")).expect("session file");
     let session_json: Value = serde_json::from_str(&session_text).expect("session json");
     let server_urls = if let Some(sessions) = session_json.get("sessions").and_then(Value::as_array)
     {
@@ -208,6 +209,7 @@ fn run_pray(repo: &std::path::Path, arguments: &[&str]) -> std::process::Output 
     Command::new(env!("CARGO_BIN_EXE_pray"))
         .args(arguments)
         .current_dir(repo)
+        .env("PRAY_HOME", repo.join(".pray-user"))
         .output()
         .expect("run pray command")
 }

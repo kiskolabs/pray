@@ -85,6 +85,24 @@ RSpec.describe Pray::Registry do
       end.not_to raise_error
     end
 
+    it "rejects missing mandatory integrity hashes" do
+      missing_artifact_hash = selected.dup
+      missing_artifact_hash.artifact_hash = nil
+      missing_tree_hash = selected.dup
+      missing_tree_hash.tree_hash = nil
+
+      expect do
+        described_class.validate_and_unpack(
+          cache_directory, declaration, missing_artifact_hash, artifact_bytes, source_url: "https://registry.example"
+        )
+      end.to raise_error(Pray::Error, /missing artifact_hash/)
+      expect do
+        described_class.validate_and_unpack(
+          cache_directory, declaration, missing_tree_hash, artifact_bytes, source_url: "https://registry.example"
+        )
+      end.to raise_error(Pray::Error, /missing tree_hash/)
+    end
+
     it "rejects registry signatures that do not match the artifact" do
       tampered = selected.dup
       tampered.signature = "sha256:deadbeef"
@@ -126,6 +144,67 @@ RSpec.describe Pray::Registry do
       else
         ENV.delete("PRAY_HOME")
       end
+    end
+
+    it "retries unpack after a failed install left an empty cache directory" do
+      artifact_path = File.join(distribution_root, "artifacts", "demo-1.0.0.praypkg")
+      FileUtils.mkdir_p(File.dirname(artifact_path))
+      File.binwrite(artifact_path, artifact_bytes)
+      metadata_dir = File.join(distribution_root, "v1", "packages")
+      FileUtils.mkdir_p(metadata_dir)
+      File.write(
+        File.join(metadata_dir, "demo.json"),
+        JSON.generate(
+          "name" => "demo",
+          "versions" => [{
+            "version" => "1.0.0",
+            "artifact" => "artifacts/demo-1.0.0.praypkg",
+            "artifact_hash" => selected.artifact_hash,
+            "tree_hash" => tree_hash
+          }]
+        )
+      )
+
+      cache_directory = described_class.registry_cache_directory(
+        workspace, "local", "demo", "1.0.0", selected.artifact_hash
+      )
+      FileUtils.mkdir_p(cache_directory)
+
+      resolved = described_class.resolve_local_registry_package_root(
+        workspace, "local", distribution_root, declaration
+      )
+      expect(File).to exist(File.join(resolved.root, "demo.prayspec"))
+      expect(File).not_to exist("#{resolved.root}.staging")
+    end
+  end
+
+  describe ".cache_ready?" do
+    it "treats an empty cache directory as not ready" do
+      cache_directory = File.join(workspace, "empty-cache")
+      FileUtils.mkdir_p(cache_directory)
+      selected = Pray::RegistryPackageVersion.new(version: "1.0.0")
+
+      expect(described_class.cache_ready?(cache_directory, selected)).to be(false)
+    end
+
+    it "rejects cached content whose tree hash changed" do
+      cache_directory = File.join(workspace, "changed-cache")
+      FileUtils.mkdir_p(cache_directory)
+      File.write(
+        File.join(cache_directory, "demo.prayspec"),
+        "Package::Specification.new do |spec|\n  spec.name = \"demo\"\n  spec.version = \"1.0.0\"\n  spec.files = []\nend\n"
+      )
+      selected = Pray::RegistryPackageVersion.new(version: "1.0.0", tree_hash: "sha256:wrong")
+
+      expect(described_class.cache_ready?(cache_directory, selected)).to be(false)
+    end
+  end
+
+  describe ".read_artifact_bytes" do
+    it "rejects absolute remote artifact URLs" do
+      expect do
+        described_class.read_artifact_bytes("https://registry.example", "https://evil.example/pkg.praypkg")
+      end.to raise_error(Pray::Error, /must be relative/)
     end
   end
 end

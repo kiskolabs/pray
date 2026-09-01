@@ -187,16 +187,16 @@ module Pray
         return [File.expand_path(local_path, project_root), nil]
       end
       return [File.expand_path(declaration.path, project_root), nil] if declaration.path
+      source_name = ResolveSource.implied_source_name(declaration, sources)
+      if source_name
+        source = sources[source_name]
+        raise Error.resolution("unknown source: #{source_name}") unless source
 
-      if declaration.source
-        source = sources[declaration.source]
-        raise Error.resolution("unknown source: #{declaration.source}") unless source
-
-        if (local_path = user_config.local.source[declaration.source])
+        if (local_path = user_config.local.source[source_name])
           source_root = File.expand_path(local_path, project_root)
           resolved = Registry.resolve_local_registry_package_root(
             project_root,
-            "local:#{declaration.source}",
+            "local:#{source_name}",
             source_root,
             declaration,
             preferred_version: lockfile_preferred_version(lockfile, declaration.name),

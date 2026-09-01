@@ -1,0 +1,4 @@
+prayfile "1"
+
+compose "../outside.md" do
+end
