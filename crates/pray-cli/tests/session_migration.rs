@@ -35,6 +35,7 @@ fn login_upgrades_legacy_single_session_document_and_publish_uses_latest_session
 
     let legacy_email = "legacy@example.com";
     let legacy_session_path = source_repo.join(".pray/session.json");
+    let user_session_path = source_repo.join(".pray-user/session.json");
     fs::create_dir_all(legacy_session_path.parent().expect("session parent")).expect("session dir");
     fs::write(
         &legacy_session_path,
@@ -91,7 +92,8 @@ fn login_upgrades_legacy_single_session_document_and_publish_uses_latest_session
         String::from_utf8_lossy(&login.stderr)
     );
 
-    let session_text = fs::read_to_string(&legacy_session_path).expect("upgraded session file");
+    assert!(!legacy_session_path.exists());
+    let session_text = fs::read_to_string(&user_session_path).expect("upgraded session file");
     let session_json: Value = serde_json::from_str(&session_text).expect("session json");
     let sessions = session_json
         .get("sessions")

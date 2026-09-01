@@ -13,6 +13,7 @@ import {
   manifestToJson,
   type RenderPolicy,
 } from "./types.js";
+import { validateManifestPaths } from "./validate.js";
 
 export function readManifestText(manifestPath: string): string {
   try {
@@ -34,7 +35,9 @@ export function readManifestText(manifestPath: string): string {
 }
 
 export function parseManifest(text: string): Manifest {
-  return parseManifestText(text);
+  const manifest = parseManifestText(text);
+  validateManifestPaths(manifest);
+  return manifest;
 }
 
 export function manifestHash(manifest: Manifest): string {

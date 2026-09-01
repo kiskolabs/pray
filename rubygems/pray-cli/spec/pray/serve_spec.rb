@@ -24,6 +24,12 @@ RSpec.describe Pray::Serve do
       expect(response).to include("{}")
     end
 
+    it "does not include the filesystem root in the index page" do
+      response = described_class.dispatch_request(root, "GET", "/")
+      expect(response).to include("200 OK")
+      expect(response).not_to include(root)
+    end
+
     it "rejects sibling paths that share a prefix with the root" do
       sibling = File.join(workspace, "dist-private")
       FileUtils.mkdir_p(sibling)
@@ -48,6 +54,14 @@ RSpec.describe Pray::Serve do
       response = described_class.service_unavailable
       expect(response).to include("503 Service Unavailable")
       expect(response).to include("too many connections")
+    end
+  end
+
+  describe ".validate_body_length!" do
+    it "rejects request bodies above the server ceiling" do
+      expect do
+        described_class.validate_body_length!(17 * 1024 * 1024)
+      end.to raise_error(Pray::Error, /request body exceeds/)
     end
   end
 end

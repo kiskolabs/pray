@@ -1,5 +1,16 @@
 # CHANGELOG
 
+## 1.9.2 (2026-09-01)
+
+- Fix `.praypkg` unpack for git and registry installs when the Ruby process forces UTF-8 internal encoding.
+- Treat empty or corrupt `.pray/cache/registry` directories as not ready so the next install unpacks again.
+- Reject archive members that escape the package root or exceed size limits; unpack through staging into cache.
+- Resolve packages from a matching source namespace or sole source without an explicit `source:`.
+- Move login sessions to the user Pray home with owner-only permissions and migrate legacy repository sessions.
+- Reject manifest paths outside the project; require registry hashes and recheck cached package trees.
+- Bound server requests, headers, connections, and timeouts; expose a readiness endpoint.
+- Cap registry downloads at 64 MiB; unpack `.praypkg` tar members without system tar; reject absolute artifact URLs.
+
 ## 1.9.1 (2026-08-29)
 
 - Rewrite every matching `pray` line when a package constraint is updated, keeping indent and extra keywords.

@@ -499,7 +499,7 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "39cab71617ae0d63f51a36d69f866391735b51691dbda63cf6f96d042b63efeb"
 dependencies = [
  "libc",
- "windows-sys 0.61.2",
+ "windows-sys 0.52.0",
 ]
 
 [[package]]
@@ -693,9 +693,9 @@ dependencies = [
 
 [[package]]
 name = "h2"
-version = "0.4.15"
+version = "0.4.16"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "6cb093c84e8bd9b188d4c4a8cb6579fc016968d14c99882163cd3ff402a4f155"
+checksum = "a9f37a958b41b3b19ee2707c06439c0e9e547e847223eb791ecb0cb821c65e27"
 dependencies = [
  "atomic-waker",
  "bytes",
@@ -1396,7 +1396,7 @@ dependencies = [
 
 [[package]]
 name = "pray-bench"
-version = "1.9.1"
+version = "1.9.2"
 dependencies = [
  "criterion",
  "pray-core",
@@ -1405,7 +1405,7 @@ dependencies = [
 
 [[package]]
 name = "pray-cli"
-version = "1.9.1"
+version = "1.9.2"
 dependencies = [
  "base64 0.23.1",
  "ed25519-dalek",
@@ -1421,10 +1421,11 @@ dependencies = [
 
 [[package]]
 name = "pray-core"
-version = "1.9.1"
+version = "1.9.2"
 dependencies = [
  "base64 0.23.1",
  "ed25519-dalek",
+ "getrandom 0.4.3",
  "jsonschema",
  "proptest",
  "reqwest",
@@ -1440,7 +1441,7 @@ dependencies = [
 
 [[package]]
 name = "pray-transport"
-version = "1.9.1"
+version = "1.9.2"
 dependencies = [
  "anyhow",
  "async-trait",
@@ -1542,7 +1543,7 @@ dependencies = [
  "once_cell",
  "socket2",
  "tracing",
- "windows-sys 0.61.2",
+ "windows-sys 0.52.0",
 ]
 
 [[package]]
@@ -1829,7 +1830,7 @@ dependencies = [
  "errno",
  "libc",
  "linux-raw-sys",
- "windows-sys 0.61.2",
+ "windows-sys 0.52.0",
 ]
 
 [[package]]
@@ -1886,7 +1887,7 @@ dependencies = [
  "security-framework",
  "security-framework-sys",
  "webpki-root-certs",
- "windows-sys 0.61.2",
+ "windows-sys 0.52.0",
 ]
 
 [[package]]
@@ -2199,7 +2200,7 @@ dependencies = [
  "getrandom 0.4.3",
  "once_cell",
  "rustix",
- "windows-sys 0.61.2",
+ "windows-sys 0.52.0",
 ]
 
 [[package]]
@@ -2662,7 +2663,7 @@ version = "0.1.11"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "c2a7b1c03c876122aa43f3020e6c3c3ee5c05081c9a00739faf7503aeba10d22"
 dependencies = [
- "windows-sys 0.61.2",
+ "windows-sys 0.52.0",
 ]
 
 [[package]]

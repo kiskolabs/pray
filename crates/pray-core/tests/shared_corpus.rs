@@ -13,6 +13,10 @@ fn corpus_root() -> PathBuf {
     workspace_root().join("testdata/shared/manifest")
 }
 
+fn invalid_corpus_root() -> PathBuf {
+    workspace_root().join("testdata/shared/manifest-invalid")
+}
+
 #[derive(Debug, Deserialize)]
 struct ExpectedCorpus {
     targets: Vec<ExpectedTarget>,
@@ -137,5 +141,28 @@ fn shared_manifest_corpus_cases_parse() {
         let manifest = parse_manifest(&text)
             .unwrap_or_else(|error| panic!("manifest parses in {:?}: {error}", case));
         assert_matches_expected(&manifest, &expected);
+    }
+}
+
+#[test]
+fn shared_manifest_corpus_rejects_unsafe_paths() {
+    let root = invalid_corpus_root();
+    let mut cases = Vec::new();
+    for entry in fs::read_dir(&root).expect("invalid corpus root") {
+        let entry = entry.expect("invalid corpus entry");
+        if entry.file_type().expect("type").is_dir() {
+            cases.push(entry.file_name());
+        }
+    }
+    cases.sort();
+    assert!(!cases.is_empty(), "expected shared invalid corpus cases");
+
+    for case in cases {
+        let text = fs::read_to_string(root.join(&case).join("Prayfile"))
+            .unwrap_or_else(|error| panic!("Prayfile in {case:?}: {error}"));
+        assert!(
+            parse_manifest(&text).is_err(),
+            "manifest in {case:?} should be rejected"
+        );
     }
 }

@@ -1,5 +1,7 @@
 use crate::server_html::{html_package_response, html_root_response};
-use crate::server_http::{http_to_rpc_request, rpc_response_to_http, strip_query};
+use crate::server_http::{
+    http_to_rpc_request, next_http_request_id, rpc_response_to_http, strip_query,
+};
 use pray_core::ssh_rpc::RpcResponse;
 use pray_core::PrayResult;
 use std::path::Path;
@@ -48,7 +50,7 @@ pub(crate) fn dispatch_http_request(
     path: &str,
     body: &[u8],
 ) -> PrayResult<Response> {
-    if let Some(rpc_request) = http_to_rpc_request(method, path, body)? {
+    if let Some(rpc_request) = http_to_rpc_request(method, path, body, &next_http_request_id())? {
         let rpc_response = match crate::server_rpc::handle_rpc(root, auth, &rpc_request) {
             Ok(response) => response,
             Err(error) => RpcResponse::error(&rpc_request.id, 500, error.to_string()),

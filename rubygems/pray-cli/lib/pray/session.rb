@@ -2,6 +2,7 @@
 
 require "json"
 require "fileutils"
+require_relative "trust"
 
 module Pray
   SessionFile = Struct.new(
@@ -12,13 +13,14 @@ module Pray
   module Session
     module_function
 
-    def session_file_path(root)
-      File.join(root, ".pray", "session.json")
+    def session_file_path(_root)
+      File.join(Trust.trust_home, "session.json")
     end
 
     def persist(root, session)
       path = session_file_path(root)
       FileUtils.mkdir_p(File.dirname(path))
+      migrate_legacy_session(root, path)
       sessions = load_sessions(path)
       existing = sessions.find { |entry| entry.server_url == session.server_url }
       if existing
@@ -34,12 +36,14 @@ module Pray
       else
         {"sessions" => sessions.map { |entry| session_to_hash(entry) }}
       end
-      File.write(path, JSON.pretty_generate(document))
+      write_document(path, document)
       session
     end
 
     def load_latest(root)
-      sessions = load_sessions(session_file_path(root))
+      path = session_file_path(root)
+      migrate_legacy_session(root, path)
+      sessions = load_sessions(path)
       sessions.reverse.find { |session| !session.email.to_s.strip.empty? }
     end
 
@@ -85,6 +89,34 @@ module Pray
         kind: entry["kind"],
         signer_fingerprint: entry["signer_fingerprint"]
       )
+    end
+
+    def migrate_legacy_session(root, path)
+      legacy_path = File.join(root, ".pray", "session.json")
+      return unless File.file?(legacy_path)
+      return if File.expand_path(legacy_path) == File.expand_path(path)
+
+      sessions = load_sessions(path)
+      load_sessions(legacy_path).each do |legacy|
+        sessions << legacy unless sessions.any? { |entry| entry.server_url == legacy.server_url }
+      end
+      document = (sessions.length == 1) ? session_to_hash(sessions.first) : {
+        "sessions" => sessions.map { |entry| session_to_hash(entry) }
+      }
+      FileUtils.mkdir_p(File.dirname(path))
+      write_document(path, document)
+      File.delete(legacy_path)
+    end
+
+    def write_document(path, document)
+      temporary_path = "#{path}.tmp-#{Process.pid}"
+      File.open(temporary_path, File::WRONLY | File::CREAT | File::TRUNC, 0o600) do |file|
+        file.write("#{JSON.pretty_generate(document)}\n")
+        file.flush
+        file.fsync
+      end
+      File.chmod(0o600, temporary_path)
+      File.rename(temporary_path, path)
     end
   end
 end

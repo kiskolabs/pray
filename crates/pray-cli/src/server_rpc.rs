@@ -114,6 +114,7 @@ pub fn handle_rpc(root: &Path, auth: &ServeAuth, request: &RpcRequest) -> PrayRe
         )?,
         "auth.passkeys.enroll" => auth_passkey_enroll_response(
             root,
+            auth.authorization.as_deref(),
             &serde_json::to_vec(request.params.get("request").ok_or_else(|| {
                 PrayError::Resolution("auth.passkeys.enroll requires request".to_string())
             })?)
@@ -135,6 +136,7 @@ pub fn handle_rpc(root: &Path, auth: &ServeAuth, request: &RpcRequest) -> PrayRe
         )?,
         "auth.ssh_keys.enroll" => auth_ssh_key_enroll_response(
             root,
+            auth.authorization.as_deref(),
             &serde_json::to_vec(request.params.get("request").ok_or_else(|| {
                 PrayError::Resolution("auth.ssh_keys.enroll requires request".to_string())
             })?)

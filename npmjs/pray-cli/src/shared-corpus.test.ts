@@ -7,6 +7,10 @@ import { parseManifest } from "./manifest/index.js";
 
 const here = dirname(fileURLToPath(import.meta.url));
 const corpusRoot = join(here, "../../../testdata/shared/manifest");
+const invalidCorpusRoot = join(
+  here,
+  "../../../testdata/shared/manifest-invalid",
+);
 
 type ExpectedEntry = {
   kind: string;
@@ -75,6 +79,21 @@ describe("shared fixture corpus", () => {
         assert.equal(local.path, want.path);
         assert.equal(local.bound, want.bound);
       }
+    });
+  }
+
+  const invalidCases = readdirSync(invalidCorpusRoot, { withFileTypes: true })
+    .filter((entry) => entry.isDirectory())
+    .map((entry) => entry.name)
+    .sort();
+
+  for (const caseName of invalidCases) {
+    it(`rejects ${caseName}`, () => {
+      const text = readFileSync(
+        join(invalidCorpusRoot, caseName, "Prayfile"),
+        "utf8",
+      );
+      assert.throws(() => parseManifest(text));
     });
   }
 });

@@ -36,18 +36,17 @@ jobs:
         uses: taiki-e/install-action@37f7c5781271959fb65b6b35224e28652ff2b63d # v2
         with:
           tool: cargo-llvm-cov
-      - name: Rust coverage soft floor
-        run: cargo llvm-cov --workspace --lcov --output-path lcov.info --fail-under-lines 20
+      - name: Rust coverage floor
+        run: cargo llvm-cov --workspace --lcov --output-path lcov.info --fail-under-lines 65
       - name: Install cargo-mutants
         uses: taiki-e/install-action@37f7c5781271959fb65b6b35224e28652ff2b63d # v2
         with:
           tool: cargo-mutants
-      - name: Mutation smoke on parser and integrity
-        continue-on-error: true
+      - name: Mutation smoke on manifest and archive boundaries
         run: >
           cargo mutants -p pray-core --timeout 30 --jobs 2
-          -f 'manifest.rs' -f 'package_spec.rs' -f 'dependency_graph.rs'
-          -f 'package_integrity.rs' -f 'package_archive.rs' -f 'paths.rs'
+          -f 'manifest_validate.rs' -f 'package_archive.rs'
+          -F '(manifest_validate.rs.*replace != with ==|package_archive.rs:12:36: replace > with ==)'
       - uses: SonarSource/sonarqube-scan-action@22918119ff8e1ca75a623e15c8296b6ea4fbe28f # v8.2.1
         continue-on-error: true
         env:
@@ -96,9 +95,9 @@ jobs:
       - name: Audit all npm dependencies
         working-directory: npmjs/pray-cli
         run: npm audit
-      - name: Run npm tests
+      - name: Run npm tests with coverage
         working-directory: npmjs/pray-cli
-        run: npm test
+        run: npm run test:coverage
       - name: Run npm lint
         working-directory: npmjs/pray-cli
         run: npm run lint

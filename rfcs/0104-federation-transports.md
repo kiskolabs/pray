@@ -5,7 +5,7 @@
 - Status: Experimental
 - Created: 2026-08-17
 - Author: Andrei Makarov
-- Relates: RFC 0050, RFC 0060, RFC 0101
+- Relates: RFC 0050, RFC 0051, RFC 0060, RFC 0101
 - Requires: RFC 0050, RFC 0060
 
 ## Summary
@@ -194,6 +194,8 @@ Optional methods:
 - `auth.ssh_keys.challenge`: `POST /v1/auth/ssh-keys/challenge`
 - `auth.ssh_keys.login`: `POST /v1/auth/ssh-keys/login`
 - `auth.ssh_keys.enroll`: `POST /v1/auth/ssh-keys/enroll`
+
+When present, `auth.*` methods follow RFC 0051: verification codes are delivered out of band, verify mints an email session, enroll requires that bearer, and `auth.session` stays closed.
 
 JSON shapes for `federation.discovery`, `sync.index`, `sync.package`, `sync.push`, artifacts, confessions, and auth match the HTTP API and federation types in Section 29.2. HTML index and package pages are not exposed over SSH-RPC.
 

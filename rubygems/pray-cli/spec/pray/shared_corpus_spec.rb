@@ -5,6 +5,7 @@ require "json"
 
 RSpec.describe "shared fixture corpus" do
   CORPUS_ROOT = File.expand_path("../../../../testdata/shared/manifest", __dir__)
+  INVALID_CORPUS_ROOT = File.expand_path("../../../../testdata/shared/manifest-invalid", __dir__)
 
   Dir.children(CORPUS_ROOT)
     .select { |name| File.directory?(File.join(CORPUS_ROOT, name)) }
@@ -48,6 +49,17 @@ RSpec.describe "shared fixture corpus" do
           expect(local.path).to eq(want["path"])
           expect(local.bound).to eq(want["bound"])
         end
+      end
+    end
+
+  Dir.children(INVALID_CORPUS_ROOT)
+    .select { |name| File.directory?(File.join(INVALID_CORPUS_ROOT, name)) }
+    .sort
+    .each do |case_name|
+      it "rejects #{case_name}" do
+        text = File.read(File.join(INVALID_CORPUS_ROOT, case_name, "Prayfile"))
+
+        expect { Pray.parse_manifest(text) }.to raise_error(Pray::Error)
       end
     end
 end
