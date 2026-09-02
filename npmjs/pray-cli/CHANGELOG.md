@@ -1,5 +1,20 @@
 # CHANGELOG
 
+## 1.10.0 (2026-09-02)
+
+- Refuse to overwrite exclusive `file:` and `tree:` destinations that already exist with other bytes.
+- Fail when a provisioned or compose destination is a symbolic link.
+- Record provisioned leaves in `Prayfile.lock` and delete a dropped leaf only when on-disk bytes still match the locked hash.
+- Keep the previous lock when a provisioned destination write fails, so retry still has its ownership record.
+- Keep TypeScript lockfiles readable when a generated top-level section is empty.
+- Reject destination paths that start with `~`.
+- Print every provisioned path in `pray plan`.
+- BREAKING: Drop unused `render` fields `section_markers` and `line_endings`; reject them at parse.
+- Inline a UTF-8 `file` export into `compose` as a marked span. Exclusive `file:` stays unmarked.
+- Write the Agent context banner on `AGENTS.md` by default. Other compose destinations opt in with `header: true`.
+- Fail compose of JSON, binary, or an unknown file type and name `file:` as the unmarked path.
+- Warn when Prayfile uses deprecated `skills`, export type `skill`, or `spec.skills`; prefer `tree` / `folder`. These forms will be removed in version 2.
+
 ## 1.9.2 (2026-09-01)
 
 - Align package version with the 1.9.2 release.
