@@ -57,6 +57,16 @@ pub fn validate_project_relative_path(value: &str) -> PrayResult<ProjectRelative
     ProjectRelativePath::parse(value)
 }
 
+pub fn validate_destination_path(value: &str) -> PrayResult<ProjectRelativePath> {
+    if value.trim().starts_with('~') {
+        return Err(PrayError::Manifest(format!(
+            "project path must be repository-relative: {}",
+            value.trim()
+        )));
+    }
+    ProjectRelativePath::parse(value)
+}
+
 pub fn find_prayspec_file(root: &Path) -> PrayResult<PathBuf> {
     let mut prayspec_files = Vec::new();
     for entry in fs::read_dir(root)? {
@@ -191,6 +201,8 @@ mod tests {
         }
         .expect_err("absolute");
         assert!(absolute.to_string().contains("repository-relative"));
+        let tilde = validate_destination_path("~/.zshrc").expect_err("tilde");
+        assert!(tilde.to_string().contains("repository-relative"));
     }
 
     #[test]

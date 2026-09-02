@@ -7,7 +7,7 @@ pub(crate) fn build_lockfile(
     project: &pray_core::resolve::ResolvedProject,
     rendered: &[pray_core::render::RenderedTarget],
 ) -> PrayResult<Lockfile> {
-    Ok(pray_core::lockfile::build_lockfile(
+    let mut lockfile = pray_core::lockfile::build_lockfile(
         project.lockfile_hash()?,
         project.environment.clone(),
         &project.project_root,
@@ -17,7 +17,9 @@ pub(crate) fn build_lockfile(
         &project.packages,
         &project.source_revisions,
         &project.source_host_keys,
-    ))
+    );
+    lockfile.provisioned = pray_core::render::provisioned_lock_records(project)?;
+    Ok(lockfile.canonicalized())
 }
 
 pub(crate) fn ensure_existing_lockfile(path: &Path) -> PrayResult<Lockfile> {

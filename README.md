@@ -777,6 +777,16 @@ pray --path /path/to/project --file-path configs/Prayfile plan
 
 Equivalent environment variables are `PRAY_PATH`, `PRAY_FILE_PATH`, and `PRAY_ENV`. The reference CLI also reads those keys from the project `.env` without overriding process values already set.
 
+A home directory can be the project root. It is a normal project folder: `pray` may write any declared destination under that root.
+
+```sh
+pray --path "$HOME" install
+```
+
+`Prayfile.lock` and `.pray` live in that root. Exclusive `file: ".zshrc"` writes unmarked bytes. Do not write `file: "~/.zshrc"`; a leading tilde is rejected as a destination string, not expanded as home. Compose uses HTML comments, so compose of `.zshrc` or `.json` fails and names `file:` as the unmarked path. Prefer a native include of the unmarked file. Prefer `pray trust set-require-signed-packages` for remote packages. The CLI does not walk parent directories for a Prayfile.
+
+`--path /` with `/Prayfile` is allowed. It is not recommended: every declared destination is relative to filesystem root.
+
 Group blocks in `Prayfile` assign environment names to packages. Ungrouped packages always render. With no environment selected, only ungrouped packages render. With `--env development`, ungrouped packages plus packages in the `development` group render. Resolution and locking still include every declared package.
 
 ## Package storage modes

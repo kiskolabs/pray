@@ -165,6 +165,8 @@ module Pray
         )
       end
 
+      VerifyProvisioned.push_findings(project, report)
+
       [report, rendered_targets, fresh_targets]
     end
 

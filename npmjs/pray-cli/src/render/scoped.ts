@@ -14,7 +14,7 @@ export function renderScopedCompose(
   output: string,
 ): RenderedTarget {
   const builder = new ContentBuilder();
-  appendHeaderIfEnabled(builder, project, output);
+  appendHeaderIfEnabled(builder, project, target, output);
 
   const managedSpans: RenderedTarget["managedSpans"] = [];
   for (const entry of targetEntries(target)) {

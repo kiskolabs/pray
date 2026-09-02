@@ -1,12 +1,20 @@
-import { mkdirSync, writeFileSync } from "node:fs";
+import { mkdirSync } from "node:fs";
 import { resolve } from "node:path";
 import { normalizeLineEndings } from "../hashing.js";
+import type { Lockfile } from "../lockfile/types.js";
 import { targetMode, targetScoped } from "../manifest/destination.js";
 import type { ManifestTarget } from "../manifest/types.js";
-import { validateProjectRelativePath } from "../manifest/validate.js";
+import { validateDestinationPath } from "../manifest/validate.js";
 import type { ResolvedProject } from "../resolve/types.js";
+import { ensureHtmlCommentComposeDest } from "./compose-dest.js";
+import { materializeProvisionedExports } from "./dest.js";
 import { renderLegacyCompose } from "./legacy.js";
-import { materializeProvisionedExports } from "./provisioned.js";
+import { relocateManagedSpans } from "./patch.js";
+import { ensureSafeDestinationAncestors } from "./path-guard.js";
+import {
+  layoutRenderedContent,
+  writeRenderedContent,
+} from "./rendered-dest.js";
 import { renderScopedCompose } from "./scoped.js";
 import type { RenderedTarget } from "./types.js";
 
@@ -25,14 +33,49 @@ export function renderProject(project: ResolvedProject): RenderedTarget[] {
 export function writeRenderedTargets(
   project: ResolvedProject,
   rendered: RenderedTarget[],
+  previousLockfile?: Lockfile,
 ): void {
   for (const target of rendered) {
-    validateProjectRelativePath(target.path);
+    validateDestinationPath(target.path);
+    ensureSafeDestinationAncestors(
+      project.projectRoot,
+      target.path,
+      target.path,
+    );
     const path = resolve(project.projectRoot, target.path);
     mkdirSync(resolve(path, ".."), { recursive: true });
-    writeFileSync(path, target.content, "utf8");
+    ensureSafeDestinationAncestors(
+      project.projectRoot,
+      target.path,
+      target.path,
+    );
+    writeRenderedContent(path, target.path, target.content);
   }
-  materializeProvisionedExports(project);
+  materializeProvisionedExports(project, previousLockfile);
+}
+
+export function layoutRenderedTargets(
+  project: ResolvedProject,
+  rendered: RenderedTarget[],
+): RenderedTarget[] {
+  return rendered.map((target) => {
+    validateDestinationPath(target.path);
+    ensureSafeDestinationAncestors(
+      project.projectRoot,
+      target.path,
+      target.path,
+    );
+    const content = layoutRenderedContent(
+      resolve(project.projectRoot, target.path),
+      target.path,
+      target.content,
+    );
+    return {
+      ...target,
+      content,
+      managedSpans: relocateManagedSpans(content, target.managedSpans),
+    };
+  });
 }
 
 function renderTarget(
@@ -40,6 +83,7 @@ function renderTarget(
   target: ManifestTarget,
   output: string,
 ): RenderedTarget {
+  ensureHtmlCommentComposeDest(output);
   if (targetScoped(target) && targetMode(target) === "compose") {
     return renderScopedCompose(project, target, output);
   }

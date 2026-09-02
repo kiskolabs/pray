@@ -71,5 +71,14 @@ module Pray
 
       path
     end
+
+    def validate_destination_path!(value)
+      path = value.to_s.strip
+      if path.start_with?("~")
+        raise Error.manifest("project path must be repository-relative: #{value}")
+      end
+
+      validate_project_relative_path!(value)
+    end
   end
 end

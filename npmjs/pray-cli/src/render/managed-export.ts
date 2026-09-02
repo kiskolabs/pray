@@ -11,7 +11,11 @@ export function shouldInlineExport(
   exportName: string,
 ): boolean {
   const exportEntry = packageEntry.spec.exports.get(exportName);
-  return !exportEntry || exportEntry.kind === "fragment";
+  return (
+    !exportEntry ||
+    exportEntry.kind === "fragment" ||
+    exportEntry.kind === "file"
+  );
 }
 
 export function appendManagedExport(
@@ -24,7 +28,13 @@ export function appendManagedExport(
   symbols: Record<string, string>,
 ): void {
   const raw = packageEntry.exportBodies.get(exportName);
-  if (!raw) {
+  if (raw === undefined) {
+    const exportEntry = packageEntry.spec.exports.get(exportName);
+    if (exportEntry?.kind === "file") {
+      throw PrayError.integrity(
+        `compose cannot write binary export ${exportName}; use file: for unmarked bytes`,
+      );
+    }
     throw PrayError.render(
       `package ${packageEntry.declaration.name} is missing cached export ${exportName}`,
     );

@@ -177,8 +177,8 @@ end
 
     let rendered = fs::read_to_string(repo.join("INSTRUCTIONS.md")).expect("rendered file");
     assert!(
-        !rendered.contains("# Review checklist"),
-        "file exports must not be inlined into root target files"
+        rendered.contains("# Review checklist"),
+        "UTF-8 file exports should be inlined into compose targets"
     );
 }
 
@@ -413,8 +413,8 @@ end
         String::from_utf8_lossy(&install.stderr)
     );
     let stdout = String::from_utf8_lossy(&install.stdout);
-    assert!(stdout.contains(".agents/skills/audit/"));
-    assert!(stdout.contains("2 files"));
+    assert!(stdout.contains(".agents/skills/audit/SKILL.md"));
+    assert!(stdout.contains(".agents/skills/audit/details.md"));
     assert!(stdout.contains("provisioned file"));
 }
 

@@ -1,10 +1,3 @@
-<!-- pray:0 ignore-comments -->
-
-# Agent context
-
-Do not edit managed blocks in `INSTRUCTIONS.md` or provisioned files under `.agents/`.
-To change shared guidance, update `Prayfile` and run `pray install`.
-
 ## Additional instructions
 
 ### .agents/project.md

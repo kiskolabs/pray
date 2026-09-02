@@ -84,8 +84,6 @@ function projectWithEnvironment(
         conflict: "fail",
         churn: "minimal",
         header: false,
-        sectionMarkers: true,
-        lineEndings: "lf",
       },
     },
     packages,

@@ -38,13 +38,21 @@ pub fn resolve_current_project(options: &ResolveOptions) -> PrayResult<ResolvedP
     }
     let project =
         resolve_project_in_context(&context.manifest_path, &context.project_root, &options)?;
-    emit_deprecation_warnings(&project.manifest);
+    emit_deprecation_warnings(&project);
     Ok(project)
 }
 
-fn emit_deprecation_warnings(manifest: &pray_core::manifest::Manifest) {
-    for warning in manifest.deprecation_warnings() {
+fn emit_deprecation_warnings(project: &ResolvedProject) {
+    for warning in project.manifest.deprecation_warnings() {
         eprintln!("{warning}");
+    }
+    let mut seen = std::collections::BTreeSet::new();
+    for package in &project.packages {
+        for warning in pray_core::deprecation::package_spec_deprecation_warnings(&package.spec) {
+            if seen.insert(warning.clone()) {
+                eprintln!("{warning}");
+            }
+        }
     }
 }
 

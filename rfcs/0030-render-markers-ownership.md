@@ -6,7 +6,7 @@
 - Describes: 1.8.1
 - Created: 2026-08-17
 - Author: Andrei Makarov
-- Relates: RFC 0010, RFC 0020, RFC 0102, RFC 0031
+- Relates: RFC 0010, RFC 0020, RFC 0102, RFC 0031, RFC 0034
 
 ## Summary
 
@@ -24,7 +24,7 @@ Root files assemble preamble, embedded `.agents` inputs, managed blocks, then an
 
 `pray plan` / `pray apply` review materialization. `pray drift` reports lock, package, span, and renderer differences. `pray apply` refreshes span line numbers and ideal checksums when the user accepts the new render. `pray verify` MUST be read-only.
 
-Same lock, packages, listed local files, and adapter MUST yield the same managed bytes.
+Same lock, packages, and listed local files MUST yield the same managed bytes.
 
 ## Reference-level explanation
 
@@ -32,7 +32,7 @@ This section is the product contract for this concern. Where it disagrees with I
 
 ### 39. Render behavior
 
-Render input: Prayfile.lock, resolved package contents, local files, target adapters, render policy
+Render input: Prayfile.lock, resolved package contents, local files, render policy
 
 Render output: INSTRUCTIONS.md, TOOL_B.md, skill directories, command directories, rule files, target-specific files
 
@@ -53,6 +53,8 @@ This marker declares that `pray` comments are render markers and should not be i
 The marker is advisory for inference behaviour and binding for Prayfile tooling.
 
 Generated files should not include: timestamps, hostnames, absolute paths, random IDs, or full package graphs unless requested.
+
+The Agent context banner defaults on `AGENTS.md` only (RFC 0108). Other compose dests opt in with `header: true`.
 
 ---
 
@@ -119,10 +121,11 @@ Local file hashes may be stored in `.pray/state.json`, not Prayfile.lock.
 
 ### 44. Render modes
 
-- managed: Generated files are owned by pray. Edits inside markers fail on write when a previous lock exists. Unmarked text is kept. Recommended for repositories.
-- check: No files are written. Used by `pray render --check`.
-- local: Generated files are placed into local tool directories. Useful for personal context.
-- vendor: Packages are copied into `.pray/vendor`. Useful for offline and archival workflows.
+The only render mode is `managed`. Generated files are owned by pray. Edits inside markers fail on write when a previous lock exists. Unmarked text is kept.
+
+Dry-run is `pray plan` or `pray render --check`. Those commands are not a `render mode`. Offline copies are `pray vendor` into `.pray/vendor`. A personal dest is an in-root `compose`, `tree`, or `file:` path, not `mode: :local`.
+
+Parsers MUST reject any `render mode` other than `managed` (RFC 0034).
 
 ---
 
@@ -144,44 +147,7 @@ Package-versus-package compose collision is a different concern. RFC 0031 golden
 
 ### 46. Target adapters
 
-Adapters define how exports become files.
-
-Example `adapters/tool_a.toml`:
-
-```toml
-[target]
-name = "tool_a"
-
-[root]
-file = "INSTRUCTIONS.md"
-supports_sections = true
-supports_skills = true
-
-[skills]
-directory = ".agents/skills"
-skill_file = "SKILL.md"
-
-[render]
-root_strategy = "summary-plus-sections"
-```
-
-Example `adapters/tool_b.toml`:
-
-```toml
-[target]
-name = "tool_b"
-
-[root]
-file = "TOOL_B.md"
-supports_sections = true
-supports_skills = true
-
-[skills]
-directory = ".tool-b/skills"
-skill_file = "SKILL.md"
-```
-
-Built-in adapters should exist for common targets. Packages may also provide adapters. Project Prayfile may override output paths.
+Unused (RFC 0034). Destination DSL already names compose, tree, and `file:` paths. Implementations MUST NOT load adapter TOML to map paths or to spell markers. `spec.adapters` MAY parse and MUST stay inert.
 
 ---
 

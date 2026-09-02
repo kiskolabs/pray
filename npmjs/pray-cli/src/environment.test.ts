@@ -56,8 +56,6 @@ describe("environment", () => {
         conflict: "fail",
         churn: "minimal",
         header: true,
-        sectionMarkers: true,
-        lineEndings: "lf",
       },
     };
     assert.throws(

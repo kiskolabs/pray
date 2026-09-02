@@ -36,6 +36,13 @@ export interface ManagedSpanRecord {
   silenced: boolean;
 }
 
+export interface ProvisionedFileRecord {
+  path: string;
+  content_hash: string;
+  package: string;
+  export: string;
+}
+
 export interface Lockfile {
   prayfile_lock: string;
   spec: string;
@@ -46,6 +53,7 @@ export interface Lockfile {
   package: LockedPackage[];
   target: LockedTarget[];
   managed_span: ManagedSpanRecord[];
+  provisioned: ProvisionedFileRecord[];
 }
 
 export function canonicalLockfile(lockfile: Lockfile): Lockfile {
@@ -68,6 +76,11 @@ export function canonicalLockfile(lockfile: Lockfile): Lockfile {
         left.target.localeCompare(right.target) ||
         left.open_line - right.open_line ||
         left.id.localeCompare(right.id),
+    ),
+    provisioned: [...(lockfile.provisioned ?? [])].sort(
+      (left, right) =>
+        left.path.localeCompare(right.path) ||
+        left.package.localeCompare(right.package),
     ),
   };
 }

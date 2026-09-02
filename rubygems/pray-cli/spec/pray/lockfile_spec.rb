@@ -48,6 +48,24 @@ RSpec.describe Pray::LockfileIO do
     expect(restored.target.first.outputs).to eq(["INSTRUCTIONS.md"])
   end
 
+  it "round-trips provisioned lock records" do
+    lockfile = sample_lockfile
+    lockfile.provisioned = [
+      Pray::ProvisionedFileRecord.new(
+        path: ".zshrc",
+        content_hash: "sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+        package: "sample/shell",
+        export: "zshrc"
+      )
+    ]
+    Pray.write_lockfile(lockfile_path, lockfile)
+    restored = Pray.read_lockfile(lockfile_path)
+
+    expect(restored.provisioned.first.path).to eq(".zshrc")
+    expect(restored.provisioned.first.package).to eq("sample/shell")
+    expect(Pray.serialize_lockfile(restored)).to include("[[provisioned]]")
+  end
+
   it "skips rewriting unchanged lockfiles" do
     lockfile = sample_lockfile
     Pray.write_lockfile(lockfile_path, lockfile)

@@ -4,6 +4,7 @@ import type {
   Lockfile,
   LockSource,
   ManagedSpanRecord,
+  ProvisionedFileRecord,
 } from "./types.js";
 import { canonicalLockfile } from "./types.js";
 
@@ -105,6 +106,17 @@ function formatManagedSpan(span: ManagedSpanRecord): string[] {
   return lines;
 }
 
+function formatProvisioned(record: ProvisionedFileRecord): string[] {
+  const lines = ["[[provisioned]]"];
+  appendScalars(lines, [
+    ["path", record.path],
+    ["content_hash", record.content_hash],
+    ["package", record.package],
+    ["export", record.export],
+  ]);
+  return lines;
+}
+
 function appendSection(lines: string[], sectionLines: string[]): void {
   if (sectionLines.length === 0) {
     return;
@@ -123,6 +135,16 @@ export function serializeLockfileText(lockfile: Lockfile): string {
   if (canonical.environment !== undefined) {
     lines.push(`environment = ${formatString(canonical.environment)}`);
   }
+  for (const [name, entries] of [
+    ["source", canonical.source],
+    ["package", canonical.package],
+    ["target", canonical.target],
+    ["managed_span", canonical.managed_span],
+  ] as const) {
+    if (entries.length === 0) {
+      lines.push(`${name} = []`);
+    }
+  }
   lines.push("");
 
   for (const source of canonical.source) {
@@ -136,6 +158,9 @@ export function serializeLockfileText(lockfile: Lockfile): string {
   }
   for (const span of canonical.managed_span) {
     appendSection(lines, formatManagedSpan(span));
+  }
+  for (const record of canonical.provisioned) {
+    appendSection(lines, formatProvisioned(record));
   }
 
   while (lines.length > 0 && lines[lines.length - 1] === "") {

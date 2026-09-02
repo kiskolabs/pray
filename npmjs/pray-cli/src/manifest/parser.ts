@@ -11,12 +11,14 @@ import { isPraySymbolKey } from "../substitute.js";
 import {
   DEPRECATED_AGENT,
   DEPRECATED_OUTPUT,
+  DEPRECATED_SKILLS,
   DEPRECATED_TARGET,
   noteDeprecatedKeyword,
 } from "./deprecation.js";
 import {
   bindLocalEntry,
   bindPackageEntry,
+  destinationHeaderKeyword,
   isLocalPathForm,
   newDestinationTarget,
   packageRoles,
@@ -207,6 +209,12 @@ class BlockParser {
         : statement.startsWith("folder ")
           ? statement.slice("folder ".length)
           : statement.slice("skills ".length);
+      if (statement.startsWith("skills ")) {
+        manifest.deprecatedKeywords = noteDeprecatedKeyword(
+          manifest.deprecatedKeywords,
+          DEPRECATED_SKILLS,
+        );
+      }
       this.parseDestinationBlock(manifest, rest, "tree");
       return;
     }
@@ -235,13 +243,14 @@ class BlockParser {
     rest: string,
     mode: DestinationMode,
   ): void {
-    const isBlock = rest.trimEnd().endsWith("do");
-    if (!isBlock) {
-      const label = mode === "compose" ? "compose" : "tree";
-      throw PrayError.parse(PARSE_CONTEXT, `${label} must use a block`);
+    if (!rest.trimEnd().endsWith("do")) {
+      throw PrayError.parse(
+        PARSE_CONTEXT,
+        `${mode === "compose" ? "compose" : "tree"} must use a block`,
+      );
     }
     const header = rest.trimEnd().slice(0, -2).trim();
-    const { values } = parseCall(header);
+    const { values, keywords } = parseCall(header);
     const path = values[0]
       ? stringFromValue(values[0], PARSE_CONTEXT)
       : undefined;
@@ -249,6 +258,7 @@ class BlockParser {
       throw PrayError.parse(PARSE_CONTEXT, "destination missing path");
     }
     const target = newDestinationTarget(mode, path);
+    target.header = destinationHeaderKeyword(mode, keywords);
     manifest.targets.push(target);
     const index = manifest.targets.length - 1;
     while (true) {
@@ -262,13 +272,10 @@ class BlockParser {
       if (statement === "end") {
         return;
       }
-      const prayPrefix = [
-        "pray ",
-        "use ",
-        "include ",
-        "agent ",
-        "package ",
-      ].find((prefix) => statement.startsWith(prefix));
+      const prefixes = ["pray ", "use ", "include ", "agent ", "package "];
+      const prayPrefix = prefixes.find((prefix) =>
+        statement.startsWith(prefix),
+      );
       if (prayPrefix) {
         this.applyPrayStatement(
           manifest,
@@ -358,13 +365,10 @@ class BlockParser {
         }
         return;
       }
-      const prayPrefix = [
-        "pray ",
-        "use ",
-        "include ",
-        "agent ",
-        "package ",
-      ].find((prefix) => statement.startsWith(prefix));
+      const prefixes = ["pray ", "use ", "include ", "agent ", "package "];
+      const prayPrefix = prefixes.find((prefix) =>
+        statement.startsWith(prefix),
+      );
       if (prayPrefix) {
         const packageEntry = this.parsePackageWithGroups(
           statement.slice(prayPrefix.length),
@@ -531,17 +535,11 @@ class BlockParser {
       if (statement === "end") {
         return;
       }
-      if (statement.startsWith("output ")) {
-        manifest.deprecatedKeywords = noteDeprecatedKeyword(
-          manifest.deprecatedKeywords,
-          DEPRECATED_OUTPUT,
-        );
-      }
       const target = manifest.targets[targetIndex];
       if (!target) {
         throw PrayError.manifest("target index out of range");
       }
-      applyTargetStatement(target, statement);
+      applyTargetStatement(manifest, target, statement);
     }
   }
 }

@@ -28,6 +28,38 @@ RSpec.describe "destination render" do
     File.write(File.join(package_root, export_path), body)
   end
 
+  it "preserves unmanaged text around an existing managed span" do
+    root = Dir.mktmpdir("pray-compose-preserve-local-")
+    begin
+      write_package(
+        root, "rules", "sample/rules", "rules", "fragment", "exports/rules.md", "Old managed text\n"
+      )
+      File.write(
+        File.join(root, "Prayfile"),
+        <<~PRAYFILE
+          prayfile "1"
+          compose "AGENTS.md" do
+            pray "sample/rules", "~> 1.0", path: "packages/rules"
+          end
+        PRAYFILE
+      )
+      project = Pray::Resolve.resolve_project(File.join(root, "Prayfile"))
+      Pray::Render.write_rendered_targets(project, Pray::Render.render_project(project))
+      destination = File.join(root, "AGENTS.md")
+      File.write(destination, "#{File.read(destination)}\nLocal text must survive.\n")
+      File.write(File.join(root, "packages/rules/exports/rules.md"), "New managed text\n")
+
+      project = Pray::Resolve.resolve_project(File.join(root, "Prayfile"))
+      Pray::Render.write_rendered_targets(project, Pray::Render.render_project(project))
+      content = File.read(destination)
+      expect(content).to include("Local text must survive.")
+      expect(content).to include("New managed text")
+      expect(content).not_to include("Old managed text")
+    ensure
+      FileUtils.rm_rf(root)
+    end
+  end
+
   it "still fans out fragments and skills for the legacy shape" do
     root = Dir.mktmpdir("pray-legacy-fanout-")
     begin
@@ -249,5 +281,246 @@ RSpec.describe "destination render" do
     ensure
       FileUtils.rm_rf(root)
     end
+  end
+
+  it "inlines a utf-8 file export into compose as a marked span" do
+    root = Dir.mktmpdir("pray-compose-file-")
+    begin
+      write_package(
+        root, "community", "sample/community", "contributing", "file",
+        "exports/CONTRIBUTING.md", "Be kind.\n"
+      )
+      File.write(
+        File.join(root, "Prayfile"),
+        <<~PRAYFILE
+          prayfile "1"
+          compose "CONTRIBUTING.md" do
+            pray "sample/community", "~> 1.0", path: "packages/community"
+          end
+        PRAYFILE
+      )
+      project = Pray::Resolve.resolve_project(File.join(root, "Prayfile"))
+      rendered = Pray::Render.render_project(project)
+      expect(rendered[0].content).to include("<!-- pray:")
+      expect(rendered[0].content).to include("Be kind")
+      expect(rendered[0].content).not_to include("# Agent context")
+    ensure
+      FileUtils.rm_rf(root)
+    end
+  end
+
+  it "fails closed on compose of JSON" do
+    root = Dir.mktmpdir("pray-compose-json-")
+    begin
+      write_package(
+        root, "rules", "sample/rules", "rules", "fragment", "exports/rules.md", "Keep it small.\n"
+      )
+      File.write(
+        File.join(root, "Prayfile"),
+        <<~PRAYFILE
+          prayfile "1"
+          compose "config.json" do
+            pray "sample/rules", "~> 1.0", path: "packages/rules"
+          end
+        PRAYFILE
+      )
+      project = Pray::Resolve.resolve_project(File.join(root, "Prayfile"))
+      expect { Pray::Render.render_project(project) }.to raise_error(
+        Pray::Error, /JSON.*file: "config.json"/m
+      )
+    ensure
+      FileUtils.rm_rf(root)
+    end
+  end
+
+  it "keeps exclusive file destinations unmarked" do
+    root = Dir.mktmpdir("pray-exclusive-file-")
+    begin
+      write_package(
+        root, "community", "sample/community", "contributing", "file",
+        "exports/CONTRIBUTING.md", "Be kind.\n"
+      )
+      File.write(
+        File.join(root, "Prayfile"),
+        <<~PRAYFILE
+          prayfile "1"
+          pray "sample/community", "~> 1.0", path: "packages/community", file: "CONTRIBUTING.md"
+        PRAYFILE
+      )
+      project = Pray::Resolve.resolve_project(File.join(root, "Prayfile"))
+      rendered = Pray::Render.render_project(project)
+      expect(rendered).to be_empty
+      Pray::Render.write_rendered_targets(project, rendered)
+      dest = File.read(File.join(root, "CONTRIBUTING.md"))
+      expect(dest).to eq("Be kind.\n")
+      expect(dest).not_to include("<!-- pray:")
+    ensure
+      FileUtils.rm_rf(root)
+    end
+  end
+
+  it "prefers a fragment when a file export also exists" do
+    root = Dir.mktmpdir("pray-compose-prefer-fragment-")
+    begin
+      package_root = File.join(root, "packages/mixed")
+      FileUtils.mkdir_p(File.join(package_root, "exports"))
+      File.write(
+        File.join(package_root, "mixed.prayspec"),
+        <<~SPEC
+          Package::Specification.new do |spec|
+            spec.name = "sample/mixed"
+            spec.version = "1.0.0"
+            spec.summary = "fixture"
+            spec.files = ["exports/notes.md", "exports/CONTRIBUTING.md"]
+            spec.exports = {
+              "notes" => { type: "fragment", path: "exports/notes.md" },
+              "contributing" => { type: "file", path: "exports/CONTRIBUTING.md" }
+            }
+          end
+        SPEC
+      )
+      File.write(File.join(package_root, "exports/notes.md"), "Fragment notes\n")
+      File.write(File.join(package_root, "exports/CONTRIBUTING.md"), "File contributing\n")
+      File.write(
+        File.join(root, "Prayfile"),
+        <<~PRAYFILE
+          prayfile "1"
+          compose "AGENTS.md" do
+            pray "sample/mixed", "~> 1.0", path: "packages/mixed"
+          end
+        PRAYFILE
+      )
+      rendered = Pray::Render.render_project(
+        Pray::Resolve.resolve_project(File.join(root, "Prayfile"))
+      )
+      expect(rendered[0].content).to include("Fragment notes")
+      expect(rendered[0].content).not_to include("File contributing")
+      expect(rendered[0].content).to include("# Agent context")
+      expect(rendered[0].content).to include(".agents/")
+    ensure
+      FileUtils.rm_rf(root)
+    end
+  end
+
+  it "fails compose of a binary file export" do
+    root = Dir.mktmpdir("pray-compose-binary-")
+    begin
+      write_package(
+        root, "blob", "sample/blob", "icon", "file",
+        "exports/icon.md", [0xff, 0xfe, 0x00].pack("C*")
+      )
+      File.write(
+        File.join(root, "Prayfile"),
+        <<~PRAYFILE
+          prayfile "1"
+          compose "ICON.md" do
+            pray "sample/blob", "~> 1.0", path: "packages/blob"
+          end
+        PRAYFILE
+      )
+      project = Pray::Resolve.resolve_project(File.join(root, "Prayfile"))
+      expect { Pray::Render.render_project(project) }.to raise_error(
+        Pray::Error, /binary|utf-8/
+      )
+    ensure
+      FileUtils.rm_rf(root)
+    end
+  end
+
+  it "fails closed on compose of an unknown type" do
+    root = Dir.mktmpdir("pray-compose-unknown-")
+    begin
+      write_package(
+        root, "rules", "sample/rules", "rules", "fragment",
+        "exports/rules.md", "Keep it small.\n"
+      )
+      File.write(
+        File.join(root, "Prayfile"),
+        <<~PRAYFILE
+          prayfile "1"
+          compose ".zshrc" do
+            pray "sample/rules", "~> 1.0", path: "packages/rules"
+          end
+        PRAYFILE
+      )
+      project = Pray::Resolve.resolve_project(File.join(root, "Prayfile"))
+      expect { Pray::Render.render_project(project) }.to raise_error(
+        Pray::Error, /file: "\.zshrc"/
+      )
+    ensure
+      FileUtils.rm_rf(root)
+    end
+  end
+
+  it "suppresses the Agent banner when compose sets header: false" do
+    root = Dir.mktmpdir("pray-compose-header-off-")
+    begin
+      write_package(
+        root, "rules", "sample/rules", "rules", "fragment",
+        "exports/rules.md", "Keep it small.\n"
+      )
+      File.write(
+        File.join(root, "Prayfile"),
+        <<~PRAYFILE
+          prayfile "1"
+          compose "AGENTS.md", header: false do
+            pray "sample/rules", "~> 1.0", path: "packages/rules"
+          end
+        PRAYFILE
+      )
+      rendered = Pray::Render.render_project(
+        Pray::Resolve.resolve_project(File.join(root, "Prayfile"))
+      )
+      expect(rendered[0].content).not_to include("# Agent context")
+    ensure
+      FileUtils.rm_rf(root)
+    end
+  end
+
+  it "omits .agents from a forced banner on NOTES.md" do
+    root = Dir.mktmpdir("pray-compose-header-on-")
+    begin
+      write_package(
+        root, "rules", "sample/rules", "rules", "fragment",
+        "exports/rules.md", "Keep it small.\n"
+      )
+      File.write(
+        File.join(root, "Prayfile"),
+        <<~PRAYFILE
+          prayfile "1"
+          compose "NOTES.md", header: true do
+            pray "sample/rules", "~> 1.0", path: "packages/rules"
+          end
+        PRAYFILE
+      )
+      rendered = Pray::Render.render_project(
+        Pray::Resolve.resolve_project(File.join(root, "Prayfile"))
+      )
+      expect(rendered[0].content).to include("# Agent context")
+      expect(rendered[0].content).not_to include(".agents/")
+    ensure
+      FileUtils.rm_rf(root)
+    end
+  end
+
+  it "does not match unused export kinds to a destination role" do
+    %w[template command rule asset bundle].each do |kind|
+      %w[fragment folder file].each do |role|
+        expect(Pray::Destination.export_kind_matches_role?(kind, role)).to be(false)
+      end
+    end
+  end
+
+  it "parses spec.adapters and does not load them" do
+    spec = Pray.parse_package_spec(<<~SPEC)
+      Package::Specification.new do |spec|
+        spec.name = "sample/with-adapters"
+        spec.version = "1.0.0"
+        spec.files = ["exports/a.md"]
+        spec.exports = { "a" => { type: "fragment", path: "exports/a.md" } }
+        spec.adapters = { "tool_a" => "adapters/tool_a.toml" }
+      end
+    SPEC
+    expect(spec.adapters["tool_a"]).to eq("adapters/tool_a.toml")
   end
 end

@@ -3,8 +3,10 @@ import { parse } from "smol-toml";
 import { PrayError } from "../errors.js";
 import { sha256Prefixed } from "../hashing.js";
 import type { ManifestSource, ManifestTarget } from "../manifest/types.js";
+import { provisionedLockRecords } from "../render/dest.js";
+import { layoutRenderedTargets } from "../render/project.js";
 import type { RenderedTarget } from "../render/types.js";
-import type { ResolvedPackage } from "../resolve/types.js";
+import type { ResolvedPackage, ResolvedProject } from "../resolve/types.js";
 import { parseLockfileValue } from "./parse.js";
 import { normalizeLockfileArtifact, relativeLockfilePath } from "./paths.js";
 import { serializeLockfileText } from "./serialize.js";
@@ -77,9 +79,13 @@ export function buildLockfile(input: {
   packages: ResolvedPackage[];
   sourceRevisions?: Map<string, string>;
   sourceHostKeys?: Map<string, string>;
+  project?: ResolvedProject;
 }): Lockfile {
   const sourceRevisions = input.sourceRevisions ?? new Map();
   const sourceHostKeys = input.sourceHostKeys ?? new Map();
+  const rendered = input.project
+    ? layoutRenderedTargets(input.project, input.rendered)
+    : input.rendered;
   return canonicalLockfile({
     prayfile_lock: "1",
     spec: "0.1",
@@ -125,7 +131,8 @@ export function buildLockfile(input: {
       name: target.name,
       outputs: target.outputs,
     })),
-    managed_span: input.rendered.flatMap((target) => target.managedSpans),
+    managed_span: rendered.flatMap((target) => target.managedSpans),
+    provisioned: input.project ? provisionedLockRecords(input.project) : [],
   });
 }
 

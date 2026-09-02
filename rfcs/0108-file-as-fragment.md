@@ -2,45 +2,31 @@
 
 - Feature Name: file-as-fragment
 - Type: Standards Track
-- Status: Experimental
+- Status: Stable
 - Created: 2026-08-18
 - Author: Andrei Makarov
-- Relates: RFC 0020, RFC 0030, RFC 0102
+- Relates: RFC 0020, RFC 0030, RFC 0034, RFC 0102
+- Requires: RFC 0030
 
 ## Summary
 
-A `type: "file"` export MAY be inlined into a `compose` destination as one managed span. Publishers keep shipping `file` for `file:` consumers. A fragment export MUST NOT satisfy `file:`.
+A `type: "file"` export MAY be inlined into `compose` as one managed span. Exclusive `file:` stays unmarked. Compose of JSON, binary, or an unknown dest type is a render error that names `file:` as the unmarked path.
 
 ## Motivation
 
-Community-health packages export one UTF-8 document as `file` so `pray "name", file: "CONTRIBUTING.md"` stays exclusive and unmarked (RFC 0030, RFC 0102). A consumer that wants project notes around that document today gets a type mismatch: compose selects the Fragment role, `export_kind_matches_role` requires `kind == "fragment"`, `load_export_bodies` skips non-fragment kinds, and `should_inline_export` skips them (`destination.rs`, `resolve_exports.rs`, `render_compose.rs`). Shipping the same bytes again as `fragment` duplicates the export. Retargeting `file` to `fragment` breaks `file:` consumers. Nesting `file:` inside `compose` remains a parse error (`manifest_parse/blocks.rs`).
+Community-health packages export one UTF-8 document as `file` so `pray "name", file: "CONTRIBUTING.md"` stays exclusive and unmarked. A consumer that wants project notes around that document today gets a type mismatch: compose selects the Fragment role and skips non-fragment kinds. Dual `fragment` plus `file` exports duplicate bytes. Retargeting `file` to `fragment` breaks `file:` consumers.
 
 ## Guide-level explanation
 
-Publishers keep:
+Publishers keep `type: "file"` with `default_path`. Exclusive consumers keep `file: "CONTRIBUTING.md"`. Bytes stay unmarked after `((pray:…))`.
 
-```ruby
-spec.exports = {
-  "contributing" => { type: "file", path: "exports/CONTRIBUTING.md", default_path: "CONTRIBUTING.md" }
-}
-```
+Compose consumers write `compose "CONTRIBUTING.md"` and bind the same package. Pray inlines the file body as one managed span. Local embeds stay unmarked. The same path still has one writer: `file:` or `compose`, not both.
 
-Exclusive consumers keep `pray "sample/community-contributing", "~> 1.0", file: "CONTRIBUTING.md"`. Bytes stay unmarked after `((pray:…))` substitution.
+Auto-select without `export:` uses the file when the package has no fragment and exactly one file export. Folder exports beside that file do not block auto-select. Binary file bytes fail compose. They are not copied as a span.
 
-Compose consumers write:
+The Agent context banner defaults on `AGENTS.md` only. `compose "CONTRIBUTING.md", header: false` is explicit off. `header: true` forces the banner. Banner text mentions `.agents/` only when the dest basename is `AGENTS.md`.
 
-```ruby
-compose "CONTRIBUTING.md" do
-  pray "sample/community-contributing", "~> 1.0"
-  pray ".agents/contributing-notes.md"
-end
-```
-
-Pray inlines the file body as one managed span with the same marker pair, span checksum, and lock record as a fragment (RFC 0030). Local embeds stay unmarked. The same path still has one writer: `file:` or `compose`, not both.
-
-`export: "contributing"` selects that file when the package also ships fragments. Auto-select without `export:` uses the file when the package has no fragment export and exactly one file export. Folder or skill exports beside that file do not block auto-select. Binary file bytes fail compose. Other kinds, including `template`, stay out of this downcast.
-
-`render.header` stays project-wide (`RenderPolicy.header` in `manifest.rs`). A Prayfile that composes `AGENTS.md` with the default header also prepends the Agent context banner to `CONTRIBUTING.md`.
+`compose "config.json"` fails and names `file: "config.json"`. The same for a binary dest or an unknown type such as `.zshrc`. There is no `markers:` override until a dialect RFC claims `ids/0032`.
 
 ## Reference-level explanation
 
@@ -50,57 +36,51 @@ When `export:` / `exports:` names an export, compose MUST inline it when the kin
 
 When those keywords are omitted and the destination role is Fragment, implementations MUST:
 
-1. If the package has one or more `fragment` exports, select among fragments only (today's rule: one succeeds, several require `export:`).
+1. If the package has one or more `fragment` exports, select among fragments only (one succeeds, several require `export:`).
 2. If the package has no `fragment` export and exactly one `file` export, select that file.
 3. If the package has no `fragment` export and several `file` exports, fail resolution and require `export:`.
 4. If the package has neither, fail with no compatible export.
 
 The File role MUST match `kind == "file"` only. A `fragment` export MUST NOT be selected for `file:`.
 
-Compose MUST wrap a selected file body with the same open and close markers as a fragment, run `substitute_pray_symbols`, and record a managed span whose `ideal_checksum` is the substituted body without markers. Non-UTF-8 file bytes MUST fail resolve or render with an integrity error. Folder, skill, `template`, and other kinds MUST NOT be inlined into compose under this RFC.
+Compose MUST wrap a selected file body with the same open and close markers as a fragment, run `substitute_pray_symbols`, and record a managed span whose `ideal_checksum` is the substituted body without markers. Non-UTF-8 file bytes MUST fail compose with an integrity or render error. Folder and other kinds MUST NOT be inlined. Binary MUST NOT be copied as a span.
 
-`file:` nested inside `compose` or `tree` MUST remain a parse error. Same-path `file:` plus `compose` stays exclusive.
+`file:` nested inside `compose` or `tree` MUST remain a parse error. Exclusive `file:` stays unmarked UTF-8 after substitution, or raw bytes when the export is not UTF-8.
 
-Exclusive `file:` destinations MUST keep today's contract: unmarked UTF-8 after substitution, whole-file verify against reconstructed expected bytes.
+Compose dests whose basename is `AGENTS.md` write the Agent context banner unless `render header: false` or the dest sets `header: false`. Other dests write that banner only when the dest sets `header: true`. `compose` MAY take `header: true` or `header: false`. Other dest keywords on `compose` MUST fail parse. Tree dests MUST reject `header`.
+
+Compose MUST fail closed unless the dest extension is `md`, `markdown`, `html`, or `htm`. A `.json` dest MUST fail as JSON. A dest with a binary extension MUST fail as binary. Any other dest MUST fail as an unknown type. Each error MUST name `file: "<dest>"` as the unmarked path. Parse of the compose statement MAY succeed; render MUST fail.
 
 ## Implementation notes
 
-Today Fragment matches `fragment` only. `load_export_bodies` continues past `kind != "fragment"`. Named `export:` of a file already selects the name (`select_exports` first branch) and then drops the body.
-
-Reference changes belong in `export_kind_matches_role` or `select_exports` for auto-select, `load_export_bodies`, and `should_inline_export`. Fixtures: file-only package in compose; file plus fragment auto-selects the fragment; named file beside fragments; binary file fails; `file:` consumer byte-equal to 1.8.1.
-
-Polyglot CLIs MUST match the Rust fixture after this RFC is Stable (RFC 0100).
+`export_kind_matches_role` Fragment stays `fragment` only. Auto-select of a lone file lives in `select_exports`. `load_export_bodies` loads UTF-8 `file` bodies. `should_inline_export` inlines `fragment` and `file`.
 
 ## Security considerations
 
-A file body in compose is a reconstructed span. Tampered span bytes fail verify. Exclusive `file:` verify is unchanged. Binary payloads MUST NOT be coerced into a span.
+A file body in compose is a reconstructed span. Binary payloads MUST NOT be coerced into a span. JSON and unknown dests MUST NOT receive HTML comment markers.
 
 ## Registrar
 
-No new Prayfile keywords, lockfile fields, or marker grammar. The Fragment role gains `file` as a selectable kind under the auto-select rules above.
+Compose keyword `header` (boolean). No lockfile fields. No marker grammar. The Fragment role gains `file` as a selectable kind under the auto-select rules above.
 
 ## Drawbacks
 
-Compose output of a file export is marked and may carry the project header. It is not byte-equal to the exclusive `file:` destination of the same export. Contributors who need unmarked exclusive files keep `file:`.
+Compose output of a file export is marked and is not byte-equal to exclusive `file:`. Destinations that used the project-wide banner on non-`AGENTS.md` files lose it unless they set `header: true`.
 
 ## Rationale and alternatives
 
-File downcasts to a span because the publisher already shipped a whole UTF-8 document. A fragment does not upcast to exclusive `file:` because that destination promises unmarked whole-file bytes.
+File downcasts to a span because the publisher already shipped a whole UTF-8 document. A fragment does not upcast to exclusive `file:`. Fail closed keeps HTML comments off host-invalid files until a dialect RFC exists.
 
-Rejected: dual `fragment` plus `file` exports; retargeting community packages to `fragment`; Copier three-way merge (RFC 0030 reconstructs, it does not merge); named slots inside exclusive `file:` (better when the destination MUST stay unmarked; a later RFC). Doing nothing leaves compose consumers copying files by hand.
+Rejected: dual exports; Copier merge; named slots inside exclusive `file:`; shebang preservation (not scheduled); claiming `ids/0032`.
 
 ## Prior art
 
-mdBook `{{#include}}` inlines a whole file into a chapter. AsciiDoc `include::` does the same. Bundler git gems still lock `revision` while the source stays a repository; here the source stays `type: "file"` while compose consumes it as a span.
+mdBook `{{#include}}`. AsciiDoc `include::`. RFC 0034 unused kinds stay out of this downcast.
 
 ## Unresolved questions
 
 Whether auto-select of a lone file should warn that the kind is `file`, or stay silent.
 
-Whether compose of a file export SHOULD default that destination's header off. That is a second contract (`RenderPolicy.header` is one boolean today). This RFC leaves header unchanged.
-
-Whether Ruby and TypeScript land in the same implementation PR as Rust.
-
 ## Future possibilities
 
-Per-destination `header:` on `compose`. Named slots inside exclusive `file:` for unmarked splice. Silence on a file-as-span uses the existing lock flag (RFC 0030).
+Named slots inside exclusive `file:`. Marker dialect RFC 0032 if scheduled. Conformance packs (RFC 0100).

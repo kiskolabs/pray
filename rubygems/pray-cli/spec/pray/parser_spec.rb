@@ -200,7 +200,7 @@ RSpec.describe "Pray parser" do
     prayfile = File.read(File.expand_path("../../../../examples/simple-project/Prayfile", __dir__))
     manifest = Pray.parse_manifest(prayfile)
     expect(manifest.manifest_hash).to eq(
-      "sha256:88e048f95c0a5ec3f09f11d24826f393fc541aebdf0aa50da45fab61d852226c"
+      "sha256:286de6b550c26f05c4bff8f30a6a43f152a2bcf73d6d49e1cc9f6817a5e32c91"
     )
   end
 
@@ -355,6 +355,39 @@ RSpec.describe "Pray parser" do
         end
       PRAYFILE
     end.to raise_error(Pray::Error, /only :fail is supported/)
+  end
+
+  it "rejects render section_markers and line_endings" do
+    %w[section_markers:\ false line_endings:\ :lf].each do |field|
+      expect do
+        Pray.parse_manifest(<<~PRAYFILE)
+          prayfile "1"
+          compose "AGENTS.md" do
+          end
+          render #{field}
+        PRAYFILE
+      end.to raise_error(Pray::Error, /does not accept/)
+    end
+  end
+
+  it "parses compose header override" do
+    manifest = Pray.parse_manifest(<<~PRAYFILE)
+      prayfile "1"
+      compose "CONTRIBUTING.md", header: false do
+        pray "sample/community", "~> 1.0"
+      end
+    PRAYFILE
+    expect(manifest.targets.first.header).to eq(false)
+  end
+
+  it "rejects unknown compose keyword" do
+    expect do
+      Pray.parse_manifest(<<~PRAYFILE)
+        prayfile "1"
+        compose "AGENTS.md", markers: :html do
+        end
+      PRAYFILE
+    end.to raise_error(Pray::Error, /does not accept/)
   end
 
   it "rejects duplicate pray symbols" do

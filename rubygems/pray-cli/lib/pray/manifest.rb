@@ -9,27 +9,25 @@ require_relative "path_safety"
 
 module Pray
   RenderPolicy = Struct.new(
-    :mode, :conflict, :churn, :header, :section_markers, :line_endings
+    :mode, :conflict, :churn, :header
   ) do
     def self.default
       new(
         mode: "managed",
         conflict: "fail",
         churn: "minimal",
-        header: true,
-        section_markers: true,
-        line_endings: "lf"
+        header: true
       )
     end
   end
 
   ManifestSource = Struct.new(:name, :kind, :url, :subdir, :rev, :tag)
   ManifestTarget = Struct.new(
-    :name, :outputs, :skills, :commands, :rules, :max_bytes, :mode, :scoped, :entries
+    :name, :outputs, :skills, :commands, :rules, :max_bytes, :mode, :scoped, :entries, :header
   ) do
     def initialize(
       name:, outputs: [], skills: [], commands: [], rules: [], max_bytes: nil,
-      mode: "legacy", scoped: false, entries: []
+      mode: "legacy", scoped: false, entries: [], header: nil
     )
       super
     end
@@ -73,7 +71,7 @@ module Pray
     end
 
     def note_deprecated_keyword(keyword)
-      return unless %w[target output agent].include?(keyword)
+      return unless %w[target output agent skills].include?(keyword)
       self.deprecated_keywords ||= []
       deprecated_keywords << keyword unless deprecated_keywords.include?(keyword)
     end
@@ -82,7 +80,10 @@ module Pray
       replacements = {
         "target" => "compose` / `tree",
         "output" => "compose",
-        "agent" => "pray"
+        "agent" => "pray",
+        "skills" => "tree` / `folder",
+        "skill" => "folder",
+        "spec.skills" => "a folder export"
       }
       (deprecated_keywords || []).filter_map do |keyword|
         replacement = replacements[keyword]
@@ -127,12 +128,12 @@ module Pray
     def validate_manifest_paths!(manifest)
       manifest.targets.each do |target|
         (target.outputs + target.skills + target.commands + target.rules).each do |path|
-          PathSafety.validate_project_relative_path!(path)
+          PathSafety.validate_destination_path!(path)
         end
       end
       manifest.packages.each do |package|
         PathSafety.validate_project_relative_path!(package.path) if package.path
-        PathSafety.validate_project_relative_path!(package.file) if package.file
+        PathSafety.validate_destination_path!(package.file) if package.file
       end
       manifest.local.each { |local| PathSafety.validate_project_relative_path!(local.path) }
     end

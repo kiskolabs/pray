@@ -33,6 +33,14 @@ pub(crate) fn select_exports(
 
     let mut selected = Vec::new();
     for role in roles {
+        if role == crate::manifest::ExportRole::Fragment {
+            for name in select_fragment_role_exports(&declaration.name, spec)? {
+                if !selected.contains(&name) {
+                    selected.push(name);
+                }
+            }
+            continue;
+        }
         let compatible: Vec<String> = spec
             .exports
             .iter()
@@ -60,6 +68,41 @@ pub(crate) fn select_exports(
         }
     }
     Ok(selected)
+}
+
+fn select_fragment_role_exports(package_name: &str, spec: &PackageSpec) -> PrayResult<Vec<String>> {
+    let fragments: Vec<String> = spec
+        .exports
+        .iter()
+        .filter(|(_, export)| export.kind == "fragment")
+        .map(|(name, _)| name.clone())
+        .collect();
+    match fragments.as_slice() {
+        [name] => Ok(vec![name.clone()]),
+        [] => {
+            let files: Vec<String> = spec
+                .exports
+                .iter()
+                .filter(|(_, export)| export.kind == "file")
+                .map(|(name, _)| name.clone())
+                .collect();
+            match files.as_slice() {
+                [name] => Ok(vec![name.clone()]),
+                [] => Err(PrayError::Resolution(format!(
+                    "package {package_name} has no export compatible with {:?}",
+                    crate::manifest::ExportRole::Fragment
+                ))),
+                _ => Err(PrayError::Resolution(format!(
+                    "package {package_name} has multiple exports compatible with {:?}; set export: \"name\"",
+                    crate::manifest::ExportRole::Fragment
+                ))),
+            }
+        }
+        _ => Err(PrayError::Resolution(format!(
+            "package {package_name} has multiple exports compatible with {:?}; set export: \"name\"",
+            crate::manifest::ExportRole::Fragment
+        ))),
+    }
 }
 
 pub(crate) fn read_text(path: &Path) -> PrayResult<String> {
@@ -104,7 +147,7 @@ pub(crate) fn load_export_bodies(
                 spec.name, export_name
             ))
         })?;
-        if entry.kind != "fragment" {
+        if !matches!(entry.kind.as_str(), "fragment" | "file") {
             continue;
         }
         let bytes = file_bytes.get(&entry.path).ok_or_else(|| {
@@ -113,12 +156,15 @@ pub(crate) fn load_export_bodies(
                 export_name, entry.path
             ))
         })?;
-        let text = std::str::from_utf8(bytes).map_err(|error| {
-            PrayError::Integrity(format!(
-                "package file is not valid utf-8 for export {}: {}",
-                export_name, error
-            ))
-        })?;
+        let text = match std::str::from_utf8(bytes) {
+            Ok(text) => text,
+            Err(error) if entry.kind == "fragment" => {
+                return Err(PrayError::Integrity(format!(
+                    "package file is not valid utf-8 for export {export_name}: {error}"
+                )));
+            }
+            Err(_) => continue,
+        };
         export_bodies.insert(export_name.clone(), normalize_line_endings(text));
     }
     Ok(export_bodies)

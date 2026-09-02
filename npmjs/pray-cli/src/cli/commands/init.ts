@@ -17,7 +17,7 @@ export function runInit(argumentsList: string[]): void {
     .map(
       (name) => `target :${name} do
   output "INSTRUCTIONS.md"
-  skills ".agents/skills"
+  folder ".agents/skills"
 end`,
     )
     .join("\n");

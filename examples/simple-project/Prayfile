@@ -2,7 +2,7 @@ prayfile "1"
 source "default", "https://agents.example.com"
 target :tool_a do
   output "INSTRUCTIONS.md"
-  skills ".agents/skills"
+  folder ".agents/skills"
 end
 agent "sample/base", "~> 1.4",
   path: "packages/base",

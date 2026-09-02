@@ -24,6 +24,25 @@ module Pray
       super
     end
 
+    def deprecation_warnings
+      keywords = []
+      keywords << "spec.skills" unless skills.nil? || skills.empty?
+      keywords << "skill" if (exports || {}).values.any? { |export| export.kind == "skill" }
+      Manifest.new(deprecated_keywords: keywords).deprecation_warnings
+    end
+
+    def self.warn_resolved_deprecations(packages)
+      seen = {}
+      packages.each do |package|
+        package.spec.deprecation_warnings.each do |warning|
+          next if seen[warning]
+
+          seen[warning] = true
+          warn(warning)
+        end
+      end
+    end
+
     def canonicalized
       dup.tap do |copy|
         copy.files = files.sort

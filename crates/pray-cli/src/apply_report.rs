@@ -1,6 +1,9 @@
 use pray_core::lockfile::{lockfiles_equivalent, Lockfile};
 use pray_core::manifest::ManifestPackage;
-use pray_core::render::{planned_provisioned_files, RenderedTarget};
+use pray_core::render::{
+    planned_provisioned_files, provisioned_destination_status, ProvisionedDestinationStatus,
+    RenderedTarget,
+};
 use pray_core::resolve::ResolvedProject;
 use pray_core::verify::{inspect_project, VerificationFinding};
 use pray_core::PrayResult;
@@ -57,10 +60,14 @@ pub fn build_materialization_preview(
     let provisioned = planned_provisioned_files(project)?
         .into_iter()
         .map(|file| {
-            let change = provisioned_change_status(&project.project_root, &file.path, &file.source);
-            (file.path, change)
+            let change = match provisioned_destination_status(project, &file, previous_lockfile)? {
+                ProvisionedDestinationStatus::Missing => TargetChange::Written,
+                ProvisionedDestinationStatus::Unchanged => TargetChange::Unchanged,
+                ProvisionedDestinationStatus::ManagedUpdate => TargetChange::Updated,
+            };
+            Ok((file.path, change))
         })
-        .collect();
+        .collect::<PrayResult<Vec<_>>>()?;
     let warnings = pre_apply_warnings(project, previous_lockfile, rendered, &targets)?;
 
     Ok(MaterializationPreview {
@@ -133,8 +140,11 @@ pub fn print_materialization_report(preview: &MaterializationPreview, mode: Mate
         println!("{} {}", path.display(), target_verb(*change, mode));
     }
 
-    for line in grouped_provisioned_lines(&preview.provisioned, mode) {
-        println!("{line}");
+    for (path, change) in &preview.provisioned {
+        if *change == TargetChange::Unchanged {
+            continue;
+        }
+        println!("{} {}", path.display(), target_verb(*change, mode));
     }
 
     if !preview.warnings.is_empty() {
@@ -232,70 +242,6 @@ fn target_change_status(path: &Path, content: &str) -> TargetChange {
         Ok(_) => TargetChange::Updated,
         Err(_) => TargetChange::Written,
     }
-}
-
-fn provisioned_change_status(
-    project_root: &Path,
-    relative_path: &Path,
-    source: &Path,
-) -> TargetChange {
-    let destination = project_root.join(relative_path);
-    let expected = fs::read(source).ok();
-    match fs::read(&destination) {
-        Ok(existing) if expected.as_ref() == Some(&existing) => TargetChange::Unchanged,
-        Ok(_) => TargetChange::Updated,
-        Err(_) => TargetChange::Written,
-    }
-}
-
-fn grouped_provisioned_lines(
-    provisioned: &[(PathBuf, TargetChange)],
-    mode: MaterializationMode,
-) -> Vec<String> {
-    let mut lines = Vec::new();
-    let mut index = 0;
-    while index < provisioned.len() {
-        let (path, change) = &provisioned[index];
-        if *change == TargetChange::Unchanged {
-            index += 1;
-            continue;
-        }
-
-        let parent = path
-            .parent()
-            .map(|parent| parent.to_path_buf())
-            .unwrap_or_else(|| path.clone());
-        let mut grouped = vec![(path.clone(), *change)];
-        let mut next = index + 1;
-        while next < provisioned.len() {
-            let (next_path, next_change) = &provisioned[next];
-            if next_path.parent() != Some(parent.as_path())
-                || *next_change == TargetChange::Unchanged
-            {
-                break;
-            }
-            grouped.push((next_path.clone(), *next_change));
-            next += 1;
-        }
-
-        if grouped.len() == 1 {
-            lines.push(format!(
-                "{} {}",
-                grouped[0].0.display(),
-                target_verb(grouped[0].1, mode)
-            ));
-        } else {
-            let verb = target_verb(grouped[0].1, mode);
-            let folder = if parent.as_os_str().is_empty() {
-                ".".to_string()
-            } else {
-                format!("{}/", parent.display())
-            };
-            lines.push(format!("{folder} {verb} ({} files)", grouped.len()));
-        }
-        index = next;
-    }
-    lines
 }
 
 fn pre_apply_warnings(
@@ -509,9 +455,12 @@ mod tests {
     }
 
     #[test]
-    fn grouped_provisioned_lines_groups_sibling_files() {
-        let lines = grouped_provisioned_lines(
-            &[
+    fn plan_lists_each_provisioned_path() {
+        let preview = MaterializationPreview {
+            package_lines: Vec::new(),
+            lockfile: LockfileChange::Unchanged,
+            targets: Vec::new(),
+            provisioned: vec![
                 (
                     PathBuf::from(".agents/skills/audit/SKILL.md"),
                     TargetChange::Written,
@@ -521,11 +470,19 @@ mod tests {
                     TargetChange::Written,
                 ),
             ],
-            MaterializationMode::Install,
+            warnings: Vec::new(),
+        };
+        assert_eq!(
+            preview
+                .provisioned
+                .iter()
+                .filter(|(_, change)| *change != TargetChange::Unchanged)
+                .count(),
+            2
         );
-
-        assert_eq!(lines.len(), 1);
-        assert!(lines[0].contains(".agents/skills/audit/"));
-        assert!(lines[0].contains("2 files"));
+        assert_eq!(
+            target_verb(TargetChange::Written, MaterializationMode::Plan),
+            "would be written"
+        );
     }
 }

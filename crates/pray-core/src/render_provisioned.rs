@@ -1,6 +1,6 @@
 use crate::destination::package_bound_to_tree;
 use crate::environment::package_matches_environment;
-use crate::paths::validate_project_relative_path;
+use crate::paths::validate_destination_path;
 use crate::resolve::ResolvedProject;
 use crate::substitute::substitute_pray_symbols;
 use crate::{PrayError, PrayResult};
@@ -11,6 +11,8 @@ use std::path::{Path, PathBuf};
 pub struct PlannedProvisionedFile {
     pub path: PathBuf,
     pub source: PathBuf,
+    pub package: String,
+    pub export: String,
 }
 
 pub fn planned_provisioned_files(
@@ -44,18 +46,6 @@ pub fn planned_provisioned_files(
     Ok(planned)
 }
 
-pub fn materialize_provisioned_exports(project: &ResolvedProject) -> PrayResult<()> {
-    for file in planned_provisioned_files(project)? {
-        let relative = validate_project_relative_path(&file.path.to_string_lossy())?;
-        let destination = relative.join_root(&project.project_root);
-        if let Some(parent) = destination.parent() {
-            fs::create_dir_all(parent)?;
-        }
-        write_provisioned_file(&file.source, &destination, &project.manifest.symbols)?;
-    }
-    Ok(())
-}
-
 pub fn expected_provisioned_bytes(
     source: &Path,
     symbols: &std::collections::BTreeMap<String, String>,
@@ -65,15 +55,6 @@ pub fn expected_provisioned_bytes(
         Ok(text) => Ok(substitute_pray_symbols(&text, symbols)?.into_bytes()),
         Err(error) => Ok(error.into_bytes()),
     }
-}
-
-fn write_provisioned_file(
-    source: &Path,
-    destination: &Path,
-    symbols: &std::collections::BTreeMap<String, String>,
-) -> PrayResult<()> {
-    fs::write(destination, expected_provisioned_bytes(source, symbols)?)?;
-    Ok(())
 }
 
 fn collect_exact_file_bindings(
@@ -106,10 +87,12 @@ fn collect_exact_file_bindings(
                     source.display()
                 )));
             }
-            let relative = validate_project_relative_path(destination)?;
+            let relative = validate_destination_path(destination)?;
             planned.push(PlannedProvisionedFile {
                 path: relative.as_path().to_path_buf(),
                 source,
+                package: package.declaration.name.clone(),
+                export: export_name.clone(),
             });
             matched = true;
             break;
@@ -152,8 +135,8 @@ fn collect_legacy_skill_files(
             &package.root.join(&skill.path),
             &destination_root.join(skill_name),
             skill_files,
-            &[],
-            &[],
+            (&[], &[]),
+            (&package.declaration.name, skill_name),
             planned,
         )?;
     }
@@ -195,8 +178,8 @@ fn collect_selected_export_files(
                     &package.root.join(&export.path),
                     &destination_root.join(destination_name),
                     indexed_files,
-                    &export.only,
-                    &export.except,
+                    (&export.only, &export.except),
+                    (&package.declaration.name, export_name),
                     planned,
                 )?;
             }
@@ -225,6 +208,8 @@ fn collect_selected_export_files(
                 planned.push(PlannedProvisionedFile {
                     path: relative_project_path(project, &destination),
                     source,
+                    package: package.declaration.name.clone(),
+                    export: export_name.clone(),
                 });
             }
             _ => {}
@@ -245,10 +230,12 @@ fn collect_tree_files(
     source_root: &Path,
     destination_root: &Path,
     relative_files: &[String],
-    only: &[String],
-    except: &[String],
+    filters: (&[String], &[String]),
+    origin: (&str, &str),
     planned: &mut Vec<PlannedProvisionedFile>,
 ) -> PrayResult<()> {
+    let (only, except) = filters;
+    let (package, export) = origin;
     if !source_root.is_dir() {
         return Err(PrayError::Render(format!(
             "folder source directory missing: {}",
@@ -282,6 +269,8 @@ fn collect_tree_files(
         planned.push(PlannedProvisionedFile {
             path: relative_project_path(project, &destination),
             source,
+            package: package.to_string(),
+            export: export.to_string(),
         });
         matched = true;
     }

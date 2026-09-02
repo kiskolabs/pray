@@ -1,10 +1,9 @@
 import { existsSync, readFileSync } from "node:fs";
 import { resolve } from "node:path";
 import { PrayError } from "../errors.js";
-import { normalizeLineEndings, sha256Prefixed } from "../hashing.js";
+import { normalizeLineEndings } from "../hashing.js";
 import type { Lockfile, ManagedSpanRecord } from "../lockfile/types.js";
 import { renderProject } from "../render/project.js";
-import { expectedProvisionedBytes } from "../render/provisioned.js";
 import { missingLocalEmbedGuidance } from "../resolve/project.js";
 import type { ResolvedProject } from "../resolve/types.js";
 import { markerPositions } from "./markers.js";
@@ -12,6 +11,7 @@ import {
   formatPositionDriftMessage,
   summarizePositionDrift,
 } from "./position.js";
+import { pushProvisionedFindings } from "./provisioned.js";
 
 export interface VerificationFinding {
   kind: string;
@@ -206,9 +206,7 @@ function collectVerificationReport(
     }
   }
 
-  for (const packageEntry of project.packages) {
-    verifyExclusiveFileBinding(packageEntry, project, report);
-  }
+  pushProvisionedFindings(project, report);
 
   for (const local of project.localFiles) {
     if (local.optional) {
@@ -223,48 +221,6 @@ function collectVerificationReport(
   }
 
   return { report, renderedTargets, freshTargets };
-}
-
-function verifyExclusiveFileBinding(
-  packageEntry: ResolvedProject["packages"][number],
-  project: ResolvedProject,
-  report: VerificationReport,
-): void {
-  const destination = packageEntry.declaration.file;
-  if (!destination) {
-    return;
-  }
-  const absolute = resolve(project.projectRoot, destination);
-  const exportName = packageEntry.selectedExports.find((name) => {
-    return packageEntry.spec.exports.get(name)?.kind === "file";
-  });
-  if (!exportName) {
-    report.findings.push({
-      kind: "verify_error",
-      message: `Package \`${packageEntry.declaration.name}\` declares file: "${destination}" but has no selected file export.`,
-    });
-    return;
-  }
-  if (!existsSync(absolute)) {
-    report.findings.push({
-      kind: "verify_error",
-      message: `Exclusive file \`${destination}\` from \`${packageEntry.declaration.name}\` is missing. Run \`pray install\` to materialize it.`,
-    });
-    return;
-  }
-  const exportEntry = packageEntry.spec.exports.get(exportName);
-  const source = resolve(packageEntry.root, exportEntry?.path ?? "");
-  const destinationBytes = readFileSync(absolute);
-  const expectedBytes = expectedProvisionedBytes(
-    source,
-    project.manifest.symbols ?? {},
-  );
-  if (sha256Prefixed(destinationBytes) !== sha256Prefixed(expectedBytes)) {
-    report.findings.push({
-      kind: "package_integrity",
-      message: `Exclusive file \`${destination}\` no longer matches package \`${packageEntry.declaration.name}\`. Run \`pray install\` to restore it.`,
-    });
-  }
 }
 
 function isWarning(finding: VerificationFinding): boolean {

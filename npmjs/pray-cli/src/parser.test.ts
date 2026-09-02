@@ -296,4 +296,45 @@ pray do; support_email("a@example.com"); security_email("b@example.com"); end
     assert.equal(manifest.symbols.support_email, "a@example.com");
     assert.equal(manifest.symbols.security_email, "b@example.com");
   });
+
+  it("rejects render section_markers and line_endings", () => {
+    for (const field of ["section_markers: false", "line_endings: :lf"]) {
+      assert.throws(
+        () =>
+          parseManifest(`
+prayfile "1"
+compose "AGENTS.md" do
+end
+render ${field}
+`),
+        (error: unknown) =>
+          error instanceof PrayError &&
+          error.message.includes("does not accept"),
+        field,
+      );
+    }
+  });
+
+  it("parses compose header override", () => {
+    const manifest = parseManifest(`
+prayfile "1"
+compose "CONTRIBUTING.md", header: false do
+  pray "sample/community", "~> 1.0"
+end
+`);
+    assert.equal(manifest.targets[0]?.header, false);
+  });
+
+  it("rejects unknown compose keyword", () => {
+    assert.throws(
+      () =>
+        parseManifest(`
+prayfile "1"
+compose "AGENTS.md", markers: :html do
+end
+`),
+      (error: unknown) =>
+        error instanceof PrayError && error.message.includes("does not accept"),
+    );
+  });
 });

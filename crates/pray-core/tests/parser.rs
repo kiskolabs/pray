@@ -480,3 +480,63 @@ end
     assert!(manifest.packages[0].roles.contains(&ExportRole::Fragment));
     assert!(manifest.packages[0].roles.contains(&ExportRole::Folder));
 }
+
+#[test]
+fn rejects_render_section_markers_and_line_endings() {
+    for field in ["section_markers: false", "line_endings: :lf"] {
+        let error = parse_manifest(&format!(
+            r#"
+prayfile "1"
+compose "AGENTS.md" do
+end
+render {field}
+"#
+        ))
+        .expect_err(field);
+        assert!(
+            error.to_string().contains("does not accept"),
+            "{field}: {error}"
+        );
+    }
+}
+
+#[test]
+fn rejects_render_mode_other_than_managed() {
+    let error = parse_manifest(
+        r#"
+prayfile "1"
+compose "AGENTS.md" do
+end
+render mode: :check
+"#,
+    )
+    .expect_err("mode");
+    assert!(error.to_string().contains("not implemented"));
+}
+
+#[test]
+fn parses_compose_header_override() {
+    let manifest = parse_manifest(
+        r#"
+prayfile "1"
+compose "CONTRIBUTING.md", header: false do
+  pray "sample/community", "~> 1.0"
+end
+"#,
+    )
+    .expect("manifest parses");
+    assert_eq!(manifest.targets[0].header, Some(false));
+}
+
+#[test]
+fn rejects_unknown_compose_keyword() {
+    let error = parse_manifest(
+        r#"
+prayfile "1"
+compose "AGENTS.md", markers: :html do
+end
+"#,
+    )
+    .expect_err("markers");
+    assert!(error.to_string().contains("does not accept"));
+}

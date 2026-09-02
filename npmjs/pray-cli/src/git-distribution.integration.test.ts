@@ -67,6 +67,7 @@ function initDistributionRepo(
   runGit(distributionRepo, "init", "-b", "main");
   runGit(distributionRepo, "config", "user.name", "Pray Test");
   runGit(distributionRepo, "config", "user.email", "pray@example.com");
+  runGit(distributionRepo, "config", "commit.gpgsign", "false");
   runGit(distributionRepo, "add", "-A");
   runGit(distributionRepo, "commit", "-m", "initial distribution");
 }
@@ -93,10 +94,14 @@ async function withWorkspace(
 ): Promise<void> {
   const workspace = mkdtempSync(join(tmpdir(), "pray-git-distribution-"));
   const previousDirectory = process.cwd();
+  const previousCache = process.env.PRAY_CACHE;
+  process.env.PRAY_CACHE = join(workspace, "global-cache");
   try {
     await callback(workspace);
   } finally {
     process.chdir(previousDirectory);
+    if (previousCache === undefined) delete process.env.PRAY_CACHE;
+    else process.env.PRAY_CACHE = previousCache;
     rmSync(workspace, { recursive: true, force: true });
   }
 }

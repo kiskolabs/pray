@@ -2,7 +2,7 @@ prayfile "1"
 
 target :tool_a do
   output "INSTRUCTIONS.md"
-  skills ".agents/skills"
+  folder ".agents/skills"
   max_bytes 120_000
 end
 target :tool_b do
@@ -24,5 +24,4 @@ local ".agents/testing.md", position: :after
 render mode: :managed,
   conflict: :fail,
   churn: :minimal,
-  header: true,
-  section_markers: true
+  header: true

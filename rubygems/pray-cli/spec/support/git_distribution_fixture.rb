@@ -55,6 +55,7 @@ module GitDistributionFixture
     run_git(distribution_repo, "init", "-b", "main")
     run_git(distribution_repo, "config", "user.name", "Pray Test")
     run_git(distribution_repo, "config", "user.email", "pray@example.com")
+    run_git(distribution_repo, "config", "commit.gpgsign", "false")
     run_git(distribution_repo, "add", "-A")
     run_git(distribution_repo, "commit", "-m", "initial distribution")
   end

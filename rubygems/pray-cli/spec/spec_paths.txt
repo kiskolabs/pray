@@ -20,6 +20,7 @@ spec/pray/lockfile_spec.rb
 spec/pray/login_spec.rb
 spec/pray/parser_spec.rb
 spec/pray/project_context_spec.rb
+spec/pray/provisioned_dest_spec.rb
 spec/pray/publish_spec.rb
 spec/pray/registry_spec.rb
 spec/pray/render_spec.rb

@@ -40,6 +40,7 @@ module Pray
       end
       rendered = Render.render_project(project)
       lockfile_path = default_lockfile_path(project.project_root)
+      previous_lockfile = File.exist?(lockfile_path) ? Pray.read_lockfile(lockfile_path) : nil
       next_lockfile = LockfileIO.build_lockfile(
         project.manifest_hash,
         project.environment,
@@ -49,7 +50,8 @@ module Pray
         rendered,
         project.packages,
         project.source_revisions,
-        project.source_host_keys
+        project.source_host_keys,
+        project
       )
 
       if locked
@@ -61,7 +63,7 @@ module Pray
           raise Error.verify("lockfile needs update; rerun install to refresh Prayfile.lock")
         end
         unless frozen
-          Render.write_rendered_targets(project, rendered)
+          Render.write_rendered_targets(project, rendered, existing)
         end
         if frozen
           rendered.each do |target|
@@ -89,8 +91,8 @@ module Pray
         end
       end
 
+      Render.write_rendered_targets(project, rendered, previous_lockfile)
       Pray.write_lockfile_if_changed(lockfile_path, next_lockfile)
-      Render.write_rendered_targets(project, rendered)
     end
 
     def default_manifest_path(working_directory = Dir.pwd)

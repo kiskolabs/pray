@@ -45,7 +45,13 @@ export function serializeRecommended(manifest: Manifest): string {
     lines.push("");
     if (target.mode === "compose") {
       const path = target.outputs[0] ?? "";
-      lines.push(`compose "${path}" do`);
+      const header =
+        target.header === true
+          ? ", header: true"
+          : target.header === false
+            ? ", header: false"
+            : "";
+      lines.push(`compose "${path}"${header} do`);
       for (const entry of target.entries ?? []) {
         lines.push(`  ${formatDestinationEntry(entry, manifest)}`);
       }
@@ -126,9 +132,7 @@ function renderPolicyEquals(left: RenderPolicy, right: RenderPolicy): boolean {
     left.mode === right.mode &&
     left.conflict === right.conflict &&
     left.churn === right.churn &&
-    left.header === right.header &&
-    left.sectionMarkers === right.sectionMarkers &&
-    left.lineEndings === right.lineEndings
+    left.header === right.header
   );
 }
 

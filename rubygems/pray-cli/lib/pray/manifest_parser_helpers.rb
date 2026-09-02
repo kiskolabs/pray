@@ -170,21 +170,50 @@ module Pray
 
       def parse_render_policy(rest)
         _, keywords = parse_call(rest)
+        keywords.each_key do |key|
+          unless %w[mode conflict churn header].include?(key)
+            raise Error.parse("manifest", "render does not accept #{key}")
+          end
+        end
         conflict = keywords["conflict"]&.as_string || "fail"
         unless conflict == "fail"
           raise Error.unsupported(
             "render conflict :#{conflict} is not implemented; only :fail is supported"
           )
         end
+        mode = keywords["mode"]&.as_string || "managed"
+        unless mode == "managed"
+          raise Error.unsupported("render mode :#{mode} is not implemented")
+        end
+        churn = keywords["churn"]&.as_string || "minimal"
+        unless churn == "minimal"
+          raise Error.unsupported("render churn :#{churn} is not implemented")
+        end
 
         RenderPolicy.new(
-          mode: keywords["mode"]&.as_string || "managed",
+          mode: mode,
           conflict: conflict,
-          churn: keywords["churn"]&.as_string || "minimal",
-          header: keyword_bool(keywords, "header", true),
-          section_markers: keyword_bool(keywords, "section_markers", true),
-          line_endings: keywords["line_endings"]&.as_string || "lf"
+          churn: churn,
+          header: keyword_bool(keywords, "header", true)
         )
+      end
+
+      def destination_header_keyword(mode, keywords)
+        label = (mode == "compose") ? "compose" : "tree"
+        keywords.each_key do |key|
+          unless key == "header"
+            raise Error.parse("manifest", "#{label} does not accept #{key}")
+          end
+        end
+        return if keywords["header"].nil?
+        unless mode == "compose"
+          raise Error.parse("manifest", "#{label} does not accept header")
+        end
+
+        value = keywords["header"].as_bool
+        raise Error.parse("manifest", "header must be true or false") if value.nil?
+
+        value
       end
 
       def keyword_bool(keywords, key, default)

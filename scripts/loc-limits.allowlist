@@ -1,7 +1,7 @@
 # Grandfathered production sources above the 300 LOC hard limit.
 # Columns: repository-relative path<TAB>max lines (ratchet; file must not grow).
 # Remove a row when the file drops to 300 or below.
-crates/pray-cli/src/apply_report.rs	531
+crates/pray-cli/src/apply_report.rs	496
 crates/pray-cli/src/auth_client.rs	413
 crates/pray-cli/src/server_http.rs	320
 crates/pray-cli/src/sync_command.rs	395
@@ -9,7 +9,6 @@ crates/pray-cli/src/trust_command.rs	339
 crates/pray-core/src/derived_metadata.rs	335
 crates/pray-core/src/format_manifest.rs	337
 crates/pray-core/src/literal.rs	502
-crates/pray-core/src/lockfile.rs	368
 crates/pray-core/src/package_spec.rs	415
 crates/pray-core/src/registry.rs	373
 crates/pray-core/src/resolve.rs	503
@@ -21,9 +20,9 @@ npmjs/pray-cli/src/literal/statement-surface.ts	352
 npmjs/pray-cli/src/manifest/format-manifest.ts	392
 npmjs/pray-cli/src/manifest/parser.ts	547
 npmjs/pray-cli/src/registry/index.ts	338
-npmjs/pray-cli/src/render/provisioned.ts	307
+npmjs/pray-cli/src/render/provisioned.ts	304
 npmjs/pray-cli/src/resolve/project.ts	386
 rubygems/pray-cli/lib/pray/literal.rb	382
 rubygems/pray-cli/lib/pray/registry.rb	353
-rubygems/pray-cli/lib/pray/render.rb	360
+rubygems/pray-cli/lib/pray/render.rb	338
 rubygems/pray-cli/lib/pray/resolve.rb	396

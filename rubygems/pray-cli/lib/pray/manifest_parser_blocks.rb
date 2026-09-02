@@ -55,11 +55,13 @@ module Pray
         end
 
         header = rest.sub(/\s*do\z/, "").strip
-        values, = parse_call(header)
+        values, keywords = parse_call(header)
         raise Error.parse("manifest", "destination missing path") if values.empty?
 
         path = string_from_value(values.first)
-        manifest.targets << Destination.new_destination_target(mode, path)
+        target = Destination.new_destination_target(mode, path)
+        target.header = destination_header_keyword(mode, keywords)
+        manifest.targets << target
         index = manifest.targets.length - 1
         parse_destination_body(manifest, index, mode)
       end
@@ -207,6 +209,7 @@ module Pray
           raise Error.manifest("target index out of range") unless target
 
           manifest.note_deprecated_keyword("output") if statement.start_with?("output ")
+          manifest.note_deprecated_keyword("skills") if statement.start_with?("skills ")
           apply_target_statement(target, statement)
         end
         raise Error.parse("manifest", "missing 'end' for target block")

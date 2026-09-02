@@ -271,10 +271,7 @@ fn install_frozen_rejects_stale_rendered_output() {
 
     let rendered_path = repo.join("INSTRUCTIONS.md");
     let rendered = fs::read_to_string(&rendered_path).expect("rendered file exists");
-    let rendered = rendered.replace(
-        "Do not edit managed blocks in `INSTRUCTIONS.md` or provisioned files under `.agents/`.",
-        "Managed blocks stay read-only.",
-    );
+    let rendered = rendered.replace("Testing guidance", "Changed guidance");
     fs::write(&rendered_path, rendered).expect("rendered file rewritten");
 
     let frozen = run_pray(&repo, &["install", "--frozen"]);

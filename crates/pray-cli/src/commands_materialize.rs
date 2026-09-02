@@ -85,8 +85,8 @@ pub(crate) fn materialize_command(
     } else {
         None
     };
-    write_lockfile_if_changed(&lockfile_path, &lockfile)?;
     write_rendered_targets_with_previous_lockfile(&project, &rendered, previous_lockfile.as_ref())?;
+    write_lockfile_if_changed(&lockfile_path, &lockfile)?;
     if !silent_report {
         if let (Some(preview), Some(mode)) = (&preview, report_mode) {
             print_materialization_report(preview, mode);

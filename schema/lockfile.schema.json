@@ -62,6 +62,12 @@
       "items": {
         "$ref": "#/$defs/managedSpanRecord"
       }
+    },
+    "provisioned": {
+      "type": "array",
+      "items": {
+        "$ref": "#/$defs/provisionedFileRecord"
+      }
     }
   },
   "$defs": {
@@ -222,6 +228,28 @@
         },
         "silenced": {
           "type": "boolean"
+        }
+      }
+    },
+    "provisionedFileRecord": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["path", "content_hash", "package", "export"],
+      "properties": {
+        "path": {
+          "type": "string",
+          "minLength": 1
+        },
+        "content_hash": {
+          "$ref": "#/$defs/sha256Digest"
+        },
+        "package": {
+          "type": "string",
+          "minLength": 1
+        },
+        "export": {
+          "type": "string",
+          "minLength": 1
         }
       }
     }

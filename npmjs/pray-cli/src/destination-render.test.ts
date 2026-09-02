@@ -6,40 +6,9 @@ import { describe, it } from "node:test";
 import { buildLockfile } from "./lockfile/index.js";
 import { renderProject, writeRenderedTargets } from "./render/project.js";
 import { plannedProvisionedFiles } from "./render/provisioned.js";
+import { writePackage } from "./render-test-package.js";
 import { resolveProject } from "./resolve/project.js";
 import { verifyProject } from "./verify/project.js";
-
-function writePackage(
-  root: string,
-  directory: string,
-  packageName: string,
-  exportName: string,
-  exportKind: string,
-  exportPath: string,
-  body: string,
-): void {
-  const packageRoot = join(root, "packages", directory);
-  mkdirSync(join(packageRoot, "exports"), { recursive: true });
-  writeFileSync(
-    join(packageRoot, `${directory}.prayspec`),
-    `
-Package::Specification.new do |spec|
-  spec.name = "${packageName}"
-  spec.version = "1.0.0"
-  spec.summary = "fixture"
-  spec.files = ["${exportPath}"]
-  spec.exports = {
-    "${exportName}" => {
-      type: "${exportKind}",
-      path: "${exportPath}",
-      summary: "${exportName}"
-    }
-  }
-end
-`,
-  );
-  writeFileSync(join(packageRoot, exportPath), body);
-}
 
 describe("destination render", () => {
   it("still fans out fragments and skills for the legacy shape", async () => {
@@ -228,6 +197,7 @@ agent "sample/unbound", "~> 1.0", path: "packages/unbound"
       manifestTargets: project.manifest.targets,
       rendered,
       packages: project.packages,
+      project,
     });
     const report = verifyProject(project, lockfile, true);
     assert.equal(report.findings.length, 0);

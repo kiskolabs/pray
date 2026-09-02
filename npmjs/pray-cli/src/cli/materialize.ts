@@ -42,6 +42,9 @@ export async function materializeProject(
   );
   const rendered = renderProject(project);
   const lockfilePath = defaultLockfilePath(project.projectRoot);
+  const previousLockfile = existsSync(lockfilePath)
+    ? readLockfile(lockfilePath)
+    : undefined;
   const nextLockfile = buildLockfile({
     manifestHash: project.manifestHash,
     ...(project.environment ? { environment: project.environment } : {}),
@@ -52,6 +55,7 @@ export async function materializeProject(
     packages: project.packages,
     sourceRevisions: project.sourceRevisions,
     sourceHostKeys: project.sourceHostKeys,
+    project,
   });
 
   if (options.frozen || options.locked) {
@@ -77,8 +81,8 @@ export async function materializeProject(
     }
   }
 
+  writeRenderedTargets(project, rendered, previousLockfile);
   writeLockfileIfChanged(lockfilePath, nextLockfile);
-  writeRenderedTargets(project, rendered);
 }
 
 export async function printManifest(

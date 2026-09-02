@@ -2,7 +2,7 @@ use super::call::{keyword_array, parse_call, string_from_literal, string_from_va
 use crate::literal::parse_literal;
 use crate::manifest::{
     DestinationMode, ExportRole, Manifest, ManifestLocal, ManifestPackage, ManifestSource,
-    ManifestTarget, RenderPolicy,
+    ManifestTarget,
 };
 use crate::{PrayError, PrayResult};
 
@@ -87,6 +87,7 @@ pub(super) fn parse_target_header(rest: &str) -> PrayResult<(ManifestTarget, boo
         mode: DestinationMode::Legacy,
         scoped: false,
         entries: Vec::new(),
+        header: None,
     };
     Ok((target, is_block))
 }
@@ -204,40 +205,6 @@ pub(super) fn parse_local_decl(rest: &str) -> PrayResult<ManifestLocal> {
     })
 }
 
-pub(super) fn parse_render_policy(rest: &str) -> PrayResult<RenderPolicy> {
-    let (_, keywords) = parse_call(rest)?;
-    Ok(RenderPolicy {
-        mode: keywords
-            .get("mode")
-            .and_then(|value| value.as_string())
-            .unwrap_or("managed")
-            .to_string(),
-        conflict: keywords
-            .get("conflict")
-            .and_then(|value| value.as_string())
-            .unwrap_or("fail")
-            .to_string(),
-        churn: keywords
-            .get("churn")
-            .and_then(|value| value.as_string())
-            .unwrap_or("minimal")
-            .to_string(),
-        header: keywords
-            .get("header")
-            .and_then(|value| value.as_bool())
-            .unwrap_or(true),
-        section_markers: keywords
-            .get("section_markers")
-            .and_then(|value| value.as_bool())
-            .unwrap_or(true),
-        line_endings: keywords
-            .get("line_endings")
-            .and_then(|value| value.as_string())
-            .unwrap_or("lf")
-            .to_string(),
-    })
-}
-
 pub(super) fn apply_target_statement(
     manifest: &mut Manifest,
     target_index: usize,
@@ -245,6 +212,9 @@ pub(super) fn apply_target_statement(
 ) -> PrayResult<()> {
     if statement.starts_with("output ") {
         manifest.note_deprecated_keyword(crate::deprecation::DEPRECATED_OUTPUT);
+    }
+    if statement.starts_with("skills ") {
+        manifest.note_deprecated_keyword(crate::deprecation::DEPRECATED_SKILLS);
     }
     let target = manifest
         .targets

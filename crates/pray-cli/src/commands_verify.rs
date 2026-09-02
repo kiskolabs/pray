@@ -17,8 +17,8 @@ pub(crate) fn render_command(check_only: bool) -> PrayResult<()> {
     let previous_lockfile = read_lockfile(&lockfile_path()).ok();
     let laid_out = layout_rendered_targets(&project, &rendered)?;
     let lockfile = build_lockfile(&project, &laid_out)?;
-    write_lockfile(&lockfile_path(), &lockfile)?;
     write_rendered_targets_with_previous_lockfile(&project, &rendered, previous_lockfile.as_ref())?;
+    write_lockfile(&lockfile_path(), &lockfile)?;
     Ok(())
 }
 

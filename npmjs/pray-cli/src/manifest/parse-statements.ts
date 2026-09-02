@@ -15,8 +15,14 @@ import {
   literalAsInteger,
   literalAsString,
 } from "../literal/types.js";
+import {
+  DEPRECATED_OUTPUT,
+  DEPRECATED_SKILLS,
+  noteDeprecatedKeyword,
+} from "./deprecation.js";
 import type {
   ExportRole,
+  Manifest,
   ManifestLocal,
   ManifestPackage,
   ManifestSource,
@@ -237,16 +243,27 @@ export function parseLocalDecl(rest: string): ManifestLocal {
 export { parseRenderPolicy } from "./parse-render-policy.js";
 
 export function applyTargetStatement(
+  manifest: Manifest,
   target: ManifestTarget,
   statement: string,
 ): void {
   if (statement.startsWith("output ")) {
+    manifest.deprecatedKeywords = noteDeprecatedKeyword(
+      manifest.deprecatedKeywords,
+      DEPRECATED_OUTPUT,
+    );
     target.outputs.push(
       stringFromLiteral(statement.slice("output ".length), PARSE_CONTEXT),
     );
     return;
   }
   if (statement.startsWith("folder ") || statement.startsWith("skills ")) {
+    if (statement.startsWith("skills ")) {
+      manifest.deprecatedKeywords = noteDeprecatedKeyword(
+        manifest.deprecatedKeywords,
+        DEPRECATED_SKILLS,
+      );
+    }
     const rest = statement.startsWith("folder ")
       ? statement.slice("folder ".length)
       : statement.slice("skills ".length);

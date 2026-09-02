@@ -104,6 +104,7 @@ module Pray
         if statement.start_with?("folder ", "skills ") && !statement.end_with?(" do")
           raise Error.parse("manifest", "top-level folder/skills must use a tree block")
         end
+        manifest.note_deprecated_keyword("skills") if statement.start_with?("skills ")
         parse_destination_block(manifest, rest, "tree")
       end
 
