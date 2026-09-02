@@ -79,12 +79,11 @@ fi
 if [[ "${SKIP_DISTRIBUTION}" -eq 0 ]]; then
   if [[ ${#DISTRIBUTION_ARGS[@]} -eq 0 ]]; then
     echo "skipping distribution publish (pass --root and/or --server to enable)"
+  elif [[ "${MODE}" == "dry-run" ]]; then
+    "${SCRIPT_DIR}/distribution.sh" --dry-run "${DISTRIBUTION_ARGS[@]}"
   else
-    DIST_FLAG=()
-    if [[ "${MODE}" == "dry-run" ]]; then
-      DIST_FLAG=(--dry-run)
-    fi
-    "${SCRIPT_DIR}/distribution.sh" "${DIST_FLAG[@]}" "${DISTRIBUTION_ARGS[@]}"
+    # Bash 3.2 with set -u treats "${empty[@]}" as unbound; pass no extra flags.
+    "${SCRIPT_DIR}/distribution.sh" "${DISTRIBUTION_ARGS[@]}"
   fi
 fi
 
