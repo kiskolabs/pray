@@ -1,0 +1,16 @@
+{
+  "spec": "pray-torrent-v1",
+  "name": "prayer-publisher",
+  "version": "0.1.0",
+  "artifact_url": "v1/artifacts/prayer-publisher/0.1.0/prayer-publisher-0.1.0.praypkg",
+  "artifact_hash": "sha256:dc85170dbdab6a49d9156fe44fc4fa60082194a74eada4a2cf1a66302ee9f24c",
+  "piece_size": 16384,
+  "length": 1724,
+  "pieces": [
+    "sha256:dc85170dbdab6a49d9156fe44fc4fa60082194a74eada4a2cf1a66302ee9f24c"
+  ],
+  "sources": [
+    "v1/artifacts/prayer-publisher/0.1.0/prayer-publisher-0.1.0.praypkg"
+  ],
+  "trackers": []
+}

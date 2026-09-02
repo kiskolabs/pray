@@ -1,0 +1,64 @@
+{
+  "name": "prayer-publisher",
+  "versions": [
+    {
+      "version": "0.1.0",
+      "artifact": "v1/artifacts/prayer-publisher/0.1.0/prayer-publisher-0.1.0.praypkg",
+      "artifact_hash": "sha256:dc85170dbdab6a49d9156fe44fc4fa60082194a74eada4a2cf1a66302ee9f24c",
+      "tree_hash": "sha256:0d728cf913686ac98aecb4e4b01c53c34a8f3b58c939332eb3215441a1113c4c",
+      "yanked": false,
+      "targets": [],
+      "exports": [
+        "skill"
+      ],
+      "signer": "amkisko",
+      "published_at": "1788351771",
+      "signature": "sha256:4cb819d1f2a236b6239b8b95e16970ace5efe2714f28800fdb6cab5e10ed5f4b",
+      "derived_metadata": {
+        "summary": "Language-first packaging guidance for prayer-managed content — Prayer publisher guidance",
+        "topics": [
+          "skill",
+          "files",
+          "into",
+          "keep",
+          "name"
+        ],
+        "categories": [
+          "documentation"
+        ],
+        "possible_effects": [
+          "clarifies usage"
+        ],
+        "possible_side_effects": [
+          "may change generated output or managed files"
+        ],
+        "embeddings": [
+          {
+            "model": "pray-hash-bucket-v1",
+            "vector": [
+              11,
+              15,
+              19,
+              19,
+              19,
+              28,
+              11,
+              14,
+              17,
+              9,
+              9,
+              23,
+              40,
+              20,
+              7,
+              12
+            ]
+          }
+        ],
+        "file_count": 1,
+        "character_count": 2796,
+        "token_count": 273
+      }
+    }
+  ]
+}
