@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+## 1.10.0 (2026-09-02)
+
 - Refuse to overwrite exclusive `file:` and `tree:` destinations that already exist with other bytes.
 - Fail when a provisioned or compose destination is a symbolic link.
 - Record provisioned leaves in `Prayfile.lock` and delete a dropped leaf only when on-disk bytes still match the locked hash.
@@ -11,7 +13,8 @@
 - Reject destination paths that start with `~`.
 - Print every provisioned path in `pray plan`.
 - Document home-as-root as `pray --path "$HOME"` with `file: ".zshrc"`, HTML-only compose, and unmarked `file:`.
-- Drop unused `render` fields `section_markers` and `line_endings`; reject them at parse.
+- BREAKING: Drop unused `render` fields `section_markers` and `line_endings`; reject them at parse.
+- Rewrite `Prayfile.lock` `manifest_hash` on install after those unused fields leave the canonical manifest.
 - Inline a UTF-8 `file` export into `compose` as a marked span. Exclusive `file:` stays unmarked.
 - Write the Agent context banner on `AGENTS.md` by default. Other compose destinations opt in with `header: true`.
 - Fail compose of JSON, binary, or an unknown file type and name `file:` as the unmarked path.
