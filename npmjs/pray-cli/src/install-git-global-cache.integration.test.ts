@@ -67,6 +67,7 @@ function initDistributionRepo(
   runGit(distributionRepo, "init", "-b", "main");
   runGit(distributionRepo, "config", "user.name", "Pray Test");
   runGit(distributionRepo, "config", "user.email", "pray@example.com");
+  runGit(distributionRepo, "config", "commit.gpgsign", "false");
   runGit(distributionRepo, "add", "-A");
   runGit(distributionRepo, "commit", "-m", "initial distribution");
 }

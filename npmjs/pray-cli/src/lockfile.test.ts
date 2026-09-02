@@ -106,4 +106,25 @@ managed_span = []
     };
     assert.equal(lockfilesEquivalent(left, right), false);
   });
+
+  it("round-trips provisioned lock records", () => {
+    const lockfile = parseLockfile(`
+prayfile_lock = "1"
+spec = "0.1"
+generated_by = "pray test"
+manifest_hash = "sha256:abc"
+source = []
+package = []
+target = []
+managed_span = []
+
+[[provisioned]]
+path = ".zshrc"
+content_hash = "sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+package = "sample/shell"
+export = "zshrc"
+`);
+    assert.equal(lockfile.provisioned[0]?.path, ".zshrc");
+    assert.match(serializeLockfile(lockfile), /\[\[provisioned\]\]/);
+  });
 });

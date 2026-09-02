@@ -141,6 +141,9 @@
           "items": {
             "$ref": "#/$defs/destinationEntry"
           }
+        },
+        "header": {
+          "type": "boolean"
         }
       }
     },
@@ -287,9 +290,7 @@
         "mode",
         "conflict",
         "churn",
-        "header",
-        "section_markers",
-        "line_endings"
+        "header"
       ],
       "properties": {
         "mode": {
@@ -306,13 +307,6 @@
         },
         "header": {
           "type": "boolean"
-        },
-        "section_markers": {
-          "type": "boolean"
-        },
-        "line_endings": {
-          "type": "string",
-          "enum": ["lf", "crlf"]
         }
       }
     }

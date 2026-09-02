@@ -112,14 +112,14 @@ Still, a formatter exists: `pray format` (alias `pray fmt`)
 `pray format` rewrites Prayfile to the recommended destination DSL:
 
 - `compose "path" do … end` for fragment outputs and local embeds
-- `tree "path" do … end` for folder/skill roots
+- `tree "path" do … end` for folder roots
 - `pray "owner/name", …, file: "path"` for whole-file exports
 - `pray` instead of legacy `agent` / `package`
-- drop empty legacy `target` wrappers that only declared `output` / `skills`
+- drop empty legacy `target` wrappers that only declared `output` / `folder`
 - keep `target` blocks that still carry `commands`, `rules`, or `max_bytes`
 - keep `group` membership via `group` blocks
 
-Legacy migration classifies packages from resolved export kinds (fragment → compose, folder/skill → tree, file → `file:` using `default_path` when present). Format may resolve packages (offline first) to classify.
+Legacy migration classifies packages from resolved export kinds (fragment → compose, folder → tree, file → `file:` using `default_path` when present). Format may resolve packages (offline first) to classify. The deprecated `skill` kind classifies as folder.
 
 Rules:
 

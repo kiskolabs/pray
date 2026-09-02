@@ -1,6 +1,7 @@
 mod format;
 mod integrity;
 pub mod position;
+mod provisioned;
 
 use crate::hashing::{checksum_managed_body_line_refs, normalize_line_endings};
 use crate::lockfile::{Lockfile, ManagedSpanRecord};
@@ -8,12 +9,11 @@ use crate::render::render_project;
 use crate::resolve::ResolvedProject;
 use crate::{PrayError, PrayResult};
 use format::format_drift_report;
-use integrity::{push_package_lock_findings, push_provisioned_and_local_findings};
+pub use format::format_verification_report;
+use integrity::push_package_lock_findings;
 use position::{format_position_drift_message, summarize_position_drift};
 use std::collections::{BTreeMap, BTreeSet, HashSet};
 use std::fs;
-
-pub use format::format_verification_report;
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct VerificationFinding {
@@ -172,7 +172,7 @@ fn collect_verification_report(
         }
     }
 
-    push_provisioned_and_local_findings(project, &mut report.findings)?;
+    provisioned::push_provisioned_and_local_findings(project, &mut report.findings)?;
 
     Ok((report, rendered_targets, fresh_targets))
 }

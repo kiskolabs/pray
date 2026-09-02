@@ -1,5 +1,10 @@
+import { existsSync } from "node:fs";
 import { PrayError } from "../../errors.js";
-import { buildLockfile, writeLockfile } from "../../lockfile/index.js";
+import {
+  buildLockfile,
+  readLockfile,
+  writeLockfile,
+} from "../../lockfile/index.js";
 import {
   defaultLockfilePath,
   defaultManifestPath,
@@ -52,6 +57,9 @@ export async function runUnlock(name: string | undefined): Promise<void> {
     throw PrayError.manifest(`package ${name} not found`);
   }
   const lockfilePath = defaultLockfilePath(project.projectRoot);
+  const previous = existsSync(lockfilePath)
+    ? readLockfile(lockfilePath)
+    : undefined;
   const rendered = renderProject(project);
   const updatedLockfile = buildLockfile({
     manifestHash: project.manifestHash,
@@ -62,8 +70,9 @@ export async function runUnlock(name: string | undefined): Promise<void> {
     packages: project.packages,
     sourceRevisions: project.sourceRevisions,
     sourceHostKeys: project.sourceHostKeys,
+    project,
   });
+  writeRenderedTargets(project, rendered, previous);
   writeLockfile(lockfilePath, updatedLockfile);
-  writeRenderedTargets(project, rendered);
   process.stdout.write(`Unlocked ${name}\n`);
 }

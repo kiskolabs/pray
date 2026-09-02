@@ -239,14 +239,10 @@ fn migrate_legacy_manifest(
         if target_has_extras(target) {
             next.targets.push(ManifestTarget {
                 name: target.name.clone(),
-                outputs: Vec::new(),
-                skills: Vec::new(),
                 commands: target.commands.clone(),
                 rules: target.rules.clone(),
                 max_bytes: target.max_bytes,
-                mode: DestinationMode::Legacy,
-                scoped: false,
-                entries: Vec::new(),
+                ..ManifestTarget::default()
             });
         }
     }

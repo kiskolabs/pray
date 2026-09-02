@@ -29,6 +29,9 @@ tar = "0.4"
 toml = "1.1"
 zstd = "0.13"
 
+[target.'cfg(unix)'.dependencies]
+libc = "0.2"
+
 [dev-dependencies]
 ed25519-dalek = "3"
 jsonschema = "0.52"

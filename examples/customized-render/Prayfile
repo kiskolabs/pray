@@ -12,6 +12,4 @@ local ".agents/security.md", optional: true
 render mode: :managed,
   conflict: :fail,
   churn: :minimal,
-  header: false,
-  section_markers: false,
-  line_endings: "lf"
+  header: false

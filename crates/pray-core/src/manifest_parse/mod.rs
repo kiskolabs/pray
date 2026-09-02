@@ -7,12 +7,14 @@ use std::borrow::Cow;
 mod blocks;
 mod call;
 mod decls;
+mod policy;
 
 use call::string_from_literal;
 use decls::{
-    apply_target_statement, parse_group_header, parse_local_decl, parse_package_decl,
-    parse_render_policy, parse_source, parse_target_header,
+    apply_target_statement, parse_group_header, parse_local_decl, parse_package_decl, parse_source,
+    parse_target_header,
 };
+use policy::parse_render_policy;
 
 pub fn parse_manifest(text: &str) -> PrayResult<Manifest> {
     let lines = prepare_parser_lines(text);
@@ -155,6 +157,9 @@ impl<'a> BlockParser<'a> {
                     kind: "manifest",
                     message: "top-level folder/skills must use a tree block".to_string(),
                 });
+            }
+            if statement.starts_with("skills ") {
+                manifest.note_deprecated_keyword(crate::deprecation::DEPRECATED_SKILLS);
             }
             self.parse_destination_block(manifest, rest, DestinationMode::Tree)?;
             return Ok(());

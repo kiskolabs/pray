@@ -1,5 +1,5 @@
 import { existsSync, readFileSync } from "node:fs";
-import { join, resolve } from "node:path";
+import { resolve } from "node:path";
 import { versionSatisfies } from "../constraint.js";
 import { validateEnvironment } from "../environment.js";
 import { PrayError } from "../errors.js";
@@ -8,11 +8,7 @@ import { normalizeLineEndings } from "../hashing.js";
 import { readLockfile } from "../lockfile/index.js";
 import { defaultLockfilePath } from "../lockfile/paths.js";
 import type { Lockfile } from "../lockfile/types.js";
-import { emitDeprecationWarnings } from "../manifest/deprecation.js";
-import {
-  exportKindMatchesRole,
-  packageRoles,
-} from "../manifest/destination.js";
+import { emitResolvedDeprecationWarnings } from "../manifest/deprecation.js";
 import {
   manifestHash,
   parseManifest,
@@ -31,6 +27,7 @@ import {
 import type { PackageSpec } from "../package-spec/types.js";
 import { activeInvocationContext } from "../project-context/runtime.js";
 import { defaultResolveOptions, type ResolveOptions } from "./context.js";
+import { loadExportBodies, selectExports } from "./exports.js";
 import { resolvePackageRoot, vendoredPackageRoot } from "./package-root.js";
 import type {
   ResolvedLocalFile,
@@ -48,7 +45,6 @@ export async function resolveProject(
     ? readLockfile(lockfilePath)
     : undefined;
   const manifest = parseManifest(readManifestText(manifestPath));
-  emitDeprecationWarnings(manifest.deprecatedKeywords);
   const environment =
     options.environment ?? activeInvocationContext()?.environment;
   validateEnvironment(manifest, environment);
@@ -97,6 +93,7 @@ export async function resolveProject(
   if (resolutionErrors.length > 0) {
     throw PrayError.resolution(resolutionErrors.join("\n"));
   }
+  emitResolvedDeprecationWarnings(manifest.deprecatedKeywords, packages);
 
   const localFiles: ResolvedLocalFile[] = [];
   const localErrors: string[] = [];
@@ -255,86 +252,6 @@ export function missingLocalEmbedGuidance(path: string): string {
 
 function sourceMap(sources: ManifestSource[]): Map<string, ManifestSource> {
   return new Map(sources.map((source) => [source.name, source]));
-}
-
-function selectExports(
-  declaration: ManifestPackage,
-  spec: PackageSpec,
-): string[] {
-  if (declaration.exports.length > 0) {
-    for (const exportName of declaration.exports) {
-      if (!spec.exports.has(exportName)) {
-        throw PrayError.resolution(
-          `package ${declaration.name} does not export ${exportName}`,
-        );
-      }
-    }
-    return [...declaration.exports];
-  }
-
-  const roles = packageRoles(declaration);
-  if (roles.length === 0 && !declaration.file) {
-    return [...spec.exports.keys()].sort();
-  }
-
-  const effectiveRoles = [...roles];
-  if (declaration.file && !effectiveRoles.includes("file")) {
-    effectiveRoles.push("file");
-  }
-
-  const selected: string[] = [];
-  for (const role of effectiveRoles) {
-    const compatible = [...spec.exports.entries()]
-      .filter(([, exportEntry]) =>
-        exportKindMatchesRole(exportEntry.kind, role),
-      )
-      .map(([name]) => name);
-    if (compatible.length === 1) {
-      const name = compatible[0]!;
-      if (!selected.includes(name)) {
-        selected.push(name);
-      }
-    } else if (compatible.length === 0) {
-      throw PrayError.resolution(
-        `package ${declaration.name} has no export compatible with ${role}`,
-      );
-    } else {
-      throw PrayError.resolution(
-        `package ${declaration.name} has multiple exports compatible with ${role}; set export: "name"`,
-      );
-    }
-  }
-  return selected;
-}
-
-function loadExportBodies(
-  root: string,
-  spec: PackageSpec,
-  selectedExports: string[],
-): Map<string, string> {
-  const exportBodies = new Map<string, string>();
-  for (const exportName of selectedExports) {
-    const entry = spec.exports.get(exportName);
-    if (!entry) {
-      throw PrayError.resolution(
-        `package ${spec.name} is missing export ${exportName}`,
-      );
-    }
-    if (entry.kind !== "fragment") {
-      continue;
-    }
-    const filePath = join(root, entry.path);
-    if (!existsSync(filePath)) {
-      throw PrayError.integrity(
-        `package file missing for export ${exportName}: ${entry.path}`,
-      );
-    }
-    exportBodies.set(
-      exportName,
-      normalizeLineEndings(readFileSync(filePath, "utf8")),
-    );
-  }
-  return exportBodies;
 }
 
 function buildSkillFileIndex(spec: PackageSpec): Map<string, string[]> {

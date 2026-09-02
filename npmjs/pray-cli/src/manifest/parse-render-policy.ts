@@ -8,9 +8,15 @@ import { literalAsBool } from "../literal/types.js";
 import type { RenderPolicy } from "./types.js";
 
 const PARSE_CONTEXT = "manifest";
+const RENDER_KEYS = new Set(["mode", "conflict", "churn", "header"]);
 
 export function parseRenderPolicy(rest: string): RenderPolicy {
   const { keywords } = parseCall(rest);
+  for (const key of keywords.keys()) {
+    if (!RENDER_KEYS.has(key)) {
+      throw PrayError.parse(PARSE_CONTEXT, `render does not accept ${key}`);
+    }
+  }
   const conflict = keywords.has("conflict")
     ? stringFromValue(
         keywordValue(keywords, "conflict", PARSE_CONTEXT),
@@ -22,33 +28,30 @@ export function parseRenderPolicy(rest: string): RenderPolicy {
       `render conflict :${conflict} is not implemented; only :fail is supported`,
     );
   }
+  const mode = keywords.has("mode")
+    ? stringFromValue(
+        keywordValue(keywords, "mode", PARSE_CONTEXT),
+        PARSE_CONTEXT,
+      )
+    : "managed";
+  if (mode !== "managed") {
+    throw PrayError.unsupported(`render mode :${mode} is not implemented`);
+  }
+  const churn = keywords.has("churn")
+    ? stringFromValue(
+        keywordValue(keywords, "churn", PARSE_CONTEXT),
+        PARSE_CONTEXT,
+      )
+    : "minimal";
+  if (churn !== "minimal") {
+    throw PrayError.unsupported(`render churn :${churn} is not implemented`);
+  }
   return {
-    mode: keywords.has("mode")
-      ? (stringFromValue(
-          keywordValue(keywords, "mode", PARSE_CONTEXT),
-          PARSE_CONTEXT,
-        ) as RenderPolicy["mode"])
-      : "managed",
+    mode,
     conflict,
-    churn: keywords.has("churn")
-      ? (stringFromValue(
-          keywordValue(keywords, "churn", PARSE_CONTEXT),
-          PARSE_CONTEXT,
-        ) as RenderPolicy["churn"])
-      : "minimal",
+    churn,
     header: keywords.has("header")
       ? (literalAsBool(keywordValue(keywords, "header", PARSE_CONTEXT)) ?? true)
       : true,
-    sectionMarkers: keywords.has("section_markers")
-      ? (literalAsBool(
-          keywordValue(keywords, "section_markers", PARSE_CONTEXT),
-        ) ?? true)
-      : true,
-    lineEndings: keywords.has("line_endings")
-      ? (stringFromValue(
-          keywordValue(keywords, "line_endings", PARSE_CONTEXT),
-          PARSE_CONTEXT,
-        ) as RenderPolicy["lineEndings"])
-      : "lf",
   };
 }

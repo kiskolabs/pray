@@ -5,7 +5,7 @@
 - Status: Stable
 - Created: 2026-08-18
 - Author: Andrei Makarov
-- Relates: RFC 0010, RFC 0020, RFC 0050, RFC 0060
+- Relates: RFC 0010, RFC 0020, RFC 0050, RFC 0060, RFC 0034
 - Requires: RFC 0010
 
 ## Summary
@@ -18,7 +18,7 @@ Independent implementations need one meaning for package bytes, export names, an
 
 ## Guide-level explanation
 
-Authors write a `*.prayspec` beside `exports/`, optional `skills/`, and adapters. `pray package` builds a `*.praypkg`. Install verifies `artifact_hash` and `tree_hash` (RFC 0050) before unpack.
+Authors write a `*.prayspec` beside `exports/`, optional `folders/`, and adapters. `pray package` builds a `*.praypkg`. Install verifies `artifact_hash` and `tree_hash` (RFC 0050) before unpack.
 
 ## Reference-level explanation
 
@@ -41,23 +41,21 @@ sample-webapp/
     testing.md
     data-layer.md
     live-pages.md
-  skills/
+  folders/
     code-review/
-      SKILL.md
+      README.md
       assets/
         checklist.md
   templates/
     pr-review.md
     incident-report.md
-  adapters/
-    tool_a.toml
-    tool_b.toml
-    tool_c.toml
 ```
 
 Required: `*.prayspec`
 
-Optional: `README.md`, `LICENSE`, `CHANGELOG.md`, `exports/`, `skills/`, `templates/`, `adapters/`, `assets/`
+Optional: `README.md`, `LICENSE`, `CHANGELOG.md`, `exports/`, `folders/`, `templates/`, `assets/`
+
+`spec.adapters` MAY still parse as a string map. It is unused (RFC 0034). Destination DSL names dest paths. Do not ship adapter TOML to spell markers.
 
 ---
 
@@ -86,7 +84,7 @@ Package::Specification.new do |spec|
     "exports/webapp-review.md",
     "exports/testing.md",
     "exports/data-layer.md",
-    "skills/code-review/SKILL.md",
+    "folders/code-review/README.md",
     "adapters/tool_a.toml",
     "adapters/tool_b.toml"
   ]
@@ -105,12 +103,11 @@ Package::Specification.new do |spec|
       type: "fragment",
       path: "exports/data-layer.md",
       summary: "Data layer guidance"
-    }
-  }
-  spec.skills = {
+    },
     "code-review" => {
-      path: "skills/code-review",
-      summary: "Application code review skill"
+      type: "folder",
+      path: "folders/code-review",
+      summary: "Application code review checklist"
     }
   }
   spec.templates = {
@@ -120,10 +117,6 @@ Package::Specification.new do |spec|
     }
   }
   spec.targets = ["tool_a", "tool_b", "generic"]
-  spec.adapters = {
-    "tool_a" => "adapters/tool_a.toml",
-    "tool_b" => "adapters/tool_b.toml"
-  }
   spec.add_dependency "sample/base", "~> 1.4"
   spec.metadata = {
     "prayfile.target.tool_a" => "true",
@@ -158,6 +151,8 @@ homepage= source_code_uri= changelog_uri= prayfile_version= files=
 exports= skills= templates= adapters= targets= metadata=
 add_dependency add_optional_dependency
 ```
+
+`skills=` is deprecated and will be removed in version 2. Prefer a `folder` export.
 
 Forbidden:
 
@@ -197,12 +192,11 @@ Every `*.prayspec` compiles to a canonical package model:
       "type": "fragment",
       "path": "exports/webapp-review.md",
       "summary": "Web application code review guidance"
-    }
-  },
-  "skills": {
+    },
     "code-review": {
-      "path": "skills/code-review",
-      "summary": "Application code review skill"
+      "type": "folder",
+      "path": "folders/code-review",
+      "summary": "Application code review checklist"
     }
   },
   "targets": ["tool_a", "tool_b", "generic"],
@@ -223,15 +217,10 @@ Every `*.prayspec` compiles to a canonical package model:
 Supported export types:
 
 - fragment: Text fragment rendered into a `compose` / legacy output
-- file: Exact file bytes via `pray …, file: "path"` (preferred) or nested under a legacy skills root
-- folder: Directory tree provisioned into a `tree` / legacy skills root
-- template: Reusable text artifact
-- command: Tool-specific or generic command template
-- rule: Tool-specific rule file
-- asset: Static file used by a template or folder export
-- bundle: Named collection of other exports
+- file: Exact file bytes via `pray …, file: "path"` (preferred) or nested under a legacy folder root
+- folder: Directory tree provisioned into a `tree` / legacy folder root
 
-`skill` remains a legacy alias for `folder`.
+`skill` is a deprecated alias for `folder` and will be removed in version 2. Types `template`, `command`, `rule`, `asset`, and `bundle` match no destination role (RFC 0034). Do not invent dest types for them.
 
 Folder exports may declare `only: [...]` or `except: [...]` relative paths to provision a subset of the tree. `default_path` on a `file` export is a publisher hint only; the consumer `file:` path wins.
 
@@ -239,9 +228,9 @@ Folder exports may declare `only: [...]` or `except: [...]` relative paths to pr
 
 ### 24. Provisioned folders
 
-A `folder` export is a directory tree copied deterministically into a `tree` destination (or legacy target `skills` / `folder` root).
+A `folder` export is a directory tree copied deterministically into a `tree` destination (or a legacy target `folder` root).
 
-A `file` export with `pray …, file: "SECURITY.md"` writes the export to that path at the project root (or relative path given), after `((pray:…))` substitution for UTF-8 text. Legacy fan-out without `file:` still copies under `<skills-root>/<export-name>/`.
+A `file` export with `pray …, file: "SECURITY.md"` writes the export to that path at the project root (or relative path given), after `((pray:…))` substitution for UTF-8 text. Legacy fan-out without `file:` still copies under `<folder-root>/<export-name>/`.
 
 Example:
 
@@ -262,7 +251,7 @@ target :agents do
 end
 ```
 
-`skills` in a target block is a legacy alias for `folder`.
+`skills` in a target block is a deprecated alias for `folder` and will be removed in version 2.
 
 Optional support files may live under `assets/`, `templates/`, or `examples/` inside the folder export.
 
@@ -274,7 +263,7 @@ Two packages must not install the same folder path.
 
 V1 packages are data packages.
 
-Allowed package contents: Markdown, TOML, JSON, YAML, plain text, templates, declared assets, images/diagrams if useful for skills, scripts as inert assets only
+Allowed package contents: Markdown, TOML, JSON, YAML, plain text, templates, declared assets, images/diagrams if useful for review checklists, scripts as inert assets only
 
 Text files are the default package substrate; additional asset types are optional and may be omitted entirely in minimal packages.
 
@@ -357,7 +346,7 @@ Archive members MUST NOT escape the extract root. Implementations MUST NOT execu
 
 ## Registrar
 
-Prayspec fields: name, version, summary, description, authors, exports, adapters, and related declaration keys in the grammar above.
+Prayspec fields: name, version, summary, description, authors, exports, adapters, and related declaration keys in the grammar above. `spec.skills` and export `type: "skill"` still parse and warn; they are removed in version 2.
 
 ## Unresolved questions
 

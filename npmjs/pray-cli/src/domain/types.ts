@@ -11,8 +11,6 @@ export type RenderConflict = "fail";
 
 export type RenderChurn = "minimal" | "full";
 
-export type LineEndings = "lf" | "crlf" | "native";
-
 export type LocalPosition = "before" | "after";
 
 export type PackageExportKind = "fragment" | "folder" | "skill" | "file";

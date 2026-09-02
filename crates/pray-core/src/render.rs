@@ -1,4 +1,4 @@
-use crate::paths::validate_project_relative_path;
+use crate::paths::validate_destination_path;
 use crate::resolve::ResolvedProject;
 use crate::{PrayError, PrayResult};
 use std::path::PathBuf;
@@ -14,7 +14,7 @@ pub fn render_project(project: &ResolvedProject) -> PrayResult<Vec<RenderedTarge
     let mut rendered = Vec::new();
     for target in &project.manifest.targets {
         for output in &target.outputs {
-            let relative = validate_project_relative_path(output)?;
+            let relative = validate_destination_path(output)?;
             let rendered_target =
                 crate::render_compose::render_target(project, target, relative.as_path())?;
             if let Some(max_bytes) = target.max_bytes {
@@ -36,7 +36,10 @@ pub use crate::render_write::{
     layout_rendered_targets, write_rendered_targets, write_rendered_targets_with_previous_lockfile,
 };
 
+pub use crate::render_dest::{
+    materialize_provisioned_exports, provisioned_destination_status, provisioned_lock_records,
+    ProvisionedDestinationStatus,
+};
 pub use crate::render_provisioned::{
-    expected_provisioned_bytes, materialize_provisioned_exports, planned_provisioned_files,
-    PlannedProvisionedFile,
+    expected_provisioned_bytes, planned_provisioned_files, PlannedProvisionedFile,
 };

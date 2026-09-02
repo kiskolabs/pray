@@ -19,7 +19,7 @@ pub struct Manifest {
     #[serde(default, skip_serializing_if = "BTreeMap::is_empty")]
     pub symbols: BTreeMap<String, String>,
     pub render: RenderPolicy,
-    /// Deprecated Prayfile keywords encountered while parsing (`target`, `output`, `agent`).
+    /// Deprecated Prayfile keywords encountered while parsing (`target`, `output`, `agent`, `skills`).
     #[serde(default, skip)]
     pub deprecated_keywords: Vec<String>,
 }
@@ -99,6 +99,8 @@ pub struct ManifestTarget {
     pub scoped: bool,
     #[serde(default)]
     pub entries: Vec<DestinationEntry>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub header: Option<bool>,
 }
 
 #[derive(Debug, Clone, Default, Serialize, Deserialize, PartialEq, Eq)]
@@ -156,8 +158,6 @@ pub struct RenderPolicy {
     pub conflict: String,
     pub churn: String,
     pub header: bool,
-    pub section_markers: bool,
-    pub line_endings: String,
 }
 
 impl Default for RenderPolicy {
@@ -167,8 +167,6 @@ impl Default for RenderPolicy {
             conflict: "fail".to_string(),
             churn: "minimal".to_string(),
             header: true,
-            section_markers: true,
-            line_endings: "lf".to_string(),
         }
     }
 }

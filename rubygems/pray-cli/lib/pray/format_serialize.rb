@@ -28,7 +28,12 @@ module Pray
         case target.mode
         when "compose"
           path = target.outputs.first || ""
-          lines << %(compose "#{path}" do)
+          header = case target.header
+          when true then ", header: true"
+          when false then ", header: false"
+          else ""
+          end
+          lines << %(compose "#{path}"#{header} do)
           target.entries.each do |entry|
             lines << "  #{format_destination_entry(entry, manifest)}"
           end

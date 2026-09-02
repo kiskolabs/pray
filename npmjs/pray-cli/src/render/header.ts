@@ -1,25 +1,22 @@
-import { basename } from "node:path";
+import type { ManifestTarget } from "../manifest/types.js";
 import type { ResolvedProject } from "../resolve/types.js";
+import { composeHeaderText } from "./compose-dest.js";
 import type { ContentBuilder } from "./content-builder.js";
 
 export function appendHeaderIfEnabled(
   builder: ContentBuilder,
   project: ResolvedProject,
+  target: ManifestTarget,
   output: string,
 ): void {
-  if (!project.manifest.render.header) {
+  const header = composeHeaderText(
+    target,
+    output,
+    project.manifest.render.header,
+  );
+  if (!header) {
     return;
   }
-  const outputName = basename(output);
-  builder.appendLine("<!-- pray:0 ignore-comments -->");
-  builder.appendEmptyLine();
-  builder.appendLine("# Agent context");
-  builder.appendEmptyLine();
-  builder.appendLine(
-    `Do not edit managed blocks in \`${outputName}\` or provisioned files under \`.agents/\`.`,
-  );
-  builder.appendLine(
-    "To change shared guidance, update `Prayfile` and run `pray install`.",
-  );
+  builder.appendBody(header);
   builder.appendEmptyLine();
 }

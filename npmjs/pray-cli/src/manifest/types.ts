@@ -1,5 +1,4 @@
 import type {
-  LineEndings,
   LocalPosition,
   RenderChurn,
   RenderConflict,
@@ -8,7 +7,6 @@ import type {
 } from "../domain/types.js";
 
 export type {
-  LineEndings,
   LocalPosition,
   PackageExportKind,
   RenderChurn,
@@ -44,6 +42,7 @@ export interface ManifestTarget {
   mode?: DestinationMode;
   scoped?: boolean;
   entries?: DestinationEntry[];
+  header?: boolean;
 }
 
 export interface ManifestPackage {
@@ -78,8 +77,6 @@ export interface RenderPolicy {
   conflict: RenderConflict;
   churn: RenderChurn;
   header: boolean;
-  sectionMarkers: boolean;
-  lineEndings: LineEndings;
 }
 
 export interface Manifest {
@@ -99,8 +96,6 @@ export const defaultRenderPolicy = (): RenderPolicy => ({
   conflict: "fail",
   churn: "minimal",
   header: true,
-  sectionMarkers: true,
-  lineEndings: "lf",
 });
 
 export function canonicalManifest(manifest: Manifest): Manifest {
@@ -155,6 +150,7 @@ export function manifestToJson(manifest: Manifest): Record<string, unknown> {
           ? { kind: "package", name: entry.name }
           : { kind: "local", path: entry.path },
       ),
+      ...(target.header !== undefined ? { header: target.header } : {}),
     })),
     packages: canonical.packages.map((packageEntry) => ({
       name: packageEntry.name,
@@ -189,8 +185,6 @@ export function manifestToJson(manifest: Manifest): Record<string, unknown> {
       conflict: canonical.render.conflict,
       churn: canonical.render.churn,
       header: canonical.render.header,
-      section_markers: canonical.render.sectionMarkers,
-      line_endings: canonical.render.lineEndings,
     },
   };
 }

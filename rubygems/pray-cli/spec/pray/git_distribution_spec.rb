@@ -7,6 +7,18 @@ require_relative "../support/git_distribution_fixture"
 RSpec.describe "git distribution install" do
   let(:workspace) { Dir.mktmpdir("pray-git-distribution-") }
 
+  around do |example|
+    previous_cache = ENV["PRAY_CACHE"]
+    ENV["PRAY_CACHE"] = File.join(workspace, "global-cache")
+    example.run
+  ensure
+    if previous_cache.nil?
+      ENV.delete("PRAY_CACHE")
+    else
+      ENV["PRAY_CACHE"] = previous_cache
+    end
+  end
+
   after do
     FileUtils.rm_rf(workspace)
   end

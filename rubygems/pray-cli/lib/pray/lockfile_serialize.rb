@@ -22,6 +22,7 @@ module Pray
       lockfile.package.each { |entry| append_section(lines, format_package(entry)) }
       lockfile.target.each { |entry| append_section(lines, format_target(entry)) }
       lockfile.managed_span.each { |entry| append_section(lines, format_managed_span(entry)) }
+      lockfile.provisioned.each { |entry| append_section(lines, format_provisioned(entry)) }
 
       lines.pop while lines.last == ""
       "#{lines.join("\n")}\n"
@@ -89,6 +90,20 @@ module Pray
           ["export", entry.export],
           ["source_checksum", entry.source_checksum],
           ["silenced", entry.silenced]
+        ]
+      )
+      lines
+    end
+
+    def format_provisioned(entry)
+      lines = ["[[provisioned]]"]
+      append_scalars(
+        lines,
+        [
+          ["path", entry.path],
+          ["content_hash", entry.content_hash],
+          ["package", entry.package],
+          ["export", entry.export]
         ]
       )
       lines

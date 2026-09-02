@@ -3,6 +3,8 @@
 require "spec_helper"
 
 RSpec.describe Pray::Invocation do
+  after { described_class.context = nil }
+
   it "strips global flags before command parsing" do
     remaining = described_class.initialize(
       ["--path", "/tmp/project", "--env", "development", "install", "--locked"]

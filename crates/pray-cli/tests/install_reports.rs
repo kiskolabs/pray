@@ -180,7 +180,6 @@ fn format_normalizes_pray_markers_and_line_endings() {
     let formatted = fs::read_to_string(&rendered_path).expect("formatted file exists");
     assert!(!formatted.contains("\r"));
     assert!(formatted.contains("<!-- pray:"));
-    assert!(formatted.contains("<!-- pray:0 ignore-comments -->"));
     assert!(!formatted.contains("<!--  pray:"));
     assert!(!formatted.contains("   -->"));
 

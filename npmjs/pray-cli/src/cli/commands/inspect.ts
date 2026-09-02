@@ -66,6 +66,7 @@ export async function runOutdated(argumentsList: string[] = []): Promise<void> {
     packages: project.packages,
     sourceRevisions: project.sourceRevisions,
     sourceHostKeys: project.sourceHostKeys,
+    project,
   });
   let reported = printUpdateSummary(
     previous,

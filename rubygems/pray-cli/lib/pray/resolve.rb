@@ -87,6 +87,7 @@ module Pray
         errors << "#{declaration.name}: #{error.message}"
       end
       raise Error.resolution(errors.join("\n")) unless errors.empty?
+      PackageSpec.warn_resolved_deprecations(packages)
 
       local_files = []
       local_errors = []
@@ -298,40 +299,11 @@ module Pray
     end
 
     def select_exports(declaration, spec)
-      unless declaration.exports.empty?
-        declaration.exports.each do |export|
-          unless spec.exports.key?(export)
-            raise Error.resolution("package #{declaration.name} does not export #{export}")
-          end
-        end
-        return declaration.exports
-      end
+      ResolveExports.select_exports(declaration, spec)
+    end
 
-      roles = declaration.roles || []
-      return spec.exports.keys.sort if roles.empty? && declaration.file.nil?
-
-      effective_roles = roles.dup
-      effective_roles << "file" if declaration.file && !effective_roles.include?("file")
-
-      selected = []
-      effective_roles.each do |role|
-        compatible = spec.exports.filter_map do |name, export|
-          name if Destination.export_kind_matches_role?(export.kind, role)
-        end
-        case compatible.length
-        when 1
-          selected << compatible.first unless selected.include?(compatible.first)
-        when 0
-          raise Error.resolution(
-            "package #{declaration.name} has no export compatible with #{role}"
-          )
-        else
-          raise Error.resolution(
-            "package #{declaration.name} has multiple exports compatible with #{role}; set export: \"name\""
-          )
-        end
-      end
-      selected
+    def load_export_bodies(file_bytes, spec, selected_exports)
+      ResolveExports.load_export_bodies(file_bytes, spec, selected_exports)
     end
 
     def load_package_file_bytes(root, spec)
@@ -344,21 +316,6 @@ module Pray
         file_bytes[file] = File.binread(path)
       end
       file_bytes
-    end
-
-    def load_export_bodies(file_bytes, spec, selected_exports)
-      export_bodies = {}
-      selected_exports.each do |export_name|
-        entry = spec.exports[export_name]
-        raise Error.resolution("package #{spec.name} is missing export #{export_name}") unless entry
-        next unless entry.kind == "fragment"
-
-        bytes = file_bytes[entry.path]
-        raise Error.integrity("package file missing for export #{export_name}: #{entry.path}") unless bytes
-
-        export_bodies[export_name] = Hashing.normalize_line_endings(bytes.force_encoding(Encoding::UTF_8))
-      end
-      export_bodies
     end
 
     def build_skill_file_index(spec)

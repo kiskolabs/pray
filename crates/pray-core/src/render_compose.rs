@@ -1,3 +1,4 @@
+use crate::compose_dest::{compose_header_text, ensure_html_comment_compose_dest};
 use crate::destination::package_bound_to_compose;
 use crate::environment::package_matches_environment;
 use crate::hashing::{checksum_managed_span_content, marker_id};
@@ -63,7 +64,7 @@ fn should_inline_export(package: &crate::resolve::ResolvedPackage, export_name: 
         .spec
         .exports
         .get(export_name)
-        .is_none_or(|export| export.kind == "fragment")
+        .is_none_or(|export| matches!(export.kind.as_str(), "fragment" | "file"))
 }
 
 pub(crate) fn render_target(
@@ -71,6 +72,7 @@ pub(crate) fn render_target(
     target: &crate::manifest::ManifestTarget,
     output: &Path,
 ) -> PrayResult<RenderedTarget> {
+    ensure_html_comment_compose_dest(output)?;
     if target.scoped && target.mode == DestinationMode::Compose {
         return render_scoped_compose(project, target, output);
     }
@@ -83,21 +85,7 @@ fn render_scoped_compose(
     output: &Path,
 ) -> PrayResult<RenderedTarget> {
     let mut builder = ContentBuilder::with_capacity(8_192);
-    if project.manifest.render.header {
-        let output_name = output
-            .file_name()
-            .map(|name| name.to_string_lossy().to_string())
-            .unwrap_or_else(|| output.to_string_lossy().to_string());
-        builder.append_line("<!-- pray:0 ignore-comments -->");
-        builder.append_empty_line();
-        builder.append_line("# Agent context");
-        builder.append_empty_line();
-        builder.append_line(&format!(
-            "Do not edit managed blocks in `{output_name}` or provisioned files under `.agents/`."
-        ));
-        builder.append_line("To change shared guidance, update `Prayfile` and run `pray install`.");
-        builder.append_empty_line();
-    }
+    append_compose_header(&mut builder, project, target, output);
 
     let mut managed_spans = Vec::new();
     for entry in &target.entries {
@@ -162,21 +150,7 @@ fn render_legacy_compose(
     output: &Path,
 ) -> PrayResult<RenderedTarget> {
     let mut builder = ContentBuilder::with_capacity(8_192);
-    if project.manifest.render.header {
-        let output_name = output
-            .file_name()
-            .map(|name| name.to_string_lossy().to_string())
-            .unwrap_or_else(|| output.to_string_lossy().to_string());
-        builder.append_line("<!-- pray:0 ignore-comments -->");
-        builder.append_empty_line();
-        builder.append_line("# Agent context");
-        builder.append_empty_line();
-        builder.append_line(&format!(
-            "Do not edit managed blocks in `{output_name}` or provisioned files under `.agents/`."
-        ));
-        builder.append_line("To change shared guidance, update `Prayfile` and run `pray install`.");
-        builder.append_empty_line();
-    }
+    append_compose_header(&mut builder, project, target, output);
 
     let unbound_locals: Vec<_> = project
         .local_files
@@ -252,12 +226,25 @@ fn append_managed_export(
     output: &Path,
     symbols: &std::collections::BTreeMap<String, String>,
 ) -> PrayResult<()> {
-    let raw = package.export_bodies.get(export).ok_or_else(|| {
-        PrayError::Render(format!(
-            "package {} is missing cached export {}",
-            package.declaration.name, export
-        ))
-    })?;
+    let raw = match package.export_bodies.get(export) {
+        Some(text) => text,
+        None if package
+            .spec
+            .exports
+            .get(export)
+            .is_some_and(|entry| entry.kind == "file") =>
+        {
+            return Err(PrayError::Integrity(format!(
+                "compose cannot write binary export {export}; use file: for unmarked bytes"
+            )));
+        }
+        None => {
+            return Err(PrayError::Render(format!(
+                "package {} is missing cached export {}",
+                package.declaration.name, export
+            )));
+        }
+    };
     let body = substitute_pray_symbols(raw, symbols)?;
     let id = marker_id(&format!(
         "{}:{}:{}",
@@ -281,4 +268,16 @@ fn append_managed_export(
     });
     builder.append_empty_line();
     Ok(())
+}
+
+fn append_compose_header(
+    builder: &mut ContentBuilder,
+    project: &ResolvedProject,
+    target: &crate::manifest::ManifestTarget,
+    output: &Path,
+) {
+    if let Some(header) = compose_header_text(target, output, project.manifest.render.header) {
+        builder.append_body(&header);
+        builder.append_empty_line();
+    }
 }

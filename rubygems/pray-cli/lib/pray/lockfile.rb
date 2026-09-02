@@ -20,14 +20,16 @@ module Pray
     :id, :target, :open_line, :close_line, :ideal_checksum, :package, :export,
     :source_checksum, :silenced
   )
+  ProvisionedFileRecord = Struct.new(:path, :content_hash, :package, :export)
 
   Lockfile = Struct.new(
     :prayfile_lock, :spec, :generated_by, :manifest_hash, :environment, :source, :package,
-    :target, :managed_span
+    :target, :managed_span, :provisioned
   ) do
     def initialize(
       prayfile_lock: "1", spec: "0.1", generated_by: Pray::GENERATED_BY,
-      manifest_hash: "", environment: nil, source: [], package: [], target: [], managed_span: []
+      manifest_hash: "", environment: nil, source: [], package: [], target: [], managed_span: [],
+      provisioned: []
     )
       super
     end
@@ -38,6 +40,7 @@ module Pray
         copy.package = package.sort_by { |entry| [entry.name, entry.source.to_s, entry.version] }
         copy.target = target.sort_by(&:name)
         copy.managed_span = managed_span.sort_by { |span| [span.target, span.open_line, span.id] }
+        copy.provisioned = provisioned.sort_by { |entry| [entry.path, entry.package] }
       end
     end
 
@@ -70,7 +73,8 @@ module Pray
         "source" => lockfile.source.map { |entry| source_to_hash(entry) },
         "package" => lockfile.package.map { |entry| package_to_hash(entry) },
         "target" => lockfile.target.map { |entry| {"name" => entry.name, "outputs" => entry.outputs} },
-        "managed_span" => lockfile.managed_span.map { |entry| managed_span_to_hash(entry) }
+        "managed_span" => lockfile.managed_span.map { |entry| managed_span_to_hash(entry) },
+        "provisioned" => lockfile.provisioned.map { |entry| provisioned_to_hash(entry) }
       }
     end
 
@@ -111,6 +115,15 @@ module Pray
       }
     end
 
+    def provisioned_to_hash(entry)
+      {
+        "path" => entry.path,
+        "content_hash" => entry.content_hash,
+        "package" => entry.package,
+        "export" => entry.export
+      }
+    end
+
     def parse_lockfile(text)
       data = TomlRB.parse(text)
       from_hash(data)
@@ -147,8 +160,9 @@ module Pray
       left.equivalent_to?(right)
     end
 
-    def build_lockfile(manifest_hash, environment, project_root, manifest_sources, manifest_targets, rendered, packages, source_revisions, source_host_keys)
-      Lockfile.new(
+    def build_lockfile(manifest_hash, environment, project_root, manifest_sources, manifest_targets, rendered, packages, source_revisions, source_host_keys, project = nil)
+      rendered = Render.layout_rendered_targets(project, rendered) if project
+      lockfile = Lockfile.new(
         manifest_hash: manifest_hash,
         environment: environment,
         source: manifest_sources.map do |source|
@@ -176,7 +190,11 @@ module Pray
         end,
         target: manifest_targets.map { |target| LockedTarget.new(name: target.name, outputs: target.outputs) },
         managed_span: rendered.flat_map(&:managed_spans)
-      ).canonicalized
+      )
+      if project
+        lockfile.provisioned = RenderDest.provisioned_records(project)
+      end
+      lockfile.canonicalized
     end
 
     def from_hash(data)
@@ -221,6 +239,14 @@ module Pray
             export: entry["export"],
             source_checksum: entry["source_checksum"],
             silenced: entry["silenced"]
+          )
+        end,
+        provisioned: Array(data["provisioned"]).map do |entry|
+          ProvisionedFileRecord.new(
+            path: entry["path"],
+            content_hash: entry["content_hash"],
+            package: entry["package"],
+            export: entry["export"]
           )
         end
       )

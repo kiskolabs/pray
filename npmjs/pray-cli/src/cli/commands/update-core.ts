@@ -44,6 +44,7 @@ export async function previewRemoteUpdates(
     packages: project.packages,
     sourceRevisions: project.sourceRevisions,
     sourceHostKeys: project.sourceHostKeys,
+    project,
   });
   if (
     printUpdateSummary(
@@ -101,17 +102,18 @@ export async function updateWithManifestConstraints(
     packages: project.packages,
     sourceRevisions: project.sourceRevisions,
     sourceHostKeys: project.sourceHostKeys,
+    project,
   });
   const merged =
     previous && packageName
       ? mergeSelectedPackageUpdate(previous, updatedLockfile, packageName)
       : updatedLockfile;
+  writeRenderedTargets(project, rendered, previous);
   if (packageName) {
     writeLockfile(lockfilePath(), merged);
   } else {
     writeLockfileIfChanged(lockfilePath(), merged);
   }
-  writeRenderedTargets(project, rendered);
 
   if (json) {
     printUpdateJsonReport(
@@ -156,6 +158,7 @@ export function printUpdateJsonReport(
       package: [],
       target: [],
       managed_span: [],
+      provisioned: [],
     },
     selectedPackage,
     project,

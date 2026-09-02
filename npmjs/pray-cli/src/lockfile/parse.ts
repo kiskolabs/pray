@@ -13,6 +13,7 @@ import type {
   Lockfile,
   LockSource,
   ManagedSpanRecord,
+  ProvisionedFileRecord,
 } from "./types.js";
 
 const CONTEXT = "lockfile";
@@ -37,6 +38,7 @@ export function parseLockfileValue(value: unknown): Lockfile {
     package: parseLockedPackages(record.package),
     target: parseLockedTargets(record.target),
     managed_span: parseManagedSpans(record.managed_span),
+    provisioned: parseProvisioned(record.provisioned),
   };
 }
 
@@ -146,6 +148,30 @@ function parseManagedSpan(value: unknown, index: number): ManagedSpanRecord {
       context,
     ),
     silenced: requireBoolean(record.silenced, "silenced", context),
+  };
+}
+
+function parseProvisioned(value: unknown): ProvisionedFileRecord[] {
+  if (value === undefined || value === null) {
+    return [];
+  }
+  if (!Array.isArray(value)) {
+    throwFieldTypeError("provisioned", "array");
+  }
+  return value.map((entry, index) => parseProvisionedRecord(entry, index));
+}
+
+function parseProvisionedRecord(
+  value: unknown,
+  index: number,
+): ProvisionedFileRecord {
+  const context = `${CONTEXT}.provisioned[${index}]`;
+  const record = requireRecord(value, context);
+  return {
+    path: requireString(record.path, "path", context),
+    content_hash: requireString(record.content_hash, "content_hash", context),
+    package: requireString(record.package, "package", context),
+    export: requireString(record.export, "export", context),
   };
 }
 

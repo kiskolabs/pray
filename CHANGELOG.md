@@ -1,5 +1,22 @@
 # CHANGELOG
 
+## Unreleased
+
+- Refuse to overwrite exclusive `file:` and `tree:` destinations that already exist with other bytes.
+- Fail when a provisioned or compose destination is a symbolic link.
+- Record provisioned leaves in `Prayfile.lock` and delete a dropped leaf only when on-disk bytes still match the locked hash.
+- Keep the previous lock when a provisioned destination write fails, so retry still has its ownership record.
+- Reject unsafe provisioned paths from a lock before pruning and make `pray plan` refuse the same unmanaged destinations as apply.
+- Keep TypeScript lockfiles readable when a generated top-level section is empty.
+- Reject destination paths that start with `~`.
+- Print every provisioned path in `pray plan`.
+- Document home-as-root as `pray --path "$HOME"` with `file: ".zshrc"`, HTML-only compose, and unmarked `file:`.
+- Drop unused `render` fields `section_markers` and `line_endings`; reject them at parse.
+- Inline a UTF-8 `file` export into `compose` as a marked span. Exclusive `file:` stays unmarked.
+- Write the Agent context banner on `AGENTS.md` by default. Other compose destinations opt in with `header: true`.
+- Fail compose of JSON, binary, or an unknown file type and name `file:` as the unmarked path.
+- Warn when Prayfile uses deprecated `skills`, export type `skill`, or `spec.skills`; prefer `tree` / `folder`. These forms will be removed in version 2.
+
 ## 1.9.2 (2026-09-01)
 
 - Fix Ruby `pray install` unpack of `.praypkg` archives from git and registry sources.

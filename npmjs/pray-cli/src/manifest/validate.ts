@@ -10,12 +10,12 @@ export function validateManifestPaths(manifest: Manifest): void {
       ...target.commands,
       ...target.rules,
     ]) {
-      validateProjectRelativePath(path);
+      validateDestinationPath(path);
     }
   }
   for (const packageEntry of manifest.packages) {
     if (packageEntry.path) validateProjectRelativePath(packageEntry.path);
-    if (packageEntry.file) validateProjectRelativePath(packageEntry.file);
+    if (packageEntry.file) validateDestinationPath(packageEntry.file);
   }
   for (const local of manifest.local) validateProjectRelativePath(local.path);
 }
@@ -37,4 +37,13 @@ export function validateProjectRelativePath(value: string): string {
     );
   }
   return path;
+}
+
+export function validateDestinationPath(value: string): string {
+  if (value.trim().startsWith("~")) {
+    throw PrayError.manifest(
+      `project path must be repository-relative: ${value}`,
+    );
+  }
+  return validateProjectRelativePath(value);
 }

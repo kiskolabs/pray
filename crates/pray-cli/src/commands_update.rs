@@ -252,8 +252,8 @@ pub(crate) fn unlock_command(package: String) -> PrayResult<()> {
     let updated_lockfile = build_lockfile(&project, &laid_out)?;
     let merged_lockfile =
         merge_selected_package_update(&previous_lockfile, &updated_lockfile, &package);
-    write_lockfile(&lockfile_path(), &merged_lockfile)?;
     write_rendered_targets_with_previous_lockfile(&project, &rendered, Some(&previous_lockfile))?;
+    write_lockfile(&lockfile_path(), &merged_lockfile)?;
     println!("Unlocked {package}");
     Ok(())
 }

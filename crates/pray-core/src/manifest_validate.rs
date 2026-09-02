@@ -1,5 +1,5 @@
 use crate::manifest::{Manifest, RenderPolicy};
-use crate::paths::validate_project_relative_path;
+use crate::paths::{validate_destination_path, validate_project_relative_path};
 use crate::{PrayError, PrayResult};
 use std::collections::BTreeSet;
 
@@ -8,7 +8,7 @@ pub(crate) fn validate_manifest_semantics(manifest: &Manifest) -> PrayResult<()>
     validate_render_policy(&manifest.render)?;
     for target in &manifest.targets {
         for output in &target.outputs {
-            validate_project_relative_path(output)?;
+            validate_destination_path(output)?;
         }
         for folder in target
             .skills
@@ -16,7 +16,7 @@ pub(crate) fn validate_manifest_semantics(manifest: &Manifest) -> PrayResult<()>
             .chain(target.commands.iter())
             .chain(target.rules.iter())
         {
-            validate_project_relative_path(folder)?;
+            validate_destination_path(folder)?;
         }
     }
     for package in &manifest.packages {
@@ -24,7 +24,7 @@ pub(crate) fn validate_manifest_semantics(manifest: &Manifest) -> PrayResult<()>
             validate_project_relative_path(path)?;
         }
         if let Some(file) = &package.file {
-            validate_project_relative_path(file)?;
+            validate_destination_path(file)?;
         }
     }
     for local in &manifest.local {

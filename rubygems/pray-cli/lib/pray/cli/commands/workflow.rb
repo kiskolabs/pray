@@ -107,8 +107,8 @@ module Pray
       rendered = Render.render_project(project)
       updated_lockfile = build_lockfile(project, rendered)
       merged_lockfile = merge_selected_package_update(previous_lockfile, updated_lockfile, name)
+      Render.write_rendered_targets(project, rendered, previous_lockfile)
       Pray.write_lockfile(lockfile_path, merged_lockfile)
-      Render.write_rendered_targets(project, rendered)
       puts "Unlocked #{name}"
     end
 

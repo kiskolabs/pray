@@ -5,7 +5,7 @@
 - Status: Stable
 - Created: 2026-08-18
 - Author: Andrei Makarov
-- Relates: RFC 0030, RFC 0010, RFC 0102
+- Relates: RFC 0030, RFC 0010, RFC 0102, RFC 0033, RFC 0034
 - Requires: RFC 0030
 
 ## Summary
@@ -91,16 +91,9 @@ The ignore marker is for tooling. The visible lines are for the application.
 
 Managed output installs under the target directory for the current project.
 
-Each managed directory or file must carry origin metadata, either in front matter or a small `.pray-origin.toml`:
+Exclusive `file:` and `tree:` leaves record ownership in `Prayfile.lock` `[[provisioned]]` (RFC 0033). Implementations MUST NOT write `.pray-origin.toml` or origin front matter into dest files.
 
-```toml
-package = "sample/webapp"
-export = "code-review"
-version = "2.1.5"
-tree_hash = "sha256:..."
-```
-
-Optional human-owned files under `.agents/` are not origin-tagged as packages. Name collisions between human-owned and managed content are conflicts unless policy says otherwise.
+Optional human-owned files under `.agents/` are not package-owned. Name collisions between human-owned and managed content are conflicts unless policy says otherwise.
 
 Applications must not edit managed directories. They may edit other files under `.agents/`.
 
@@ -114,7 +107,6 @@ Inputs to render:
 - resolved package trees (verified by tree hash)
 - `.agents/**` contents listed in `Prayfile`
 - render policy from Prayfile
-- target adapter
 
 Guarantees:
 
@@ -135,7 +127,7 @@ pray update sample/webapp
 
 1. resolve selects new version within constraints and updates Prayfile.lock.
 2. render replaces every managed block mapped to `sample/webapp` in `Prayfile.lock`.
-3. render replaces managed directories whose origin package is `sample/webapp`.
+3. render replaces exclusive `file:` and `tree:` leaves recorded for `sample/webapp` in `[[provisioned]]` (RFC 0033).
 4. Embedded `.agents` files are re-read but not modified on disk.
 5. `pray drift` shows recipe, lock, managed-block, and render changes.
 
@@ -150,7 +142,7 @@ pray remove sample/webapp
 1. Remove declaration from Prayfile.
 2. resolve recomputes lock without that package.
 3. render deletes all managed blocks mapped to `sample/webapp`.
-4. render deletes managed directories tagged with that package origin.
+4. render deletes exclusive `file:` and `tree:` leaves for that package only when on-disk hash still matches the locked `content_hash` (RFC 0033). Dest files are not tagged.
 5. Human-owned `.agents/**` files are preserved.
 6. Orphan pray markers after remove are verify errors.
 

@@ -14,7 +14,7 @@ export function renderLegacyCompose(
   output: string,
 ): RenderedTarget {
   const builder = new ContentBuilder();
-  appendHeaderIfEnabled(builder, project, output);
+  appendHeaderIfEnabled(builder, project, target, output);
   appendUnboundLocals(builder, project);
 
   builder.appendLine("## Shared instructions");

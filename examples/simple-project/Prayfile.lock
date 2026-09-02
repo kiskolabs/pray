@@ -1,7 +1,7 @@
 prayfile_lock = "1"
 spec = "0.1"
-generated_by = "pray 0.1.0"
-manifest_hash = "sha256:340c8fc15fa0196aadea58a50834d4f726698fb74a4967cdc340e3e653950326"
+generated_by = "pray 1.9.2"
+manifest_hash = "sha256:286de6b550c26f05c4bff8f30a6a43f152a2bcf73d6d49e1cc9f6817a5e32c91"
 
 [[source]]
 name = "default"
@@ -28,8 +28,8 @@ outputs = ["INSTRUCTIONS.md"]
 [[managed_span]]
 id = "621c7072"
 target = "INSTRUCTIONS.md"
-open_line = 16
-close_line = 19
+open_line = 9
+close_line = 12
 ideal_checksum = "sha256:f9c12155822e6cef961610d3b037c408f1223eb2979b62212a8228af903c6cd0"
 package = "sample/base"
 export = "testing-basics"
@@ -39,8 +39,8 @@ silenced = false
 [[managed_span]]
 id = "b8c5e234"
 target = "INSTRUCTIONS.md"
-open_line = 21
-close_line = 24
+open_line = 14
+close_line = 17
 ideal_checksum = "sha256:abbd7b4b11c35cd569786d8cce785415f1c98d602f91b2344344a11950ca82f0"
 package = "sample/base"
 export = "security-basics"

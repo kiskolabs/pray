@@ -1,8 +1,11 @@
 import { existsSync } from "node:fs";
 import { PrayError } from "../../errors.js";
 import { buildLockfile, readLockfile } from "../../lockfile/index.js";
+import { provisionedDestinationStatus } from "../../render/dest.js";
 import { renderProject } from "../../render/project.js";
+import { plannedProvisionedFiles } from "../../render/provisioned.js";
 import { defaultResolveOptions } from "../../resolve/context.js";
+import type { ResolvedProject } from "../../resolve/types.js";
 import {
   lockfilePath,
   resolveCurrentProject,
@@ -31,6 +34,7 @@ export async function runPlanCommand(argumentsList: string[]): Promise<void> {
     packages: project.packages,
     sourceRevisions: project.sourceRevisions,
     sourceHostKeys: project.sourceHostKeys,
+    project,
   });
   const previous = existsSync(lockfilePath())
     ? readLockfile(lockfilePath())
@@ -38,6 +42,11 @@ export async function runPlanCommand(argumentsList: string[]): Promise<void> {
   process.stdout.write("Plan\n");
   for (const target of rendered) {
     process.stdout.write(`would render ${target.path}\n`);
+  }
+  for (const file of plannedProvisionedFiles(project)) {
+    process.stdout.write(
+      `Provisioned ${file.path}: ${provisionedChange(project, file, previous)}\n`,
+    );
   }
   if (!previous) {
     return;
@@ -52,6 +61,14 @@ export async function runPlanCommand(argumentsList: string[]): Promise<void> {
       );
     }
   }
+}
+
+export function provisionedChange(
+  project: ResolvedProject,
+  file: Parameters<typeof provisionedDestinationStatus>[1],
+  previous: Parameters<typeof provisionedDestinationStatus>[2],
+): string {
+  return provisionedDestinationStatus(project, file, previous);
 }
 
 function parsePlanArguments(argumentsList: string[]): boolean {

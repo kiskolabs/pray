@@ -34,7 +34,7 @@ module Pray
     end
 
     def target_fields(target)
-      {
+      fields = {
         "name" => target.name,
         "outputs" => target.outputs,
         "skills" => target.skills,
@@ -45,6 +45,8 @@ module Pray
         "scoped" => target.scoped || false,
         "entries" => (target.entries || []).map { |entry| entry_fields(entry) }
       }
+      fields["header"] = target.header unless target.header.nil?
+      fields
     end
 
     def entry_fields(entry)
@@ -93,9 +95,7 @@ module Pray
         "mode" => render.mode,
         "conflict" => render.conflict,
         "churn" => render.churn,
-        "header" => render.header,
-        "section_markers" => render.section_markers,
-        "line_endings" => render.line_endings
+        "header" => render.header
       }
     end
 

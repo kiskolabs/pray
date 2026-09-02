@@ -6,7 +6,7 @@
 - Describes: 1.8.1
 - Created: 2026-08-17
 - Author: Andrei Makarov
-- Relates: RFC 0020, RFC 0030, RFC 0102, RFC 0011
+- Relates: RFC 0020, RFC 0030, RFC 0102, RFC 0011, RFC 0034
 
 ## Summary
 
@@ -20,7 +20,7 @@ Independent implementations need one meaning for a Prayfile regardless of Ruby-l
 
 A project commits Prayfile and usually Prayfile.lock. `pray install` writes the lock and renders destinations. `pray format` rewrites the manifest toward `compose` / `tree` / `pray …, file:`.
 
-Deprecated keywords `target`, `output`, and `agent` still parse and warn. Changelog 1.6.0 schedules removal in CLI version 2. RFC 0102 tracks making destination DSL the documented default.
+Deprecated keywords `target`, `output`, `agent`, and `skills` still parse and warn. Changelog 1.6.0 schedules removal in CLI version 2. RFC 0102 tracks making destination DSL the documented default.
 
 ## Reference-level explanation
 
@@ -48,7 +48,7 @@ prayfile "1"
 source "default", "https://agents.example.com"
 target :tool_a do
   output "INSTRUCTIONS.md"
-  skills ".agents/skills"
+  folder ".agents/skills"
 end
 agent "sample/base", "~> 1.4",
   exports: ["testing-basics", "security-basics"]
@@ -144,11 +144,11 @@ prayfile "1"
 source "default", "https://agents.example.com"
 target :tool_a do
   output "INSTRUCTIONS.md"
-  skills ".agents/skills"
+  folder ".agents/skills"
 end
 target :tool_b do
   output "TOOL_B.md"
-  skills ".tool-b/skills"
+  folder ".tool-b/skills"
 end
 agent "public/base", "~> 1.0",
   exports: ["repository-basics", "testing-basics"]
@@ -170,12 +170,12 @@ source "default", "https://agents.example.com"
 source "sample", "git+ssh://git@example.com/agent-context/index.git"
 target :tool_a do
   output "INSTRUCTIONS.md"
-  skills ".agents/skills"
+  folder ".agents/skills"
   max_bytes 120_000
 end
 target :tool_b do
   output "TOOL_B.md"
-  skills ".tool-b/skills"
+  folder ".tool-b/skills"
   max_bytes 120_000
 end
 target :tool_c do
@@ -207,8 +207,7 @@ local ".agents/testing.md", position: :after
 render mode: :managed,
   conflict: :fail,
   churn: :minimal,
-  header: true,
-  section_markers: true
+  header: true
 ```
 
 ---
@@ -244,12 +243,12 @@ Supported source kinds: `registry`, `static_index`, `git`, `path`, `tarball`, `o
 
 Optional grouping for legacy Prayfiles and selective apply. Not required when using top-level `compose` / `tree` / `pray …, file:`.
 
-Deprecated in prayfile `"1"`: implementations should warn that `target` and nested `output` will be removed in version 2. Prefer `compose` / `tree`. Top-level `output "path" do … end` (compose alias) is likewise deprecated in favor of `compose`.
+Deprecated in prayfile `"1"`: implementations should warn that `target`, nested `output`, and nested `skills` will be removed in version 2. Prefer `compose` / `tree` / `folder`. Top-level `output "path" do … end` (compose alias) is likewise deprecated in favor of `compose`. Top-level `skills "path" do … end` is likewise deprecated in favor of `tree`.
 
 ```manifest
 target :tool_a do
   output "INSTRUCTIONS.md"
-  skills ".agents/skills"
+  folder ".agents/skills"
 end
 ```
 
@@ -257,7 +256,7 @@ Common target fields:
 
 ```
 output "INSTRUCTIONS.md"
-skills ".agents/skills"
+folder ".agents/skills"
 commands ".tool-b/commands"
 rules ".tool-c/rules"
 max_bytes 120_000
@@ -281,11 +280,12 @@ Rules:
 - Declaration order inside the block is render order.
 - Package inputs use fragment exports (see default export resolution).
 - Local bare paths embed human-owned files (no pray markers).
+- Markers are HTML comments (`<!-- pray:id -->`) only. Compose fails closed unless the destination accepts HTML comments, as specified by RFC 0108.
 - Alias: `output "AGENTS.md" do … end` at top level.
 
 #### tree
 
-Provisions package folder/skill exports under a directory root.
+Provisions package folder exports under a directory root.
 
 ```manifest
 tree ".agents/skills" do
@@ -293,7 +293,13 @@ tree ".agents/skills" do
 end
 ```
 
-Aliases: `folder`, `skills` (block form at top level).
+Alias: `folder`. Deprecated alias: `skills` (block form at top level); removed in version 2.
+
+Rules:
+
+- Copies listed folder leaves into the destination directory.
+- Leaves undeclared siblings in place.
+- Destinations are project-relative. A leading `~` is a manifest error (RFC 0033).
 
 #### pray
 
@@ -318,7 +324,8 @@ Forms:
 
 - Requires a `file`-typed package export (default export resolution applies).
 - Writes UTF-8 text after `((pray:…))` substitution (binary non-UTF-8 copies as bytes); no pray markers; no agent header.
-- Exclusive ownership of the path.
+- Exclusive ownership of the path. Refuse-clobber, symlink dest reject, lock ledger, and hash-gated prune are RFC 0033.
+- Destination strings MUST be project-relative. A leading `~` is a manifest error, not home expansion.
 - Mutually exclusive with nesting inside `compose` / `tree`.
 - Optional alias: `file "SECURITY.md" do pray "pkg", "~> 1.0" end`.
 
@@ -368,7 +375,7 @@ Default export resolution when `export:` / `exports:` omitted:
 
 - inside `compose`: `fragment`
 - `file:` keyword: `file`
-- inside `tree`: `folder` / `skill`
+- inside `tree`: `folder` (deprecated alias `skill`)
 
 Exactly one compatible export is selected; multiple require `export: "name"`; none is a type mismatch. Legacy-only Prayfiles (no `compose` / `tree` / `pray` / `file:`) keep empty exports selecting all package exports.
 
@@ -443,7 +450,7 @@ Default: `after`
 
 #### Compatibility
 
-Stay on `prayfile "1"`. New keywords are additive. A legacy-only Prayfile keeps today’s fan-out (all unbound packages into legacy `output` / `skills` roots). When new-form destinations are present, packages bind only where `pray` appears; unbound legacy `agent` declarations still fan into legacy outputs.
+Stay on `prayfile "1"`. New keywords are additive. A legacy-only Prayfile keeps today’s fan-out (all unbound packages into legacy `output` / `folder` roots). When new-form destinations are present, packages bind only where `pray` appears; unbound legacy `agent` declarations still fan into legacy outputs.
 
 #### render
 
@@ -455,7 +462,7 @@ render mode: :managed,
   churn: :minimal
 ```
 
-Supported fields: `mode`, `conflict`, `churn`, `header`, `section_markers`, `line_endings`
+Supported fields: `mode`, `conflict`, `churn`, `header`. Parsers MUST reject `section_markers` and `line_endings` (RFC 0034).
 
 ---
 
@@ -526,11 +533,11 @@ Parsers: `crates/pray-core/src/manifest_parse/`, `package_spec.rs`, `lockfile.rs
 
 Property tests and a local cargo-fuzz harness cover Prayfile, prayspec, and package path validation (changelog 1.6.0).
 
-Ruby and TypeScript CLIs consume `testdata/shared/manifest/` for destination-focused parse slices: `compose-tree-file` and `legacy-target`.
+Ruby and TypeScript CLIs consume `testdata/shared/manifest/` for destination-focused parse slices: `compose-tree-file` and `legacy-target`. Provisioned dest writes follow RFC 0033 (`render_dest` in each CLI).
 
 ## Registrar
 
-Prayfile keywords in use: `prayfile`, `source`, `compose`, `tree`, `pray`, `local`, `render`, `group`, plus deprecated `target`, `output`, `agent`. Marker comment grammar is RFC 0030. Lockfile keys are RFC 0020.
+Prayfile keywords in use: `prayfile`, `source`, `compose`, `tree`, `pray`, `local`, `render`, `group`, plus deprecated `target`, `output`, `agent`, `skills`. Marker comment grammar is RFC 0030. Lockfile keys are RFC 0020.
 
 ## Unresolved questions
 

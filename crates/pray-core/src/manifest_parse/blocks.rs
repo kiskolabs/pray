@@ -1,5 +1,6 @@
 use super::call::{parse_call, string_from_literal, string_from_value};
 use super::decls::{parse_local_decl, parse_package_decl};
+use super::policy::destination_header_keyword;
 use super::BlockParser;
 use crate::manifest::{DestinationMode, ExportRole, Manifest, ManifestLocal};
 use crate::statement_surface::split_symbol_assignment;
@@ -27,12 +28,13 @@ impl BlockParser<'_> {
             });
         }
         let header = rest.trim_end_matches("do").trim();
-        let (values, _) = parse_call(header)?;
+        let (values, keywords) = parse_call(header)?;
         let path = string_from_value(values.first().ok_or_else(|| PrayError::Parse {
             kind: "manifest",
             message: "destination missing path".to_string(),
         })?)?;
-        let target = crate::destination::new_destination_target(mode, &path);
+        let mut target = crate::destination::new_destination_target(mode, &path);
+        target.header = destination_header_keyword(mode, &keywords)?;
         manifest.targets.push(target);
         let index = manifest.targets.len() - 1;
         while let Some(statement) = self.next_statement()? {

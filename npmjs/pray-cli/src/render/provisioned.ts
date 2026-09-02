@@ -1,15 +1,16 @@
-import { existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
+import { existsSync, readFileSync } from "node:fs";
 import { basename, resolve } from "node:path";
 import { packageMatchesEnvironment } from "../environment.js";
 import { PrayError } from "../errors.js";
 import { packageBoundToTree } from "../manifest/destination.js";
-import { validateProjectRelativePath } from "../manifest/validate.js";
 import type { ResolvedPackage, ResolvedProject } from "../resolve/types.js";
 import { substitutePraySymbols } from "../substitute.js";
 
 export interface PlannedProvisionedFile {
   path: string;
   source: string;
+  package: string;
+  export: string;
 }
 
 export function plannedProvisionedFiles(
@@ -65,18 +66,7 @@ function dedupeByPath(
   }
   return result;
 }
-export function materializeProvisionedExports(project: ResolvedProject): void {
-  for (const file of plannedProvisionedFiles(project)) {
-    validateProjectRelativePath(file.path);
-    const destination = resolve(project.projectRoot, file.path);
-    mkdirSync(resolve(destination, ".."), { recursive: true });
-    writeProvisionedFile(
-      file.source,
-      destination,
-      project.manifest.symbols ?? {},
-    );
-  }
-}
+
 export function expectedProvisionedBytes(
   source: string,
   symbols: Record<string, string>,
@@ -91,14 +81,6 @@ export function expectedProvisionedBytes(
     }
     return bytes;
   }
-}
-
-function writeProvisionedFile(
-  source: string,
-  destination: string,
-  symbols: Record<string, string>,
-): void {
-  writeFileSync(destination, expectedProvisionedBytes(source, symbols));
 }
 
 function collectExactFileBindings(
@@ -128,7 +110,12 @@ function collectExactFileBindings(
       if (!existsSync(source)) {
         throw PrayError.render(`file export source missing: ${source}`);
       }
-      planned.push({ path: destination, source });
+      planned.push({
+        path: destination,
+        source,
+        package: packageEntry.declaration.name,
+        export: exportName,
+      });
       matched = true;
       break;
     }
@@ -163,6 +150,8 @@ function collectLegacySkillFiles(
       skillFiles,
       [],
       [],
+      packageEntry.declaration.name,
+      skillName,
       planned,
     );
   }
@@ -214,6 +203,8 @@ function collectSelectedExportFiles(
         indexedFiles,
         exportEntry.only ?? [],
         exportEntry.except ?? [],
+        packageEntry.declaration.name,
+        exportName,
         planned,
       );
       continue;
@@ -236,6 +227,8 @@ function collectSelectedExportFiles(
       planned.push({
         path: relativeProjectPath(project.projectRoot, destination),
         source,
+        package: packageEntry.declaration.name,
+        export: exportName,
       });
     }
   }
@@ -258,6 +251,8 @@ function collectTreeFiles(
   relativeFiles: string[],
   only: string[],
   except: string[],
+  packageName: string,
+  exportName: string,
   planned: PlannedProvisionedFile[],
 ): void {
   if (!existsSync(sourceRoot)) {
@@ -285,6 +280,8 @@ function collectTreeFiles(
     planned.push({
       path: relativeProjectPath(project.projectRoot, destination),
       source,
+      package: packageName,
+      export: exportName,
     });
     matched = true;
   }

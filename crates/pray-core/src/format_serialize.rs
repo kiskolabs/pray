@@ -31,7 +31,12 @@ pub(crate) fn serialize_recommended(manifest: &Manifest) -> String {
         match target.mode {
             DestinationMode::Compose => {
                 let path = target.outputs.first().map(String::as_str).unwrap_or("");
-                lines.push(format!("compose \"{path}\" do"));
+                let header = match target.header {
+                    Some(true) => ", header: true",
+                    Some(false) => ", header: false",
+                    None => "",
+                };
+                lines.push(format!("compose \"{path}\"{header} do"));
                 for entry in &target.entries {
                     lines.push(format!("  {}", format_destination_entry(entry, manifest)));
                 }

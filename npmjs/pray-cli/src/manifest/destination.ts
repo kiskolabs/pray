@@ -1,4 +1,5 @@
 import { PrayError } from "../errors.js";
+import { type LiteralValue, literalAsBool } from "../literal/types.js";
 import type {
   DestinationEntry,
   DestinationMode,
@@ -242,4 +243,28 @@ export function exportKindMatchesRole(kind: string, role: ExportRole): boolean {
     return kind === "folder" || kind === "skill";
   }
   return kind === "file";
+}
+
+export function destinationHeaderKeyword(
+  mode: DestinationMode,
+  keywords: Map<string, LiteralValue>,
+): boolean | undefined {
+  const label =
+    mode === "compose" ? "compose" : mode === "tree" ? "tree" : "destination";
+  for (const key of keywords.keys()) {
+    if (key !== "header") {
+      throw PrayError.parse("manifest", `${label} does not accept ${key}`);
+    }
+  }
+  if (!keywords.has("header")) {
+    return undefined;
+  }
+  if (mode !== "compose") {
+    throw PrayError.parse("manifest", `${label} does not accept header`);
+  }
+  const value = literalAsBool(keywords.get("header")!);
+  if (value === undefined) {
+    throw PrayError.parse("manifest", "header must be true or false");
+  }
+  return value;
 }

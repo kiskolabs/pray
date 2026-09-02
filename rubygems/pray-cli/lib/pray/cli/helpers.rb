@@ -38,7 +38,8 @@ module Pray
         rendered,
         project.packages,
         project.source_revisions,
-        project.source_host_keys
+        project.source_host_keys,
+        project
       )
     end
 

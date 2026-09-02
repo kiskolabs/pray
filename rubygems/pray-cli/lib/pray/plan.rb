@@ -15,7 +15,9 @@ module Pray
         package_lines: package_summary_lines(previous_lockfile, lockfile, project),
         lockfile: lockfile_change_status(lockfile_path, lockfile),
         targets: rendered.map { |target| target_change(project, target) },
-        provisioned: Render.planned_provisioned_files(project).map { |file| provisioned_change(project, file) },
+        provisioned: Render.planned_provisioned_files(project).map do |file|
+          provisioned_change(project, file, previous_lockfile)
+        end,
         warnings: []
       )
     end
@@ -68,16 +70,8 @@ module Pray
       [target.path, change]
     end
 
-    def provisioned_change(project, file)
-      destination = File.join(project.project_root, file.path)
-      change = if !File.exist?(destination)
-        "write"
-      elsif FileUtils.compare_file(destination, file.source)
-        "unchanged"
-      else
-        "update"
-      end
-      [file.path, change]
+    def provisioned_change(project, file, previous_lockfile)
+      [file.path, RenderDest.destination_status(project, file, previous_lockfile).to_s]
     end
   end
 end
