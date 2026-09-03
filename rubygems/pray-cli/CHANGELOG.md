@@ -1,5 +1,9 @@
 # CHANGELOG
 
+## Unreleased
+
+- Read the whole eight byte tar checksum field so `.praypkg` archives whose checksum is written as seven octal digits unpack instead of failing integrity.
+
 ## 1.10.0 (2026-09-02)
 
 - Refuse to overwrite exclusive `file:` and `tree:` destinations that already exist with other bytes.

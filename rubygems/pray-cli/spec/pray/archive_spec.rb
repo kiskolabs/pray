@@ -78,6 +78,26 @@ RSpec.describe Pray::Archive do
       end.to raise_error(Pray::Error, /checksum/)
     end
 
+    it "accepts a checksum field written as seven octal digits" do
+      tar_bytes = ustar_bytes("rules.md", "ok\n", checksum_format: "%07o\0")
+      artifact_bytes = zstd_bytes(tar_bytes)
+      output_directory = File.join(workspace, "gnu-checksum-out")
+
+      described_class.unpack_praypkg(artifact_bytes, output_directory)
+
+      expect(File).to exist(File.join(output_directory, "rules.md"))
+    end
+
+    it "accepts a checksum field padded with leading spaces" do
+      tar_bytes = ustar_bytes("rules.md", "ok\n", checksum_format: "%7o\0")
+      artifact_bytes = zstd_bytes(tar_bytes)
+      output_directory = File.join(workspace, "padded-checksum-out")
+
+      described_class.unpack_praypkg(artifact_bytes, output_directory)
+
+      expect(File).to exist(File.join(output_directory, "rules.md"))
+    end
+
     it "rejects duplicate archive paths" do
       tar_bytes = ustar_entry("rules.md", "first\n") +
         ustar_entry("rules.md", "second\n") + ("\0" * 1024)
@@ -110,11 +130,13 @@ RSpec.describe Pray::Archive do
     end
   end
 
-  def ustar_bytes(path, content)
-    ustar_entry(path, content) + ("\0" * 1024)
+  def ustar_bytes(path, content, checksum_format: "%06o\0 ")
+    ustar_entry(path, content, checksum_format: checksum_format) + ("\0" * 1024)
   end
 
-  def ustar_entry(path, content)
+  # checksum_format fills the eight byte checksum field. Writers differ: six octal
+  # digits then NUL and space, seven digits then NUL, or space padding.
+  def ustar_entry(path, content, checksum_format: "%06o\0 ")
     content = content.b
     path = path.b
     header = +"".b
@@ -136,7 +158,7 @@ RSpec.describe Pray::Archive do
     header << ("\0" * 155)
     header = header.ljust(512, "\0")
     sum = header.bytes.sum
-    header[148, 8] = format("%06o\0 ", sum).b
+    header[148, 8] = format(checksum_format, sum).b
     pad = (512 - (content.bytesize % 512)) % 512
     header + content + ("\0" * pad)
   end

@@ -102,7 +102,10 @@ module Pray
     end
 
     def verify_checksum!(header)
-      stored = parse_octal(header.byteslice(148, 6), "checksum")
+      # The checksum field is eight bytes. Writers fill it differently: six octal
+      # digits then NUL and space, seven digits then NUL, or space padding. Read the
+      # whole field and let parse_octal strip the terminator.
+      stored = parse_octal(header.byteslice(148, 8), "checksum")
       sum = 0
       header.bytes.each_with_index do |byte, index|
         sum += (index >= 148 && index < 156) ? 32 : byte
