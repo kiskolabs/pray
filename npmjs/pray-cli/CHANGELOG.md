@@ -3,6 +3,7 @@
 ## Unreleased
 
 - Read the whole eight byte tar checksum field so `.praypkg` archives whose checksum is written as seven octal digits unpack instead of failing integrity.
+- Sort tree hash entries by UTF-8 bytes in the TypeScript CLI so a package hashes the same as where it was published, instead of following the host's locale collation.
 
 ## 1.10.0 (2026-09-02)
 
