@@ -3,6 +3,8 @@
 ## Unreleased
 
 - Read the whole eight byte tar checksum field so `.praypkg` archives whose checksum is written as seven octal digits unpack instead of failing integrity.
+- Collapse trailing blank lines when composing so a composed file ends with a single newline, matching the other CLIs.
+- Order `symbols` before `render` in the canonical manifest JSON so `manifest_hash` matches the other CLIs.
 
 ## 1.10.0 (2026-09-02)
 
