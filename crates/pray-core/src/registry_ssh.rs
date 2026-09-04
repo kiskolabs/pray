@@ -56,7 +56,7 @@ pub(crate) fn resolve_ssh_registry_package_root(
             source_url,
             &declaration.name,
             &selected.version,
-        );
+        )?;
 
         if let Some(mut cached) = crate::registry_cache::try_reuse_cached_registry_package(
             &cache_directory,

@@ -6,7 +6,11 @@ module Pray
       puts "pray #{Pray::VERSION}"
     end
 
-    def clean_command
+    def clean_command(unused: false)
+      if unused
+        CacheClean.clean_unused_registry_cache(Invocation.project_root)
+        return
+      end
       remove_path_if_exists(".pray/cache")
       remove_path_if_exists(".pray/vendor")
       remove_path_if_exists(".pray/state.json")

@@ -1,5 +1,11 @@
 # CHANGELOG
 
+## 1.11.0 (2026-09-04)
+
+- Share the source-keyed registry cache path with the Rust and Ruby CLIs.
+- Add `pray clean --unused` for lockfile-driven registry cache cleanup.
+- Reject unsafe registry package and version path segments.
+
 ## 1.10.0 (2026-09-02)
 
 - Refuse to overwrite exclusive `file:` and `tree:` destinations that already exist with other bytes.

@@ -160,7 +160,7 @@ pub fn resolve_registry_package_root(
         source_url,
         &declaration.name,
         &selected.version,
-    );
+    )?;
 
     if let Some(mut cached) = crate::registry_cache::try_reuse_cached_registry_package(
         &cache_directory,
@@ -246,22 +246,12 @@ pub fn resolve_local_registry_package_root(
             registry_latest_version,
         });
     }
-    let cache_identifier = format!(
-        "{}:{}:{}:{}",
-        source_key,
-        declaration.name,
-        selected.version,
-        selected
-            .artifact_hash
-            .as_deref()
-            .unwrap_or("no-artifact-hash")
-    );
     let cache_directory = crate::registry_cache::registry_cache_directory(
         project_root,
-        &cache_identifier,
+        source_key,
         &declaration.name,
         &selected.version,
-    );
+    )?;
 
     if let Some(mut cached) = crate::registry_cache::try_reuse_cached_registry_package(
         &cache_directory,
