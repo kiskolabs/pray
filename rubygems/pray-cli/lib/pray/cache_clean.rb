@@ -8,6 +8,7 @@ module Pray
 
     def clean_unused_registry_cache(project_root)
       lockfile = Pray.read_lockfile(File.join(project_root, "Prayfile.lock"))
+      validate_lockfile_for_cleanup!(lockfile)
       registry_root = File.expand_path(".pray/cache/registry", project_root)
       retained = lockfile.package.filter_map do |package|
         package_path = File.expand_path(package.path, project_root)
@@ -24,6 +25,24 @@ module Pray
         return
       end
       prune_directory(registry_root, retained, remove_when_empty: false)
+    end
+
+    def validate_lockfile_for_cleanup!(lockfile)
+      validate_sha256_digest!("manifest_hash", lockfile.manifest_hash)
+      lockfile.package.each do |package|
+        if !package.path.is_a?(String) || package.path.empty?
+          raise Error.parse("lockfile", "package path must not be empty")
+        end
+        validate_sha256_digest!("package tree_hash", package.tree_hash)
+        validate_sha256_digest!("package artifact_hash", package.artifact_hash)
+      end
+    end
+
+    def validate_sha256_digest!(field, value)
+      digest = value.to_s.delete_prefix("sha256:")
+      return if value.is_a?(String) && value.start_with?("sha256:") && digest.match?(/\A[0-9a-f]{64}\z/)
+
+      raise Error.parse("lockfile", "#{field} must be a sha256 digest")
     end
 
     def prune_directory(path, retained, remove_when_empty:)

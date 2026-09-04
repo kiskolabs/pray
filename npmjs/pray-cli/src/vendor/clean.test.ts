@@ -3,6 +3,7 @@ import {
   existsSync,
   mkdirSync,
   mkdtempSync,
+  readFileSync,
   rmSync,
   symlinkSync,
   writeFileSync,
@@ -36,7 +37,7 @@ describe("unused registry cache cleaning", () => {
       `prayfile_lock = "1"
 spec = "0.1"
 generated_by = "pray test"
-manifest_hash = "sha256:test"
+manifest_hash = "sha256:0000000000000000000000000000000000000000000000000000000000000000"
 source = []
 target = []
 managed_span = []
@@ -46,8 +47,8 @@ provisioned = []
 name = "sample/base"
 version = "1.4.3"
 path = "${packagePath}"
-tree_hash = "sha256:tree"
-artifact_hash = "sha256:artifact"
+tree_hash = "sha256:1111111111111111111111111111111111111111111111111111111111111111"
+artifact_hash = "sha256:2222222222222222222222222222222222222222222222222222222222222222"
 artifact = "path:${packagePath}"
 exports = []
 dependencies = []
@@ -86,7 +87,7 @@ dependencies = []
     assert.ok(existsSync(globalCache));
   });
 
-  it("validates the complete lockfile before deleting", () => {
+  it("requires a readable and parseable lockfile", () => {
     for (const contents of [undefined, "not valid = ["]) {
       rmSync(join(projectRoot, "Prayfile.lock"), { force: true });
       const cache = createCache(
@@ -98,6 +99,20 @@ dependencies = []
       assert.throws(() => cleanUnusedRegistryCache(projectRoot));
       assert.ok(existsSync(cache));
     }
+  });
+
+  it("rejects an incomplete lockfile before deleting", () => {
+    const cache = createCache(".pray/cache/registry/sample/base/1.0.0/source");
+    writeLockfile("./.pray/cache/registry/sample/base/1.0.0/source");
+    const lockfilePath = join(projectRoot, "Prayfile.lock");
+    const contents = readFileSync(lockfilePath, "utf8").replace(
+      "sha256:0000000000000000000000000000000000000000000000000000000000000000",
+      "sha256:incomplete",
+    );
+    writeFileSync(lockfilePath, contents);
+
+    assert.throws(() => cleanUnusedRegistryCache(projectRoot), /manifest_hash/);
+    assert.ok(existsSync(cache));
   });
 
   it("does not follow registry symlinks", () => {
