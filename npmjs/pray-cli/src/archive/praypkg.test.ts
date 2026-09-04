@@ -74,9 +74,41 @@ describe("praypkg extraction", () => {
       rmSync(output, { recursive: true, force: true });
     }
   });
+
+  it("accepts checksum fields written in other tar conventions", () => {
+    for (const writeChecksum of [sevenDigitChecksum, paddedChecksum]) {
+      const output = mkdtempSync(join(tmpdir(), "pray-archive-checksum-"));
+      const compressed = spawnSync("zstd", ["-q", "-c"], {
+        input: Buffer.concat([
+          tarEntry("rules.md", Buffer.from("ok\n"), writeChecksum),
+          Buffer.alloc(1024),
+        ]),
+      });
+      try {
+        unpackPraypkg(compressed.stdout, output);
+        assert.equal(existsSync(join(output, "rules.md")), true);
+      } finally {
+        rmSync(output, { recursive: true, force: true });
+      }
+    }
+  });
 });
 
-function tarEntry(path: string, content: Buffer): Buffer {
+// The eight byte checksum field is filled differently by different tar writers.
+type ChecksumWriter = (checksum: number) => string;
+
+const posixChecksum: ChecksumWriter = (checksum) =>
+  `${checksum.toString(8).padStart(6, "0")}\0 `;
+const sevenDigitChecksum: ChecksumWriter = (checksum) =>
+  `${checksum.toString(8).padStart(7, "0")}\0`;
+const paddedChecksum: ChecksumWriter = (checksum) =>
+  `${checksum.toString(8).padStart(7, " ")}\0`;
+
+function tarEntry(
+  path: string,
+  content: Buffer,
+  writeChecksum: ChecksumWriter = posixChecksum,
+): Buffer {
   const header = Buffer.alloc(512);
   header.write(path, 0, 100, "utf8");
   header.write("0000644\0", 100, "ascii");
@@ -93,7 +125,7 @@ function tarEntry(path: string, content: Buffer): Buffer {
   header.write("ustar\0", 257, "ascii");
   header.write("00", 263, "ascii");
   const checksum = [...header].reduce((sum, byte) => sum + byte, 0);
-  header.write(`${checksum.toString(8).padStart(6, "0")}\0 `, 148, "ascii");
+  header.write(writeChecksum(checksum), 148, "ascii");
   const padding = Buffer.alloc((512 - (content.length % 512)) % 512);
   return Buffer.concat([header, content, padding]);
 }

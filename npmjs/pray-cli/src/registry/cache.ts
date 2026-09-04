@@ -2,8 +2,7 @@ import { join } from "node:path";
 import { sha256Hex } from "../hashing.js";
 import {
   resolveDistributionPath,
-  validatePackageName,
-  validatePathSegment,
+  validateRegistryCacheIdentity,
 } from "../sync/path-safety.js";
 
 export function registryCacheDirectory(
@@ -11,26 +10,11 @@ export function registryCacheDirectory(
   sourceKey: string,
   packageName: string,
   version: string,
-  artifactHash?: string,
 ): string {
-  validatePackageName(packageName);
-  validatePathSegment(version, "package version");
-  const identifier = [
-    sourceKey,
-    packageName,
-    version,
-    artifactHash ?? "no-artifact-hash",
-  ].join(":");
-  const digest = sha256Hex(identifier).slice(0, 16);
+  const [namespace, name] = validateRegistryCacheIdentity(packageName, version);
+  const sourceHash = sha256Hex(sourceKey).slice(0, 16);
   return resolveDistributionPath(
     projectRoot,
-    join(
-      ".pray",
-      "cache",
-      "registry",
-      packageName.replaceAll("/", "-"),
-      version,
-      digest,
-    ),
+    join(".pray", "cache", "registry", namespace, name, version, sourceHash),
   );
 }

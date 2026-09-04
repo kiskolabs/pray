@@ -6,11 +6,14 @@ import type { PackageSpec } from "./types.js";
 
 export function treeHashFromFileBytes(fileBytes: Map<string, Buffer>): string {
   const entries = [...fileBytes.entries()]
-    .map(([path, bytes]) => [path, sha256Prefixed(bytes)] as const)
-    .sort(([left], [right]) => left.localeCompare(right));
+    .map(
+      ([path, bytes]) =>
+        [Buffer.from(path, "utf8"), path, sha256Prefixed(bytes)] as const,
+    )
+    .sort(([left], [right]) => Buffer.compare(left, right));
 
   let serialized = "";
-  for (const [path, hash] of entries) {
+  for (const [, path, hash] of entries) {
     serialized += `file\0regular\0${path}\0${hash}\n`;
   }
   return sha256Prefixed(serialized);
