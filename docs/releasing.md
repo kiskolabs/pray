@@ -75,7 +75,7 @@ Exit codes for operators: `docs/cli-exit-codes.md` (normative table in RFC 0040)
 
 ## After language registry publish
 
-1. Create a GitHub Release for `vX.Y.Z` so `pray` upgrade notices can resolve the latest tag.
+1. Create a GitHub Release for `vX.Y.Z` so `pray` upgrade notices can resolve the latest tag. When the annotated tag already exists, run `gh release create vX.Y.Z --verify-tag` and omit `--target`. `--target` accepts a branch or full commit SHA; a short SHA returns HTTP 422. Use `--latest=false` when backfilling an older version.
 2. Optionally bump Homebrew with `make bump-homebrew` once the tag exists.
 3. Confirm install paths:
 
