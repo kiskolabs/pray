@@ -19,6 +19,7 @@ spec/pray/invocation_spec.rb
 spec/pray/library_spec.rb
 spec/pray/lockfile_spec.rb
 spec/pray/login_spec.rb
+spec/pray/package_tree_hash_spec.rb
 spec/pray/parser_spec.rb
 spec/pray/project_context_spec.rb
 spec/pray/provisioned_dest_spec.rb

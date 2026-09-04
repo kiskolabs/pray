@@ -76,7 +76,7 @@ describe("praypkg extraction", () => {
   });
 
   it("accepts checksum fields written in other tar conventions", () => {
-    for (const writeChecksum of [gnuChecksum, paddedChecksum]) {
+    for (const writeChecksum of [sevenDigitChecksum, paddedChecksum]) {
       const output = mkdtempSync(join(tmpdir(), "pray-archive-checksum-"));
       const compressed = spawnSync("zstd", ["-q", "-c"], {
         input: Buffer.concat([
@@ -99,7 +99,7 @@ type ChecksumWriter = (checksum: number) => string;
 
 const posixChecksum: ChecksumWriter = (checksum) =>
   `${checksum.toString(8).padStart(6, "0")}\0 `;
-const gnuChecksum: ChecksumWriter = (checksum) =>
+const sevenDigitChecksum: ChecksumWriter = (checksum) =>
   `${checksum.toString(8).padStart(7, "0")}\0`;
 const paddedChecksum: ChecksumWriter = (checksum) =>
   `${checksum.toString(8).padStart(7, " ")}\0`;

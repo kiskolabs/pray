@@ -5,17 +5,15 @@ import { sha256Prefixed } from "../hashing.js";
 import type { PackageSpec } from "./types.js";
 
 export function treeHashFromFileBytes(fileBytes: Map<string, Buffer>): string {
-  // Sort by UTF-8 bytes to match the other implementations. Locale collation
-  // orders "exports/rules.md" before "README.md" and would hash a package
-  // differently here than where it was published.
   const entries = [...fileBytes.entries()]
-    .map(([path, bytes]) => [path, sha256Prefixed(bytes)] as const)
-    .sort(([left], [right]) =>
-      Buffer.compare(Buffer.from(left, "utf8"), Buffer.from(right, "utf8")),
-    );
+    .map(
+      ([path, bytes]) =>
+        [Buffer.from(path, "utf8"), path, sha256Prefixed(bytes)] as const,
+    )
+    .sort(([left], [right]) => Buffer.compare(left, right));
 
   let serialized = "";
-  for (const [path, hash] of entries) {
+  for (const [, path, hash] of entries) {
     serialized += `file\0regular\0${path}\0${hash}\n`;
   }
   return sha256Prefixed(serialized);
