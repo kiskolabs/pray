@@ -100,7 +100,9 @@ pub(crate) enum Command {
         package: String,
     },
     Vendor,
-    Clean,
+    Clean {
+        unused: bool,
+    },
     Tree,
     Sync {
         root: PathBuf,

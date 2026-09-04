@@ -2,7 +2,12 @@
 
 ## Unreleased
 
+## 1.11.0 (2026-09-04)
+
 - Read the whole eight byte tar checksum field so `.praypkg` archives whose checksum is written as seven octal digits unpack instead of failing integrity.
+- Share the source-keyed registry cache path with the Rust and TypeScript CLIs.
+- Add `pray clean --unused` for lockfile-driven registry cache cleanup.
+- Reject unsafe registry package and version path segments.
 
 ## 1.10.0 (2026-09-02)
 

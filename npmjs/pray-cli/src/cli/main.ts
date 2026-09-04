@@ -6,8 +6,13 @@ import { initDistributionRoot } from "../publish/index.js";
 import { renderProject } from "../render/project.js";
 import { renderDependencyTree } from "../tree/index.js";
 import { runTrustCommand } from "../trust/index.js";
-import { cleanProjectCaches, vendorProject } from "../vendor/index.js";
+import {
+  cleanProjectCaches,
+  cleanUnusedRegistryCache,
+  vendorProject,
+} from "../vendor/index.js";
 import { driftProject, verifyProject } from "../verify/project.js";
+import { parseCleanArguments } from "./commands/clean.js";
 import {
   runConfess,
   runPublish,
@@ -190,8 +195,12 @@ export async function runCli(argumentsList: string[]): Promise<number> {
         return 0;
       }
       case "clean": {
-        const project = await resolveCurrentProject();
-        cleanProjectCaches(project.projectRoot);
+        const options = parseCleanArguments(rest);
+        if (options.unused) {
+          cleanUnusedRegistryCache(projectRoot());
+        } else {
+          cleanProjectCaches(projectRoot());
+        }
         return 0;
       }
       case "tree": {
