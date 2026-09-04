@@ -34,6 +34,22 @@ export function validatePackageName(value: string): string {
   return value;
 }
 
+export function validateRegistryCacheIdentity(
+  packageName: string,
+  version: string,
+): [string, string] {
+  const segments = packageName.split("/");
+  if (segments.length !== 2) {
+    throw PrayError.integrity(`invalid registry package name: ${packageName}`);
+  }
+  const namespace = segments[0]!;
+  const name = segments[1]!;
+  validatePathSegment(namespace, "registry package namespace");
+  validatePathSegment(name, "registry package name");
+  validatePathSegment(version, "registry package version");
+  return [namespace, name];
+}
+
 export function rejectAbsoluteArtifactPath(value: string): string {
   const path = value.trim();
   if (/^[a-z][a-z0-9+.-]*:/i.test(path)) {

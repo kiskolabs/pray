@@ -110,6 +110,33 @@ pub fn validate_package_relative_path(path: &Path) -> PrayResult<()> {
     Ok(())
 }
 
+pub fn validate_registry_cache_identity<'a>(
+    package_name: &'a str,
+    version: &str,
+) -> PrayResult<(&'a str, &'a str)> {
+    let mut segments = package_name.split('/');
+    let namespace = segments.next().unwrap_or_default();
+    let name = segments.next().unwrap_or_default();
+    if segments.next().is_some()
+        || !registry_cache_segment_is_safe(namespace)
+        || !registry_cache_segment_is_safe(name)
+    {
+        return Err(PrayError::Integrity(format!(
+            "invalid registry package name: {package_name}"
+        )));
+    }
+    if !registry_cache_segment_is_safe(version) {
+        return Err(PrayError::Integrity(format!(
+            "invalid registry package version: {version}"
+        )));
+    }
+    Ok((namespace, name))
+}
+
+fn registry_cache_segment_is_safe(value: &str) -> bool {
+    !value.is_empty() && value != "." && value != ".." && !value.contains(['/', '\\', '\0'])
+}
+
 pub fn sanitize_relative_path(path: &str) -> PrayResult<PathBuf> {
     let path = path.trim_start_matches('/');
     let mut relative = PathBuf::new();

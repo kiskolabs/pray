@@ -51,7 +51,6 @@ export async function resolveRegistryPackageRoot(
     sourceUrl,
     declaration.name,
     selected.version,
-    selected.artifactHash,
   );
 
   if (cacheReady(cacheDirectory, selected)) {
@@ -112,7 +111,6 @@ export async function resolveLocalRegistryPackageRoot(
     sourceKey,
     declaration.name,
     selected.version,
-    selected.artifactHash,
   );
 
   if (cacheReady(cacheDirectory, selected)) {

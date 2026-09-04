@@ -3,12 +3,19 @@ use crate::manifest::ManifestPackage;
 use crate::package_archive::unpack_praypkg;
 use crate::package_integrity::{require_remote_integrity_fields, verify_package_signature};
 use crate::package_spec::parse_package_spec;
-use crate::paths::{find_prayspec_file, remove_path_if_exists, validate_package_relative_path};
+use crate::paths::{
+    find_prayspec_file, remove_path_if_exists, validate_package_relative_path,
+    validate_registry_cache_identity,
+};
 use crate::registry::{RegistryPackageResolution, RegistryPackageVersion};
 use crate::registry_http::http_get;
 use crate::{PrayError, PrayResult};
 use std::fs;
 use std::path::{Path, PathBuf};
+
+#[cfg(test)]
+#[path = "registry_cache_unit.rs"]
+mod tests;
 
 /// Download into a staging directory, unpack, then rename into the final cache path.
 pub(crate) fn install_registry_artifact_to_cache(
@@ -142,20 +149,22 @@ pub(crate) fn validate_and_unpack_registry_package(
 
 pub(crate) fn registry_cache_directory(
     project_root: &Path,
-    source_url: &str,
+    source_key: &str,
     package_name: &str,
     version: &str,
-) -> PathBuf {
-    let source_key = sha256_prefixed(source_url.as_bytes())
+) -> PrayResult<PathBuf> {
+    let (namespace, name) = validate_registry_cache_identity(package_name, version)?;
+    let source_hash = sha256_prefixed(source_key.as_bytes())
         .trim_start_matches("sha256:")
         .chars()
         .take(16)
         .collect::<String>();
-    project_root
+    Ok(project_root
         .join(".pray/cache/registry")
-        .join(source_key)
-        .join(package_name)
+        .join(namespace)
+        .join(name)
         .join(version)
+        .join(source_hash))
 }
 
 pub(crate) fn try_vendored_package_root(
