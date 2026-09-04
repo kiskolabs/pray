@@ -8,6 +8,7 @@ Fixtures under this tree are inputs (and expected parse slices) exercised by Rus
 - `manifest/<case>/expected.json` — destination-focused parse expectations
 - `manifest-invalid/<case>/Prayfile` — Prayfile text every implementation must reject
 - `registry-cache/<case>.json` — source identity and expected project-local cache path
+- `package-tree/<case>.json` — package files and expected normalized tree hash
 
 Add cases when a surface or destination contract must stay aligned across runtimes. Prefer small, decision-bearing fixtures over copying full integration trees.
 
@@ -17,5 +18,6 @@ Current cases:
 - `legacy-target` — classic `target` / `output` / unbound package declaration
 - `manifest-invalid` — project-relative path boundary violations
 - `registry-cache/identity-first` — namespaced package cache identity shared by every CLI
+- `package-tree/byte-order` — UTF-8 byte ordering shared by every CLI
 
 Fuller conformance packs also start under `fixtures/` (RFC 0100).

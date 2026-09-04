@@ -81,7 +81,7 @@ RSpec.describe Pray::Archive do
     it "accepts a checksum field written as seven octal digits" do
       tar_bytes = ustar_bytes("rules.md", "ok\n", checksum_format: "%07o\0")
       artifact_bytes = zstd_bytes(tar_bytes)
-      output_directory = File.join(workspace, "gnu-checksum-out")
+      output_directory = File.join(workspace, "seven-digit-checksum-out")
 
       described_class.unpack_praypkg(artifact_bytes, output_directory)
 

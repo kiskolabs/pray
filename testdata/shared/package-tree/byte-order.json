@@ -1,0 +1,21 @@
+{
+  "files": [
+    {
+      "path": "exports/rules.md",
+      "content": "rules\n"
+    },
+    {
+      "path": "README.md",
+      "content": "# demo\n"
+    },
+    {
+      "path": "\ue000/rules.md",
+      "content": "private use\n"
+    },
+    {
+      "path": "\ud800\udc00/rules.md",
+      "content": "supplementary\n"
+    }
+  ],
+  "tree_hash": "sha256:4f914246da1c08fdb92222f6d427a576631a2f17ccb94c2ae0fd5d99a22ee9c0"
+}
