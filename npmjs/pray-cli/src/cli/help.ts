@@ -14,7 +14,7 @@ const PACKAGE_COMMANDS = [
   "update [package] [--major] [--latest] [--dry-run] [--json]",
   "unlock <package>                       clear a locked package pin",
   "vendor                                 copy resolved packages locally",
-  "clean                                  remove local cache and vendor trees",
+  "clean [--unused]                       remove local state or unused registry entries",
 ];
 
 const DISTRIBUTION_COMMANDS = [
@@ -89,7 +89,8 @@ const COMMAND_HELP: Record<string, string> = {
   remove: "remove a package from Prayfile\n\nUsage: pray remove <name>",
   unlock: "clear a locked package pin\n\nUsage: pray unlock <package>",
   vendor: "copy resolved packages locally\n\nUsage: pray vendor",
-  clean: "remove local cache and vendor trees\n\nUsage: pray clean",
+  clean:
+    "remove local cache and vendor trees, or only unused registry entries\n\nUsage: pray clean [--unused]",
   login:
     "authenticate to a registry server\n\n" +
     "Usage: pray login --server URL --email EMAIL (--passkey-key PATH --credential-id ID | --ssh-agent --public-key PATH)",

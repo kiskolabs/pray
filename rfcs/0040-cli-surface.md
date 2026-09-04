@@ -66,7 +66,11 @@ Also useful: `remove`, `unlock`, `tree`, `list`, `outdated`, `explain`, `manifes
 - confess: signed acceptance/rejection feedback
 - serve: local or self-hosted distribution point
 - yank: mark a version yanked in a distribution root; `--undo` clears the flag
-- vendor / clean: copy into `.pray/vendor`; remove cache/ephemeral state
+- vendor: copy resolved packages into `.pray/vendor`
+- clean: remove `.pray/cache`, `.pray/vendor`, and `.pray/state.json`
+- clean --unused: remove only project-local registry cache entries that the
+  complete current `Prayfile.lock` does not reference; preserve Git caches,
+  vendor state, project state, and global caches
 - tree: dependency graph
 - unlock: drop the lock pin for one package
 - search: substring match over a distribution index

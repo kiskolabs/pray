@@ -1,6 +1,7 @@
 mod apply_report;
 mod auth_client;
 mod auth_session_store;
+mod cache_clean;
 mod cli_parse;
 mod cli_parse_auth;
 mod cli_parse_packages;
@@ -240,7 +241,7 @@ fn run(arguments: Vec<String>) -> PrayResult<()> {
         Command::Outdated { remote } => outdated_command(remote),
         Command::Explain { package } => explain_command(package),
         Command::Vendor => vendor_command(),
-        Command::Clean => clean_command(),
+        Command::Clean { unused } => clean_command(unused),
         Command::Tree => tree_command(),
         Command::Sync { root, peers } => sync_command(root, peers),
         Command::Trust { arguments } => trust_command::run_trust_command(arguments),

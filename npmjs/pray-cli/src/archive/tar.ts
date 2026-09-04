@@ -121,7 +121,10 @@ function basenameStartsWithAppleDouble(path: string): boolean {
 }
 
 function verifyChecksum(header: Buffer): void {
-  const stored = parseOctal(header.subarray(148, 154), "checksum");
+  // The checksum field is eight bytes. Writers fill it differently: six octal
+  // digits then NUL and space, seven digits then NUL, or space padding. Read the
+  // whole field and let parseOctal strip the terminator.
+  const stored = parseOctal(header.subarray(148, 156), "checksum");
   let sum = 0;
   for (let index = 0; index < header.length; index += 1) {
     sum += index >= 148 && index < 156 ? 32 : (header[index] ?? 0);

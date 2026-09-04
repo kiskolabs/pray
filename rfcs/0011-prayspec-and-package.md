@@ -311,7 +311,7 @@ Rules:
 - paths are UTF-8
 - paths are relative
 - paths must not contain `..`
-- file order is lexicographic
+- file order is lexicographic by unsigned UTF-8 bytes
 - symlinks forbidden in v1
 - device files forbidden
 - only files listed in prayspec included
@@ -319,7 +319,7 @@ Rules:
 Pseudo-algorithm:
 
 ```
-entries = sorted(package_files_by_relative_path)
+entries = sorted(package_files_by_relative_path_utf8_bytes)
 for each entry:
   append entry.kind
   append "\0"

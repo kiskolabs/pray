@@ -117,7 +117,7 @@ module Pray
         "remove" => "remove a package from Prayfile\n\nUsage: pray remove <name>",
         "unlock" => "clear a locked package pin\n\nUsage: pray unlock <package>",
         "vendor" => "copy resolved packages locally\n\nUsage: pray vendor",
-        "clean" => "remove local cache and vendor trees\n\nUsage: pray clean",
+        "clean" => "remove local cache and vendor trees, or only unused registry entries\n\nUsage: pray clean [--unused]",
         "publish" => <<~TEXT.strip,
           upload packages to a registry or local root
 
