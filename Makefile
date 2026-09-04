@@ -1,4 +1,5 @@
-.PHONY: build clean install bench bench-scaling ruby-test loc-check rfc-ids libyears libyears-rust libyears-ruby libyears-npm bump-homebrew \
+.PHONY: build clean install bench bench-scaling ruby-test loc-check rfc-ids audit audit-rust audit-ruby audit-npm \
+	libyears libyears-rust libyears-ruby libyears-npm bump-homebrew \
 	release-dry-run release-crates release-npm release-rubygems release-distribution release-all \
 	coverage coverage-rust mutants fuzz-build
 
@@ -47,6 +48,17 @@ mutants:
 
 fuzz-build:
 	cargo +nightly fuzz build --fuzz-dir fuzz
+
+audit: audit-rust audit-ruby audit-npm
+
+audit-rust:
+	cargo deny check advisories licenses bans sources
+
+audit-ruby:
+	cd rubygems/pray-cli && bundle exec bundler-audit check --update
+
+audit-npm:
+	cd npmjs/pray-cli && npm audit --omit=dev
 
 libyears: libyears-rust libyears-ruby libyears-npm
 
