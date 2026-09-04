@@ -14,7 +14,7 @@ fn write_lockfile(repo: &std::path::Path, package_path: &str) {
             r#"prayfile_lock = "1"
 spec = "0.1"
 generated_by = "pray test"
-manifest_hash = "sha256:test"
+manifest_hash = "sha256:0000000000000000000000000000000000000000000000000000000000000000"
 source = []
 target = []
 managed_span = []
@@ -24,8 +24,8 @@ provisioned = []
 name = "sample/base"
 version = "1.4.3"
 path = "{package_path}"
-tree_hash = "sha256:tree"
-artifact_hash = "sha256:artifact"
+tree_hash = "sha256:1111111111111111111111111111111111111111111111111111111111111111"
+artifact_hash = "sha256:2222222222222222222222222222222222222222222222222222222222222222"
 artifact = "path:{package_path}"
 exports = []
 dependencies = []
@@ -69,7 +69,7 @@ fn clean_unused_retains_only_locked_registry_entries() {
 }
 
 #[test]
-fn clean_unused_validates_the_lockfile_before_deleting() {
+fn clean_unused_requires_a_readable_parseable_lockfile() {
     for contents in [None, Some("not valid = [")] {
         let repo = temporary_directory("pray-clean-unused-lock");
         let cache = repo.join(".pray/cache/registry/sample/base/1.0.0/source");
@@ -82,6 +82,50 @@ fn clean_unused_validates_the_lockfile_before_deleting() {
         assert!(!run_pray(&repo, &["clean", "--unused"]).status.success());
         assert!(cache.exists());
     }
+}
+
+#[test]
+fn clean_unused_rejects_incomplete_lockfile_before_deleting() {
+    let repo = temporary_directory("pray-clean-unused-incomplete-lock");
+    let cache = repo.join(".pray/cache/registry/sample/base/1.0.0/source");
+    fs::create_dir_all(&cache).expect("cache");
+    fs::write(cache.join("entry"), "cached").expect("cache entry");
+    write_lockfile(&repo, "./.pray/cache/registry/sample/base/1.0.0/source");
+    let lockfile_path = repo.join("Prayfile.lock");
+    let lockfile = fs::read_to_string(&lockfile_path)
+        .expect("lockfile")
+        .replace(
+            "sha256:0000000000000000000000000000000000000000000000000000000000000000",
+            "sha256:incomplete",
+        );
+    fs::write(lockfile_path, lockfile).expect("incomplete lockfile");
+
+    assert!(!run_pray(&repo, &["clean", "--unused"]).status.success());
+    assert!(cache.exists());
+}
+
+#[test]
+fn clean_uses_the_selected_project_root() {
+    let repo = temporary_directory("pray-clean-project-root");
+    let nested = repo.join("nested");
+    fs::create_dir_all(&nested).expect("nested directory");
+    for relative in [".pray/cache", ".pray/vendor"] {
+        fs::create_dir_all(repo.join(relative)).expect("local state");
+    }
+    fs::write(repo.join(".pray/state.json"), "{}").expect("state");
+
+    let clean = run_pray(
+        &nested,
+        &["--path", repo.to_str().expect("utf-8 path"), "clean"],
+    );
+    assert!(
+        clean.status.success(),
+        "clean failed: {}",
+        String::from_utf8_lossy(&clean.stderr)
+    );
+    assert!(!repo.join(".pray/cache").exists());
+    assert!(!repo.join(".pray/vendor").exists());
+    assert!(!repo.join(".pray/state.json").exists());
 }
 
 #[cfg(unix)]

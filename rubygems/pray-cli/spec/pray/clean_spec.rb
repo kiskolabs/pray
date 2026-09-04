@@ -7,6 +7,7 @@ RSpec.describe Pray::CLI do
   let(:workspace) { Dir.mktmpdir("pray-clean-unused-") }
 
   after do
+    Pray::Invocation.context = nil
     FileUtils.rm_rf(workspace)
   end
 
@@ -17,7 +18,7 @@ RSpec.describe Pray::CLI do
         prayfile_lock = "1"
         spec = "0.1"
         generated_by = "pray test"
-        manifest_hash = "sha256:test"
+        manifest_hash = "sha256:0000000000000000000000000000000000000000000000000000000000000000"
         source = []
         target = []
         managed_span = []
@@ -27,8 +28,8 @@ RSpec.describe Pray::CLI do
         name = "sample/base"
         version = "1.4.3"
         path = "#{package_path}"
-        tree_hash = "sha256:tree"
-        artifact_hash = "sha256:artifact"
+        tree_hash = "sha256:1111111111111111111111111111111111111111111111111111111111111111"
+        artifact_hash = "sha256:2222222222222222222222222222222222222222222222222222222222222222"
         artifact = "path:#{package_path}"
         exports = []
         dependencies = []
@@ -68,7 +69,7 @@ RSpec.describe Pray::CLI do
     expect(File).to exist(global_cache)
   end
 
-  it "validates the complete lockfile before deleting" do
+  it "requires a readable and parseable lockfile" do
     [nil, "not valid = [\n"].each do |contents|
       FileUtils.rm_rf(File.join(workspace, "Prayfile.lock"))
       cache = File.join(workspace, ".pray/cache/registry/sample/base/1.0.0/source")
@@ -80,6 +81,37 @@ RSpec.describe Pray::CLI do
       end.to raise_error(StandardError)
       expect(File).to exist(cache)
     end
+  end
+
+  it "rejects an incomplete lockfile before deleting" do
+    cache = File.join(workspace, ".pray/cache/registry/sample/base/1.0.0/source")
+    create_cache(cache)
+    write_lockfile("./.pray/cache/registry/sample/base/1.0.0/source")
+    lockfile_path = File.join(workspace, "Prayfile.lock")
+    contents = File.read(lockfile_path).sub(
+      "sha256:0000000000000000000000000000000000000000000000000000000000000000",
+      "sha256:incomplete"
+    )
+    File.write(lockfile_path, contents)
+
+    expect do
+      Dir.chdir(workspace) { described_class.clean_command(unused: true) }
+    end.to raise_error(Pray::Error, /manifest_hash/)
+    expect(File).to exist(cache)
+  end
+
+  it "cleans the selected project root" do
+    nested = File.join(workspace, "nested")
+    FileUtils.mkdir_p(nested)
+    create_cache(File.join(workspace, ".pray/cache/entry"))
+    create_cache(File.join(workspace, ".pray/vendor/entry"))
+    File.write(File.join(workspace, ".pray/state.json"), "{}")
+
+    Dir.chdir(nested) { described_class.run(["--path", workspace, "clean"]) }
+
+    expect(File).not_to exist(File.join(workspace, ".pray/cache"))
+    expect(File).not_to exist(File.join(workspace, ".pray/vendor"))
+    expect(File).not_to exist(File.join(workspace, ".pray/state.json"))
   end
 
   it "does not follow registry symlinks" do

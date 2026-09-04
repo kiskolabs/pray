@@ -33,13 +33,17 @@ Worked example for source `https://registry.example/index.json`, package `sample
 
 No GitHub issue and no existing usr/docs issue records this layout split. Nearby notes cover unpack staging and integrity fail-closed, not path order.
 
-Implementation pass: Rust, Ruby, and TypeScript now use the identity-first path and the same source-key hash. `pray clean --unused` validates the complete lockfile before pruning unreferenced registry entries, abandoned staging paths, and legacy layouts without following symbolic links. It preserves Git caches, vendor output, project state, and global caches.
+Implementation pass: Rust, Ruby, and TypeScript now use the identity-first path and the same source-key hash. `pray clean --unused` requires a readable and parseable lockfile, validates cleanup-critical paths and SHA-256 fields, then prunes unreferenced registry entries, abandoned staging paths, and legacy layouts without following symbolic links. It preserves Git caches, vendor output, project state, and global caches.
 
 RFC 0070 and RFC 0040 now carry the cache path and cleanup contracts. Shared and runtime-specific regression tests cover parity, unsafe identities, retained and stale paths, malformed or missing lockfiles, and symbolic-link safety. Release validation is recorded in `usr/docs/changelogs/20260904081940_registry-cache-cleanup.md`.
 
+Engineering audit pass: all three cleanup implementations accepted malformed SHA-256 fields after structural parsing. Ruby could also turn a missing package path into a runtime type error, and bare clean in Rust and Ruby ignored the selected project root. Regression tests demonstrated cache deletion or wrong-root behavior before the fixes. Cleanup now fails before deletion when the manifest hash, package tree hash, package artifact hash, or package path is invalid. Bare clean and unused cleanup now use the same selected project root.
+
+The audit rejected two reported defects. An empty package array is a valid lockfile for a project with no packages, so removing every registry entry is correct. A legacy registry path that remains in the current lockfile is still retained; a new-layout entry absent from that lockfile is unused by definition.
+
 ## Next
 
-No open implementation actions remain for registry cache parity or project-local unused cache cleanup. Vendor slash flattening and Git cache pruning remain unchanged by decision.
+No release-blocking implementation action remains. Vendor slash flattening and Git cache pruning remain unchanged by decision. Cache mutations are not serialized across processes, so cleanup must not run concurrently with install or update.
 
 ## Source
 

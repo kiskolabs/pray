@@ -18,7 +18,6 @@ use pray_core::registry::version_is_greater_than;
 use pray_core::render::{layout_rendered_targets, render_project};
 use pray_core::resolve_context::ResolveOptions;
 use pray_core::{PrayError, PrayResult};
-use std::path::Path;
 
 pub(crate) fn manifest_command() -> PrayResult<()> {
     let manifest = load_manifest()?;
@@ -55,12 +54,13 @@ pub(crate) fn plan_command(remote: bool) -> PrayResult<()> {
 }
 
 pub(crate) fn clean_command(unused: bool) -> PrayResult<()> {
+    let project_root = workspace_root();
     if unused {
-        return clean_unused_registry_cache(&workspace_root());
+        return clean_unused_registry_cache(&project_root);
     }
-    remove_path_if_exists(Path::new(".pray/cache"))?;
-    remove_path_if_exists(Path::new(".pray/vendor"))?;
-    remove_path_if_exists(Path::new(".pray/state.json"))?;
+    remove_path_if_exists(&project_root.join(".pray/cache"))?;
+    remove_path_if_exists(&project_root.join(".pray/vendor"))?;
+    remove_path_if_exists(&project_root.join(".pray/state.json"))?;
     Ok(())
 }
 

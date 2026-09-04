@@ -1,11 +1,12 @@
 use crate::materialize::remove_path_if_exists;
 use pray_core::lockfile::read_lockfile;
-use pray_core::PrayResult;
+use pray_core::{PrayError, PrayResult};
 use std::fs;
 use std::path::{Component, Path, PathBuf};
 
 pub(crate) fn clean_unused_registry_cache(project_root: &Path) -> PrayResult<()> {
     let lockfile = read_lockfile(&project_root.join("Prayfile.lock"))?;
+    validate_lockfile_for_cleanup(&lockfile)?;
     let registry_root = project_root.join(".pray/cache/registry");
     let retained = lockfile
         .package
@@ -23,6 +24,40 @@ pub(crate) fn clean_unused_registry_cache(project_root: &Path) -> PrayResult<()>
     }
 
     prune_directory(&registry_root, &retained, false)
+}
+
+fn validate_lockfile_for_cleanup(lockfile: &pray_core::lockfile::Lockfile) -> PrayResult<()> {
+    validate_sha256_digest("manifest_hash", &lockfile.manifest_hash)?;
+    for package in &lockfile.package {
+        if package.path.is_empty() {
+            return Err(lockfile_parse_error("package path must not be empty"));
+        }
+        validate_sha256_digest("package tree_hash", &package.tree_hash)?;
+        validate_sha256_digest("package artifact_hash", &package.artifact_hash)?;
+    }
+    Ok(())
+}
+
+fn validate_sha256_digest(field: &str, value: &str) -> PrayResult<()> {
+    let digest = value.strip_prefix("sha256:").unwrap_or_default();
+    if digest.len() == 64
+        && digest
+            .bytes()
+            .all(|byte| byte.is_ascii_digit() || (b'a'..=b'f').contains(&byte))
+    {
+        Ok(())
+    } else {
+        Err(lockfile_parse_error(&format!(
+            "{field} must be a sha256 digest"
+        )))
+    }
+}
+
+fn lockfile_parse_error(message: &str) -> PrayError {
+    PrayError::Parse {
+        kind: "lockfile",
+        message: message.to_string(),
+    }
 }
 
 fn retained_registry_path(
