@@ -115,6 +115,18 @@ cache/
 
 Cache must be safely deletable.
 
+Registry packages use a project-local cache beside other project state:
+
+```
+.pray/cache/registry/<namespace>/<name>/<version>/<source-hash>
+```
+
+Package identity MUST contain exactly two non-empty, path-safe segments. The
+version MUST be one path-safe segment. `source-hash` is the first 16 lowercase
+hexadecimal characters of SHA-256 over the exact source key used for
+resolution. Artifact and tree hashes validate cache content; they are not cache
+path inputs.
+
 ---
 
 ### 56. State file

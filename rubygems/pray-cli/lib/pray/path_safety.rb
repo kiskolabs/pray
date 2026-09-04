@@ -80,5 +80,25 @@ module Pray
 
       validate_project_relative_path!(value)
     end
+
+    def validate_registry_cache_identity!(package_name, version)
+      namespace, name, extra_segment = package_name.to_s.split("/", -1)
+      unless extra_segment.nil? && registry_cache_segment_safe?(namespace) && registry_cache_segment_safe?(name)
+        raise Error.integrity("invalid registry package name: #{package_name}")
+      end
+      unless registry_cache_segment_safe?(version)
+        raise Error.integrity("invalid registry package version: #{version}")
+      end
+
+      [namespace, name]
+    end
+
+    def registry_cache_segment_safe?(value)
+      value.is_a?(String) &&
+        !value.empty? &&
+        ![".", ".."].include?(value) &&
+        !value.match?(%r{[/\\\0]})
+    end
+    private_class_method :registry_cache_segment_safe?
   end
 end

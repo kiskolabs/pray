@@ -9,6 +9,8 @@ import { basename, dirname, join } from "node:path";
 import { findPrayspecFile } from "../package-spec/index.js";
 import type { ResolvedProject } from "../resolve/types.js";
 
+export { cleanUnusedRegistryCache } from "./clean.js";
+
 export function vendorProject(project: ResolvedProject): void {
   for (const packageEntry of project.packages) {
     const vendorRoot = join(

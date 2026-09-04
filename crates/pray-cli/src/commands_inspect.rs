@@ -1,6 +1,7 @@
 use crate::apply_report::{
     build_materialization_preview, print_materialization_report, MaterializationMode,
 };
+use crate::cache_clean::clean_unused_registry_cache;
 use crate::commands_materialize::resolve_project_for_materialization;
 use crate::commands_update::{
     constraint_preview_options, preview_remote_updates, remote_preview_options,
@@ -9,7 +10,7 @@ use crate::lockfile_ops::build_lockfile;
 use crate::materialize::remove_path_if_exists;
 use crate::project_paths::{
     load_manifest, locked_package, lockfile_path, manifest_path, resolve_project,
-    resolve_project_with_options,
+    resolve_project_with_options, workspace_root,
 };
 use crate::update_report::{print_constraint_blocked_packages, print_update_summary};
 use pray_core::lockfile::read_lockfile;
@@ -53,7 +54,10 @@ pub(crate) fn plan_command(remote: bool) -> PrayResult<()> {
     Ok(())
 }
 
-pub(crate) fn clean_command() -> PrayResult<()> {
+pub(crate) fn clean_command(unused: bool) -> PrayResult<()> {
+    if unused {
+        return clean_unused_registry_cache(&workspace_root());
+    }
     remove_path_if_exists(Path::new(".pray/cache"))?;
     remove_path_if_exists(Path::new(".pray/vendor"))?;
     remove_path_if_exists(Path::new(".pray/state.json"))?;

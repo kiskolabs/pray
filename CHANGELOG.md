@@ -2,6 +2,12 @@
 
 ## Unreleased
 
+## 1.11.0 (2026-09-04)
+
+- Use the same source-keyed `.pray/cache/registry/<namespace>/<name>/<version>/<source-hash>` path in the Rust, Ruby, and TypeScript CLIs.
+- Add `pray clean --unused` to remove registry cache entries absent from the current lockfile while preserving Git cache, vendor, and project state.
+- Reject unsafe registry package and version path segments before writing cache entries.
+
 ## 1.10.0 (2026-09-02)
 
 - Refuse to overwrite exclusive `file:` and `tree:` destinations that already exist with other bytes.

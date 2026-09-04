@@ -3,6 +3,7 @@
 require "fileutils"
 
 require_relative "invocation"
+require_relative "cache_clean"
 require_relative "cli/parse"
 require_relative "cli/help"
 require_relative "cli/suggest"
@@ -97,7 +98,7 @@ module Pray
       in [:outdated, arguments] then outdated_command(arguments)
       in [:explain, name] then explain_command(name)
       in [:vendor] then raise Error.unsupported("vendor is not implemented yet in pray-cli Ruby")
-      in [:clean] then clean_command
+      in [:clean, options] then clean_command(**options)
       in [:tree] then tree_command
       in [:trust_list, options] then trust_list_command(**options)
       in [:trust_show] then trust_show_command

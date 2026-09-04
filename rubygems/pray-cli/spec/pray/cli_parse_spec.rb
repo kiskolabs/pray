@@ -27,6 +27,15 @@ RSpec.describe Pray::CLI do
       )
     end
 
+    it "strictly parses clean arguments" do
+      expect(described_class.parse_command(["clean"])).to eq([:clean, {unused: false}])
+      expect(described_class.parse_command(["clean", "--unused"])).to eq([:clean, {unused: true}])
+      expect { described_class.parse_command(["clean", "--other"]) }
+        .to raise_error(Pray::Error, /unknown clean flag/)
+      expect { described_class.parse_command(["clean", "unused"]) }
+        .to raise_error(Pray::Error, /unexpected clean argument/)
+    end
+
     it "rejects unknown commands with usage errors" do
       expect { described_class.parse_command(["not-a-command"]) }
         .to raise_error(Pray::Error, /usage error:.*unknown command/)
