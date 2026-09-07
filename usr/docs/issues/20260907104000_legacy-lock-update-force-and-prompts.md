@@ -191,6 +191,8 @@ At 10,000 files, wall-time ranges were Rust 1.19 to 1.36 seconds, TypeScript 1.0
 
 ## Next
 
+Later pass 20260907150000: this work ships as 1.12.0. See usr/docs/issues/20260907150000_prepare-1-12-0-release.md.
+
 Validate crash recovery on additional operating systems and filesystems. This pass exercises process exit and I/O failures on macOS; it does not simulate power loss. Rust conservatively refuses stale-owner takeover outside Unix. Directory syncing is skipped on Windows in the ports. Automatic recovery on Windows remains unvalidated. The ownership protocol assumes a local filesystem and one host process namespace; network filesystems and duplicate hostnames need separate validation.
 
 Cooperating Pray commands serialize writes, but readers can observe intermediate files. External writers can still race between the final check and replacement. Staging requires destinations to share a filesystem with the project recovery directory; cross-filesystem replacement fails and enters recovery. Restored state covers file contents and POSIX permission bits, not timestamps, inode or hard-link identity, ACLs, or extended attributes. Empty created directories and source-cache changes may remain.
@@ -200,7 +202,7 @@ Extend the final Ruby comparison to other package shapes, near-limit valid files
 ## Source
 
 - rfcs/0033-provisioned-destination-safety.md; rfcs/0031-ownership-and-generated-output.md; rfcs/0040-cli-surface.md.
-- CHANGELOG.md, versions 1.9.1 and 1.10.0 and the current Unreleased entries.
+- CHANGELOG.md, versions 1.9.1, 1.10.0, and 1.12.0.
 - Historical writers: git show v1.9.1:crates/pray-core/src/render_provisioned.rs and git show v1.9.2:crates/pray-core/src/render_provisioned.rs.
 - crates/pray-cli/src/commands_update.rs; crates/pray-cli/src/commands_update_latest.rs; crates/pray-core/src/render_dest.rs; crates/pray-core/src/render_write.rs; crates/pray-core/src/verify/provisioned.rs.
 - npmjs/pray-cli/src/cli/commands/update-core.ts; npmjs/pray-cli/src/cli/commands/update-latest.ts; npmjs/pray-cli/src/render/dest.ts; npmjs/pray-cli/src/verify/provisioned.ts.
