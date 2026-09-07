@@ -84,6 +84,14 @@ module Pray
     end
 
     def update_command(arguments)
+      if arguments.any? { |argument| %w[--dry-run --json].include?(argument) }
+        raise Error.unsupported("this Ruby CLI does not support --dry-run or --json for update; use `pray plan` to preview the current Prayfile")
+      end
+      if arguments.any? { |argument| %w[--latest --major].include?(argument) }
+        raise Error.unsupported(
+          "to update beyond the current constraint, edit the package version in Prayfile, then run `pray update`"
+        )
+      end
       package = arguments.reject { |argument| argument.start_with?("--") }.first
       offline = arguments.include?("--offline")
       if package

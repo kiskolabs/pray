@@ -11,6 +11,7 @@ module Pray
     module_function
 
     def build_materialization_preview(project, rendered, lockfile, lockfile_path, previous_lockfile)
+      RenderDest.validate_destinations!(project, previous_lockfile)
       MaterializationPreview.new(
         package_lines: package_summary_lines(previous_lockfile, lockfile, project),
         lockfile: lockfile_change_status(lockfile_path, lockfile),

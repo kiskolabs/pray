@@ -87,6 +87,7 @@ pub fn write_rendered_targets_with_previous_lockfile(
     rendered: &[RenderedTarget],
     previous_lockfile: Option<&Lockfile>,
 ) -> PrayResult<()> {
+    crate::render_dest::provisioned_destination_statuses(project, previous_lockfile)?;
     if project.manifest.render.conflict == "fail" {
         if let Some(lockfile) = previous_lockfile {
             crate::render_conflict::reject_managed_span_conflicts(&project.project_root, lockfile)?;

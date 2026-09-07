@@ -172,7 +172,7 @@ fn collect_verification_report(
         }
     }
 
-    provisioned::push_provisioned_and_local_findings(project, &mut report.findings)?;
+    provisioned::push_provisioned_and_local_findings(project, lockfile, &mut report.findings)?;
 
     Ok((report, rendered_targets, fresh_targets))
 }

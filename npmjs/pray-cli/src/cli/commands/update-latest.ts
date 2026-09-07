@@ -1,22 +1,15 @@
-import { existsSync, readFileSync, writeFileSync } from "node:fs";
+import { readFileSync } from "node:fs";
 import {
   latestConstraintForPackage,
   versionSatisfies,
 } from "../../constraint.js";
 import { PrayError } from "../../errors.js";
-import { readLockfile } from "../../lockfile/index.js";
 import { parseManifest } from "../../manifest/index.js";
 import { replacePackageDeclaration } from "../../manifest/package-declaration.js";
 import { defaultResolveOptions } from "../../resolve/context.js";
-import {
-  lockfilePath,
-  manifestPath,
-  resolveCurrentProject,
-} from "../invocation.js";
-import {
-  printUpdateJsonReport,
-  updateWithManifestConstraints,
-} from "./update-core.js";
+import { resolveProject } from "../../resolve/project.js";
+import { manifestPath, resolveCurrentProject } from "../invocation.js";
+import { writeUpdate } from "./update-core.js";
 
 export async function updateLatestCommand(
   packageName: string | undefined,
@@ -24,7 +17,8 @@ export async function updateLatestCommand(
   dryRun = false,
 ): Promise<void> {
   const path = manifestPath();
-  let manifestText = readFileSync(path, "utf8");
+  const originalText = readFileSync(path, "utf8");
+  let manifestText = originalText;
   const project = await resolveCurrentProject({
     ...defaultResolveOptions(),
     refreshSourceRevisions: true,
@@ -77,16 +71,10 @@ export async function updateLatestCommand(
   }
 
   if (manifestUpdates.length === 0) {
-    if (json) {
-      const current = existsSync(lockfilePath())
-        ? readLockfile(lockfilePath())
-        : undefined;
-      printUpdateJsonReport([], current, current, packageName, project);
-      return;
-    }
-    process.stdout.write(
-      "All package constraints already allow registry latest versions\n",
-    );
+    if (!json)
+      process.stdout.write(
+        "All package constraints already allow registry latest versions\n",
+      );
   } else if (!json) {
     for (const update of manifestUpdates) {
       process.stdout.write(
@@ -95,15 +83,22 @@ export async function updateLatestCommand(
     }
   }
 
-  if (manifestUpdates.length > 0) {
-    parseManifest(manifestText);
-  }
-  if (dryRun) {
-    return;
-  }
-  if (manifestUpdates.length > 0) {
-    writeFileSync(path, manifestText, "utf8");
-  }
-
-  await updateWithManifestConstraints(packageName, json, manifestUpdates);
+  const candidate = await resolveProject(
+    path,
+    {
+      ...defaultResolveOptions(),
+      refreshSourceRevisions: true,
+      ignoreLockedVersions: packageName === undefined,
+      unlockedPackages: packageName ? new Set([packageName]) : new Set(),
+    },
+    parseManifest(manifestText),
+  );
+  await writeUpdate(
+    candidate,
+    packageName,
+    json,
+    manifestUpdates,
+    manifestText === originalText ? undefined : manifestText,
+    dryRun,
+  );
 }

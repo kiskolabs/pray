@@ -4,7 +4,7 @@ module Pray
   module VerifyProvisioned
     module_function
 
-    def push_findings(project, report)
+    def push_findings(project, report, lockfile)
       push_exclusive_file_export_findings(project, report)
       Render.planned_provisioned_files(project).each do |file|
         path_text = file.path.to_s.tr("\\", "/")
@@ -27,9 +27,17 @@ module Pray
         expected_bytes = Render.expected_provisioned_bytes(file.source, project.manifest.symbols || {})
         next if Hashing.sha256_prefixed(destination_bytes) == Hashing.sha256_prefixed(expected_bytes.b)
 
+        owned = Array(lockfile.provisioned).any? do |record|
+          record.path == path_text && record.content_hash == Hashing.sha256_prefixed(destination_bytes)
+        end
+        recovery = if owned
+          "Run `pray install` to restore it."
+        else
+          "Inspect your changes and move the file aside, then run `pray install` to restore it."
+        end
         report.findings << VerificationFinding.new(
           kind: "package_integrity",
-          message: "Provisioned file `#{path_text}` no longer matches package `#{file.package}`. Run `pray install` to restore it."
+          message: "Provisioned file `#{path_text}` no longer matches package `#{file.package}`. #{recovery}"
         )
       end
     end

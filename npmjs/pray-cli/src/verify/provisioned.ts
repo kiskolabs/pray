@@ -1,6 +1,7 @@
 import { existsSync, lstatSync, readFileSync } from "node:fs";
 import { resolve } from "node:path";
 import { sha256Prefixed } from "../hashing.js";
+import type { Lockfile } from "../lockfile/types.js";
 import {
   expectedProvisionedBytes,
   plannedProvisionedFiles,
@@ -14,6 +15,7 @@ interface VerificationReport {
 export function pushProvisionedFindings(
   project: ResolvedProject,
   report: VerificationReport,
+  lockfile: Lockfile,
 ): void {
   pushExclusiveFileExportFindings(project, report);
   for (const file of plannedProvisionedFiles(project)) {
@@ -50,9 +52,17 @@ export function pushProvisionedFindings(
       project.manifest.symbols ?? {},
     );
     if (sha256Prefixed(destinationBytes) !== sha256Prefixed(expectedBytes)) {
+      const owned = lockfile.provisioned?.some(
+        (record) =>
+          record.path === pathText &&
+          record.content_hash === sha256Prefixed(destinationBytes),
+      );
+      const recovery = owned
+        ? "Run `pray install` to restore it."
+        : "Inspect your changes and move the file aside, then run `pray install` to restore it.";
       report.findings.push({
         kind: "package_integrity",
-        message: `Provisioned file \`${pathText}\` no longer matches package \`${file.package}\`. Run \`pray install\` to restore it.`,
+        message: `Provisioned file \`${pathText}\` no longer matches package \`${file.package}\`. ${recovery}`,
       });
     }
   }
