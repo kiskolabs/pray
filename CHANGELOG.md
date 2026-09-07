@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+- Recommend ignoring the project `.pray` directory so local cache, write recovery, and state stay out of version control (RFC 0071).
+
 ## 1.12.0 (2026-09-07)
 
 - Speed up Ruby planning for large package trees and reuse the resolved lock during installation.

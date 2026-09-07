@@ -159,7 +159,7 @@ AGENTS.md
 CLAUDE.md
 .github/copilot-instructions.md
 
-.pray/cache/     # ignored by default
+.pray/           # ignored by default
 .pray/vendor/    # optional, committed only for hermetic/offline mode
 ```
 
@@ -171,7 +171,7 @@ Rendered target files are usually committed because current inference tools comm
 
 `examples/` contains small, self-contained project trees that show different Prayfile layouts and rendering styles.
 
-The local cache is ignored by default. It may be committed or archived only in hermetic, regulated, air-gapped, or long-term preservation modes.
+The local `.pray/` directory is ignored by default. Vendor copies under `.pray/vendor/` may be committed in hermetic, regulated, air-gapped, or long-term preservation modes.
 
 Expanded packages are not committed by default. They are dependencies, like gems.
 
@@ -799,7 +799,7 @@ Default mode:
 Prayfile
 Prayfile.lock
 AGENTS.md
-.gitignore: .pray/cache
+.gitignore: .pray/
 ```
 
 Use this for most repositories. Packages are fetched from sources and cached locally. Rendered files are committed for current tool compatibility.
@@ -811,6 +811,7 @@ Prayfile
 Prayfile.lock
 AGENTS.md
 .pray/vendor/*.praypkg
+.gitignore: .pray/cache/, .pray/write-state/, .pray/state.json
 ```
 
 Use this for air-gapped repositories, regulated work, long-term archival, or cases where upstream availability cannot be trusted.
@@ -892,7 +893,7 @@ The gem would not replace `pray`. Development and CI still run `pray plan`, `pra
 ```text
 Prayfile + Prayfile.lock   committed in the app repo
 AGENTS.md / CLAUDE.md      committed rendered targets (today's tool compatibility)
-.pray/cache/               ignored locally; populated by pray install
+.pray/                     ignored locally; populated by pray install
 
 CI:  pray verify --strict && pray drift
 App: Prayer::Context.for(:inference).to_s  # example API; not normative yet
@@ -976,6 +977,7 @@ Start with `rfcs/README.md` for:
 * file formats (RFC 0010, RFC 0011)
 * resolver and lockfile behaviour (RFC 0020)
 * checksum verification (RFC 0050)
+* local `.pray/` layout and ignore policy (RFC 0071)
 * local cache behaviour (RFC 0070)
 * package structure (RFC 0011)
 * distribution point API (RFC 0060)
