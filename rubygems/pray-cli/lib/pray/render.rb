@@ -25,16 +25,7 @@ module Pray
     end
 
     def write_rendered_targets(project, rendered, previous_lockfile = nil)
-      RenderDest.validate_destinations!(project, previous_lockfile)
-      rendered.each do |target|
-        PathSafety.validate_destination_path!(target.path)
-        RenderDest.ensure_safe_destination_ancestors!(project.project_root, target.path, target.path)
-        path = File.join(project.project_root, target.path)
-        FileUtils.mkdir_p(File.dirname(path))
-        RenderDest.ensure_safe_destination_ancestors!(project.project_root, target.path, target.path)
-        RenderDest.write_rendered_content(path, target.path, target.content)
-      end
-      materialize_provisioned_exports(project, previous_lockfile)
+      Transaction.run(project.project_root) { RenderDest.write_rendered_targets(project, rendered, previous_lockfile) }
     end
 
     def materialize_provisioned_exports(project, previous_lockfile = nil) = RenderDest.materialize(project, previous_lockfile)
@@ -305,6 +296,7 @@ module Pray
       raise Error.render("folder source directory missing: #{source_root}") unless File.directory?(source_root)
       raise Error.render("no files listed in package manifest for #{source_root}") if relative_files.empty?
 
+      relative_root = relative_project_path(project, destination_root)
       matched = false
       relative_files.each do |relative|
         next if !only.empty? && !only.include?(relative)
@@ -313,9 +305,9 @@ module Pray
         source = File.join(source_root, relative)
         raise Error.render("provisioned file missing: #{source}") unless File.file?(source)
 
-        destination = File.join(destination_root, relative)
+        destination = Pathname(File.join(relative_root, relative)).cleanpath.to_s
         planned << PlannedProvisionedFile.new(
-          path: relative_project_path(project, destination),
+          path: destination,
           source: source,
           package: package_name,
           export: export_name

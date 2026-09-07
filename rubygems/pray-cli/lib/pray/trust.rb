@@ -1,6 +1,6 @@
 # frozen_string_literal: true
 
-require "toml-rb"
+require "perfect_toml"
 require "fileutils"
 
 module Pray
@@ -44,8 +44,8 @@ module Pray
       path = trust_policy_path(home)
       return nil unless File.file?(path)
 
-      parse_policy(TomlRB.load_file(path))
-    rescue TomlRB::ParseError => error
+      parse_policy(PerfectTOML.parse(File.read(path, encoding: "UTF-8")))
+    rescue PerfectTOML::ParseError => error
       raise Error.parse("trust policy", "#{path}: #{error.message}")
     end
 

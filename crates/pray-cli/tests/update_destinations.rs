@@ -112,3 +112,79 @@ fn verify_gives_recovery_that_preserves_an_edited_destination() {
         "operator changes"
     );
 }
+
+#[test]
+fn oversized_destination_is_rejected_before_output_changes() {
+    let fixture = UpdateFixture::new("~> 1.0");
+    let lockfile_path = fixture.consumer.join("Prayfile.lock");
+    let lockfile = pray_core::lockfile::read_lockfile(&lockfile_path).unwrap();
+    let destination = fixture.consumer.join(&lockfile.provisioned[0].path);
+    fs::OpenOptions::new()
+        .write(true)
+        .open(&destination)
+        .unwrap()
+        .set_len(32 * 1024 * 1024 + 1)
+        .unwrap();
+    let previous_lock = fs::read(&lockfile_path).unwrap();
+    let previous_compose = fs::read(fixture.consumer.join("INSTRUCTIONS.md")).unwrap();
+    fs::write(fixture.consumer.join("rules/rules.md"), "new rules\n").unwrap();
+    let output = fixture.run(&["install"]);
+    assert_eq!(output.status.code(), Some(5));
+    assert!(String::from_utf8_lossy(&output.stderr).contains("32 MiB"));
+    assert_eq!(
+        fs::metadata(destination).unwrap().len(),
+        32 * 1024 * 1024 + 1
+    );
+    assert_eq!(fs::read(lockfile_path).unwrap(), previous_lock);
+    assert_eq!(
+        fs::read(fixture.consumer.join("INSTRUCTIONS.md")).unwrap(),
+        previous_compose
+    );
+}
+
+#[cfg(unix)]
+#[test]
+fn late_lock_failure_restores_manifest_outputs_and_pruned_files() {
+    let fixture = UpdateFixture::new("~> 1.0");
+    let lock_path = fixture.consumer.join("Prayfile.lock");
+    let mut lockfile = pray_core::lockfile::read_lockfile(&lock_path).unwrap();
+    fs::write(fixture.consumer.join("dropped.txt"), "old export").unwrap();
+    lockfile
+        .provisioned
+        .push(pray_core::lockfile::ProvisionedFileRecord {
+            path: "dropped.txt".into(),
+            content_hash: pray_core::hashing::sha256_prefixed(b"old export"),
+            package: "sample/files".into(),
+            export: "files".into(),
+        });
+    pray_core::lockfile::write_lockfile(&lock_path, &lockfile).unwrap();
+    let mut paths = vec![
+        "Prayfile".to_owned(),
+        "Prayfile.lock".to_owned(),
+        "INSTRUCTIONS.md".to_owned(),
+    ];
+    paths.extend(lockfile.provisioned.iter().map(|file| file.path.clone()));
+    let original: Vec<_> = paths
+        .iter()
+        .map(|path| fs::read(fixture.consumer.join(path)).unwrap())
+        .collect();
+    fs::rename(&lock_path, fixture.consumer.join("original.lock")).unwrap();
+    std::os::unix::fs::symlink("original.lock", &lock_path).unwrap();
+    fixture.publish("2.0.0");
+    fs::write(fixture.consumer.join("rules/rules.md"), "new rules\n").unwrap();
+    let output = fixture.run(&["update", "--latest"]);
+    assert_eq!(
+        output.status.code(),
+        Some(5),
+        "{}",
+        String::from_utf8_lossy(&output.stderr)
+    );
+    assert!(String::from_utf8_lossy(&output.stderr).contains("symbolic link"));
+    for (path, bytes) in paths.iter().zip(original) {
+        assert_eq!(
+            fs::read(fixture.consumer.join(path)).unwrap(),
+            bytes,
+            "{path}"
+        );
+    }
+}

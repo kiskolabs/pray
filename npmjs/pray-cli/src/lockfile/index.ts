@@ -1,4 +1,4 @@
-import { existsSync, readFileSync, writeFileSync } from "node:fs";
+import { existsSync, readFileSync } from "node:fs";
 import { parse } from "smol-toml";
 import { PrayError } from "../errors.js";
 import { sha256Prefixed } from "../hashing.js";
@@ -7,6 +7,7 @@ import { provisionedLockRecords } from "../render/dest.js";
 import { layoutRenderedTargets } from "../render/project.js";
 import type { RenderedTarget } from "../render/types.js";
 import type { ResolvedPackage, ResolvedProject } from "../resolve/types.js";
+import { writeProjectFile } from "../transaction/index.js";
 import { parseLockfileValue } from "./parse.js";
 import { normalizeLockfileArtifact, relativeLockfilePath } from "./paths.js";
 import { serializeLockfileText } from "./serialize.js";
@@ -51,7 +52,7 @@ export function serializeLockfile(lockfile: Lockfile): string {
 }
 
 export function writeLockfile(path: string, lockfile: Lockfile): void {
-  writeFileSync(path, serializeLockfile(lockfile), "utf8");
+  writeProjectFile(path, serializeLockfile(lockfile));
 }
 
 export function writeLockfileIfChanged(path: string, lockfile: Lockfile): void {
@@ -62,7 +63,7 @@ export function writeLockfileIfChanged(path: string, lockfile: Lockfile): void {
       return;
     }
   }
-  writeFileSync(path, serialized, "utf8");
+  writeProjectFile(path, serialized);
 }
 
 export function lockfileHash(lockfile: Lockfile): string {

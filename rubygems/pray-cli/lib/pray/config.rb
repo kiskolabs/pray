@@ -1,6 +1,6 @@
 # frozen_string_literal: true
 
-require "toml-rb"
+require "perfect_toml"
 
 module Pray
   module Config
@@ -22,14 +22,14 @@ module Pray
       path = user_config_path
       return PrayConfig.new unless path && File.file?(path)
 
-      data = TomlRB.load_file(path)
+      data = PerfectTOML.parse(File.read(path, encoding: "UTF-8"))
       PrayConfig.new(
         local: PrayLocalConfig.new(
           package: data.dig("local", "package") || {},
           source: data.dig("local", "source") || {}
         )
       )
-    rescue TomlRB::ParseError => error
+    rescue PerfectTOML::ParseError => error
       raise Error.parse("config", "#{path}: #{error.message}")
     end
 

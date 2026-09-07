@@ -44,7 +44,7 @@ module Pray
     end
 
     def parse_compromised_toml(body)
-      data = TomlRB.parse(body)
+      data = PerfectTOML.parse(body)
       Array(data["keys"]).filter_map do |entry|
         key = normalize_key(entry["value"].to_s)
         next if key.empty?
@@ -54,7 +54,7 @@ module Pray
           reference: entry["reference"], reported_at: entry["reported_at"]
         )
       end
-    rescue TomlRB::ParseError
+    rescue PerfectTOML::ParseError
       []
     end
 

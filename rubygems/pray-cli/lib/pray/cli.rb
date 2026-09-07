@@ -30,7 +30,11 @@ module Pray
       return if maybe_print_help(arguments)
 
       command = parse_command(arguments)
-      dispatch(command)
+      if %i[install apply update unlock add remove render plan verify drift].include?(command.first)
+        Transaction.run(Invocation.invocation_context.project_root) { dispatch(command) }
+      else
+        dispatch(command)
+      end
     end
 
     def maybe_print_help(arguments)

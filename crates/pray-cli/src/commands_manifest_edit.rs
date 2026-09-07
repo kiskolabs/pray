@@ -3,7 +3,6 @@ use crate::project_paths::manifest_path;
 use pray_core::manifest::{parse_manifest, read_manifest_text};
 use pray_core::resolve_context::ResolveOptions;
 use pray_core::{PrayError, PrayResult};
-use std::fs;
 
 pub(crate) fn add_command(
     name: String,
@@ -31,8 +30,8 @@ pub(crate) fn add_command(
         format!("agent \"{name}\"")
     };
 
-    fs::write(
-        manifest_path,
+    pray_core::transaction::write_file(
+        &manifest_path,
         insert_manifest_statement(&manifest_text, &declaration),
     )?;
     Ok(())
@@ -46,8 +45,8 @@ pub(crate) fn remove_command(name: String) -> PrayResult<()> {
         return Err(PrayError::Manifest(format!("package {name} not found")));
     }
 
-    fs::write(
-        manifest_path,
+    pray_core::transaction::write_file(
+        &manifest_path,
         remove_manifest_statement(&manifest_text, &name),
     )?;
     install_command(false, false, ResolveOptions::default(), false)?;

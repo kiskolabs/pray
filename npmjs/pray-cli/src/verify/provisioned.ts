@@ -1,7 +1,8 @@
-import { existsSync, lstatSync, readFileSync } from "node:fs";
+import { existsSync, lstatSync } from "node:fs";
 import { resolve } from "node:path";
 import { sha256Prefixed } from "../hashing.js";
 import type { Lockfile } from "../lockfile/types.js";
+import { readRegularBytes } from "../render/destination-io.js";
 import {
   expectedProvisionedBytes,
   plannedProvisionedFiles,
@@ -18,6 +19,9 @@ export function pushProvisionedFindings(
   lockfile: Lockfile,
 ): void {
   pushExclusiveFileExportFindings(project, report);
+  const previous = new Map(
+    lockfile.provisioned?.map((record) => [record.path, record.content_hash]),
+  );
   for (const file of plannedProvisionedFiles(project)) {
     const pathText = file.path.replaceAll("\\", "/");
     const absolute = resolve(project.projectRoot, file.path);
@@ -46,17 +50,14 @@ export function pushProvisionedFindings(
       });
       continue;
     }
-    const destinationBytes = readFileSync(absolute);
+    const destinationBytes = readRegularBytes(absolute, pathText);
     const expectedBytes = expectedProvisionedBytes(
       file.source,
       project.manifest.symbols ?? {},
     );
-    if (sha256Prefixed(destinationBytes) !== sha256Prefixed(expectedBytes)) {
-      const owned = lockfile.provisioned?.some(
-        (record) =>
-          record.path === pathText &&
-          record.content_hash === sha256Prefixed(destinationBytes),
-      );
+    const destinationHash = sha256Prefixed(destinationBytes);
+    if (destinationHash !== sha256Prefixed(expectedBytes)) {
+      const owned = previous.get(pathText) === destinationHash;
       const recovery = owned
         ? "Run `pray install` to restore it."
         : "Inspect your changes and move the file aside, then run `pray install` to restore it.";

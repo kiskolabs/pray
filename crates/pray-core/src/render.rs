@@ -43,3 +43,5 @@ pub use crate::render_dest::{
 pub use crate::render_provisioned::{
     expected_provisioned_bytes, planned_provisioned_files, PlannedProvisionedFile,
 };
+
+pub use crate::render_file::read_destination_text;

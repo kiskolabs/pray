@@ -16,7 +16,6 @@ use pray_core::render::{
 };
 use pray_core::resolve_context::ResolveOptions;
 use pray_core::{PrayError, PrayResult};
-use std::fs;
 
 pub(crate) fn update_command(
     package: Option<String>,
@@ -138,7 +137,7 @@ fn write_update(
     }
     write_rendered_targets_with_previous_lockfile(&project, &rendered, previous_lockfile.as_ref())?;
     if let Some(text) = manifest_update {
-        fs::write(&project.manifest_path, text)?;
+        pray_core::transaction::write_file(&project.manifest_path, text)?;
     }
     write_lockfile_if_changed(&lockfile_path(), &merged_lockfile)?;
     if json {

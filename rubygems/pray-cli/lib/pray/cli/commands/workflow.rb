@@ -76,7 +76,7 @@ module Pray
       )
       rendered = Render.render_project(project)
       lockfile = build_lockfile(project, rendered)
-      previous_lockfile = File.exist?(lockfile_path) ? Pray.read_lockfile(lockfile_path) : nil
+      previous_lockfile = project.previous_lockfile
       preview = Plan.build_materialization_preview(
         project, rendered, lockfile, lockfile_path, previous_lockfile
       )

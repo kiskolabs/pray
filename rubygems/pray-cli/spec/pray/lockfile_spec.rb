@@ -74,4 +74,31 @@ RSpec.describe Pray::LockfileIO do
     Pray.write_lockfile_if_changed(lockfile_path, lockfile)
     expect(File.binread(lockfile_path)).to eq(bytes)
   end
+
+  it "reads quoted keys, Unicode paths, comments and multiline export arrays" do
+    lockfile = Pray.parse_lockfile(<<~'TOML')
+      "manifest_hash" = 'sha256:original' # retained provenance
+      [[package]]
+      name = "sample/notes"
+      exports = [
+        "notes",
+        "shell", # a trailing comma is valid
+      ]
+      [[provisioned]]
+      path = "out/\u00e9.txt"
+      content_hash = "sha256:content"
+      package = "sample/notes"
+      export = "notes"
+    TOML
+
+    expect(lockfile.manifest_hash).to eq("sha256:original")
+    expect(lockfile.package.first.exports).to eq(%w[notes shell])
+    expect(lockfile.provisioned.first.path).to eq("out/é.txt")
+  end
+
+  it "reports duplicate and malformed fields as lockfile parse errors" do
+    ["manifest_hash = 'one'\nmanifest_hash = 'two'", "package = [", 'path = "\\q"'].each do |text|
+      expect { Pray.parse_lockfile(text) }.to raise_error(Pray::Error, /lockfile/)
+    end
+  end
 end

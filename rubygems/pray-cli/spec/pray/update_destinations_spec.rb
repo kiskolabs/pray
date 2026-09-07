@@ -74,4 +74,50 @@ RSpec.describe "destination recovery" do
       expect(File.read(File.join(root, "Prayfile.lock"))).to eq(lockfile)
     end
   end
+
+  it "rejects oversized destinations before changing output" do
+    lock_path = File.join(root, "Prayfile.lock")
+    destination = File.join(root, Pray.read_lockfile(lock_path).provisioned.first.path)
+    File.truncate(destination, 32 * 1024 * 1024 + 1)
+    previous_lock = File.read(lock_path)
+    compose_path = File.join(root, "INSTRUCTIONS.md")
+    previous_compose = File.read(compose_path)
+    File.write(File.join(root, "local.md"), "new rules\n")
+    expect { Pray::CLI.run(["--path", root, "install"]) }
+      .to raise_error(Pray::Error, /32 MiB/)
+    expect(File.size(destination)).to eq(32 * 1024 * 1024 + 1)
+    expect(File.read(lock_path)).to eq(previous_lock)
+    expect(File.read(compose_path)).to eq(previous_compose)
+  end
+
+  it "bounds collision reports and counts omitted paths" do
+    files = Array.new(105) { |index| "files/#{index.to_s.rjust(3, "0")}.txt" }
+    spec_path = File.join(root, "package/files.prayspec")
+    File.write(spec_path, File.read(spec_path).sub('["files/a.md", "files/b.md"]', files.inspect))
+    files.each do |file|
+      File.write(File.join(root, "package", file), "package")
+      File.write(File.join(root, "skills", file), "operator")
+    end
+    expect { Pray::CLI.run(["--path", root, "plan"]) }.to raise_error(Pray::Error) { |error|
+      expect(error.message).to include("5 additional destination conflicts")
+      expect(error.message.bytesize).to be < 65_536
+    }
+  end
+
+  it "restores compose, exclusive outputs and pruning after a late lock failure" do
+    lock_path = File.join(root, "Prayfile.lock")
+    lockfile = Pray.read_lockfile(lock_path)
+    File.write(File.join(root, "dropped.txt"), "old export")
+    lockfile.provisioned << Pray::ProvisionedFileRecord.new(path: "dropped.txt",
+      content_hash: Pray::Hashing.sha256_prefixed("old export"), package: "sample/files", export: "files")
+    Pray.write_lockfile(lock_path, lockfile)
+    paths = ["Prayfile", "Prayfile.lock", "INSTRUCTIONS.md", *lockfile.provisioned.map(&:path)]
+    original = paths.to_h { |path| [path, File.binread(File.join(root, path))] }
+    File.rename(lock_path, File.join(root, "original.lock"))
+    File.symlink("original.lock", lock_path)
+    File.write(File.join(root, "local.md"), "new rules\n")
+    %w[a.md b.md].each { |name| File.write(File.join(root, "package/files", name), "new content") }
+    expect { Pray::CLI.run(["--path", root, "install"]) }.to raise_error(Pray::Error, /symbolic link/)
+    original.each { |path, bytes| expect(File.binread(File.join(root, path))).to eq(bytes) }
+  end
 end

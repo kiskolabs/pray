@@ -1,6 +1,6 @@
 # frozen_string_literal: true
 
-require "toml-rb"
+require "perfect_toml"
 
 require_relative "lockfile_serialize"
 
@@ -125,9 +125,9 @@ module Pray
     end
 
     def parse_lockfile(text)
-      data = TomlRB.parse(text)
+      data = PerfectTOML.parse(text)
       from_hash(data)
-    rescue TomlRB::ParseError => error
+    rescue PerfectTOML::ParseError => error
       raise Error.parse("lockfile", error.message)
     end
 
@@ -144,7 +144,7 @@ module Pray
     end
 
     def write_lockfile(path, lockfile)
-      File.write(path, serialize_lockfile(lockfile))
+      Transaction.write_file(path, serialize_lockfile(lockfile))
     end
 
     def write_lockfile_if_changed(path, lockfile)
@@ -153,7 +153,7 @@ module Pray
         return
       end
 
-      File.write(path, serialized)
+      Transaction.write_file(path, serialized)
     end
 
     def lockfiles_equivalent?(left, right)

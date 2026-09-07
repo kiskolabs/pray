@@ -2,7 +2,6 @@ use crate::hashing::checksum_managed_body_line_refs;
 use crate::lockfile::{Lockfile, ManagedSpanRecord};
 use crate::{PrayError, PrayResult};
 use std::collections::BTreeMap;
-use std::fs;
 use std::path::Path;
 
 pub(crate) fn reject_managed_span_conflicts(
@@ -21,7 +20,7 @@ pub(crate) fn reject_managed_span_conflicts(
         if !absolute.exists() {
             continue;
         }
-        let text = fs::read_to_string(&absolute)?;
+        let text = crate::render_file::read_destination_text(&absolute)?;
         let lines: Vec<&str> = text.lines().collect();
         let markers = marker_checksums(&lines);
         for span in spans {

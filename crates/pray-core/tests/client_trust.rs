@@ -44,13 +44,15 @@ fn trust_policy_persists_via_toml_round_trip() {
 }
 
 fn temp_trust_home() -> PathBuf {
+    static NEXT_DIRECTORY: std::sync::atomic::AtomicU64 = std::sync::atomic::AtomicU64::new(0);
     let home = std::env::temp_dir().join(format!(
-        "pray-trust-test-{}-{}",
+        "pray-trust-test-{}-{}-{}",
         std::process::id(),
         std::time::SystemTime::now()
             .duration_since(std::time::UNIX_EPOCH)
             .expect("clock")
-            .as_nanos()
+            .as_nanos(),
+        NEXT_DIRECTORY.fetch_add(1, std::sync::atomic::Ordering::Relaxed)
     ));
     fs::create_dir_all(&home).expect("home");
     home

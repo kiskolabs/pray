@@ -4,7 +4,11 @@ module Pray
   module Materialize
     module_function
 
-    def materialize_project(
+    def materialize_project(**options)
+      Transaction.run(Invocation.invocation_context.project_root) { materialize_in_transaction(**options) }
+    end
+
+    def materialize_in_transaction(
       manifest_path: nil,
       frozen: false,
       locked: false,
@@ -40,7 +44,7 @@ module Pray
       end
       rendered = Render.render_project(project)
       lockfile_path = default_lockfile_path(project.project_root)
-      previous_lockfile = File.exist?(lockfile_path) ? Pray.read_lockfile(lockfile_path) : nil
+      previous_lockfile = project.previous_lockfile
       next_lockfile = LockfileIO.build_lockfile(
         project.manifest_hash,
         project.environment,
@@ -58,7 +62,7 @@ module Pray
         unless File.exist?(lockfile_path)
           raise Error.verify("missing Prayfile.lock; run install first")
         end
-        existing = Pray.read_lockfile(lockfile_path)
+        existing = previous_lockfile
         unless Pray.lockfiles_equivalent?(existing, next_lockfile)
           raise Error.verify("lockfile needs update; rerun install to refresh Prayfile.lock")
         end
@@ -80,7 +84,7 @@ module Pray
       end
 
       if frozen
-        existing = File.exist?(lockfile_path) ? Pray.read_lockfile(lockfile_path) : nil
+        existing = previous_lockfile
         if existing
           rendered.each do |target|
             output_path = File.join(project.project_root, target.path)

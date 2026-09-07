@@ -2,8 +2,8 @@ use crate::hashing::sha256_prefixed;
 use crate::lockfile::{Lockfile, ProvisionedFileRecord};
 use crate::paths::validate_destination_path;
 use crate::render_file::{
-    create_regular_bytes, destination_kind, open_regular, read_regular_bytes, symlink_error,
-    DestinationKind,
+    create_regular_bytes, destination_kind, open_regular, read_destination_bytes,
+    read_regular_bytes, symlink_error, DestinationKind,
 };
 use crate::render_path_guard::ensure_safe_destination_ancestors;
 use crate::render_provisioned::{
@@ -13,7 +13,7 @@ use crate::resolve::ResolvedProject;
 use crate::{PrayError, PrayResult};
 use std::collections::{BTreeMap, BTreeSet};
 use std::fs;
-use std::io::{Read, Seek, Write};
+use std::io::{Seek, Write};
 use std::path::Path;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -62,6 +62,20 @@ pub fn provisioned_destination_status(
     file: &PlannedProvisionedFile,
     previous_lockfile: Option<&Lockfile>,
 ) -> PrayResult<ProvisionedDestinationStatus> {
+    let previous = previous_lockfile.and_then(|lockfile| {
+        lockfile
+            .provisioned
+            .iter()
+            .find(|record| record.path == lock_path(&file.path))
+    });
+    destination_status_with_record(project, file, previous)
+}
+
+fn destination_status_with_record(
+    project: &ResolvedProject,
+    file: &PlannedProvisionedFile,
+    previous: Option<&ProvisionedFileRecord>,
+) -> PrayResult<ProvisionedDestinationStatus> {
     let relative = validate_destination_path(&file.path.to_string_lossy())?;
     ensure_safe_destination_ancestors(
         &project.project_root,
@@ -70,31 +84,43 @@ pub fn provisioned_destination_status(
     )?;
     let destination = relative.join_root(&project.project_root);
     let expected = expected_provisioned_bytes(&file.source, &project.manifest.symbols)?;
-    let normalized = lock_path(relative.as_path());
-    let previous = previous_lockfile.and_then(|lockfile| {
-        lockfile
-            .provisioned
-            .iter()
-            .find(|record| record.path == normalized)
-    });
-    classify_destination(&destination, &normalized, &expected, previous)
+    classify_destination(
+        &destination,
+        &lock_path(relative.as_path()),
+        &expected,
+        previous,
+    )
 }
 
 pub fn provisioned_destination_statuses(
     project: &ResolvedProject,
     previous_lockfile: Option<&Lockfile>,
 ) -> PrayResult<Vec<(PlannedProvisionedFile, ProvisionedDestinationStatus)>> {
+    let previous = previous_lock_map(previous_lockfile);
     let mut statuses = Vec::new();
     let mut errors = Vec::new();
+    let mut omitted = 0;
+    let mut diagnostic_bytes = 0;
     for file in planned_provisioned_files(project)? {
-        match provisioned_destination_status(project, &file, previous_lockfile) {
+        match destination_status_with_record(project, &file, previous.get(&lock_path(&file.path))) {
             Ok(status) => statuses.push((file, status)),
-            Err(PrayError::Render(message)) => errors.push(format!(
-                "{message} (package `{}`, export `{}`)",
-                file.package, file.export
-            )),
+            Err(PrayError::Render(message)) => {
+                let message = format!(
+                    "{message} (package `{}`, export `{}`)",
+                    file.package, file.export
+                );
+                if errors.len() < 100 && diagnostic_bytes + message.len() < 60 * 1024 {
+                    diagnostic_bytes += message.len();
+                    errors.push(message);
+                } else {
+                    omitted += 1;
+                }
+            }
             Err(error) => return Err(error),
         }
+    }
+    if omitted > 0 {
+        errors.push(format!("{omitted} additional destination conflicts omitted; resolve the listed paths and run `pray plan` again"));
     }
     if errors.is_empty() {
         Ok(statuses)
@@ -216,7 +242,9 @@ fn prune_dropped_leaves(
                         relative.as_path(),
                         relative.as_str(),
                     )?;
-                    fs::remove_file(&destination)?;
+                    if !crate::transaction::replace(&destination, Some(&on_disk), None)? {
+                        fs::remove_file(&destination)?;
+                    }
                 }
             }
             DestinationKind::Missing | DestinationKind::Symlink | DestinationKind::Other => {}
@@ -236,8 +264,7 @@ fn update_regular_bytes(
     authorized_hash: &str,
 ) -> PrayResult<()> {
     let mut file = open_regular(path, display, true)?;
-    let mut on_disk = Vec::new();
-    file.read_to_end(&mut on_disk)?;
+    let on_disk = read_destination_bytes(&mut file, display)?;
     if on_disk == bytes {
         return Ok(());
     }
@@ -245,6 +272,9 @@ fn update_regular_bytes(
         return Err(PrayError::Render(format!(
             "refusing to overwrite `{display}`; it was written by pray and then edited. Inspect your changes and move the file aside, then run `pray install`"
         )));
+    }
+    if crate::transaction::replace(path, Some(&on_disk), Some(bytes))? {
+        return Ok(());
     }
     file.rewind()?;
     file.set_len(0)?;

@@ -69,3 +69,5 @@ pub mod trust;
 pub mod verify;
 
 pub use error::{PrayError, PrayResult};
+
+pub mod transaction;
