@@ -9,7 +9,7 @@ source "amkisko", git: "https://github.com/amkisko/prayers.git", distribution: "
 
 compose "AGENTS.md" do
   pray ".agents/project.md"
-  pray "amkisko/working-rules", "~> 2.2"
+  pray "amkisko/working-rules", "~> 2.3"
   pray "amkisko/security", "~> 1.2"
   pray "amkisko/docs-conventions", "~> 2.3"
   pray "amkisko/dependency-issues", "~> 2.1"
@@ -19,7 +19,7 @@ compose "AGENTS.md" do
   pray "amkisko/finite-state-machines", "~> 1.2"
   pray "amkisko/branch-naming", "~> 1.0"
   pray "amkisko/preferred-stack", "~> 1.4"
-  pray "amkisko/writing-prose", "~> 3.3"
+  pray "amkisko/writing-prose", "~> 3.4"
   pray "amkisko/claims-audit", "~> 1.0"
   pray "amkisko/rfc-process", "~> 1.2"
   pray "amkisko/rejected-changes", "~> 1.0"
