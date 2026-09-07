@@ -15,7 +15,7 @@ module Pray
       declaration = Pray.format_package_declaration(
         ManifestPackage.new(name: name, constraint: constraint || "*", path: path)
       )
-      File.write(manifest_path_value, insert_manifest_statement(manifest_text, declaration))
+      Transaction.write_file(manifest_path_value, insert_manifest_statement(manifest_text, declaration))
     end
 
     def remove_command(name)
@@ -28,7 +28,7 @@ module Pray
         raise Error.manifest("package #{name} not found")
       end
 
-      File.write(manifest_path_value, remove_manifest_statement(manifest_text, name))
+      Transaction.write_file(manifest_path_value, remove_manifest_statement(manifest_text, name))
       install_command({locked: false, frozen: false, offline: false})
     end
 

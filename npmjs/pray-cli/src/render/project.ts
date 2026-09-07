@@ -6,6 +6,7 @@ import { targetMode, targetScoped } from "../manifest/destination.js";
 import type { ManifestTarget } from "../manifest/types.js";
 import { validateDestinationPath } from "../manifest/validate.js";
 import type { ResolvedProject } from "../resolve/types.js";
+import { runTransaction } from "../transaction/index.js";
 import { ensureHtmlCommentComposeDest } from "./compose-dest.js";
 import {
   materializeProvisionedExports,
@@ -34,6 +35,15 @@ export function renderProject(project: ResolvedProject): RenderedTarget[] {
 }
 
 export function writeRenderedTargets(
+  project: ResolvedProject,
+  rendered: RenderedTarget[],
+  previousLockfile?: Lockfile,
+): void {
+  runTransaction(project.projectRoot, () =>
+    writeProjectFiles(project, rendered, previousLockfile),
+  );
+}
+function writeProjectFiles(
   project: ResolvedProject,
   rendered: RenderedTarget[],
   previousLockfile?: Lockfile,

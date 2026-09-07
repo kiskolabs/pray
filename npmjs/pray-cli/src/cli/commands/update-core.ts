@@ -1,4 +1,4 @@
-import { existsSync, writeFileSync } from "node:fs";
+import { existsSync } from "node:fs";
 import { PrayError } from "../../errors.js";
 import {
   buildLockfile,
@@ -15,6 +15,7 @@ import {
 } from "../../render/project.js";
 import { defaultResolveOptions } from "../../resolve/context.js";
 import type { ResolvedProject } from "../../resolve/types.js";
+import { writeProjectFile } from "../../transaction/index.js";
 import { lockfilePath, resolveCurrentProject } from "../invocation.js";
 import {
   buildUpdateSummary,
@@ -135,7 +136,7 @@ export async function writeUpdate(
   }
   writeRenderedTargets(project, rendered, previous);
   if (manifestUpdate !== undefined)
-    writeFileSync(project.manifestPath, manifestUpdate, "utf8");
+    writeProjectFile(project.manifestPath, manifestUpdate);
   if (packageName) {
     writeLockfile(lockfilePath(), merged);
   } else {

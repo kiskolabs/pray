@@ -7,6 +7,19 @@ module Pray
   module RenderDest
     module_function
 
+    def write_rendered_targets(project, rendered, previous_lockfile = nil)
+      validate_destinations!(project, previous_lockfile)
+      rendered.each do |target|
+        PathSafety.validate_destination_path!(target.path)
+        ensure_safe_destination_ancestors!(project.project_root, target.path, target.path)
+        path = File.join(project.project_root, target.path)
+        FileUtils.mkdir_p(File.dirname(path))
+        ensure_safe_destination_ancestors!(project.project_root, target.path, target.path)
+        write_rendered_content(path, target.path, target.content)
+      end
+      materialize(project, previous_lockfile)
+    end
+
     def materialize(project, previous_lockfile = nil)
       planned = Render.planned_provisioned_files(project)
       previous = previous_map(previous_lockfile)
@@ -40,25 +53,38 @@ module Pray
       Array(lockfile.provisioned).to_h { |record| [record.path, record] }
     end
 
-    def destination_status(project, file, previous_lockfile = nil)
+    def destination_status(project, file, previous_lockfile = nil, previous = previous_map(previous_lockfile))
       PathSafety.validate_destination_path!(file.path)
       ensure_safe_destination_ancestors!(project.project_root, file.path, file.path)
       destination = File.join(project.project_root, file.path)
       expected = Render.expected_provisioned_bytes(file.source, project.manifest.symbols || {})
-      record = previous_map(previous_lockfile)[file.path.to_s.tr("\\", "/")]
+      record = previous[file.path.to_s.tr("\\", "/")]
       classify_destination(destination, file.path, expected, record)
     end
 
     def validate_destinations!(project, previous_lockfile = nil)
       errors = []
+      statuses = []
+      omitted = 0
+      diagnostic_bytes = 0
+      previous = previous_map(previous_lockfile)
       Render.planned_provisioned_files(project).each do |file|
-        destination_status(project, file, previous_lockfile)
+        statuses << [file, destination_status(project, file, previous_lockfile, previous)]
       rescue Error => error
         raise unless error.category == :render
 
-        errors << "#{error.message} (package `#{file.package}`, export `#{file.export}`)"
+        message = "#{error.message} (package `#{file.package}`, export `#{file.export}`)"
+        if errors.length < 100 && diagnostic_bytes + message.bytesize < 60 * 1024
+          diagnostic_bytes += message.bytesize
+          errors << message
+        else
+          omitted += 1
+        end
       end
+      errors << "#{omitted} additional destination conflicts omitted; resolve the listed paths and run `pray plan` again" if omitted > 0
       raise Error.render(errors.join("\n")) unless errors.empty?
+
+      statuses
     end
 
     def write_leaf(project, file, previous)
@@ -116,7 +142,7 @@ module Pray
         on_disk = read_regular_bytes(destination, record.path)
         if Hashing.sha256_prefixed(on_disk) == record.content_hash
           ensure_safe_destination_ancestors!(project.project_root, record.path, record.path)
-          File.delete(destination)
+          File.delete(destination) unless Transaction.replace(destination, on_disk, nil)
         end
       end
     end
@@ -136,8 +162,10 @@ module Pray
       return create_bytes(path, display, fresh) if destination_kind(path) == :missing
 
       open_regular(path, display, File::RDWR) do |file|
-        existing = decode_utf8(file.read, display)
+        existing = decode_utf8(read_destination_bytes(file, display), display)
         content = RenderPatch.patch_rendered_content(existing, fresh)
+        return if Transaction.replace(path, existing.b, content.b)
+
         file.rewind
         file.truncate(0)
         file.write(content)
@@ -170,6 +198,8 @@ module Pray
     end
 
     def create_bytes(path, display, bytes)
+      return if Transaction.replace(path, nil, bytes.b)
+
       open_path(path, display, File::WRONLY | File::CREAT | File::EXCL) do |file|
         file.write(bytes)
       end
@@ -177,12 +207,14 @@ module Pray
 
     def update_bytes(path, display, bytes, authorized_hash)
       open_regular(path, display, File::RDWR) do |file|
-        on_disk = file.read
+        on_disk = read_destination_bytes(file, display)
         return if on_disk.b == bytes.b
 
         unless Hashing.sha256_prefixed(on_disk) == authorized_hash
           raise Error.render("refusing to overwrite `#{display}`; it was written by pray and then edited. Inspect your changes and move the file aside, then run `pray install`")
         end
+        return if Transaction.replace(path, on_disk, bytes.b)
+
         file.rewind
         file.truncate(0)
         file.write(bytes)
@@ -190,7 +222,30 @@ module Pray
     end
 
     def read_regular_bytes(path, display)
-      open_regular(path, display, File::RDONLY) { |file| file.read }
+      open_regular(path, display, File::RDONLY) { |file| read_destination_bytes(file, display) }
+    end
+
+    MAX_DESTINATION_BYTES = 32 * 1024 * 1024
+
+    def read_destination_bytes(file, display)
+      if file.stat.size > MAX_DESTINATION_BYTES
+        raise Error.render("refusing to read `#{display}`; destination exceeds the 32 MiB limit")
+      end
+      bytes = +"".b
+      capacity = [file.stat.size + 1, 64 * 1024].min
+      loop do
+        chunk = file.read([capacity, MAX_DESTINATION_BYTES + 1 - bytes.bytesize].min)
+        break unless chunk
+
+        bytes << chunk
+        if bytes.bytesize > MAX_DESTINATION_BYTES
+          raise Error.render("refusing to read `#{display}`; destination exceeds the 32 MiB limit")
+        end
+        break if chunk.bytesize < capacity
+
+        capacity = 64 * 1024
+      end
+      bytes
     end
 
     def decode_utf8(bytes, display)

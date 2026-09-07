@@ -6,6 +6,7 @@ module Pray
 
     def push_findings(project, report, lockfile)
       push_exclusive_file_export_findings(project, report)
+      previous = RenderDest.previous_map(lockfile)
       Render.planned_provisioned_files(project).each do |file|
         path_text = file.path.to_s.tr("\\", "/")
         absolute = File.join(project.project_root, file.path)
@@ -23,13 +24,12 @@ module Pray
           )
           next
         end
-        destination_bytes = File.binread(absolute)
+        destination_bytes = RenderDest.read_regular_bytes(absolute, path_text)
         expected_bytes = Render.expected_provisioned_bytes(file.source, project.manifest.symbols || {})
-        next if Hashing.sha256_prefixed(destination_bytes) == Hashing.sha256_prefixed(expected_bytes.b)
+        destination_hash = Hashing.sha256_prefixed(destination_bytes)
+        next if destination_hash == Hashing.sha256_prefixed(expected_bytes.b)
 
-        owned = Array(lockfile.provisioned).any? do |record|
-          record.path == path_text && record.content_hash == Hashing.sha256_prefixed(destination_bytes)
-        end
+        owned = previous[path_text]&.content_hash == destination_hash
         recovery = if owned
           "Run `pray install` to restore it."
         else

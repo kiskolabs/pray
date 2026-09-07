@@ -6,12 +6,16 @@ import {
   readFileSync,
   renameSync,
   rmSync,
+  statSync,
+  symlinkSync,
+  truncateSync,
   writeFileSync,
 } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { afterEach, it } from "node:test";
 import { fileURLToPath } from "node:url";
+import { sha256Prefixed } from "./hashing.js";
 import { readLockfile, writeLockfile } from "./lockfile/index.js";
 
 class UpdateFixture {
@@ -221,4 +225,61 @@ it("gives a recovery that preserves an edited destination", () => {
     readFileSync(`${destination}.saved`, "utf8"),
     "operator changes",
   );
+});
+
+it("rejects oversized destinations before changing output", () => {
+  fixture = new UpdateFixture("~> 1.0");
+  const lockPath = join(fixture.consumer, "Prayfile.lock");
+  const destination = join(
+    fixture.consumer,
+    readLockfile(lockPath).provisioned[0]!.path,
+  );
+  truncateSync(destination, 32 * 1024 * 1024 + 1);
+  const previousLock = readFileSync(lockPath);
+  const compose = join(fixture.consumer, "INSTRUCTIONS.md");
+  const previousCompose = readFileSync(compose);
+  writeFileSync(join(fixture.consumer, "rules/rules.md"), "new rules\n");
+  const output = fixture.run(["install"]);
+  assert.equal(output.status, 5, output.stderr);
+  assert.ok(output.stderr.includes("32 MiB"), output.stderr);
+  assert.equal(statSync(destination).size, 32 * 1024 * 1024 + 1);
+  assert.deepEqual(readFileSync(lockPath), previousLock);
+  assert.deepEqual(readFileSync(compose), previousCompose);
+});
+
+it("restores constraints, outputs and pruning after a late lock write failure", () => {
+  fixture = new UpdateFixture("~> 1.0");
+  const lockPath = join(fixture.consumer, "Prayfile.lock");
+  const lockfile = readLockfile(lockPath);
+  writeFileSync(join(fixture.consumer, "dropped.txt"), "old export");
+  lockfile.provisioned.push({
+    path: "dropped.txt",
+    content_hash: sha256Prefixed("old export"),
+    package: "sample/files",
+    export: "files",
+  });
+  writeLockfile(lockPath, lockfile);
+  const paths = [
+    "Prayfile",
+    "Prayfile.lock",
+    "INSTRUCTIONS.md",
+    ...lockfile.provisioned.map((file) => file.path),
+  ];
+  const original = paths.map((path) =>
+    readFileSync(join(fixture.consumer, path)),
+  );
+  renameSync(lockPath, join(fixture.consumer, "original.lock"));
+  symlinkSync("original.lock", lockPath);
+  fixture.publish("2.0.0");
+  writeFileSync(join(fixture.consumer, "rules/rules.md"), "new rules\n");
+  const output = fixture.run(["update", "--latest"]);
+  assert.equal(output.status, 5, output.stderr);
+  assert.ok(output.stderr.includes("symbolic link"), output.stderr);
+  paths.forEach((path, index) => {
+    assert.deepEqual(
+      readFileSync(join(fixture.consumer, path)),
+      original[index],
+      path,
+    );
+  });
 });

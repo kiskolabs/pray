@@ -132,13 +132,13 @@ pub fn write_lockfile_if_changed(path: &Path, lockfile: &Lockfile) -> PrayResult
             }
         }
     }
-    fs::write(path, serialized)?;
+    crate::transaction::write_file(path, serialized)?;
     Ok(())
 }
 
 pub fn write_lockfile(path: &Path, lockfile: &Lockfile) -> PrayResult<()> {
     let serialized = lockfile.serialized()?;
-    fs::write(path, serialized)?;
+    crate::transaction::write_file(path, serialized)?;
     Ok(())
 }
 

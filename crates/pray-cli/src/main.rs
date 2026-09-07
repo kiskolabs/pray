@@ -142,7 +142,7 @@ fn run(arguments: Vec<String>) -> PrayResult<()> {
         ));
     }
 
-    let result = match parse_command(filtered.clone())? {
+    let execute = || match parse_command(filtered.clone())? {
         Command::Manifest => manifest_command(),
         Command::Init { targets } => init_command(targets),
         Command::PrayerInit => prayer_init_command(),
@@ -249,6 +249,8 @@ fn run(arguments: Vec<String>) -> PrayResult<()> {
         Command::Version => version_command(),
         Command::Completion { shell } => completion_command(&shell),
     };
+
+    let result = project_paths::run_project_command(&filtered, execute);
 
     if result.is_ok() {
         cli_release::maybe_print_upgrade_notice(&filtered);

@@ -1,16 +1,12 @@
-import {
-  closeSync,
-  constants,
-  ftruncateSync,
-  readFileSync,
-  writeSync,
-} from "node:fs";
+import { closeSync, constants, ftruncateSync, writeSync } from "node:fs";
 import { TextDecoder } from "node:util";
 import { PrayError } from "../errors.js";
+import { replaceProjectFile } from "../transaction/hooks.js";
 import {
   createBytes,
   destinationKind,
   openRegular,
+  readDestinationBytes,
   readRegularBytes,
 } from "./destination-io.js";
 import { patchRenderedContent } from "./patch.js";
@@ -49,8 +45,9 @@ export function writeRenderedContent(
   }
   const descriptor = openRegular(path, display, constants.O_RDWR);
   try {
-    const existing = decodeUtf8(readFileSync(descriptor));
+    const existing = decodeUtf8(readDestinationBytes(descriptor, display));
     const bytes = Buffer.from(patchRenderedContent(existing, fresh), "utf8");
+    if (replaceProjectFile(path, Buffer.from(existing, "utf8"), bytes)) return;
     ftruncateSync(descriptor, 0);
     writeAll(descriptor, bytes);
   } finally {

@@ -2,6 +2,11 @@
 
 ## Unreleased
 
+- Speed up Ruby planning for large package trees and reuse the resolved lock during installation.
+- Report duplicate Ruby lockfile fields as parsing errors with lockfile context.
+- Restore compose files, provisioned destinations, Prayfile, and lock after failed writes, and recover interrupted writes on the next install, plan, or verification in Rust, Ruby, and TypeScript on Unix.
+- Preserve later local edits when recovery encounters changed files, and prevent cooperating Pray commands from writing the same project together.
+- Limit destination reads to 32 MiB, saved transaction payload to 64 MiB across 10,000 writes, and grouped conflict details to 100 entries.
 - Keep Prayfile constraints unchanged when `pray update --latest` cannot write destination files in the Rust and TypeScript CLIs.
 - Apply newer versions with `update --latest --json` even when the existing constraints already allow them, and check destination conflicts during `update --latest --dry-run`.
 - Report conflicting file and tree destinations together before changing compose output, with steps that preserve local edits.

@@ -12,7 +12,11 @@ import { manifestToJson } from "../manifest/types.js";
 import { renderProject, writeRenderedTargets } from "../render/project.js";
 import { defaultResolveOptions } from "../resolve/context.js";
 import { resolveProject } from "../resolve/project.js";
-import { resolveCurrentProjectWithGitRefreshFallback } from "./invocation.js";
+import { runTransaction } from "../transaction/index.js";
+import {
+  projectRoot,
+  resolveCurrentProjectWithGitRefreshFallback,
+} from "./invocation.js";
 
 export interface MaterializeOptions {
   manifestPath?: string;
@@ -24,6 +28,12 @@ export interface MaterializeOptions {
 
 export async function materializeProject(
   options: MaterializeOptions = {},
+): Promise<void> {
+  return runTransaction(projectRoot(), () => materializeInTransaction(options));
+}
+
+async function materializeInTransaction(
+  options: MaterializeOptions,
 ): Promise<void> {
   const manifestPath = resolve(options.manifestPath ?? defaultManifestPath());
   if (!existsSync(manifestPath)) {

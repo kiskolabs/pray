@@ -4,6 +4,7 @@ import { readLockfile } from "../lockfile/index.js";
 import { PACKAGE_VERSION } from "../lockfile/types.js";
 import { initDistributionRoot } from "../publish/index.js";
 import { renderProject } from "../render/project.js";
+import { runTransaction } from "../transaction/index.js";
 import { renderDependencyTree } from "../tree/index.js";
 import { runTrustCommand } from "../trust/index.js";
 import {
@@ -72,145 +73,161 @@ export async function runCli(argumentsList: string[]): Promise<number> {
     }
 
     const [command, ...rest] = initializeInvocation(filteredArguments);
-    switch (command) {
-      case "version":
-      case "-V":
-      case "--version":
-        process.stdout.write(`pray ${PACKAGE_VERSION} (typescript)\n`);
-        return 0;
-      case "help":
-      case "-h":
-      case "--help":
-        process.stdout.write(conciseHelpText());
-        return 0;
-      case "manifest":
-        await printManifest();
-        return 0;
-      case "init":
-        runInit(rest);
-        return 0;
-      case "prayer":
-        if (rest[0] !== "init") {
-          throw PrayError.unsupported("prayer requires init");
-        }
-        runPrayerInit();
-        return 0;
-      case "repo":
-        if (rest[0] !== "init") {
-          throw PrayError.unsupported("repo requires init");
-        }
-        initDistributionRoot(process.cwd());
-        process.stdout.write("created distribution root\n");
-        return 0;
-      case "add":
-        await runAdd(rest);
-        return 0;
-      case "remove":
-        await runRemove(rest[0]);
-        return 0;
-      case "update":
-        await runUpdateCommand(rest);
-        return 0;
-      case "unlock":
-        await runUnlock(rest[0]);
-        return 0;
-      case "install":
-      case "apply":
-        await materializeProject({
-          frozen: rest.includes("--frozen"),
-          locked: rest.includes("--locked"),
-          offline: rest.includes("--offline"),
-        });
-        return 0;
-      case "plan":
-        await runPlanCommand(rest);
-        return 0;
-      case "render":
-        if (rest.includes("--check")) {
+    const execute = async (): Promise<number> => {
+      switch (command) {
+        case "version":
+        case "-V":
+        case "--version":
+          process.stdout.write(`pray ${PACKAGE_VERSION} (typescript)\n`);
+          return 0;
+        case "help":
+        case "-h":
+        case "--help":
+          process.stdout.write(conciseHelpText());
+          return 0;
+        case "manifest":
+          await printManifest();
+          return 0;
+        case "init":
+          runInit(rest);
+          return 0;
+        case "prayer":
+          if (rest[0] !== "init") {
+            throw PrayError.unsupported("prayer requires init");
+          }
+          runPrayerInit();
+          return 0;
+        case "repo":
+          if (rest[0] !== "init") {
+            throw PrayError.unsupported("repo requires init");
+          }
+          initDistributionRoot(process.cwd());
+          process.stdout.write("created distribution root\n");
+          return 0;
+        case "add":
+          await runAdd(rest);
+          return 0;
+        case "remove":
+          await runRemove(rest[0]);
+          return 0;
+        case "update":
+          await runUpdateCommand(rest);
+          return 0;
+        case "unlock":
+          await runUnlock(rest[0]);
+          return 0;
+        case "install":
+        case "apply":
+          await materializeProject({
+            frozen: rest.includes("--frozen"),
+            locked: rest.includes("--locked"),
+            offline: rest.includes("--offline"),
+          });
+          return 0;
+        case "plan":
+          await runPlanCommand(rest);
+          return 0;
+        case "render":
+          if (rest.includes("--check")) {
+            const project = await resolveCurrentProject();
+            renderProject(project);
+            process.stdout.write("render check: ok\n");
+            return 0;
+          }
+          await materializeProject();
+          return 0;
+        case "verify": {
           const project = await resolveCurrentProject();
-          renderProject(project);
-          process.stdout.write("render check: ok\n");
+          const lockfile = readLockfile(lockfilePath());
+          verifyProject(project, lockfile, rest.includes("--strict"));
+          process.stdout.write("verify: ok\n");
           return 0;
         }
-        await materializeProject();
-        return 0;
-      case "verify": {
-        const project = await resolveCurrentProject();
-        const lockfile = readLockfile(lockfilePath());
-        verifyProject(project, lockfile, rest.includes("--strict"));
-        process.stdout.write("verify: ok\n");
-        return 0;
-      }
-      case "drift": {
-        const project = await resolveCurrentProject();
-        const lockfile = readLockfile(lockfilePath());
-        if (rest.includes("--semantic")) {
-          verifyProject(project, lockfile, false);
-        } else {
-          driftProject(project, lockfile);
+        case "drift": {
+          const project = await resolveCurrentProject();
+          const lockfile = readLockfile(lockfilePath());
+          if (rest.includes("--semantic")) {
+            verifyProject(project, lockfile, false);
+          } else {
+            driftProject(project, lockfile);
+          }
+          process.stdout.write("drift: ok\n");
+          return 0;
         }
-        process.stdout.write("drift: ok\n");
-        return 0;
-      }
-      case "format":
-      case "fmt":
-        await runFormat();
-        return 0;
-      case "package":
-        await runPackage();
-        return 0;
-      case "publish":
-        await runPublish(rest);
-        return 0;
-      case "login":
-        await runLoginCommand(rest, projectRoot());
-        return 0;
-      case "upgrade":
-        runUpgradeCommand();
-        return 0;
-      case "serve":
-        await runServe(rest);
-        return 0;
-      case "sync":
-        await runSync(rest);
-        return 0;
-      case "trust":
-        await runTrustCommand(rest, projectRoot());
-        return 0;
-      case "confess":
-        await runConfess(rest);
-        return 0;
-      case "list":
-        await runList();
-        return 0;
-      case "outdated":
-        await runOutdated(rest);
-        return 0;
-      case "explain":
-        await runExplain(rest[0]);
-        return 0;
-      case "vendor": {
-        const project = await resolveCurrentProject();
-        vendorProject(project);
-        return 0;
-      }
-      case "clean": {
-        const options = parseCleanArguments(rest);
-        if (options.unused) {
-          cleanUnusedRegistryCache(projectRoot());
-        } else {
-          cleanProjectCaches(projectRoot());
+        case "format":
+        case "fmt":
+          await runFormat();
+          return 0;
+        case "package":
+          await runPackage();
+          return 0;
+        case "publish":
+          await runPublish(rest);
+          return 0;
+        case "login":
+          await runLoginCommand(rest, projectRoot());
+          return 0;
+        case "upgrade":
+          runUpgradeCommand();
+          return 0;
+        case "serve":
+          await runServe(rest);
+          return 0;
+        case "sync":
+          await runSync(rest);
+          return 0;
+        case "trust":
+          await runTrustCommand(rest, projectRoot());
+          return 0;
+        case "confess":
+          await runConfess(rest);
+          return 0;
+        case "list":
+          await runList();
+          return 0;
+        case "outdated":
+          await runOutdated(rest);
+          return 0;
+        case "explain":
+          await runExplain(rest[0]);
+          return 0;
+        case "vendor": {
+          const project = await resolveCurrentProject();
+          vendorProject(project);
+          return 0;
         }
-        return 0;
+        case "clean": {
+          const options = parseCleanArguments(rest);
+          if (options.unused) {
+            cleanUnusedRegistryCache(projectRoot());
+          } else {
+            cleanProjectCaches(projectRoot());
+          }
+          return 0;
+        }
+        case "tree": {
+          const project = await resolveCurrentProject();
+          process.stdout.write(`${renderDependencyTree(project).join("\n")}\n`);
+          return 0;
+        }
+        default:
+          throw PrayError.usage(unknownCommandMessage(command ?? ""));
       }
-      case "tree": {
-        const project = await resolveCurrentProject();
-        process.stdout.write(`${renderDependencyTree(project).join("\n")}\n`);
-        return 0;
-      }
-      default:
-        throw PrayError.usage(unknownCommandMessage(command ?? ""));
-    }
+    };
+    return await ([
+      "install",
+      "apply",
+      "update",
+      "unlock",
+      "add",
+      "remove",
+      "render",
+      "plan",
+      "verify",
+      "drift",
+    ].includes(command ?? "")
+      ? runTransaction(projectRoot(), execute)
+      : execute());
   } catch (error) {
     if (error instanceof PrayError) {
       process.stderr.write(`${error.toString()}\n`);

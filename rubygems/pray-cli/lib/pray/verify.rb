@@ -114,7 +114,7 @@ module Pray
           next
         end
 
-        text = File.read(absolute_path)
+        text = RenderDest.decode_utf8(RenderDest.read_regular_bytes(absolute_path, target_path), target_path)
         rendered_targets[target_path] = text
         lines = text.lines(chomp: true)
         markers = marker_positions(lines)

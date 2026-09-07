@@ -3,7 +3,7 @@
 module Pray
   ResolvedProject = Struct.new(
     :manifest_path, :project_root, :manifest, :manifest_hash, :packages,
-    :local_files, :source_revisions, :source_host_keys, :environment
+    :local_files, :source_revisions, :source_host_keys, :environment, :previous_lockfile
   ) do
     def lockfile_hash
       manifest_hash
@@ -107,7 +107,8 @@ module Pray
         local_files: local_files,
         source_revisions: source_revisions,
         source_host_keys: source_host_keys,
-        environment: options.environment
+        environment: options.environment,
+        previous_lockfile: lockfile_hints
       )
     end
 

@@ -6,7 +6,6 @@ use pray_core::render::{
 use pray_core::resolve::ResolvedProject;
 use pray_core::verify::{inspect_project, VerificationFinding};
 use pray_core::PrayResult;
-use std::fs;
 use std::path::{Path, PathBuf};
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -236,7 +235,7 @@ fn lockfile_change_status(path: &Path, lockfile: &Lockfile) -> PrayResult<Lockfi
 }
 
 fn target_change_status(path: &Path, content: &str) -> TargetChange {
-    match fs::read_to_string(path) {
+    match pray_core::render::read_destination_text(path) {
         Ok(existing) if existing == content => TargetChange::Unchanged,
         Ok(_) => TargetChange::Updated,
         Err(_) => TargetChange::Written,
@@ -267,7 +266,7 @@ fn pre_apply_warnings(
         if change == TargetChange::Unchanged {
             continue;
         }
-        if let Ok(existing) = fs::read_to_string(&path) {
+        if let Ok(existing) = pray_core::render::read_destination_text(&path) {
             if existing != target.content
                 && !warnings
                     .iter()

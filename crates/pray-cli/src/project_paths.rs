@@ -78,3 +78,29 @@ pub(crate) fn locked_package<'a>(
             && record.source.as_deref() == package.declaration.source.as_deref()
     })
 }
+
+pub(crate) fn run_project_command<T>(
+    arguments: &[String],
+    execute: impl FnOnce() -> PrayResult<T>,
+) -> PrayResult<T> {
+    let transactional = arguments.first().is_some_and(|command| {
+        matches!(
+            command.as_str(),
+            "install"
+                | "apply"
+                | "update"
+                | "unlock"
+                | "add"
+                | "remove"
+                | "render"
+                | "plan"
+                | "verify"
+                | "drift"
+        )
+    });
+    if transactional {
+        pray_core::transaction::run(&invocation::project_root(), execute)
+    } else {
+        execute()
+    }
+}

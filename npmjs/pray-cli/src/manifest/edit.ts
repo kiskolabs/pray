@@ -1,4 +1,3 @@
-import { writeFileSync } from "node:fs";
 import { PrayError } from "../errors.js";
 import {
   formatPackageDeclaration,
@@ -6,6 +5,7 @@ import {
   readManifestText,
 } from "../manifest/index.js";
 import type { ManifestPackage } from "../manifest/types.js";
+import { writeProjectFile } from "../transaction/index.js";
 
 export function insertManifestStatement(
   manifestText: string,
@@ -66,7 +66,7 @@ export function addPackageToManifest(
     manifestText,
     formatPackageDeclaration(declaration),
   );
-  writeFileSync(manifestPath, updated, "utf8");
+  writeProjectFile(manifestPath, updated);
 }
 
 export function removePackageFromManifest(
@@ -78,9 +78,5 @@ export function removePackageFromManifest(
   if (!manifest.packages.some((packageEntry) => packageEntry.name === name)) {
     throw PrayError.manifest(`package ${name} not found`);
   }
-  writeFileSync(
-    manifestPath,
-    removeManifestStatement(manifestText, name),
-    "utf8",
-  );
+  writeProjectFile(manifestPath, removeManifestStatement(manifestText, name));
 }
