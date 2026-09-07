@@ -2,6 +2,11 @@
 
 ## Unreleased
 
+- Keep Prayfile constraints unchanged when `pray update --latest` cannot write destination files in the Rust and TypeScript CLIs.
+- Apply newer versions with `update --latest --json` even when the existing constraints already allow them, and check destination conflicts during `update --latest --dry-run`.
+- Report conflicting file and tree destinations together before changing compose output, with steps that preserve local edits.
+- Reject unsupported Ruby update options (`--latest`, `--major`, `--dry-run`, and `--json`) instead of silently ignoring them.
+
 ## 1.11.0 (2026-09-04)
 
 - Read the whole eight byte tar checksum field so `.praypkg` archives whose checksum is written as seven octal digits unpack instead of failing integrity.

@@ -80,6 +80,29 @@ pub fn provisioned_destination_status(
     classify_destination(&destination, &normalized, &expected, previous)
 }
 
+pub fn provisioned_destination_statuses(
+    project: &ResolvedProject,
+    previous_lockfile: Option<&Lockfile>,
+) -> PrayResult<Vec<(PlannedProvisionedFile, ProvisionedDestinationStatus)>> {
+    let mut statuses = Vec::new();
+    let mut errors = Vec::new();
+    for file in planned_provisioned_files(project)? {
+        match provisioned_destination_status(project, &file, previous_lockfile) {
+            Ok(status) => statuses.push((file, status)),
+            Err(PrayError::Render(message)) => errors.push(format!(
+                "{message} (package `{}`, export `{}`)",
+                file.package, file.export
+            )),
+            Err(error) => return Err(error),
+        }
+    }
+    if errors.is_empty() {
+        Ok(statuses)
+    } else {
+        Err(PrayError::Render(errors.join("\n")))
+    }
+}
+
 fn previous_lock_map(lockfile: Option<&Lockfile>) -> BTreeMap<String, ProvisionedFileRecord> {
     lockfile
         .map(|lockfile| {
@@ -154,11 +177,11 @@ fn classify_destination(
                     return Ok(ProvisionedDestinationStatus::ManagedUpdate);
                 }
                 return Err(PrayError::Render(format!(
-                    "refusing to overwrite `{path_text}`; it was provisioned and then edited"
+                    "refusing to overwrite `{path_text}`; it was written by pray and then edited. Inspect your changes and move the file aside, then run `pray install`"
                 )));
             }
             Err(PrayError::Render(format!(
-                "refusing to overwrite `{path_text}`; it already exists and is not the expected provisioned file"
+                "refusing to overwrite `{path_text}`; its existing contents differ from this package. Inspect the file and move it aside, then run `pray install`. If an older pray wrote it, restore the original Prayfile and package version, run `pray install`, then retry the update"
             )))
         }
         DestinationKind::Symlink => Err(symlink_error(path_text)),
@@ -220,7 +243,7 @@ fn update_regular_bytes(
     }
     if sha256_prefixed(&on_disk) != authorized_hash {
         return Err(PrayError::Render(format!(
-            "refusing to overwrite `{display}`; it was provisioned and then edited"
+            "refusing to overwrite `{display}`; it was written by pray and then edited. Inspect your changes and move the file aside, then run `pray install`"
         )));
     }
     file.rewind()?;

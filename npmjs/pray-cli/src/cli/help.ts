@@ -79,7 +79,11 @@ const COMMAND_HELP: Record<string, string> = {
     "Usage: pray format\n       pray fmt",
   update:
     "refresh package versions within constraints\n\n" +
-    "Usage: pray update [package] [--major] [--latest] [--dry-run] [--json]",
+    "Usage: pray update [package] [--major] [--latest] [--dry-run] [--json]\n\n" +
+    "--latest adjusts constraints to allow the latest package versions.\n" +
+    "--latest --dry-run previews those versions and checks destination conflicts.\n" +
+    "If a destination conflicts, inspect it and move it aside before retrying.\n" +
+    "For files from an older pray, install the original package version first.",
   plan: "preview install/apply changes\n\nUsage: pray plan [--remote]",
   outdated:
     "show constraint vs resolved versions\n\n" +

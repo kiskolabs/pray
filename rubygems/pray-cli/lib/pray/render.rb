@@ -25,6 +25,7 @@ module Pray
     end
 
     def write_rendered_targets(project, rendered, previous_lockfile = nil)
+      RenderDest.validate_destinations!(project, previous_lockfile)
       rendered.each do |target|
         PathSafety.validate_destination_path!(target.path)
         RenderDest.ensure_safe_destination_ancestors!(project.project_root, target.path, target.path)
@@ -36,9 +37,7 @@ module Pray
       materialize_provisioned_exports(project, previous_lockfile)
     end
 
-    def materialize_provisioned_exports(project, previous_lockfile = nil)
-      RenderDest.materialize(project, previous_lockfile)
-    end
+    def materialize_provisioned_exports(project, previous_lockfile = nil) = RenderDest.materialize(project, previous_lockfile)
 
     def expected_provisioned_bytes(source, symbols)
       bytes = File.binread(source)

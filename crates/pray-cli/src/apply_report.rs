@@ -1,8 +1,7 @@
 use pray_core::lockfile::{lockfiles_equivalent, Lockfile};
 use pray_core::manifest::ManifestPackage;
 use pray_core::render::{
-    planned_provisioned_files, provisioned_destination_status, ProvisionedDestinationStatus,
-    RenderedTarget,
+    provisioned_destination_statuses, ProvisionedDestinationStatus, RenderedTarget,
 };
 use pray_core::resolve::ResolvedProject;
 use pray_core::verify::{inspect_project, VerificationFinding};
@@ -57,10 +56,10 @@ pub fn build_materialization_preview(
             Ok((target.path.clone(), change))
         })
         .collect::<PrayResult<Vec<_>>>()?;
-    let provisioned = planned_provisioned_files(project)?
+    let provisioned = provisioned_destination_statuses(project, previous_lockfile)?
         .into_iter()
-        .map(|file| {
-            let change = match provisioned_destination_status(project, &file, previous_lockfile)? {
+        .map(|(file, status)| {
+            let change = match status {
                 ProvisionedDestinationStatus::Missing => TargetChange::Written,
                 ProvisionedDestinationStatus::Unchanged => TargetChange::Unchanged,
                 ProvisionedDestinationStatus::ManagedUpdate => TargetChange::Updated,

@@ -165,7 +165,7 @@ module Pray
         )
       end
 
-      VerifyProvisioned.push_findings(project, report)
+      VerifyProvisioned.push_findings(project, report, lockfile)
 
       [report, rendered_targets, fresh_targets]
     end

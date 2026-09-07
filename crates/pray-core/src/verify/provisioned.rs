@@ -1,12 +1,16 @@
 use super::VerificationFinding;
 use crate::hashing::sha256_prefixed;
-use crate::render::{expected_provisioned_bytes, planned_provisioned_files};
+use crate::render::{
+    expected_provisioned_bytes, planned_provisioned_files, provisioned_destination_status,
+    ProvisionedDestinationStatus,
+};
 use crate::resolve::{missing_local_embed_guidance, ResolvedProject};
 use crate::PrayResult;
 use std::fs;
 
 pub(super) fn push_provisioned_and_local_findings(
     project: &ResolvedProject,
+    lockfile: &crate::lockfile::Lockfile,
     report_findings: &mut Vec<VerificationFinding>,
 ) -> PrayResult<()> {
     push_exclusive_file_export_findings(project, report_findings);
@@ -38,10 +42,18 @@ pub(super) fn push_provisioned_and_local_findings(
         let destination_bytes = fs::read(&absolute)?;
         let expected_bytes = expected_provisioned_bytes(&file.source, &project.manifest.symbols)?;
         if sha256_prefixed(&destination_bytes) != sha256_prefixed(&expected_bytes) {
+            let recovery = if matches!(
+                provisioned_destination_status(project, &file, Some(lockfile)),
+                Ok(ProvisionedDestinationStatus::ManagedUpdate)
+            ) {
+                "Run `pray install` to restore it."
+            } else {
+                "Inspect your changes and move the file aside, then run `pray install` to restore it."
+            };
             report_findings.push(VerificationFinding {
                 kind: "package_integrity".to_string(),
                 message: format!(
-                    "Provisioned file `{path_text}` no longer matches package `{}`. Run `pray install` to restore it.",
+                    "Provisioned file `{path_text}` no longer matches package `{}`. {recovery}",
                     file.package
                 ),
             });

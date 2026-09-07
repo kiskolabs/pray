@@ -49,6 +49,18 @@ module Pray
       classify_destination(destination, file.path, expected, record)
     end
 
+    def validate_destinations!(project, previous_lockfile = nil)
+      errors = []
+      Render.planned_provisioned_files(project).each do |file|
+        destination_status(project, file, previous_lockfile)
+      rescue Error => error
+        raise unless error.category == :render
+
+        errors << "#{error.message} (package `#{file.package}`, export `#{file.export}`)"
+      end
+      raise Error.render(errors.join("\n")) unless errors.empty?
+    end
+
     def write_leaf(project, file, previous)
       PathSafety.validate_destination_path!(file.path)
       ensure_safe_destination_ancestors!(project.project_root, file.path, file.path)
@@ -84,11 +96,11 @@ module Pray
       return :update if record && Hashing.sha256_prefixed(on_disk) == record.content_hash
 
       if record
-        raise Error.render("refusing to overwrite `#{display}`; it was provisioned and then edited")
+        raise Error.render("refusing to overwrite `#{display}`; it was written by pray and then edited. Inspect your changes and move the file aside, then run `pray install`")
       end
 
       raise Error.render(
-        "refusing to overwrite `#{display}`; it already exists and is not the expected provisioned file"
+        "refusing to overwrite `#{display}`; its existing contents differ from this package. Inspect the file and move it aside, then run `pray install`. If an older pray wrote it, restore the original Prayfile and package version, run `pray install`, then retry the update"
       )
     end
 
@@ -169,7 +181,7 @@ module Pray
         return if on_disk.b == bytes.b
 
         unless Hashing.sha256_prefixed(on_disk) == authorized_hash
-          raise Error.render("refusing to overwrite `#{display}`; it was provisioned and then edited")
+          raise Error.render("refusing to overwrite `#{display}`; it was written by pray and then edited. Inspect your changes and move the file aside, then run `pray install`")
         end
         file.rewind
         file.truncate(0)

@@ -15,6 +15,7 @@ import {
   readManifestText,
 } from "../manifest/index.js";
 import type {
+  Manifest,
   ManifestLocal,
   ManifestPackage,
   ManifestSource,
@@ -38,13 +39,13 @@ import type {
 export async function resolveProject(
   manifestPath: string,
   options: ResolveOptions = defaultResolveOptions(),
+  manifest: Manifest = parseManifest(readManifestText(manifestPath)),
 ): Promise<ResolvedProject> {
   const projectRoot = canonicalProjectRoot(manifestPath);
   const lockfilePath = defaultLockfilePath(projectRoot);
   const lockfile = existsSync(lockfilePath)
     ? readLockfile(lockfilePath)
     : undefined;
-  const manifest = parseManifest(readManifestText(manifestPath));
   const environment =
     options.environment ?? activeInvocationContext()?.environment;
   validateEnvironment(manifest, environment);

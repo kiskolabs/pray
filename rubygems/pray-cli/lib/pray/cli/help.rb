@@ -16,7 +16,7 @@ module Pray
       PACKAGE_COMMANDS = [
         "add <name> [constraint] [--path PATH]  declare a package in Prayfile",
         "remove <name>                          remove a package from Prayfile",
-        "update [package] [--major] [--latest] [--dry-run] [--json]",
+        "update [package]",
         "unlock <package>                       clear a locked package pin",
         "vendor                                 copy resolved packages locally",
         "clean                                  remove local cache and vendor trees"
@@ -101,7 +101,7 @@ module Pray
         "update" => <<~TEXT.strip,
           refresh package versions within constraints
 
-          Usage: pray update [package] [--major] [--latest] [--dry-run] [--json]
+          Usage: pray update [package]
         TEXT
         "plan" => <<~TEXT.strip,
           preview install/apply changes

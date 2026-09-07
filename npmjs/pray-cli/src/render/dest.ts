@@ -81,6 +81,31 @@ export function provisionedDestinationStatus(
   );
 }
 
+export function provisionedDestinationStatuses(
+  project: ResolvedProject,
+  previousLockfile?: Lockfile,
+): Array<[PlannedProvisionedFile, ProvisionedDestinationStatus]> {
+  const statuses: Array<
+    [PlannedProvisionedFile, ProvisionedDestinationStatus]
+  > = [];
+  const errors: string[] = [];
+  for (const file of plannedProvisionedFiles(project)) {
+    try {
+      statuses.push([
+        file,
+        provisionedDestinationStatus(project, file, previousLockfile),
+      ]);
+    } catch (error) {
+      if (!(error instanceof PrayError) || error.kind !== "render") throw error;
+      errors.push(
+        `${error.message} (package \`${file.package}\`, export \`${file.export}\`)`,
+      );
+    }
+  }
+  if (errors.length > 0) throw PrayError.render(errors.join("\n"));
+  return statuses;
+}
+
 function previousMap(lockfile?: Lockfile): Map<string, ProvisionedFileRecord> {
   const records = new Map<string, ProvisionedFileRecord>();
   for (const record of lockfile?.provisioned ?? []) {
@@ -142,11 +167,11 @@ function classifyDestination(
   if (record && sha256Prefixed(onDisk) === record.content_hash) return "update";
   if (record) {
     throw PrayError.render(
-      `refusing to overwrite \`${display}\`; it was provisioned and then edited`,
+      `refusing to overwrite \`${display}\`; it was written by pray and then edited. Inspect your changes and move the file aside, then run \`pray install\``,
     );
   }
   throw PrayError.render(
-    `refusing to overwrite \`${display}\`; it already exists and is not the expected provisioned file`,
+    `refusing to overwrite \`${display}\`; its existing contents differ from this package. Inspect the file and move it aside, then run \`pray install\`. If an older pray wrote it, restore the original Prayfile and package version, run \`pray install\`, then retry the update`,
   );
 }
 
@@ -193,7 +218,7 @@ function updateBytes(
     if (onDisk.equals(bytes)) return;
     if (sha256Prefixed(onDisk) !== authorizedHash) {
       throw PrayError.render(
-        `refusing to overwrite \`${display}\`; it was provisioned and then edited`,
+        `refusing to overwrite \`${display}\`; it was written by pray and then edited. Inspect your changes and move the file aside, then run \`pray install\``,
       );
     }
     ftruncateSync(descriptor, 0);

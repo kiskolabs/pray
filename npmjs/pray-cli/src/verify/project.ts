@@ -206,7 +206,7 @@ function collectVerificationReport(
     }
   }
 
-  pushProvisionedFindings(project, report);
+  pushProvisionedFindings(project, report, lockfile);
 
   for (const local of project.localFiles) {
     if (local.optional) {
