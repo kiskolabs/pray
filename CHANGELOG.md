@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+## 1.12.0 (2026-09-07)
+
 - Speed up Ruby planning for large package trees and reuse the resolved lock during installation.
 - Report duplicate Ruby lockfile fields as parsing errors with lockfile context.
 - Restore compose files, provisioned destinations, Prayfile, and lock after failed writes, and recover interrupted writes on the next install, plan, or verification in Rust, Ruby, and TypeScript on Unix.
