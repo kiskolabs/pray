@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+## 1.12.1 (2026-09-08)
+
 - Refresh a locked git catalog during `pray install` when a newly declared package is missing from the pinned revision, and name that revision with `pray update` if it is still missing.
 - Recommend ignoring the project `.pray` directory so local cache, write recovery, and state stay out of version control (RFC 0071).
 

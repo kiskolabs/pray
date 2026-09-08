@@ -20,7 +20,7 @@ Rust, Ruby, and TypeScript CLIs treat not found in distribution and missing v1/p
 
 ## Next
 
-None.
+Later pass 20260908125500: this work ships as 1.12.1. See usr/docs/issues/20260908125500_prepare-1-12-1-release.md.
 
 ## Source
 
