@@ -9,6 +9,7 @@ import {
   parseSkills,
   parseStringMap,
   parseTemplates,
+  parseUpstream,
 } from "./parse-maps.js";
 import { canonicalPackageSpec, type PackageSpec } from "./types.js";
 
@@ -75,6 +76,16 @@ class BlockParser {
           true,
         ),
       );
+      return;
+    }
+    if (statement.startsWith("spec.upstream ")) {
+      if (spec.upstream) {
+        throw PrayError.parse(
+          PARSE_CONTEXT,
+          "upstream may only be declared once",
+        );
+      }
+      spec.upstream = parseUpstream(statement.slice("spec.upstream ".length));
       return;
     }
     if (statement.startsWith("spec.")) {

@@ -28,6 +28,8 @@ mod manifest_validate;
 mod package_archive;
 pub mod package_integrity;
 pub mod package_spec;
+mod package_spec_render;
+pub mod package_upstream;
 pub mod paths;
 pub mod project_context;
 pub mod push_auth;

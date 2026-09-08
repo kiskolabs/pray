@@ -127,6 +127,7 @@ export function buildLockfile(input: {
       ...(packageEntry.signerFingerprint
         ? { signer_fingerprint: packageEntry.signerFingerprint }
         : {}),
+      ...(packageEntry.upstream ? { upstream: packageEntry.upstream } : {}),
     })),
     target: input.manifestTargets.map((target) => ({
       name: target.name,

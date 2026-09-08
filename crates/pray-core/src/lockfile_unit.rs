@@ -45,6 +45,42 @@ fn build_lockfile_records_git_source_revision() {
 }
 
 #[test]
+fn build_lockfile_records_package_upstream() {
+    let lockfile = Lockfile {
+        package: vec![LockedPackage {
+            name: "fork/base".to_string(),
+            version: "1.0.0".to_string(),
+            source: None,
+            path: "./packages/base".to_string(),
+            tree_hash: "sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+                .to_string(),
+            artifact_hash:
+                "sha256:bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"
+                    .to_string(),
+            artifact: "path:./packages/base".to_string(),
+            exports: Vec::new(),
+            dependencies: Vec::new(),
+            signer_fingerprint: None,
+            upstream: Some(crate::package_upstream::LockedUpstream {
+                name: "sample/base".to_string(),
+                version: "1.4.3".to_string(),
+                source: Some("sample".to_string()),
+                tree_hash:
+                    "sha256:cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc"
+                        .to_string(),
+                artifact_hash:
+                    "sha256:dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd"
+                        .to_string(),
+            }),
+        }],
+        ..Lockfile::default()
+    };
+    let serialized = lockfile.serialized().expect("serialize lockfile");
+    assert!(serialized.contains("sample/base"));
+    assert!(serialized.contains("1.4.3"));
+}
+
+#[test]
 fn lockfiles_equivalent_ignores_field_order() {
     let left = Lockfile {
         manifest_hash: "sha256:manifest".to_string(),
@@ -59,6 +95,7 @@ fn lockfiles_equivalent_ignores_field_order() {
             exports: vec!["SKILL.md".to_string()],
             dependencies: Vec::new(),
             signer_fingerprint: None,
+            upstream: None,
         }],
         ..Lockfile::default()
     };

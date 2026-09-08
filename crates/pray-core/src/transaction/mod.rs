@@ -92,6 +92,16 @@ pub fn write_file(path: &Path, bytes: impl AsRef<[u8]>) -> PrayResult<()> {
     Ok(())
 }
 
+pub(crate) fn remove_file(path: &Path) -> PrayResult<()> {
+    if ACTIVE.with(|active| active.borrow().is_some()) {
+        let before = crate::render_file::read_regular_bytes(path, &path.display().to_string())?;
+        replace(path, Some(&before), None)?;
+    } else {
+        fs::remove_file(path)?;
+    }
+    Ok(())
+}
+
 pub(crate) fn replace(
     path: &Path,
     before: Option<&[u8]>,

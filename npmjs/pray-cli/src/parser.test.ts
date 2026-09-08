@@ -141,6 +141,35 @@ end
     assert.equal(packageSpec.dependencies[0]?.name, "sample/common");
   });
 
+  it("parses package spec upstream", () => {
+    const packageSpec = parsePackageSpec(`
+Package::Specification.new do |spec|
+  spec.name = "fork/base"
+  spec.version = "1.0.0"
+  spec.files = ["README.md"]
+  spec.upstream "sample/base", "~> 1.4"
+end
+`);
+    assert.equal(packageSpec.upstream?.name, "sample/base");
+    assert.equal(packageSpec.upstream?.constraint, "~> 1.4");
+  });
+
+  it("rejects duplicate package spec upstream", () => {
+    assert.throws(
+      () =>
+        parsePackageSpec(`
+Package::Specification.new do |spec|
+  spec.name = "fork/base"
+  spec.version = "1.0.0"
+  spec.files = ["README.md"]
+  spec.upstream "sample/base", "~> 1.4"
+  spec.upstream "sample/other", "~> 2.0"
+end
+`),
+      /upstream may only be declared once/,
+    );
+  });
+
   it("parses compose blocks with pray and local entries", () => {
     const manifest = parseManifest(`
 prayfile "1"

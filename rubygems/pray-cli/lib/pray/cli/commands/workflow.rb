@@ -100,6 +100,8 @@ module Pray
           raise Error.manifest("package #{package} not found")
         end
       end
+      current = resolve_current_project(ResolveOptions.new(offline: offline))
+      Upstream.ensure_update_supported!(current.packages, package)
       install_command({locked: false, frozen: false, offline: offline, refresh: true})
     end
 

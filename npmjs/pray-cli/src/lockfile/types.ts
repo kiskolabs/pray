@@ -17,6 +17,15 @@ export interface LockedPackage {
   exports: string[];
   dependencies: string[];
   signer_fingerprint?: string;
+  upstream?: LockedUpstream;
+}
+
+export interface LockedUpstream {
+  name: string;
+  version: string;
+  source?: string;
+  tree_hash: string;
+  artifact_hash: string;
 }
 
 export interface LockedTarget {
@@ -85,5 +94,5 @@ export function canonicalLockfile(lockfile: Lockfile): Lockfile {
   };
 }
 
-export const PACKAGE_VERSION = "1.12.1";
+export const PACKAGE_VERSION = "1.13.0";
 export const GENERATED_BY = `pray ${PACKAGE_VERSION} (typescript)`;

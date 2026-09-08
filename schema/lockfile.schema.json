@@ -160,6 +160,34 @@
         "signer_fingerprint": {
           "type": "string",
           "minLength": 1
+        },
+        "upstream": {
+          "$ref": "#/$defs/lockedUpstream"
+        }
+      }
+    },
+    "lockedUpstream": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["name", "version", "tree_hash", "artifact_hash"],
+      "properties": {
+        "name": {
+          "type": "string",
+          "minLength": 1
+        },
+        "version": {
+          "type": "string",
+          "minLength": 1
+        },
+        "source": {
+          "type": ["string", "null"],
+          "minLength": 1
+        },
+        "tree_hash": {
+          "$ref": "#/$defs/sha256Digest"
+        },
+        "artifact_hash": {
+          "$ref": "#/$defs/sha256Digest"
         }
       }
     },
