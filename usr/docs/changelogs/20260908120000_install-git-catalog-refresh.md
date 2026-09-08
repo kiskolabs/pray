@@ -21,4 +21,4 @@ Covered by install_refreshes_when_a_new_catalog_package_is_declared and the matc
 ## Source
 
 usr/docs/issues/20260908120000_install-git-catalog-refresh.md
-CHANGELOG.md Unreleased
+CHANGELOG.md 1.12.1

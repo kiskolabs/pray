@@ -14,6 +14,8 @@ Do not teach pray init to rewrite gitignore in this pass.
 
 Claimed rfcs/ids/0071. Added rfcs/0071-project-local-pray-directory.md. RFC 0040, RFC 0070, RFC 0111, and rfcs/README.md cite it. Operator README and this repository gitignore now ignore .pray/. CHANGELOG Unreleased names the ignore guidance.
 
+Later pass 20260908125500: ignore guidance ships in CHANGELOG 1.12.1. See usr/docs/issues/20260908125500_prepare-1-12-1-release.md.
+
 Observed: cargo test -p pray-core --test rfc_ids
 5 passed, 0 failed.
 
