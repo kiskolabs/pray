@@ -137,4 +137,51 @@ RSpec.describe "git distribution install" do
     lockfile = File.read(File.join(consumer_repo, "Prayfile.lock"))
     expect(lockfile).to include(advanced_revision)
   end
+
+  it "refreshes the locked catalog when a newly declared package is added" do
+    source_repo = File.join(workspace, "source")
+    distribution_repo = File.join(workspace, "distribution")
+    prayers_root = File.join(distribution_repo, "prayers")
+    consumer_repo = File.join(workspace, "consumer")
+
+    FileUtils.mkdir_p(source_repo)
+    FileUtils.mkdir_p(distribution_repo)
+    FileUtils.mkdir_p(consumer_repo)
+
+    GitDistributionFixture.create_add_fixture(source_repo)
+    GitDistributionFixture.publish_source_to_prayers(source_repo, prayers_root)
+    GitDistributionFixture.init_distribution_repo(distribution_repo, prayers_root)
+    initial_revision = GitDistributionFixture.run_git(distribution_repo, "rev-parse", "HEAD").strip
+    GitDistributionFixture.write_consumer_prayfile(consumer_repo, distribution_repo)
+
+    Dir.chdir(consumer_repo) do
+      Pray::CLI.run(["install"])
+    end
+
+    GitDistributionFixture.create_extra_package(source_repo)
+    Dir.chdir(source_repo) do
+      Pray::CLI.run(["add", "sample/extra", "--path", "packages/extra"])
+      Pray::CLI.run(["publish", "--root", prayers_root])
+    end
+    GitDistributionFixture.run_git(distribution_repo, "add", "-A")
+    GitDistributionFixture.run_git(distribution_repo, "commit", "-m", "publish extra package")
+    updated_revision = GitDistributionFixture.run_git(distribution_repo, "rev-parse", "HEAD").strip
+    expect(updated_revision).not_to eq(initial_revision)
+
+    GitDistributionFixture.write_consumer_prayfile(consumer_repo, distribution_repo, extra: true)
+
+    Dir.chdir(consumer_repo) do
+      expect { Pray::CLI.run(["install", "--locked"]) }.to raise_error(Pray::Error) { |error|
+        expect(error.message).to include(initial_revision)
+        expect(error.message).to include("pray update")
+        expect(error.message).not_to include("check the package name")
+      }
+      Pray::CLI.run(["install"])
+    end
+
+    lockfile = File.read(File.join(consumer_repo, "Prayfile.lock"))
+    expect(lockfile).to include(updated_revision)
+    expect(lockfile).not_to include(initial_revision)
+    expect(lockfile).to include("sample/extra")
+  end
 end

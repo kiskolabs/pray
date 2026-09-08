@@ -12,6 +12,10 @@ use crate::resolve_git_sources::{
 };
 
 pub use crate::resolve_git::{discover_distribution_root, git_source_cache_directory};
+pub use crate::resolve_git_refresh::{
+    annotate_failed_git_refresh, annotate_missing_git_catalog,
+    resolution_may_benefit_from_git_source_refresh,
+};
 pub use crate::resolve_git_sources::refresh_git_sources;
 use crate::{PrayError, PrayResult};
 use std::collections::BTreeMap;
@@ -104,14 +108,17 @@ pub fn resolve_project_with_git_refresh_fallback(
                 refresh_source_revisions: true,
                 ..options.clone()
             };
-            resolve_project_with_options(manifest_path, &refreshed_options)
+            match resolve_project_with_options(manifest_path, &refreshed_options) {
+                Ok(project) => Ok(project),
+                Err(error) => {
+                    let lockfile_path =
+                        project_root_from_manifest(manifest_path).join("Prayfile.lock");
+                    Err(annotate_failed_git_refresh(&lockfile_path, error))
+                }
+            }
         }
         Err(error) => Err(error),
     }
-}
-
-fn resolution_may_benefit_from_git_source_refresh(message: &str) -> bool {
-    message.contains("no registry version")
 }
 
 pub fn resolve_project_with_options(
