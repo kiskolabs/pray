@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+- Refresh a locked git catalog during `pray install` when a newly declared package is missing from the pinned revision, and name that revision with `pray update` if it is still missing.
+
 ## 1.12.0 (2026-09-07)
 
 - Restore compose files, provisioned destinations, Prayfile, and lock after failed writes, and recover interrupted writes on the next install, plan, or verification on Unix.

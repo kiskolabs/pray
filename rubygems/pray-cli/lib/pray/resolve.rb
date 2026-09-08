@@ -127,14 +127,21 @@ module Pray
           !refresh &&
           resolution_may_benefit_from_git_source_refresh?(error)
         refreshed = ResolveOptions.new(offline: offline, refresh: true, environment: environment)
-        resolve_project_with_options(manifest_path, refreshed)
+        begin
+          resolve_project_with_options(manifest_path, refreshed)
+        rescue Error => retry_error
+          raise GitRefresh.annotate_failed_refresh(
+            File.join(File.dirname(File.expand_path(manifest_path)), "Prayfile.lock"),
+            retry_error
+          )
+        end
       else
         raise
       end
     end
 
     def resolution_may_benefit_from_git_source_refresh?(error)
-      error.category == :resolution && error.message.include?("no registry version")
+      GitRefresh.resolution_may_benefit_from_git_source_refresh?(error)
     end
 
     def missing_local_embed_guidance(path)
@@ -228,14 +235,23 @@ module Pray
           clone_url = source.url.delete_prefix("git+")
           distribution_root = GitSources.resolve_distribution_root(checkout.cache_directory, checkout.subdir)
           source_key = checkout.revision.to_s.empty? ? clone_url : "#{clone_url}@#{checkout.revision}"
-          resolved = Registry.resolve_local_registry_package_root(
-            project_root,
-            source_key,
-            distribution_root,
-            declaration,
-            preferred_version: lockfile_preferred_version(lockfile, declaration.name),
-            offline: offline
-          )
+          resolved = begin
+            Registry.resolve_local_registry_package_root(
+              project_root,
+              source_key,
+              distribution_root,
+              declaration,
+              preferred_version: lockfile_preferred_version(lockfile, declaration.name),
+              offline: offline
+            )
+          rescue Error => error
+            raise GitRefresh.annotate_missing_git_catalog(
+              error,
+              package_name: declaration.name,
+              source_name: source.name,
+              revision: checkout.revision
+            )
+          end
           return [resolved.root, resolved.registry_latest_version]
         else
           raise Error.unsupported("source kind #{source.kind} not implemented yet")

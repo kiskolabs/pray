@@ -55,6 +55,7 @@ mod resolve_deps;
 mod resolve_exports;
 mod resolve_git;
 mod resolve_git_command;
+mod resolve_git_refresh;
 mod resolve_git_sources;
 mod resolve_queue;
 pub mod resource_limits;

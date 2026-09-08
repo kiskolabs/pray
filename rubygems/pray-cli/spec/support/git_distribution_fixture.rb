@@ -43,6 +43,33 @@ module GitDistributionFixture
     )
   end
 
+  def create_extra_package(repo)
+    FileUtils.mkdir_p(File.join(repo, "packages/extra/exports"))
+    File.write(
+      File.join(repo, "packages/extra/sample-extra.prayspec"),
+      <<~PRAYSPEC
+        Package::Specification.new do |spec|
+          spec.name = "sample/extra"
+          spec.version = "1.0.0"
+          spec.summary = "extra guidance"
+          spec.files = ["README.md", "exports/extra-note.md"]
+          spec.exports = {
+            "extra-note" => {
+              type: "fragment",
+              path: "exports/extra-note.md",
+              summary: "Extra guidance"
+            }
+          }
+        end
+      PRAYSPEC
+    )
+    File.write(File.join(repo, "packages/extra/README.md"), "extra readme\n")
+    File.write(
+      File.join(repo, "packages/extra/exports/extra-note.md"),
+      "Extra guidance\n"
+    )
+  end
+
   def run_git(directory, *arguments)
     output, status = Open3.capture2e("git", "-C", directory, *arguments)
     raise "git #{arguments.join(" ")} failed: #{output}" unless status.success?
@@ -67,14 +94,15 @@ module GitDistributionFixture
     end
   end
 
-  def write_consumer_prayfile(consumer_repo, distribution_repo, constraint: "~> 1.4")
+  def write_consumer_prayfile(consumer_repo, distribution_repo, constraint: "~> 1.4", extra: false)
+    extra_declaration = extra ? %(agent "sample/extra", "~> 1.0", source: "dist"\n) : ""
     File.write(
       File.join(consumer_repo, "Prayfile"),
       <<~PRAYFILE
         prayfile "1"
         source "dist", "git+file://#{distribution_repo}"
         agent "sample/base", "#{constraint}", source: "dist"
-        target :tool_a do
+        #{extra_declaration}target :tool_a do
           output "INSTRUCTIONS.md"
         end
         render mode: :managed, conflict: :fail, churn: :minimal

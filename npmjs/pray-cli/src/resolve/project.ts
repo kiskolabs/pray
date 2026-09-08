@@ -29,6 +29,10 @@ import type { PackageSpec } from "../package-spec/types.js";
 import { activeInvocationContext } from "../project-context/runtime.js";
 import { defaultResolveOptions, type ResolveOptions } from "./context.js";
 import { loadExportBodies, selectExports } from "./exports.js";
+import {
+  annotateFailedGitRefresh,
+  resolutionMayBenefitFromGitSourceRefresh,
+} from "./git-refresh.js";
 import { resolvePackageRoot, vendoredPackageRoot } from "./package-root.js";
 import type {
   ResolvedLocalFile,
@@ -137,21 +141,20 @@ export async function resolveProjectWithGitRefreshFallback(
       !options.refreshSourceRevisions &&
       resolutionMayBenefitFromGitSourceRefresh(error)
     ) {
-      return resolveProject(manifestPath, {
-        ...options,
-        refreshSourceRevisions: true,
-      });
+      try {
+        return await resolveProject(manifestPath, {
+          ...options,
+          refreshSourceRevisions: true,
+        });
+      } catch (retryError) {
+        throw annotateFailedGitRefresh(
+          defaultLockfilePath(canonicalProjectRoot(manifestPath)),
+          retryError,
+        ) as Error;
+      }
     }
     throw error;
   }
-}
-
-function resolutionMayBenefitFromGitSourceRefresh(error: unknown): boolean {
-  return (
-    error instanceof PrayError &&
-    error.kind === "resolution" &&
-    error.message.includes("no registry version")
-  );
 }
 
 function canonicalProjectRoot(manifestPath: string): string {

@@ -34,10 +34,17 @@ module Pray
         if allow_git_refresh_fallback &&
             !offline &&
             !refresh &&
-            Resolve.resolution_may_benefit_from_git_source_refresh?(error)
+            GitRefresh.resolution_may_benefit_from_git_source_refresh?(error)
           refreshed = options.dup
           refreshed.refresh = true
-          Resolve.resolve_project_in_context(manifest_path, project_root, refreshed)
+          begin
+            Resolve.resolve_project_in_context(manifest_path, project_root, refreshed)
+          rescue Error => retry_error
+            raise GitRefresh.annotate_failed_refresh(
+              default_lockfile_path(project_root),
+              retry_error
+            )
+          end
         else
           raise
         end
