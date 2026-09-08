@@ -11,6 +11,7 @@ use crate::resolve_git_sources::{
     prepare_git_sources, prepare_pray_ssh_host_keys, resolve_git_package_root, GitSourceCheckout,
 };
 
+use crate::paths::find_prayspec_file;
 pub use crate::resolve_git::{discover_distribution_root, git_source_cache_directory};
 pub use crate::resolve_git_refresh::{
     annotate_failed_git_refresh, annotate_missing_git_catalog,
@@ -52,6 +53,7 @@ pub struct ResolvedPackage {
     pub registry_latest_version: Option<String>,
     /// True when the package was declared in Prayfile; false for transitive dependencies.
     pub explicit: bool,
+    pub upstream: Option<crate::package_upstream::LockedUpstream>,
 }
 
 #[derive(Debug, Clone)]
@@ -133,6 +135,10 @@ pub fn resolve_project_with_options(
 mod project;
 pub use project::{resolve_manifest_in_context, resolve_project_in_context};
 
+#[path = "resolve_upstream.rs"]
+mod resolve_upstream;
+pub use resolve_upstream::apply_path_upstream_refreshes;
+
 fn resolve_package(
     project_root: &Path,
     sources: &BTreeMap<String, ManifestSource>,
@@ -176,6 +182,15 @@ fn resolve_package(
     let export_bodies = load_export_bodies(&file_bytes, &spec, &selected_exports)?;
     let skill_files = build_skill_file_index(&spec);
     let source_checksum = tree_hash.clone();
+    let upstream_context = resolve_upstream::UpstreamResolutionContext::new(
+        project_root,
+        sources,
+        git_sources,
+        user_config,
+        lockfile,
+        options,
+    );
+    let upstream = resolve_upstream::lock_path_upstream(&upstream_context, declaration, &spec)?;
     Ok(ResolvedPackage {
         declaration: declaration.clone(),
         root,
@@ -193,6 +208,7 @@ fn resolve_package(
         signer_fingerprint,
         registry_latest_version,
         explicit: false,
+        upstream,
     })
 }
 
@@ -331,28 +347,6 @@ fn resolve_local_file(
         position: declaration.position.clone(),
         optional: declaration.optional,
     })
-}
-
-fn find_prayspec_file(root: &Path) -> PrayResult<PathBuf> {
-    let mut prayspec_files = Vec::new();
-    for entry in fs::read_dir(root)? {
-        let entry = entry?;
-        let path = entry.path();
-        if path.extension().and_then(|value| value.to_str()) == Some("prayspec") {
-            prayspec_files.push(path);
-        }
-    }
-    match prayspec_files.len() {
-        1 => Ok(prayspec_files.remove(0)),
-        0 => Err(PrayError::Resolution(format!(
-            "no prayspec file found in {:?}",
-            root
-        ))),
-        _ => Err(PrayError::Resolution(format!(
-            "multiple prayspec files found in {:?}",
-            root
-        ))),
-    }
 }
 
 fn source_map(sources: &[ManifestSource]) -> BTreeMap<String, ManifestSource> {

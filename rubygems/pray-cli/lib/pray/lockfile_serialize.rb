@@ -66,6 +66,25 @@ module Pray
       lines << "exports = #{format_string_array(entry.exports)}"
       lines << "dependencies = #{format_string_array(entry.dependencies)}"
       lines << "signer_fingerprint = #{format_string(entry.signer_fingerprint)}" if entry.signer_fingerprint
+      if entry.upstream
+        lines << ""
+        lines << "[package.upstream]"
+        append_scalars(
+          lines,
+          [
+            ["name", entry.upstream.name],
+            ["version", entry.upstream.version]
+          ].tap do |scalars|
+            scalars << ["source", entry.upstream.source] unless entry.upstream.source.nil?
+            scalars.concat(
+              [
+                ["tree_hash", entry.upstream.tree_hash],
+                ["artifact_hash", entry.upstream.artifact_hash]
+              ]
+            )
+          end
+        )
+      end
       lines
     end
 

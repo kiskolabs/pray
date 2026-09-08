@@ -134,7 +134,7 @@ function packageNamespace(name: string): string | undefined {
   return separator === -1 ? undefined : name.slice(0, separator);
 }
 
-function impliedSourceName(
+export function impliedSourceName(
   declaration: ManifestPackage,
   sources: Map<string, ManifestSource>,
 ): string | undefined {

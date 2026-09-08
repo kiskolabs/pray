@@ -25,6 +25,11 @@ export interface PackageDependency {
   optional: boolean;
 }
 
+export interface PackageUpstream {
+  name: string;
+  constraint: string;
+}
+
 export interface PackageSpec {
   name: string;
   version: string;
@@ -44,6 +49,7 @@ export interface PackageSpec {
   targets: string[];
   dependencies: PackageDependency[];
   metadata: Map<string, unknown>;
+  upstream?: PackageUpstream;
 }
 
 export function canonicalPackageSpec(spec: PackageSpec): PackageSpec {

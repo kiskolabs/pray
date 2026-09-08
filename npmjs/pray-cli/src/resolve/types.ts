@@ -23,6 +23,7 @@ export interface ResolvedPackage {
   skillFiles: Map<string, string[]>;
   signerFingerprint?: string;
   registryLatestVersion?: string;
+  upstream?: import("../lockfile/types.js").LockedUpstream;
 }
 
 export interface ResolvedProject {

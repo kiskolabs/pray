@@ -91,6 +91,7 @@ fn unlocked_packages_skip_locked_version_hints() {
             exports: vec![],
             dependencies: vec![],
             signer_fingerprint: None,
+            upstream: None,
         }],
         ..Lockfile::default()
     };

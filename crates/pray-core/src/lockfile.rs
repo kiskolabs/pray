@@ -45,6 +45,8 @@ pub struct LockedPackage {
     pub dependencies: Vec<String>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub signer_fingerprint: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub upstream: Option<crate::package_upstream::LockedUpstream>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
@@ -261,6 +263,7 @@ pub fn build_lockfile(
                     .map(|dependency| dependency.name.clone())
                     .collect(),
                 signer_fingerprint: package.signer_fingerprint.clone(),
+                upstream: package.upstream.clone(),
             })
             .collect(),
         target: manifest_targets

@@ -80,6 +80,22 @@ function formatPackage(packageEntry: LockedPackage): string[] {
       `signer_fingerprint = ${formatString(packageEntry.signer_fingerprint)}`,
     );
   }
+  if (packageEntry.upstream !== undefined) {
+    lines.push("");
+    lines.push("[package.upstream]");
+    const upstreamEntries: Array<[string, string]> = [
+      ["name", packageEntry.upstream.name],
+      ["version", packageEntry.upstream.version],
+    ];
+    if (packageEntry.upstream.source !== undefined) {
+      upstreamEntries.push(["source", packageEntry.upstream.source]);
+    }
+    upstreamEntries.push(
+      ["tree_hash", packageEntry.upstream.tree_hash],
+      ["artifact_hash", packageEntry.upstream.artifact_hash],
+    );
+    appendScalars(lines, upstreamEntries);
+  }
   return lines;
 }
 

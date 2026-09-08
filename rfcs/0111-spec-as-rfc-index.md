@@ -39,6 +39,7 @@ Open `rfcs/README.md` for types, statuses, numbering, and the current set. Open 
 - RFC 0102: destination DSL as canonical examples
 - RFC 0104: federation and extra transports
 - RFC 0108: file-as-fragment
+- RFC 0114: package upstream (path fork pin)
 
 Implementation PRs cite `RFC-NNNN`. JSON Schema and fixtures win for field presence. RFC reference-level text wins for algorithms until RFC 0100 is Stable.
 

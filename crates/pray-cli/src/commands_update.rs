@@ -83,7 +83,18 @@ fn update_command_with_manifest_constraints(
     }
 
     let options = update_resolve_options(package.as_deref());
+    let previous_lockfile = read_lockfile(&lockfile_path()).ok();
     let project = resolve_project_with_options(&manifest_path, &options)?;
+    let project = if pray_core::resolve::apply_path_upstream_refreshes(
+        &project,
+        previous_lockfile.as_ref(),
+        package.as_deref(),
+        &options,
+    )? {
+        resolve_project_with_options(&manifest_path, &options)?
+    } else {
+        project
+    };
     write_update(
         project,
         package,

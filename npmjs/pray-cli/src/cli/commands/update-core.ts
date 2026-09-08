@@ -15,6 +15,7 @@ import {
 } from "../../render/project.js";
 import { defaultResolveOptions } from "../../resolve/context.js";
 import type { ResolvedProject } from "../../resolve/types.js";
+import { assertPathUpstreamRefreshSupported } from "../../resolve/upstream.js";
 import { writeProjectFile } from "../../transaction/index.js";
 import { lockfilePath, resolveCurrentProject } from "../invocation.js";
 import {
@@ -87,6 +88,7 @@ export async function updateWithManifestConstraints(
     ignoreLockedVersions: packageName === undefined,
     unlockedPackages: packageName ? new Set([packageName]) : new Set(),
   });
+  assertPathUpstreamRefreshSupported(project.packages, packageName);
   await writeUpdate(project, packageName, json, manifestConstraintUpdates);
 }
 

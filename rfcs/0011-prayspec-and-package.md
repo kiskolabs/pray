@@ -149,8 +149,10 @@ Allowed methods:
 name= version= summary= description= authors= maintainers= license=
 homepage= source_code_uri= changelog_uri= prayfile_version= files=
 exports= skills= templates= adapters= targets= metadata=
-add_dependency add_optional_dependency
+add_dependency add_optional_dependency upstream
 ```
+`upstream` is provenance for a path fork (RFC 0114). It is not `add_dependency`.
+
 
 `skills=` is deprecated and will be removed in version 2. Prefer a `folder` export.
 

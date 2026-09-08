@@ -63,6 +63,34 @@ RSpec.describe "Pray parser" do
     expect(package.dependencies.first.name).to eq("sample/common")
   end
 
+  it "parses package spec upstream" do
+    package = Pray.parse_package_spec(<<~SPEC)
+      Package::Specification.new do |spec|
+        spec.name = "fork/base"
+        spec.version = "1.0.0"
+        spec.files = ["README.md"]
+        spec.upstream "sample/base", "~> 1.4"
+      end
+    SPEC
+
+    expect(package.upstream.name).to eq("sample/base")
+    expect(package.upstream.constraint).to eq("~> 1.4")
+  end
+
+  it "rejects duplicate package spec upstream" do
+    expect do
+      Pray.parse_package_spec(<<~SPEC)
+        Package::Specification.new do |spec|
+          spec.name = "fork/base"
+          spec.version = "1.0.0"
+          spec.files = ["README.md"]
+          spec.upstream "sample/base", "~> 1.4"
+          spec.upstream "sample/other", "~> 2.0"
+        end
+      SPEC
+    end.to raise_error(Pray::Error, /upstream may only be declared once/)
+  end
+
   it "preserves package declaration order" do
     manifest = Pray.parse_manifest(<<~PRAYFILE)
       prayfile "1"

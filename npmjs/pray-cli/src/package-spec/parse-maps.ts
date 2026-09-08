@@ -18,6 +18,7 @@ import type {
   PackageExport,
   PackageSkill,
   PackageTemplate,
+  PackageUpstream,
 } from "./types.js";
 
 const PARSE_CONTEXT = "prayspec";
@@ -34,6 +35,14 @@ export function parseDependency(
       ? (literalAsBool(keywordValue(keywords, "optional", PARSE_CONTEXT)) ??
         optional)
       : optional,
+  };
+}
+
+export function parseUpstream(rest: string): PackageUpstream {
+  const { values } = parseCall(rest);
+  return {
+    name: requirePositionalString(values, 0, PARSE_CONTEXT),
+    constraint: values[1] ? stringFromValue(values[1], PARSE_CONTEXT) : "*",
   };
 }
 

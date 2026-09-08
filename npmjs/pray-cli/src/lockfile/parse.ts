@@ -101,6 +101,32 @@ function parseLockedPackage(value: unknown, index: number): LockedPackage {
       "signer_fingerprint",
       context,
     ),
+    upstream: parseLockedUpstream(record.upstream, context),
+  };
+}
+
+function parseLockedUpstream(
+  value: unknown,
+  context: string,
+): import("./types.js").LockedUpstream | undefined {
+  if (value === undefined || value === null) {
+    return undefined;
+  }
+  const record = requireRecord(value, `${context}.upstream`);
+  return {
+    name: requireString(record.name, "name", `${context}.upstream`),
+    version: requireString(record.version, "version", `${context}.upstream`),
+    source: optionalString(record.source, "source", `${context}.upstream`),
+    tree_hash: requireString(
+      record.tree_hash,
+      "tree_hash",
+      `${context}.upstream`,
+    ),
+    artifact_hash: requireString(
+      record.artifact_hash,
+      "artifact_hash",
+      `${context}.upstream`,
+    ),
   };
 }
 

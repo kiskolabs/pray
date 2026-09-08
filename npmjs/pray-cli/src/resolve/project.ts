@@ -39,6 +39,7 @@ import type {
   ResolvedPackage,
   ResolvedProject,
 } from "./types.js";
+import { lockPathUpstream } from "./upstream.js";
 
 export async function resolveProject(
   manifestPath: string,
@@ -205,7 +206,7 @@ async function resolvePackage(
   const treeHash = treeHashForRoot(root, spec);
   const exportBodies = loadExportBodies(root, spec, selectedExports);
   const skillFiles = buildSkillFileIndex(spec);
-  return {
+  const resolved: ResolvedPackage = {
     declaration,
     root,
     spec,
@@ -219,8 +220,24 @@ async function resolvePackage(
     signerFingerprint: resolution.signerFingerprint,
     registryLatestVersion: resolution.registryLatestVersion,
   };
+  resolved.upstream = await lockPathUpstream(
+    declaration,
+    spec,
+    sources,
+    lockfile,
+    options,
+    (named) =>
+      resolvePackage(
+        projectRoot,
+        sources,
+        gitSources,
+        named,
+        lockfile,
+        options,
+      ),
+  );
+  return resolved;
 }
-
 function resolveLocalFile(
   projectRoot: string,
   declaration: ManifestLocal,

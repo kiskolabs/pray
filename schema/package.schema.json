@@ -107,6 +107,21 @@
         "$ref": "#/$defs/packageDependency"
       }
     },
+    "upstream": {
+      "type": ["object", "null"],
+      "additionalProperties": false,
+      "required": ["name", "constraint"],
+      "properties": {
+        "name": {
+          "type": "string",
+          "minLength": 1
+        },
+        "constraint": {
+          "type": "string",
+          "minLength": 1
+        }
+      }
+    },
     "metadata": {
       "type": "object",
       "additionalProperties": {

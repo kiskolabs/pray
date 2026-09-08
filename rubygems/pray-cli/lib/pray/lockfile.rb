@@ -8,14 +8,15 @@ module Pray
   LockSource = Struct.new(:name, :kind, :url, :revision, :host_key_fingerprint)
   LockedPackage = Struct.new(
     :name, :version, :source, :path, :tree_hash, :artifact_hash, :artifact,
-    :exports, :dependencies, :signer_fingerprint
+    :exports, :dependencies, :signer_fingerprint, :upstream
   ) do
-    def initialize(exports: [], dependencies: [], signer_fingerprint: nil, source: nil, **kwargs)
-      super(**kwargs, exports: exports, dependencies: dependencies, signer_fingerprint: signer_fingerprint, source: source)
+    def initialize(exports: [], dependencies: [], signer_fingerprint: nil, source: nil, upstream: nil, **kwargs)
+      super(**kwargs, exports: exports, dependencies: dependencies, signer_fingerprint: signer_fingerprint, source: source, upstream: upstream)
     end
   end
 
   LockedTarget = Struct.new(:name, :outputs)
+  LockedUpstream = Struct.new(:name, :version, :source, :tree_hash, :artifact_hash, keyword_init: true)
   ManagedSpanRecord = Struct.new(
     :id, :target, :open_line, :close_line, :ideal_checksum, :package, :export,
     :source_checksum, :silenced
@@ -98,6 +99,7 @@ module Pray
       }
       hash["source"] = entry.source unless entry.source.nil?
       hash["signer_fingerprint"] = entry.signer_fingerprint if entry.signer_fingerprint
+      hash["upstream"] = Upstream.to_lock_hash(entry.upstream) if entry.upstream
       hash
     end
 
@@ -185,7 +187,8 @@ module Pray
             artifact: normalize_lockfile_artifact(project_root, package.artifact, package.root),
             exports: package.selected_exports,
             dependencies: package.spec.dependencies.map(&:name),
-            signer_fingerprint: package.signer_fingerprint
+            signer_fingerprint: package.signer_fingerprint,
+            upstream: package.upstream
           )
         end,
         target: manifest_targets.map { |target| LockedTarget.new(name: target.name, outputs: target.outputs) },
@@ -224,7 +227,8 @@ module Pray
             artifact: entry["artifact"],
             exports: entry["exports"] || [],
             dependencies: entry["dependencies"] || [],
-            signer_fingerprint: entry["signer_fingerprint"]
+            signer_fingerprint: entry["signer_fingerprint"],
+            upstream: Upstream.from_lock_hash(entry["upstream"])
           )
         end,
         target: Array(data["target"]).map { |entry| LockedTarget.new(name: entry["name"], outputs: entry["outputs"] || []) },

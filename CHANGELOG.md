@@ -2,6 +2,10 @@
 
 ## Unreleased
 
+## 1.13.0 (2026-09-08)
+
+- Record and verify package upstream pins in `.prayspec` and `Prayfile.lock`. Refresh path forks with the Rust CLI; refuse that update in the npm and RubyGems CLIs until they can refresh the path tree safely (RFC 0114).
+
 ## 1.12.1 (2026-09-08)
 
 - Refresh a locked git catalog during `pray install` when a newly declared package is missing from the pinned revision, and name that revision with `pray update` if it is still missing.

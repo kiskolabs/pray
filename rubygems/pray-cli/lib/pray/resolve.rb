@@ -13,7 +13,7 @@ module Pray
   ResolvedPackage = Struct.new(
     :declaration, :root, :spec, :tree_hash, :artifact_hash, :artifact,
     :selected_exports, :source_checksum, :export_bodies, :skill_files,
-    :signer_fingerprint, :registry_latest_version
+    :signer_fingerprint, :registry_latest_version, :upstream
   )
 
   ResolvedLocalFile = Struct.new(
@@ -75,7 +75,7 @@ module Pray
           user_config,
           declaration,
           lockfile_hints,
-          offline: options.offline
+          options: options
         )
         if seen[package.declaration.name]
           raise Error.resolution("duplicate package declaration: #{package.declaration.name}")
@@ -149,9 +149,10 @@ module Pray
         "Create the file or remove the entry from Prayfile, then run `pray install`."
     end
 
-    def resolve_package(project_root, sources, git_sources, user_config, declaration, lockfile, offline: false)
+    def resolve_package(project_root, sources, git_sources, user_config, declaration, lockfile, offline: false, options: nil)
+      options ||= ResolveOptions.new(offline: offline)
       root, registry_latest_version = resolve_package_root_with_metadata(
-        project_root, sources, git_sources, user_config, declaration, lockfile, offline: offline
+        project_root, sources, git_sources, user_config, declaration, lockfile, offline: options.offline
       )
       spec_path = find_prayspec_file(root)
       spec_text = File.read(spec_path)
@@ -185,7 +186,10 @@ module Pray
         export_bodies: export_bodies,
         skill_files: skill_files,
         signer_fingerprint: nil,
-        registry_latest_version: registry_latest_version
+        registry_latest_version: registry_latest_version,
+        upstream: Upstream.lock_path(
+          project_root, sources, git_sources, user_config, declaration, spec, lockfile, options
+        )
       )
     end
 
