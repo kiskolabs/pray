@@ -2,6 +2,9 @@
 
 ## Unreleased
 
+- Collapse trailing blank lines when composing so a composed file ends with a single newline, matching the other CLIs.
+- Order `symbols` before `render` in the canonical manifest JSON so `manifest_hash` matches the other CLIs.
+
 ## 1.13.0 (2026-09-08)
 
 - Record and verify package upstream pins in `.prayspec` and `Prayfile.lock`. Refuse path-fork updates until this CLI can refresh the path tree safely (RFC 0114).

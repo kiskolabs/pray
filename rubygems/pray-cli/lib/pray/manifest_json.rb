@@ -14,10 +14,10 @@ module Pray
         "sources" => manifest.sources.map { |source| source_fields(source) },
         "targets" => manifest.targets.map { |target| target_fields(target) },
         "packages" => manifest.packages.map { |package| package_fields(package) },
-        "local" => manifest.local.map { |entry| local_fields(entry) },
-        "render" => render_fields(manifest.render)
+        "local" => manifest.local.map { |entry| local_fields(entry) }
       }
       fields["symbols"] = manifest.symbols.sort.to_h unless manifest.symbols.empty?
+      fields["render"] = render_fields(manifest.render)
       fields
     end
 
