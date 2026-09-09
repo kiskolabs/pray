@@ -34,5 +34,5 @@ libc = "0.2"
 
 [dev-dependencies]
 ed25519-dalek = "3"
-jsonschema = "0.52"
+jsonschema = "0.53"
 proptest = "1"
