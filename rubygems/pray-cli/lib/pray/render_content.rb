@@ -27,7 +27,7 @@ module Pray
       end
 
       def finish
-        @content.sub(/\n\n+\z/, "\n")
+        @content.sub!(/\n\n+\z/, "\n")
         @content << "\n" unless @content.end_with?("\n")
         @content
       end
