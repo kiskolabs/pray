@@ -7,9 +7,16 @@ import {
   writeLockfileIfChanged,
 } from "../../lockfile/index.js";
 import type { Lockfile } from "../../lockfile/types.js";
-import { renderProject, writeRenderedTargets } from "../../render/project.js";
+import { provisionedDestinationStatuses } from "../../render/dest.js";
+import {
+  layoutRenderedTargets,
+  renderProject,
+  writeRenderedTargets,
+} from "../../render/project.js";
 import { defaultResolveOptions } from "../../resolve/context.js";
 import type { ResolvedProject } from "../../resolve/types.js";
+import { assertPathUpstreamRefreshSupported } from "../../resolve/upstream.js";
+import { writeProjectFile } from "../../transaction/index.js";
 import { lockfilePath, resolveCurrentProject } from "../invocation.js";
 import {
   buildUpdateSummary,
@@ -75,30 +82,43 @@ export async function updateWithManifestConstraints(
     registry_latest_version: string;
   }>,
 ): Promise<void> {
-  const projectCheck = await resolveCurrentProject();
-  if (
-    packageName &&
-    !projectCheck.manifest.packages.some((entry) => entry.name === packageName)
-  ) {
-    throw PrayError.manifest(`package ${packageName} not found`);
-  }
-
-  const previous = existsSync(lockfilePath())
-    ? readLockfile(lockfilePath())
-    : undefined;
   const project = await resolveCurrentProject({
     ...defaultResolveOptions(),
     refreshSourceRevisions: true,
     ignoreLockedVersions: packageName === undefined,
     unlockedPackages: packageName ? new Set([packageName]) : new Set(),
   });
+  assertPathUpstreamRefreshSupported(project.packages, packageName);
+  await writeUpdate(project, packageName, json, manifestConstraintUpdates);
+}
+
+export async function writeUpdate(
+  project: ResolvedProject,
+  packageName: string | undefined,
+  json: boolean,
+  manifestConstraintUpdates: Parameters<
+    typeof updateWithManifestConstraints
+  >[2],
+  manifestUpdate?: string,
+  dryRun = false,
+): Promise<void> {
+  if (
+    packageName &&
+    !project.manifest.packages.some((entry) => entry.name === packageName)
+  ) {
+    throw PrayError.manifest(`package ${packageName} not found`);
+  }
+  const previous = existsSync(lockfilePath())
+    ? readLockfile(lockfilePath())
+    : undefined;
   const rendered = renderProject(project);
+  const laidOut = layoutRenderedTargets(project, rendered);
   const updatedLockfile = buildLockfile({
     manifestHash: project.manifestHash,
     projectRoot: project.projectRoot,
     manifestSources: project.manifest.sources,
     manifestTargets: project.manifest.targets,
-    rendered,
+    rendered: laidOut,
     packages: project.packages,
     sourceRevisions: project.sourceRevisions,
     sourceHostKeys: project.sourceHostKeys,
@@ -108,7 +128,17 @@ export async function updateWithManifestConstraints(
     previous && packageName
       ? mergeSelectedPackageUpdate(previous, updatedLockfile, packageName)
       : updatedLockfile;
+  const destinations = provisionedDestinationStatuses(project, previous);
+  if (dryRun) {
+    for (const target of laidOut)
+      process.stdout.write(`would render ${target.path}\n`);
+    for (const [file, status] of destinations)
+      process.stdout.write(`${file.path}: ${status}\n`);
+    return;
+  }
   writeRenderedTargets(project, rendered, previous);
+  if (manifestUpdate !== undefined)
+    writeProjectFile(project.manifestPath, manifestUpdate);
   if (packageName) {
     writeLockfile(lockfilePath(), merged);
   } else {

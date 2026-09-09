@@ -3,7 +3,7 @@
 module Pray
   ResolvedProject = Struct.new(
     :manifest_path, :project_root, :manifest, :manifest_hash, :packages,
-    :local_files, :source_revisions, :source_host_keys, :environment
+    :local_files, :source_revisions, :source_host_keys, :environment, :previous_lockfile
   ) do
     def lockfile_hash
       manifest_hash
@@ -13,7 +13,7 @@ module Pray
   ResolvedPackage = Struct.new(
     :declaration, :root, :spec, :tree_hash, :artifact_hash, :artifact,
     :selected_exports, :source_checksum, :export_bodies, :skill_files,
-    :signer_fingerprint, :registry_latest_version
+    :signer_fingerprint, :registry_latest_version, :upstream
   )
 
   ResolvedLocalFile = Struct.new(
@@ -75,7 +75,7 @@ module Pray
           user_config,
           declaration,
           lockfile_hints,
-          offline: options.offline
+          options: options
         )
         if seen[package.declaration.name]
           raise Error.resolution("duplicate package declaration: #{package.declaration.name}")
@@ -107,7 +107,8 @@ module Pray
         local_files: local_files,
         source_revisions: source_revisions,
         source_host_keys: source_host_keys,
-        environment: options.environment
+        environment: options.environment,
+        previous_lockfile: lockfile_hints
       )
     end
 
@@ -126,14 +127,21 @@ module Pray
           !refresh &&
           resolution_may_benefit_from_git_source_refresh?(error)
         refreshed = ResolveOptions.new(offline: offline, refresh: true, environment: environment)
-        resolve_project_with_options(manifest_path, refreshed)
+        begin
+          resolve_project_with_options(manifest_path, refreshed)
+        rescue Error => retry_error
+          raise GitRefresh.annotate_failed_refresh(
+            File.join(File.dirname(File.expand_path(manifest_path)), "Prayfile.lock"),
+            retry_error
+          )
+        end
       else
         raise
       end
     end
 
     def resolution_may_benefit_from_git_source_refresh?(error)
-      error.category == :resolution && error.message.include?("no registry version")
+      GitRefresh.resolution_may_benefit_from_git_source_refresh?(error)
     end
 
     def missing_local_embed_guidance(path)
@@ -141,9 +149,10 @@ module Pray
         "Create the file or remove the entry from Prayfile, then run `pray install`."
     end
 
-    def resolve_package(project_root, sources, git_sources, user_config, declaration, lockfile, offline: false)
+    def resolve_package(project_root, sources, git_sources, user_config, declaration, lockfile, offline: false, options: nil)
+      options ||= ResolveOptions.new(offline: offline)
       root, registry_latest_version = resolve_package_root_with_metadata(
-        project_root, sources, git_sources, user_config, declaration, lockfile, offline: offline
+        project_root, sources, git_sources, user_config, declaration, lockfile, offline: options.offline
       )
       spec_path = find_prayspec_file(root)
       spec_text = File.read(spec_path)
@@ -177,7 +186,10 @@ module Pray
         export_bodies: export_bodies,
         skill_files: skill_files,
         signer_fingerprint: nil,
-        registry_latest_version: registry_latest_version
+        registry_latest_version: registry_latest_version,
+        upstream: Upstream.lock_path(
+          project_root, sources, git_sources, user_config, declaration, spec, lockfile, options
+        )
       )
     end
 
@@ -227,14 +239,23 @@ module Pray
           clone_url = source.url.delete_prefix("git+")
           distribution_root = GitSources.resolve_distribution_root(checkout.cache_directory, checkout.subdir)
           source_key = checkout.revision.to_s.empty? ? clone_url : "#{clone_url}@#{checkout.revision}"
-          resolved = Registry.resolve_local_registry_package_root(
-            project_root,
-            source_key,
-            distribution_root,
-            declaration,
-            preferred_version: lockfile_preferred_version(lockfile, declaration.name),
-            offline: offline
-          )
+          resolved = begin
+            Registry.resolve_local_registry_package_root(
+              project_root,
+              source_key,
+              distribution_root,
+              declaration,
+              preferred_version: lockfile_preferred_version(lockfile, declaration.name),
+              offline: offline
+            )
+          rescue Error => error
+            raise GitRefresh.annotate_missing_git_catalog(
+              error,
+              package_name: declaration.name,
+              source_name: source.name,
+              revision: checkout.revision
+            )
+          end
           return [resolved.root, resolved.registry_latest_version]
         else
           raise Error.unsupported("source kind #{source.kind} not implemented yet")

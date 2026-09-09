@@ -11,7 +11,12 @@ use crate::resolve_git_sources::{
     prepare_git_sources, prepare_pray_ssh_host_keys, resolve_git_package_root, GitSourceCheckout,
 };
 
+use crate::paths::find_prayspec_file;
 pub use crate::resolve_git::{discover_distribution_root, git_source_cache_directory};
+pub use crate::resolve_git_refresh::{
+    annotate_failed_git_refresh, annotate_missing_git_catalog,
+    resolution_may_benefit_from_git_source_refresh,
+};
 pub use crate::resolve_git_sources::refresh_git_sources;
 use crate::{PrayError, PrayResult};
 use std::collections::BTreeMap;
@@ -48,6 +53,7 @@ pub struct ResolvedPackage {
     pub registry_latest_version: Option<String>,
     /// True when the package was declared in Prayfile; false for transitive dependencies.
     pub explicit: bool,
+    pub upstream: Option<crate::package_upstream::LockedUpstream>,
 }
 
 #[derive(Debug, Clone)]
@@ -104,14 +110,17 @@ pub fn resolve_project_with_git_refresh_fallback(
                 refresh_source_revisions: true,
                 ..options.clone()
             };
-            resolve_project_with_options(manifest_path, &refreshed_options)
+            match resolve_project_with_options(manifest_path, &refreshed_options) {
+                Ok(project) => Ok(project),
+                Err(error) => {
+                    let lockfile_path =
+                        project_root_from_manifest(manifest_path).join("Prayfile.lock");
+                    Err(annotate_failed_git_refresh(&lockfile_path, error))
+                }
+            }
         }
         Err(error) => Err(error),
     }
-}
-
-fn resolution_may_benefit_from_git_source_refresh(message: &str) -> bool {
-    message.contains("no registry version")
 }
 
 pub fn resolve_project_with_options(
@@ -122,80 +131,13 @@ pub fn resolve_project_with_options(
     resolve_project_in_context(manifest_path, &project_root, options)
 }
 
-pub fn resolve_project_in_context(
-    manifest_path: &Path,
-    project_root: &Path,
-    options: &ResolveOptions,
-) -> PrayResult<ResolvedProject> {
-    let user_config = crate::config::load_user_config()?;
-    let lockfile_path = project_root.join("Prayfile.lock");
-    let lockfile_hints = crate::lockfile::read_lockfile(&lockfile_path).ok();
-    let manifest_text = crate::manifest::read_manifest_text(manifest_path)?;
-    let manifest = crate::manifest::parse_manifest(&manifest_text)?;
-    crate::environment::validate_environment(&manifest, options.environment.as_deref())?;
-    let manifest_hash = manifest.manifest_hash()?;
-    let sources = source_map(&manifest.sources);
-    let git_sources = prepare_git_sources(
-        project_root,
-        &manifest.sources,
-        lockfile_hints.as_ref(),
-        options,
-    )?;
-    let source_host_keys = prepare_pray_ssh_host_keys(&manifest.sources)?;
-    let mut queue = crate::resolve_queue::ResolveQueue::seed(&manifest.packages)?;
-    let outcome = queue.resolve_all(&manifest.packages, &sources, |declaration| {
-        resolve_package(
-            project_root,
-            &sources,
-            &git_sources,
-            &user_config,
-            declaration,
-            lockfile_hints.as_ref(),
-            options,
-        )
-    });
-    if !outcome.errors.is_empty() {
-        let message = outcome.errors.join("\n");
-        return Err(if outcome.saw_network_error {
-            PrayError::Network(message)
-        } else {
-            PrayError::Resolution(message)
-        });
-    }
-    let packages = outcome.packages;
-    let mut local_files = Vec::new();
-    let mut local_errors = Vec::new();
-    for local in &manifest.local {
-        match resolve_local_file(project_root, local) {
-            Ok(resolved) => local_files.push(resolved),
-            Err(error) => local_errors.push(format!("local {}: {error}", local.path)),
-        }
-    }
-    if !local_errors.is_empty() {
-        return Err(PrayError::Resolution(local_errors.join("\n")));
-    }
-    crate::resolve_deps::reject_dependency_cycles(&packages)?;
-    Ok(ResolvedProject {
-        manifest_path: manifest_path.to_path_buf(),
-        project_root: project_root.to_path_buf(),
-        manifest,
-        manifest_hash,
-        packages,
-        local_files,
-        source_revisions: git_sources
-            .into_iter()
-            .filter_map(|(name, checkout)| {
-                if checkout.revision.is_empty() {
-                    None
-                } else {
-                    Some((name, checkout.revision))
-                }
-            })
-            .collect(),
-        source_host_keys,
-        environment: options.environment.clone(),
-    })
-}
+#[path = "resolve_project.rs"]
+mod project;
+pub use project::{resolve_manifest_in_context, resolve_project_in_context};
+
+#[path = "resolve_upstream.rs"]
+mod resolve_upstream;
+pub use resolve_upstream::apply_path_upstream_refreshes;
 
 fn resolve_package(
     project_root: &Path,
@@ -240,6 +182,15 @@ fn resolve_package(
     let export_bodies = load_export_bodies(&file_bytes, &spec, &selected_exports)?;
     let skill_files = build_skill_file_index(&spec);
     let source_checksum = tree_hash.clone();
+    let upstream_context = resolve_upstream::UpstreamResolutionContext::new(
+        project_root,
+        sources,
+        git_sources,
+        user_config,
+        lockfile,
+        options,
+    );
+    let upstream = resolve_upstream::lock_path_upstream(&upstream_context, declaration, &spec)?;
     Ok(ResolvedPackage {
         declaration: declaration.clone(),
         root,
@@ -257,6 +208,7 @@ fn resolve_package(
         signer_fingerprint,
         registry_latest_version,
         explicit: false,
+        upstream,
     })
 }
 
@@ -395,28 +347,6 @@ fn resolve_local_file(
         position: declaration.position.clone(),
         optional: declaration.optional,
     })
-}
-
-fn find_prayspec_file(root: &Path) -> PrayResult<PathBuf> {
-    let mut prayspec_files = Vec::new();
-    for entry in fs::read_dir(root)? {
-        let entry = entry?;
-        let path = entry.path();
-        if path.extension().and_then(|value| value.to_str()) == Some("prayspec") {
-            prayspec_files.push(path);
-        }
-    }
-    match prayspec_files.len() {
-        1 => Ok(prayspec_files.remove(0)),
-        0 => Err(PrayError::Resolution(format!(
-            "no prayspec file found in {:?}",
-            root
-        ))),
-        _ => Err(PrayError::Resolution(format!(
-            "multiple prayspec files found in {:?}",
-            root
-        ))),
-    }
 }
 
 fn source_map(sources: &[ManifestSource]) -> BTreeMap<String, ManifestSource> {

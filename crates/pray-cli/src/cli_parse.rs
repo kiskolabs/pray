@@ -103,7 +103,7 @@ pub(crate) fn parse_command(arguments: Vec<String>) -> PrayResult<Command> {
         "outdated" => parse_outdated_command(iter),
         "explain" => parse_explain_command(iter),
         "vendor" => Ok(Command::Vendor),
-        "clean" => Ok(Command::Clean),
+        "clean" => parse_clean_command(iter),
         "tree" => Ok(Command::Tree),
         "sync" => parse_sync_command(iter),
         "trust" => {
@@ -114,6 +114,21 @@ pub(crate) fn parse_command(arguments: Vec<String>) -> PrayResult<Command> {
         "version" | "-V" | "--version" => Ok(Command::Version),
         "completion" => parse_completion_command(iter),
         other => Err(PrayError::Usage(unknown_command_message(other))),
+    }
+}
+
+fn parse_clean_command(mut arguments: std::vec::IntoIter<String>) -> PrayResult<Command> {
+    match arguments.next() {
+        None => Ok(Command::Clean { unused: false }),
+        Some(argument) if argument == "--unused" && arguments.next().is_none() => {
+            Ok(Command::Clean { unused: true })
+        }
+        Some(argument) if argument.starts_with("--") => Err(PrayError::Unsupported(format!(
+            "unknown clean flag: {argument}"
+        ))),
+        Some(argument) => Err(PrayError::Unsupported(format!(
+            "unexpected clean argument: {argument}"
+        ))),
     }
 }
 

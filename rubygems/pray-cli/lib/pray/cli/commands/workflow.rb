@@ -76,7 +76,7 @@ module Pray
       )
       rendered = Render.render_project(project)
       lockfile = build_lockfile(project, rendered)
-      previous_lockfile = File.exist?(lockfile_path) ? Pray.read_lockfile(lockfile_path) : nil
+      previous_lockfile = project.previous_lockfile
       preview = Plan.build_materialization_preview(
         project, rendered, lockfile, lockfile_path, previous_lockfile
       )
@@ -84,6 +84,14 @@ module Pray
     end
 
     def update_command(arguments)
+      if arguments.any? { |argument| %w[--dry-run --json].include?(argument) }
+        raise Error.unsupported("this Ruby CLI does not support --dry-run or --json for update; use `pray plan` to preview the current Prayfile")
+      end
+      if arguments.any? { |argument| %w[--latest --major].include?(argument) }
+        raise Error.unsupported(
+          "to update beyond the current constraint, edit the package version in Prayfile, then run `pray update`"
+        )
+      end
       package = arguments.reject { |argument| argument.start_with?("--") }.first
       offline = arguments.include?("--offline")
       if package
@@ -92,6 +100,8 @@ module Pray
           raise Error.manifest("package #{package} not found")
         end
       end
+      current = resolve_current_project(ResolveOptions.new(offline: offline))
+      Upstream.ensure_update_supported!(current.packages, package)
       install_command({locked: false, frozen: false, offline: offline, refresh: true})
     end
 

@@ -9,17 +9,18 @@ module Pray
   PackageSkill = Struct.new(:path, :summary)
   PackageTemplate = Struct.new(:path, :summary)
   PackageDependency = Struct.new(:name, :constraint, :optional)
+  PackageUpstream = Struct.new(:name, :constraint, keyword_init: true)
 
   PackageSpec = Struct.new(
     :name, :version, :summary, :description, :authors, :license, :homepage,
     :source_code_uri, :changelog_uri, :prayfile_version, :files, :exports,
-    :skills, :templates, :adapters, :targets, :dependencies, :metadata
+    :skills, :templates, :adapters, :targets, :dependencies, :metadata, :upstream
   ) do
     def initialize(
       name: "", version: "", summary: nil, description: nil, authors: [], license: nil,
       homepage: nil, source_code_uri: nil, changelog_uri: nil, prayfile_version: nil,
       files: [], exports: {}, skills: {}, templates: {}, adapters: {}, targets: [],
-      dependencies: [], metadata: {}
+      dependencies: [], metadata: {}, upstream: nil
     )
       super
     end
@@ -88,6 +89,13 @@ module Pray
           constraint: constraint,
           optional: keywords["optional"]&.as_bool || optional
         )
+      end
+
+      def parse_upstream(rest)
+        values, _keywords = parse_call(rest)
+        name = string_from_value(values.first)
+        constraint = values[1] ? string_from_value(values[1]) : "*"
+        PackageUpstream.new(name: name, constraint: constraint)
       end
 
       def parse_exports(value)
@@ -208,6 +216,10 @@ module Pray
           spec.dependencies << parse_dependency(Regexp.last_match(1), false)
         when /\Aspec\.add_optional_dependency (.+)\z/
           spec.dependencies << parse_dependency(Regexp.last_match(1), true)
+        when /\Aspec\.upstream (.+)\z/
+          raise Error.parse("prayspec", "upstream may only be declared once") if spec.upstream
+
+          spec.upstream = parse_upstream(Regexp.last_match(1))
         when /\Aspec\.(.+) = (.+)\z/
           apply_assignment(spec, Regexp.last_match(1).strip, Regexp.last_match(2).strip)
         else

@@ -15,6 +15,7 @@ import {
   readManifestText,
 } from "../manifest/index.js";
 import type {
+  Manifest,
   ManifestLocal,
   ManifestPackage,
   ManifestSource,
@@ -28,23 +29,28 @@ import type { PackageSpec } from "../package-spec/types.js";
 import { activeInvocationContext } from "../project-context/runtime.js";
 import { defaultResolveOptions, type ResolveOptions } from "./context.js";
 import { loadExportBodies, selectExports } from "./exports.js";
+import {
+  annotateFailedGitRefresh,
+  resolutionMayBenefitFromGitSourceRefresh,
+} from "./git-refresh.js";
 import { resolvePackageRoot, vendoredPackageRoot } from "./package-root.js";
 import type {
   ResolvedLocalFile,
   ResolvedPackage,
   ResolvedProject,
 } from "./types.js";
+import { lockPathUpstream } from "./upstream.js";
 
 export async function resolveProject(
   manifestPath: string,
   options: ResolveOptions = defaultResolveOptions(),
+  manifest: Manifest = parseManifest(readManifestText(manifestPath)),
 ): Promise<ResolvedProject> {
   const projectRoot = canonicalProjectRoot(manifestPath);
   const lockfilePath = defaultLockfilePath(projectRoot);
   const lockfile = existsSync(lockfilePath)
     ? readLockfile(lockfilePath)
     : undefined;
-  const manifest = parseManifest(readManifestText(manifestPath));
   const environment =
     options.environment ?? activeInvocationContext()?.environment;
   validateEnvironment(manifest, environment);
@@ -136,21 +142,20 @@ export async function resolveProjectWithGitRefreshFallback(
       !options.refreshSourceRevisions &&
       resolutionMayBenefitFromGitSourceRefresh(error)
     ) {
-      return resolveProject(manifestPath, {
-        ...options,
-        refreshSourceRevisions: true,
-      });
+      try {
+        return await resolveProject(manifestPath, {
+          ...options,
+          refreshSourceRevisions: true,
+        });
+      } catch (retryError) {
+        throw annotateFailedGitRefresh(
+          defaultLockfilePath(canonicalProjectRoot(manifestPath)),
+          retryError,
+        ) as Error;
+      }
     }
     throw error;
   }
-}
-
-function resolutionMayBenefitFromGitSourceRefresh(error: unknown): boolean {
-  return (
-    error instanceof PrayError &&
-    error.kind === "resolution" &&
-    error.message.includes("no registry version")
-  );
 }
 
 function canonicalProjectRoot(manifestPath: string): string {
@@ -201,7 +206,7 @@ async function resolvePackage(
   const treeHash = treeHashForRoot(root, spec);
   const exportBodies = loadExportBodies(root, spec, selectedExports);
   const skillFiles = buildSkillFileIndex(spec);
-  return {
+  const resolved: ResolvedPackage = {
     declaration,
     root,
     spec,
@@ -215,8 +220,24 @@ async function resolvePackage(
     signerFingerprint: resolution.signerFingerprint,
     registryLatestVersion: resolution.registryLatestVersion,
   };
+  resolved.upstream = await lockPathUpstream(
+    declaration,
+    spec,
+    sources,
+    lockfile,
+    options,
+    (named) =>
+      resolvePackage(
+        projectRoot,
+        sources,
+        gitSources,
+        named,
+        lockfile,
+        options,
+      ),
+  );
+  return resolved;
 }
-
 function resolveLocalFile(
   projectRoot: string,
   declaration: ManifestLocal,

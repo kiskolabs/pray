@@ -37,9 +37,11 @@ pub use crate::render_write::{
 };
 
 pub use crate::render_dest::{
-    materialize_provisioned_exports, provisioned_destination_status, provisioned_lock_records,
-    ProvisionedDestinationStatus,
+    materialize_provisioned_exports, provisioned_destination_status,
+    provisioned_destination_statuses, provisioned_lock_records, ProvisionedDestinationStatus,
 };
 pub use crate::render_provisioned::{
     expected_provisioned_bytes, planned_provisioned_files, PlannedProvisionedFile,
 };
+
+pub use crate::render_file::read_destination_text;

@@ -1,12 +1,20 @@
-use crate::hashing::sha256_prefixed;
 use crate::literal::{
-    find_top_level, is_balanced, parse_literal, parse_literal_map, prepare_parser_lines,
-    split_top_level, LiteralValue,
+    find_top_level, is_balanced, parse_literal, prepare_parser_lines, split_top_level, LiteralValue,
 };
+use crate::package_upstream::{parse_upstream, PackageUpstream};
 use crate::{PrayError, PrayResult};
 use serde::{Deserialize, Serialize};
 use std::borrow::Cow;
 use std::collections::BTreeMap;
+
+#[path = "package_spec_maps.rs"]
+mod maps;
+#[path = "package_spec_hash.rs"]
+mod package_hash;
+use maps::{
+    array_of_strings, parse_exports, parse_metadata, parse_skills, parse_string_map,
+    parse_templates, string_from_literal, string_from_value,
+};
 
 #[derive(Debug, Clone, Default, Serialize, Deserialize, PartialEq)]
 pub struct PackageSpec {
@@ -28,6 +36,8 @@ pub struct PackageSpec {
     pub targets: Vec<String>,
     pub dependencies: Vec<PackageDependency>,
     pub metadata: BTreeMap<String, LiteralValue>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub upstream: Option<PackageUpstream>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
@@ -60,64 +70,6 @@ pub struct PackageDependency {
     pub name: String,
     pub constraint: String,
     pub optional: bool,
-}
-
-impl PackageSpec {
-    pub fn canonicalized(&self) -> Self {
-        let mut package = self.clone();
-        package.files.sort();
-        package.authors.sort();
-        package.targets.sort();
-        package.dependencies.sort_by(|left, right| {
-            left.name
-                .cmp(&right.name)
-                .then(left.constraint.cmp(&right.constraint))
-                .then(left.optional.cmp(&right.optional))
-        });
-        package
-    }
-
-    pub fn tree_hash_for_root(&self, root: &std::path::Path) -> PrayResult<String> {
-        let mut file_bytes = BTreeMap::new();
-        for file in &self.files {
-            let path = root.join(file);
-            if !path.exists() {
-                return Err(PrayError::Integrity(format!(
-                    "package file missing: {}",
-                    file
-                )));
-            }
-            if path.is_dir() {
-                return Err(PrayError::Integrity(format!(
-                    "package file is a directory: {}",
-                    file
-                )));
-            }
-            file_bytes.insert(file.clone(), std::fs::read(&path)?);
-        }
-        Self::tree_hash_from_file_bytes(&file_bytes)
-    }
-
-    pub fn tree_hash_from_file_bytes(file_bytes: &BTreeMap<String, Vec<u8>>) -> PrayResult<String> {
-        let mut entries = Vec::new();
-        for (path, bytes) in file_bytes {
-            entries.push((path.clone(), sha256_prefixed(bytes)));
-        }
-        entries.sort_by(|left, right| left.0.cmp(&right.0));
-
-        let mut serialized = String::new();
-        for (path, hash) in entries {
-            serialized.push_str("file");
-            serialized.push('\0');
-            serialized.push_str("regular");
-            serialized.push('\0');
-            serialized.push_str(&path);
-            serialized.push('\0');
-            serialized.push_str(&hash);
-            serialized.push('\n');
-        }
-        Ok(sha256_prefixed(serialized.as_bytes()))
-    }
 }
 
 pub fn parse_package_spec(text: &str) -> PrayResult<PackageSpec> {
@@ -172,6 +124,16 @@ impl<'a> BlockParser<'a> {
         }
         if let Some(rest) = statement.strip_prefix("spec.add_optional_dependency ") {
             spec.dependencies.push(parse_dependency(rest, true)?);
+            return Ok(());
+        }
+        if let Some(rest) = statement.strip_prefix("spec.upstream ") {
+            if spec.upstream.is_some() {
+                return Err(PrayError::Parse {
+                    kind: "prayspec",
+                    message: "upstream may only be declared once".to_string(),
+                });
+            }
+            spec.upstream = Some(parse_upstream(rest)?);
             return Ok(());
         }
         if let Some(rest) = statement.strip_prefix("spec.") {
@@ -288,128 +250,4 @@ fn parse_keyword_segment(segment: &str) -> PrayResult<Option<(String, LiteralVal
         return Ok(Some((left.to_string(), parse_literal(right)?)));
     }
     Ok(None)
-}
-
-fn parse_exports(value: &str) -> PrayResult<BTreeMap<String, PackageExport>> {
-    let map = parse_literal_map(value)?;
-    let mut exports = BTreeMap::new();
-    for (name, literal) in map {
-        let entry = literal.as_map().ok_or_else(|| PrayError::Parse {
-            kind: "prayspec",
-            message: format!("export {name} must be a map"),
-        })?;
-        let missing_path_name = name.clone();
-        exports.insert(
-            name,
-            PackageExport {
-                kind: map_string(entry, "type").unwrap_or_else(|| "fragment".to_string()),
-                path: map_string(entry, "path").ok_or_else(|| PrayError::Parse {
-                    kind: "prayspec",
-                    message: format!("export {missing_path_name} missing path"),
-                })?,
-                summary: map_string(entry, "summary"),
-                only: map_string_array(entry, "only"),
-                except: map_string_array(entry, "except"),
-                default_path: map_string(entry, "default_path"),
-            },
-        );
-    }
-    Ok(exports)
-}
-
-fn parse_skills(value: &str) -> PrayResult<BTreeMap<String, PackageSkill>> {
-    let map = parse_literal_map(value)?;
-    let mut output = BTreeMap::new();
-    for (name, literal) in map {
-        let entry = literal.as_map().ok_or_else(|| PrayError::Parse {
-            kind: "prayspec",
-            message: format!("skill {name} must be a map"),
-        })?;
-        output.insert(
-            name,
-            PackageSkill {
-                path: map_string(entry, "path").ok_or_else(|| PrayError::Parse {
-                    kind: "prayspec",
-                    message: "skill missing path".to_string(),
-                })?,
-                summary: map_string(entry, "summary"),
-            },
-        );
-    }
-    Ok(output)
-}
-
-fn parse_templates(value: &str) -> PrayResult<BTreeMap<String, PackageTemplate>> {
-    let map = parse_literal_map(value)?;
-    let mut output = BTreeMap::new();
-    for (name, literal) in map {
-        let entry = literal.as_map().ok_or_else(|| PrayError::Parse {
-            kind: "prayspec",
-            message: format!("template {name} must be a map"),
-        })?;
-        output.insert(
-            name,
-            PackageTemplate {
-                path: map_string(entry, "path").ok_or_else(|| PrayError::Parse {
-                    kind: "prayspec",
-                    message: "template missing path".to_string(),
-                })?,
-                summary: map_string(entry, "summary"),
-            },
-        );
-    }
-    Ok(output)
-}
-
-fn parse_string_map(value: &str) -> PrayResult<BTreeMap<String, String>> {
-    let map = parse_literal_map(value)?;
-    let mut output = BTreeMap::new();
-    for (key, literal) in map {
-        output.insert(key, string_from_value(&literal)?);
-    }
-    Ok(output)
-}
-
-fn parse_metadata(value: &str) -> PrayResult<BTreeMap<String, LiteralValue>> {
-    parse_literal_map(value)
-}
-
-fn map_string(map: &BTreeMap<String, LiteralValue>, key: &str) -> Option<String> {
-    map.get(key)
-        .and_then(|value| value.as_string().map(str::to_string))
-}
-
-fn map_string_array(map: &BTreeMap<String, LiteralValue>, key: &str) -> Vec<String> {
-    map.get(key)
-        .and_then(|value| value.as_array())
-        .map(|values| {
-            values
-                .iter()
-                .filter_map(|value| value.as_string().map(str::to_string))
-                .collect()
-        })
-        .unwrap_or_default()
-}
-
-fn array_of_strings(value: &str) -> PrayResult<Vec<String>> {
-    let array = parse_literal(value)?;
-    let values = array.as_array().ok_or_else(|| PrayError::Parse {
-        kind: "prayspec",
-        message: "expected array".to_string(),
-    })?;
-    values.iter().map(string_from_value).collect()
-}
-
-fn string_from_value(value: &LiteralValue) -> PrayResult<String> {
-    value
-        .as_string()
-        .map(str::to_string)
-        .ok_or_else(|| PrayError::Parse {
-            kind: "prayspec",
-            message: format!("expected string-like literal, found {:?}", value),
-        })
-}
-
-fn string_from_literal(value: &str) -> PrayResult<String> {
-    string_from_value(&parse_literal(value)?)
 }

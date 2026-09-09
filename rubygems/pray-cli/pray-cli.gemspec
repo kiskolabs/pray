@@ -39,7 +39,7 @@ Gem::Specification.new do |spec|
     "rubygems_mfa_required" => "true"
   }
 
-  spec.add_dependency "toml-rb", "~> 4.0"
+  spec.add_dependency "perfect_toml", "~> 0.9", ">= 0.9.1"
   spec.add_dependency "base64", "~> 0.2"
 
   spec.add_development_dependency "rspec", "~> 3.13"

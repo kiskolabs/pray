@@ -7,9 +7,15 @@ use std::fs;
 
 pub(super) fn push_provisioned_and_local_findings(
     project: &ResolvedProject,
+    lockfile: &crate::lockfile::Lockfile,
     report_findings: &mut Vec<VerificationFinding>,
 ) -> PrayResult<()> {
     push_exclusive_file_export_findings(project, report_findings);
+    let previous: std::collections::BTreeMap<_, _> = lockfile
+        .provisioned
+        .iter()
+        .map(|record| (record.path.as_str(), record.content_hash.as_str()))
+        .collect();
     for file in planned_provisioned_files(project)? {
         let path_text = file.path.to_string_lossy().replace('\\', "/");
         let absolute = project.project_root.join(&file.path);
@@ -35,13 +41,21 @@ pub(super) fn push_provisioned_and_local_findings(
                 continue;
             }
         }
-        let destination_bytes = fs::read(&absolute)?;
+        let destination_bytes = crate::render_file::read_regular_bytes(&absolute, &path_text)?;
         let expected_bytes = expected_provisioned_bytes(&file.source, &project.manifest.symbols)?;
-        if sha256_prefixed(&destination_bytes) != sha256_prefixed(&expected_bytes) {
+        let destination_hash = sha256_prefixed(&destination_bytes);
+        if destination_hash != sha256_prefixed(&expected_bytes) {
+            let recovery = if previous.get(path_text.as_str()).copied()
+                == Some(destination_hash.as_str())
+            {
+                "Run `pray install` to restore it."
+            } else {
+                "Inspect your changes and move the file aside, then run `pray install` to restore it."
+            };
             report_findings.push(VerificationFinding {
                 kind: "package_integrity".to_string(),
                 message: format!(
-                    "Provisioned file `{path_text}` no longer matches package `{}`. Run `pray install` to restore it.",
+                    "Provisioned file `{path_text}` no longer matches package `{}`. {recovery}",
                     file.package
                 ),
             });

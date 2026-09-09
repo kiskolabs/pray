@@ -47,8 +47,7 @@ module Pray
         project_root,
         source_url,
         declaration.name,
-        selected.version,
-        selected.artifact_hash
+        selected.version
       )
 
       if cache_ready?(cache_directory, selected)
@@ -91,8 +90,7 @@ module Pray
         project_root,
         source_key,
         declaration.name,
-        selected.version,
-        selected.artifact_hash
+        selected.version
       )
 
       if cache_ready?(cache_directory, selected)
@@ -238,15 +236,10 @@ module Pray
       )
     end
 
-    def registry_cache_directory(project_root, source_key, package_name, version, artifact_hash)
-      identifier = [
-        source_key,
-        package_name,
-        version,
-        artifact_hash || "no-artifact-hash"
-      ].join(":")
-      digest = Hashing.sha256_hex(identifier)[0, 16]
-      File.join(project_root, ".pray", "cache", "registry", package_name.tr("/", "-"), version, digest)
+    def registry_cache_directory(project_root, source_key, package_name, version)
+      namespace, name = PathSafety.validate_registry_cache_identity!(package_name, version)
+      source_hash = Hashing.sha256_hex(source_key)[0, 16]
+      File.join(project_root, ".pray", "cache", "registry", namespace, name, version, source_hash)
     end
 
     def offline_package_error(package_name, version)

@@ -2,9 +2,32 @@
 
 ## Unreleased
 
+- Emit absent package locators and an absent target `max_bytes` as null in the canonical manifest JSON so `manifest_hash` matches the other CLIs.
+
+## 1.13.0 (2026-09-08)
+
+- Record and verify package upstream pins in `.prayspec` and `Prayfile.lock`. Refuse path-fork updates until this CLI can refresh the path tree safely (RFC 0114).
+
+## 1.12.1 (2026-09-08)
+
+- Refresh a locked git catalog during `pray install` when a newly declared package is missing from the pinned revision, and name that revision with `pray update` if it is still missing.
+
+## 1.12.0 (2026-09-07)
+
+- Restore compose files, provisioned destinations, Prayfile, and lock after failed writes, and recover interrupted writes on the next install, plan, or verification on Unix.
+- Preserve later local edits when recovery encounters changed files, and prevent cooperating Pray commands from writing the same project together.
+- Limit destination reads to 32 MiB, saved transaction payload to 64 MiB across 10,000 writes, and grouped conflict details to 100 entries.
+- Keep Prayfile constraints unchanged when `pray update --latest` cannot write destination files.
+- Apply newer versions with `update --latest --json` even when the existing constraints already allow them, and check destination conflicts during `update --latest --dry-run`.
+- Report conflicting file and tree destinations together before changing compose output, with steps that preserve local edits.
+
+## 1.11.0 (2026-09-04)
+
 - Read the whole eight byte tar checksum field so `.praypkg` archives whose checksum is written as seven octal digits unpack instead of failing integrity.
 - Sort tree hash entries by UTF-8 bytes in the TypeScript CLI so a package hashes the same as where it was published, instead of following the host's locale collation.
-- Emit absent package locators and an absent target `max_bytes` as null in the canonical manifest JSON so `manifest_hash` matches the other CLIs.
+- Share the source-keyed registry cache path with the Rust and Ruby CLIs.
+- Add `pray clean --unused` for lockfile-driven registry cache cleanup.
+- Reject unsafe registry package and version path segments.
 
 ## 1.10.0 (2026-09-02)
 

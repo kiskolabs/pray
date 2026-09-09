@@ -4,7 +4,7 @@
 - Type: Procedural
 - Status: Stable
 - Created: 2026-08-17
-- Updated: 2026-08-18
+- Updated: 2026-09-07
 - Author: Andrei Makarov
 - Relates: RFC 0001, RFC 0100
 - Requires: RFC 0001
@@ -32,12 +32,14 @@ Open `rfcs/README.md` for types, statuses, numbering, and the current set. Open 
 - RFC 0050: security and trust
 - RFC 0051: registry authentication delivery and enrollment
 - RFC 0060: static registry and sources
-- RFC 0070: reference implementation and operator layout
+- RFC 0070: reference implementation
+- RFC 0071: project-local `.pray` directory and ignore policy
 - RFC 0100: conformance fixtures
 - RFC 0101: crate boundaries
 - RFC 0102: destination DSL as canonical examples
 - RFC 0104: federation and extra transports
 - RFC 0108: file-as-fragment
+- RFC 0114: package upstream (path fork pin)
 
 Implementation PRs cite `RFC-NNNN`. JSON Schema and fixtures win for field presence. RFC reference-level text wins for algorithms until RFC 0100 is Stable.
 

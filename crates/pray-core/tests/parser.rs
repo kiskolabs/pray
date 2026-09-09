@@ -73,6 +73,45 @@ end
 }
 
 #[test]
+fn parses_package_spec_upstream() {
+    let package = parse_package_spec(
+        r#"
+Package::Specification.new do |spec|
+  spec.name = "fork/base"
+  spec.version = "1.0.0"
+  spec.files = ["README.md"]
+  spec.upstream "sample/base", "~> 1.4"
+end
+"#,
+    )
+    .expect("package spec parses");
+
+    let upstream = package.upstream.expect("upstream");
+    assert_eq!(upstream.name, "sample/base");
+    assert_eq!(upstream.constraint, "~> 1.4");
+}
+
+#[test]
+fn rejects_duplicate_package_spec_upstream() {
+    let error = parse_package_spec(
+        r#"
+Package::Specification.new do |spec|
+  spec.name = "fork/base"
+  spec.version = "1.0.0"
+  spec.files = ["README.md"]
+  spec.upstream "sample/base", "~> 1.4"
+  spec.upstream "sample/other", "~> 2.0"
+end
+"#,
+    )
+    .expect_err("duplicate upstream should fail");
+
+    assert!(error
+        .to_string()
+        .contains("upstream may only be declared once"));
+}
+
+#[test]
 fn preserves_package_declaration_order() {
     let manifest = parse_manifest(
         r#"

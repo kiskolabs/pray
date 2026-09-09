@@ -1,8 +1,9 @@
-import { existsSync, readFileSync } from "node:fs";
+import { existsSync } from "node:fs";
 import { resolve } from "node:path";
 import { PrayError } from "../errors.js";
 import { normalizeLineEndings } from "../hashing.js";
 import type { Lockfile, ManagedSpanRecord } from "../lockfile/types.js";
+import { readRegularBytes } from "../render/destination-io.js";
 import { renderProject } from "../render/project.js";
 import { missingLocalEmbedGuidance } from "../resolve/project.js";
 import type { ResolvedProject } from "../resolve/types.js";
@@ -160,7 +161,7 @@ function collectVerificationReport(
       });
       continue;
     }
-    const text = readFileSync(absolutePath, "utf8");
+    const text = readRegularBytes(absolutePath, targetPath).toString("utf8");
     renderedTargets.set(targetPath, text);
     const lines = text.split("\n");
     const markers = markerPositions(lines);
@@ -206,7 +207,7 @@ function collectVerificationReport(
     }
   }
 
-  pushProvisionedFindings(project, report);
+  pushProvisionedFindings(project, report, lockfile);
 
   for (const local of project.localFiles) {
     if (local.optional) {

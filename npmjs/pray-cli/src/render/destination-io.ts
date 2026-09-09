@@ -4,10 +4,11 @@ import {
   fstatSync,
   lstatSync,
   openSync,
-  readFileSync,
+  readSync,
   writeSync,
 } from "node:fs";
 import { PrayError } from "../errors.js";
+import { replaceProjectFile } from "../transaction/hooks.js";
 
 export type DestinationKind = "missing" | "regular" | "symlink" | "other";
 
@@ -16,6 +17,7 @@ export function createBytes(
   display: string,
   bytes: Buffer,
 ): void {
+  if (replaceProjectFile(path, undefined, bytes)) return;
   const descriptor = openPath(
     path,
     display,
@@ -31,10 +33,38 @@ export function createBytes(
 export function readRegularBytes(path: string, display: string): Buffer {
   const descriptor = openRegular(path, display, constants.O_RDONLY);
   try {
-    return readFileSync(descriptor);
+    return readDestinationBytes(descriptor, display);
   } finally {
     closeSync(descriptor);
   }
+}
+
+export const MAX_DESTINATION_BYTES = 32 * 1024 * 1024;
+
+export function readDestinationBytes(
+  descriptor: number,
+  display: string,
+): Buffer {
+  const fail = () =>
+    PrayError.render(
+      `refusing to read \`${display}\`; destination exceeds the 32 MiB limit`,
+    );
+  if (fstatSync(descriptor).size > MAX_DESTINATION_BYTES) throw fail();
+  let capacity = Math.min(fstatSync(descriptor).size + 1, 64 * 1024);
+  const chunks: Buffer[] = [];
+  let size = 0;
+  while (true) {
+    const chunk = Buffer.allocUnsafe(
+      Math.min(capacity, MAX_DESTINATION_BYTES + 1 - size),
+    );
+    const count = readSync(descriptor, chunk, 0, chunk.length, null);
+    if (count === 0) break;
+    size += count;
+    if (size > MAX_DESTINATION_BYTES) throw fail();
+    chunks.push(chunk.subarray(0, count));
+    if (count === capacity) capacity = 64 * 1024;
+  }
+  return Buffer.concat(chunks, size);
 }
 
 export function openRegular(

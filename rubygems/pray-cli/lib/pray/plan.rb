@@ -10,14 +10,13 @@ module Pray
 
     module_function
 
-    def build_materialization_preview(project, rendered, lockfile, lockfile_path, previous_lockfile)
+    def build_materialization_preview(project, rendered, lockfile, _lockfile_path, previous_lockfile)
+      destinations = RenderDest.validate_destinations!(project, previous_lockfile)
       MaterializationPreview.new(
         package_lines: package_summary_lines(previous_lockfile, lockfile, project),
-        lockfile: lockfile_change_status(lockfile_path, lockfile),
+        lockfile: lockfile_change_status(previous_lockfile, lockfile),
         targets: rendered.map { |target| target_change(project, target) },
-        provisioned: Render.planned_provisioned_files(project).map do |file|
-          provisioned_change(project, file, previous_lockfile)
-        end,
+        provisioned: destinations.map { |file, status| [file.path, status.to_s] },
         warnings: []
       )
     end
@@ -51,10 +50,9 @@ module Pray
       end
     end
 
-    def lockfile_change_status(lockfile_path, lockfile)
-      return "create" unless File.exist?(lockfile_path)
+    def lockfile_change_status(existing, lockfile)
+      return "create" unless existing
 
-      existing = Pray.read_lockfile(lockfile_path)
       Pray.lockfiles_equivalent?(lockfile, existing) ? "unchanged" : "update"
     end
 
@@ -62,7 +60,7 @@ module Pray
       path = File.join(project.project_root, target.path)
       change = if !File.exist?(path)
         "write"
-      elsif File.read(path) == target.content
+      elsif RenderDest.read_regular_bytes(path, target.path) == target.content.b
         "unchanged"
       else
         "update"

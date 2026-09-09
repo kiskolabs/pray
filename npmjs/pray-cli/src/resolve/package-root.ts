@@ -14,6 +14,7 @@ import {
   resolveRegistryPackageRoot,
 } from "../registry/index.js";
 import { lockfilePreferredVersion, type ResolveOptions } from "./context.js";
+import { annotateMissingGitCatalog } from "./git-refresh.js";
 
 export interface PackageRootResolution {
   root: string;
@@ -90,18 +91,27 @@ export async function resolvePackageRoot(
       const sourceKey = checkout.revision
         ? `${cloneUrl}@${checkout.revision}`
         : cloneUrl;
-      const resolved = await resolveLocalRegistryPackageRoot(
-        projectRoot,
-        sourceKey,
-        distributionRoot,
-        declaration,
-        registryOptions,
-      );
-      return {
-        root: resolved.root,
-        signerFingerprint: resolved.signerFingerprint,
-        registryLatestVersion: resolved.registryLatestVersion,
-      };
+      try {
+        const resolved = await resolveLocalRegistryPackageRoot(
+          projectRoot,
+          sourceKey,
+          distributionRoot,
+          declaration,
+          registryOptions,
+        );
+        return {
+          root: resolved.root,
+          signerFingerprint: resolved.signerFingerprint,
+          registryLatestVersion: resolved.registryLatestVersion,
+        };
+      } catch (error) {
+        throw annotateMissingGitCatalog(
+          error,
+          declaration.name,
+          source.name,
+          checkout.revision,
+        ) as Error;
+      }
     }
 
     throw PrayError.unsupported(
@@ -124,7 +134,7 @@ function packageNamespace(name: string): string | undefined {
   return separator === -1 ? undefined : name.slice(0, separator);
 }
 
-function impliedSourceName(
+export function impliedSourceName(
   declaration: ManifestPackage,
   sources: Map<string, ManifestSource>,
 ): string | undefined {

@@ -67,7 +67,7 @@ module Pray
       when "outdated" then [:outdated, arguments]
       when "explain" then [:explain, arguments.shift]
       when "vendor" then [:vendor]
-      when "clean" then [:clean]
+      when "clean" then [:clean, parse_clean_arguments(arguments, flags)]
       when "tree" then [:tree]
       when "sync" then [:sync, parse_sync_arguments(arguments)]
       when "trust" then parse_trust_command(arguments)
@@ -81,6 +81,24 @@ module Pray
       found = arguments.include?(flag)
       arguments.reject! { |argument| argument == flag }
       found
+    end
+
+    def parse_clean_arguments(arguments, flags)
+      if flags.values_at(:check, :strict, :semantic, :locked, :frozen, :offline).any?
+        raise Error.unsupported("unknown clean flag")
+      end
+
+      unused = false
+      arguments.each do |argument|
+        if argument == "--unused" && !unused
+          unused = true
+        elsif argument.start_with?("--")
+          raise Error.unsupported("unknown clean flag: #{argument}")
+        else
+          raise Error.unsupported("unexpected clean argument: #{argument}")
+        end
+      end
+      {unused: unused}
     end
 
     def parse_add_arguments(arguments)

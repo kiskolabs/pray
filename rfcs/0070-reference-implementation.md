@@ -6,7 +6,7 @@
 - Describes: 1.8.1
 - Created: 2026-08-17
 - Author: Andrei Makarov
-- Relates: RFC 0040, RFC 0100, RFC 0101
+- Relates: RFC 0040, RFC 0071, RFC 0100, RFC 0101
 
 ## Summary
 
@@ -32,36 +32,15 @@ The former snapshot suggested crate names that do not exist. RFC 0101 is the wor
 
 ### 9. Repository layout
 
-#### Recommended project layout:
+Project-local `.pray/` directory, gitignore, commit policy, state file, and vendor copies are RFC 0071.
 
-```
-Prayfile
-Prayfile.lock
-tool-specific instruction files
-
-.pray/cache/                # ignored by default
-.pray/vendor/               # optional, committed only in hermetic/offline mode
-
-.agents/                     # skills and other project agent inputs
-```
-
-Recommended `.gitignore`:
-
-```
-.pray/cache/
-```
-
-Depending on repository policy, rendered target files may be committed or ignored. Rendered files are usually committed because current inference tools commonly read repository-visible files, not `Prayfile` directly.
+Rendered target files stay outside `.pray/`. Depending on repository policy they may be committed or ignored. They are usually committed because current inference tools commonly read repository-visible files, not `Prayfile` directly.
 
 ---
 
 ### 10. Commit policy
 
-Default: commit Prayfile, Prayfile.lock, and rendered targets when tools need them; ignore cache and state.
-
-Personal local: commit Prayfile; optionally lock; ignore generated tool output, cache, state.
-
-Offline / archival: also commit `.pray/vendor` and generated files if targets need them.
+See RFC 0071. Default: commit Prayfile, Prayfile.lock, and rendered targets when tools need them.
 
 ---
 
@@ -115,25 +94,29 @@ cache/
 
 Cache must be safely deletable.
 
+Registry packages use a project-local cache beside other project state:
+
+```
+.pray/cache/registry/<namespace>/<name>/<version>/<source-hash>
+```
+
+Package identity MUST contain exactly two non-empty, path-safe segments. The
+version MUST be one path-safe segment. `source-hash` is the first 16 lowercase
+hexadecimal characters of SHA-256 over the exact source key used for
+resolution. Artifact and tree hashes validate cache content; they are not cache
+path inputs.
+
 ---
 
 ### 56. State file
 
-`.pray/state.json` is local and ignored.
-
-May contain: last render hashes, manual edit detection data, cache hints, local file hashes, tool discovery result
-
-It must not be required for reproducible install. Deleting it must be safe.
+See RFC 0071.
 
 ---
 
 ### 57. Vendor mode
 
-Vendor mode copies package contents into `.pray/vendor/`.
-
-Used for: offline work, archival, regulated environments, private distribution without registry availability
-
-Vendor mode must preserve package tree hashes. Vendor directory can be committed.
+See RFC 0071.
 
 ---
 

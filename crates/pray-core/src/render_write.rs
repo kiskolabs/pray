@@ -2,14 +2,14 @@ use crate::lockfile::Lockfile;
 use crate::paths::validate_destination_path;
 use crate::render::RenderedTarget;
 use crate::render_file::{
-    create_regular_bytes, destination_kind, open_regular, read_regular_bytes, symlink_error,
-    DestinationKind,
+    create_regular_bytes, destination_kind, open_regular, read_destination_bytes,
+    read_regular_bytes, symlink_error, DestinationKind,
 };
 use crate::render_path_guard::ensure_safe_destination_ancestors;
 use crate::resolve::ResolvedProject;
 use crate::{PrayError, PrayResult};
 use std::fs;
-use std::io::{Read, Seek, Write};
+use std::io::{Seek, Write};
 use std::path::Path;
 
 fn layout_rendered_content(path: &Path, display: &str, rendered: &str) -> PrayResult<String> {
@@ -35,9 +35,16 @@ fn write_rendered_content(path: &Path, display: &str, rendered: &str) -> PrayRes
         DestinationKind::Missing => create_regular_bytes(path, display, rendered.as_bytes()),
         DestinationKind::Regular => {
             let mut file = open_regular(path, display, true)?;
-            let mut existing = String::new();
-            file.read_to_string(&mut existing)?;
+            let existing = String::from_utf8(read_destination_bytes(&mut file, display)?)
+                .map_err(|error| PrayError::Render(error.to_string()))?;
             let content = crate::render_patch::patch_rendered_content(&existing, rendered);
+            if crate::transaction::replace(
+                path,
+                Some(existing.as_bytes()),
+                Some(content.as_bytes()),
+            )? {
+                return Ok(());
+            }
             file.rewind()?;
             file.set_len(0)?;
             file.write_all(content.as_bytes())?;
@@ -87,6 +94,17 @@ pub fn write_rendered_targets_with_previous_lockfile(
     rendered: &[RenderedTarget],
     previous_lockfile: Option<&Lockfile>,
 ) -> PrayResult<()> {
+    crate::transaction::run(&project.project_root, || {
+        write_project_files(project, rendered, previous_lockfile)
+    })
+}
+
+fn write_project_files(
+    project: &ResolvedProject,
+    rendered: &[RenderedTarget],
+    previous_lockfile: Option<&Lockfile>,
+) -> PrayResult<()> {
+    crate::render_dest::provisioned_destination_statuses(project, previous_lockfile)?;
     if project.manifest.render.conflict == "fail" {
         if let Some(lockfile) = previous_lockfile {
             crate::render_conflict::reject_managed_span_conflicts(&project.project_root, lockfile)?;

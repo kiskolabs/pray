@@ -14,7 +14,7 @@ pub(crate) const PACKAGE_COMMANDS: &[&str] = &[
     "update [package] [--major] [--latest] [--dry-run] [--json]",
     "unlock <package>                       clear a locked package pin",
     "vendor                                 copy resolved packages locally",
-    "clean                                  remove local cache and vendor trees",
+    "clean [--unused]                       remove local state or unused registry entries",
 ];
 
 #[cfg(feature = "auth")]
@@ -106,11 +106,18 @@ pub(crate) fn command_help_text(command: &str) -> Option<&'static str> {
         "remove" => Some("remove a package from Prayfile\n\nUsage: pray remove <name>"),
         "update" => Some(
             "refresh package versions within constraints\n\n\
-             Usage: pray update [package] [--major] [--latest] [--dry-run] [--json]",
+             Usage: pray update [package] [--major] [--latest] [--dry-run] [--json]\n\n\
+             --latest adjusts constraints to allow the latest package versions.\n\
+             --latest --dry-run previews those versions and checks destination conflicts.\n\
+             If a destination conflicts, inspect it and move it aside before retrying.\n\
+             For files from an older pray, install the original package version first.",
         ),
         "unlock" => Some("clear a locked package pin\n\nUsage: pray unlock <package>"),
         "vendor" => Some("copy resolved packages locally\n\nUsage: pray vendor"),
-        "clean" => Some("remove local cache and vendor trees\n\nUsage: pray clean"),
+        "clean" => Some(
+            "remove local cache and vendor trees, or only unused registry entries\n\n\
+             Usage: pray clean [--unused]",
+        ),
         "publish" => Some(
             "upload packages to a registry or local root\n\n\
              Usage: pray publish --root PATH [--server URL ...] [--signing-key PATH]\n\n\

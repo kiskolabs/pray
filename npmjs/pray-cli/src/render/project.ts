@@ -6,8 +6,12 @@ import { targetMode, targetScoped } from "../manifest/destination.js";
 import type { ManifestTarget } from "../manifest/types.js";
 import { validateDestinationPath } from "../manifest/validate.js";
 import type { ResolvedProject } from "../resolve/types.js";
+import { runTransaction } from "../transaction/index.js";
 import { ensureHtmlCommentComposeDest } from "./compose-dest.js";
-import { materializeProvisionedExports } from "./dest.js";
+import {
+  materializeProvisionedExports,
+  provisionedDestinationStatuses,
+} from "./dest.js";
 import { renderLegacyCompose } from "./legacy.js";
 import { relocateManagedSpans } from "./patch.js";
 import { ensureSafeDestinationAncestors } from "./path-guard.js";
@@ -35,6 +39,16 @@ export function writeRenderedTargets(
   rendered: RenderedTarget[],
   previousLockfile?: Lockfile,
 ): void {
+  runTransaction(project.projectRoot, () =>
+    writeProjectFiles(project, rendered, previousLockfile),
+  );
+}
+function writeProjectFiles(
+  project: ResolvedProject,
+  rendered: RenderedTarget[],
+  previousLockfile?: Lockfile,
+): void {
+  provisionedDestinationStatuses(project, previousLockfile);
   for (const target of rendered) {
     validateDestinationPath(target.path);
     ensureSafeDestinationAncestors(

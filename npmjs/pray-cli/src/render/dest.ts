@@ -3,7 +3,6 @@ import {
   constants,
   ftruncateSync,
   mkdirSync,
-  readFileSync,
   unlinkSync,
 } from "node:fs";
 import { dirname, resolve } from "node:path";
@@ -12,10 +11,12 @@ import { sha256Prefixed } from "../hashing.js";
 import type { Lockfile, ProvisionedFileRecord } from "../lockfile/types.js";
 import { validateDestinationPath } from "../manifest/validate.js";
 import type { ResolvedProject } from "../resolve/types.js";
+import { replaceProjectFile } from "../transaction/hooks.js";
 import {
   createBytes,
   destinationKind,
   openRegular,
+  readDestinationBytes,
   readRegularBytes,
   writeAll,
 } from "./destination-io.js";
@@ -66,6 +67,7 @@ export function provisionedDestinationStatus(
   project: ResolvedProject,
   file: PlannedProvisionedFile,
   previousLockfile?: Lockfile,
+  previous = previousMap(previousLockfile),
 ): ProvisionedDestinationStatus {
   validateDestinationPath(file.path);
   ensureSafeDestinationAncestors(project.projectRoot, file.path, file.path);
@@ -77,8 +79,45 @@ export function provisionedDestinationStatus(
     resolve(project.projectRoot, file.path),
     file.path,
     expected,
-    previousMap(previousLockfile).get(file.path.replaceAll("\\", "/")),
+    previous.get(file.path.replaceAll("\\", "/")),
   );
+}
+
+export function provisionedDestinationStatuses(
+  project: ResolvedProject,
+  previousLockfile?: Lockfile,
+): Array<[PlannedProvisionedFile, ProvisionedDestinationStatus]> {
+  const statuses: Array<
+    [PlannedProvisionedFile, ProvisionedDestinationStatus]
+  > = [];
+  const errors: string[] = [];
+  let omitted = 0;
+  let diagnosticBytes = 0;
+  const previous = previousMap(previousLockfile);
+  for (const file of plannedProvisionedFiles(project)) {
+    try {
+      statuses.push([
+        file,
+        provisionedDestinationStatus(project, file, previousLockfile, previous),
+      ]);
+    } catch (error) {
+      if (!(error instanceof PrayError) || error.kind !== "render") throw error;
+      const message = `${error.message} (package \`${file.package}\`, export \`${file.export}\`)`;
+      const size = Buffer.byteLength(message);
+      if (errors.length < 100 && diagnosticBytes + size < 60 * 1024) {
+        diagnosticBytes += size;
+        errors.push(message);
+      } else {
+        omitted++;
+      }
+    }
+  }
+  if (omitted > 0)
+    errors.push(
+      `${omitted} additional destination conflicts omitted; resolve the listed paths and run \`pray plan\` again`,
+    );
+  if (errors.length > 0) throw PrayError.render(errors.join("\n"));
+  return statuses;
 }
 
 function previousMap(lockfile?: Lockfile): Map<string, ProvisionedFileRecord> {
@@ -142,11 +181,11 @@ function classifyDestination(
   if (record && sha256Prefixed(onDisk) === record.content_hash) return "update";
   if (record) {
     throw PrayError.render(
-      `refusing to overwrite \`${display}\`; it was provisioned and then edited`,
+      `refusing to overwrite \`${display}\`; it was written by pray and then edited. Inspect your changes and move the file aside, then run \`pray install\``,
     );
   }
   throw PrayError.render(
-    `refusing to overwrite \`${display}\`; it already exists and is not the expected provisioned file`,
+    `refusing to overwrite \`${display}\`; its existing contents differ from this package. Inspect the file and move it aside, then run \`pray install\`. If an older pray wrote it, restore the original Prayfile and package version, run \`pray install\`, then retry the update`,
   );
 }
 
@@ -176,7 +215,8 @@ function pruneDropped(
         record.path,
         record.path,
       );
-      unlinkSync(destination);
+      if (!replaceProjectFile(destination, onDisk, undefined))
+        unlinkSync(destination);
     }
   }
 }
@@ -189,13 +229,14 @@ function updateBytes(
 ): void {
   const descriptor = openRegular(path, display, constants.O_RDWR);
   try {
-    const onDisk = readFileSync(descriptor);
+    const onDisk = readDestinationBytes(descriptor, display);
     if (onDisk.equals(bytes)) return;
     if (sha256Prefixed(onDisk) !== authorizedHash) {
       throw PrayError.render(
-        `refusing to overwrite \`${display}\`; it was provisioned and then edited`,
+        `refusing to overwrite \`${display}\`; it was written by pray and then edited. Inspect your changes and move the file aside, then run \`pray install\``,
       );
     }
+    if (replaceProjectFile(path, onDisk, bytes)) return;
     ftruncateSync(descriptor, 0);
     writeAll(descriptor, bytes);
   } finally {

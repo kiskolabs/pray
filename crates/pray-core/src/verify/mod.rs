@@ -13,7 +13,6 @@ pub use format::format_verification_report;
 use integrity::push_package_lock_findings;
 use position::{format_position_drift_message, summarize_position_drift};
 use std::collections::{BTreeMap, BTreeSet, HashSet};
-use std::fs;
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct VerificationFinding {
@@ -122,7 +121,7 @@ fn collect_verification_report(
             });
             continue;
         }
-        let text = fs::read_to_string(&absolute_path)?;
+        let text = crate::render_file::read_destination_text(&absolute_path)?;
         rendered_targets.insert(target_path.clone(), text.clone());
         let lines: Vec<&str> = text.lines().collect();
         let markers = marker_positions(&lines);
@@ -172,7 +171,7 @@ fn collect_verification_report(
         }
     }
 
-    provisioned::push_provisioned_and_local_findings(project, &mut report.findings)?;
+    provisioned::push_provisioned_and_local_findings(project, lockfile, &mut report.findings)?;
 
     Ok((report, rendered_targets, fresh_targets))
 }

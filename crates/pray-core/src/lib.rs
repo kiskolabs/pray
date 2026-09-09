@@ -28,6 +28,8 @@ mod manifest_validate;
 mod package_archive;
 pub mod package_integrity;
 pub mod package_spec;
+mod package_spec_render;
+pub mod package_upstream;
 pub mod paths;
 pub mod project_context;
 pub mod push_auth;
@@ -55,6 +57,7 @@ mod resolve_deps;
 mod resolve_exports;
 mod resolve_git;
 mod resolve_git_command;
+mod resolve_git_refresh;
 mod resolve_git_sources;
 mod resolve_queue;
 pub mod resource_limits;
@@ -69,3 +72,5 @@ pub mod trust;
 pub mod verify;
 
 pub use error::{PrayError, PrayResult};
+
+pub mod transaction;

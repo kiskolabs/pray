@@ -149,8 +149,10 @@ Allowed methods:
 name= version= summary= description= authors= maintainers= license=
 homepage= source_code_uri= changelog_uri= prayfile_version= files=
 exports= skills= templates= adapters= targets= metadata=
-add_dependency add_optional_dependency
+add_dependency add_optional_dependency upstream
 ```
+`upstream` is provenance for a path fork (RFC 0114). It is not `add_dependency`.
+
 
 `skills=` is deprecated and will be removed in version 2. Prefer a `folder` export.
 
@@ -311,7 +313,7 @@ Rules:
 - paths are UTF-8
 - paths are relative
 - paths must not contain `..`
-- file order is lexicographic
+- file order is lexicographic by unsigned UTF-8 bytes
 - symlinks forbidden in v1
 - device files forbidden
 - only files listed in prayspec included
@@ -319,7 +321,7 @@ Rules:
 Pseudo-algorithm:
 
 ```
-entries = sorted(package_files_by_relative_path)
+entries = sorted(package_files_by_relative_path_utf8_bytes)
 for each entry:
   append entry.kind
   append "\0"

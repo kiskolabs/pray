@@ -1,6 +1,7 @@
 mod apply_report;
 mod auth_client;
 mod auth_session_store;
+mod cache_clean;
 mod cli_parse;
 mod cli_parse_auth;
 mod cli_parse_packages;
@@ -141,7 +142,7 @@ fn run(arguments: Vec<String>) -> PrayResult<()> {
         ));
     }
 
-    let result = match parse_command(filtered.clone())? {
+    let execute = || match parse_command(filtered.clone())? {
         Command::Manifest => manifest_command(),
         Command::Init { targets } => init_command(targets),
         Command::PrayerInit => prayer_init_command(),
@@ -240,7 +241,7 @@ fn run(arguments: Vec<String>) -> PrayResult<()> {
         Command::Outdated { remote } => outdated_command(remote),
         Command::Explain { package } => explain_command(package),
         Command::Vendor => vendor_command(),
-        Command::Clean => clean_command(),
+        Command::Clean { unused } => clean_command(unused),
         Command::Tree => tree_command(),
         Command::Sync { root, peers } => sync_command(root, peers),
         Command::Trust { arguments } => trust_command::run_trust_command(arguments),
@@ -248,6 +249,8 @@ fn run(arguments: Vec<String>) -> PrayResult<()> {
         Command::Version => version_command(),
         Command::Completion { shell } => completion_command(&shell),
     };
+
+    let result = project_paths::run_project_command(&filtered, execute);
 
     if result.is_ok() {
         cli_release::maybe_print_upgrade_notice(&filtered);

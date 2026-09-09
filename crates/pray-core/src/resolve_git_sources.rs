@@ -146,7 +146,15 @@ pub(crate) fn resolve_git_package_root(
             &distribution_root,
             declaration,
             context,
-        );
+        )
+        .map_err(|error| {
+            crate::resolve_git_refresh::annotate_missing_git_catalog(
+                error,
+                &declaration.name,
+                source_name,
+                &checkout.revision,
+            )
+        });
     }
     if let Some(source_root) = local_git_source_root(clone_url) {
         return resolve_local_registry_package_root(

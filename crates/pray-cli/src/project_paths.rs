@@ -1,7 +1,9 @@
 use crate::invocation;
 use pray_core::lockfile::Lockfile;
 use pray_core::manifest::{parse_manifest, read_manifest_text};
-use pray_core::resolve::ResolvedProject;
+use pray_core::resolve::{
+    annotate_failed_git_refresh, resolution_may_benefit_from_git_source_refresh, ResolvedProject,
+};
 use pray_core::resolve_context::ResolveOptions;
 use pray_core::{PrayError, PrayResult};
 use std::path::{Path, PathBuf};
@@ -40,13 +42,16 @@ pub(crate) fn resolve_project_with_git_refresh_fallback(
             if allow_git_refresh_fallback
                 && !options.offline
                 && !options.refresh_source_revisions
-                && message.contains("no registry version") =>
+                && resolution_may_benefit_from_git_source_refresh(&message) =>
         {
             let refreshed_options = ResolveOptions {
                 refresh_source_revisions: true,
                 ..options.clone()
             };
-            invocation::resolve_current_project(&refreshed_options)
+            match invocation::resolve_current_project(&refreshed_options) {
+                Ok(project) => Ok(project),
+                Err(error) => Err(annotate_failed_git_refresh(&lockfile_path(), error)),
+            }
         }
         Err(error) => Err(error),
     }
@@ -77,4 +82,30 @@ pub(crate) fn locked_package<'a>(
         record.name == package.declaration.name
             && record.source.as_deref() == package.declaration.source.as_deref()
     })
+}
+
+pub(crate) fn run_project_command<T>(
+    arguments: &[String],
+    execute: impl FnOnce() -> PrayResult<T>,
+) -> PrayResult<T> {
+    let transactional = arguments.first().is_some_and(|command| {
+        matches!(
+            command.as_str(),
+            "install"
+                | "apply"
+                | "update"
+                | "unlock"
+                | "add"
+                | "remove"
+                | "render"
+                | "plan"
+                | "verify"
+                | "drift"
+        )
+    });
+    if transactional {
+        pray_core::transaction::run(&invocation::project_root(), execute)
+    } else {
+        execute()
+    }
 }

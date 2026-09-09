@@ -2,11 +2,38 @@
 
 ## Unreleased
 
-- Read the whole eight byte tar checksum field so `.praypkg` archives whose checksum is written as seven octal digits unpack instead of failing integrity.
-- Sort tree hash entries by UTF-8 bytes in the TypeScript CLI so a package hashes the same as where it was published, instead of following the host's locale collation.
 - Collapse trailing blank lines when composing so a composed file ends with a single newline, matching the other CLIs.
 - Order `symbols` before `render` in the canonical manifest JSON so `manifest_hash` matches the other CLIs.
 - Emit absent package locators and an absent target `max_bytes` as null in the canonical manifest JSON so `manifest_hash` matches the other CLIs.
+
+## 1.13.0 (2026-09-08)
+
+- Record and verify package upstream pins in `.prayspec` and `Prayfile.lock`. Refresh path forks with the Rust CLI; refuse that update in the npm and RubyGems CLIs until they can refresh the path tree safely (RFC 0114).
+
+## 1.12.1 (2026-09-08)
+
+- Refresh a locked git catalog during `pray install` when a newly declared package is missing from the pinned revision, and name that revision with `pray update` if it is still missing.
+- Recommend ignoring the project `.pray` directory so local cache, write recovery, and state stay out of version control (RFC 0071).
+
+## 1.12.0 (2026-09-07)
+
+- Speed up Ruby planning for large package trees and reuse the resolved lock during installation.
+- Report duplicate Ruby lockfile fields as parsing errors with lockfile context.
+- Restore compose files, provisioned destinations, Prayfile, and lock after failed writes, and recover interrupted writes on the next install, plan, or verification in Rust, Ruby, and TypeScript on Unix.
+- Preserve later local edits when recovery encounters changed files, and prevent cooperating Pray commands from writing the same project together.
+- Limit destination reads to 32 MiB, saved transaction payload to 64 MiB across 10,000 writes, and grouped conflict details to 100 entries.
+- Keep Prayfile constraints unchanged when `pray update --latest` cannot write destination files in the Rust and TypeScript CLIs.
+- Apply newer versions with `update --latest --json` even when the existing constraints already allow them, and check destination conflicts during `update --latest --dry-run`.
+- Report conflicting file and tree destinations together before changing compose output, with steps that preserve local edits.
+- Reject unsupported Ruby update options (`--latest`, `--major`, `--dry-run`, and `--json`) instead of silently ignoring them.
+
+## 1.11.0 (2026-09-04)
+
+- Read the whole eight byte tar checksum field so `.praypkg` archives whose checksum is written as seven octal digits unpack instead of failing integrity.
+- Sort tree hash entries by UTF-8 bytes in the TypeScript CLI so a package hashes the same as where it was published, instead of following the host's locale collation.
+- Use the same source-keyed `.pray/cache/registry/<namespace>/<name>/<version>/<source-hash>` path in the Rust, Ruby, and TypeScript CLIs.
+- Add `pray clean --unused` to remove registry cache entries absent from the current lockfile while preserving Git cache, vendor, and project state.
+- Reject unsafe registry package and version path segments before writing cache entries.
 
 ## 1.10.0 (2026-09-02)
 

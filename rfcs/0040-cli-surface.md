@@ -6,7 +6,7 @@
 - Describes: 1.8.1
 - Created: 2026-08-17
 - Author: Andrei Makarov
-- Relates: RFC 0070, RFC 0100
+- Relates: RFC 0070, RFC 0071, RFC 0100
 
 ## Summary
 
@@ -66,7 +66,11 @@ Also useful: `remove`, `unlock`, `tree`, `list`, `outdated`, `explain`, `manifes
 - confess: signed acceptance/rejection feedback
 - serve: local or self-hosted distribution point
 - yank: mark a version yanked in a distribution root; `--undo` clears the flag
-- vendor / clean: copy into `.pray/vendor`; remove cache/ephemeral state
+- vendor: copy resolved packages into `.pray/vendor`
+- clean: remove `.pray/cache`, `.pray/vendor`, and `.pray/state.json`; leave `.pray/write-state` (RFC 0071)
+- clean --unused: remove only project-local registry cache entries that the
+  complete current `Prayfile.lock` does not reference; preserve Git caches,
+  vendor state, project state, and global caches
 - tree: dependency graph
 - unlock: drop the lock pin for one package
 - search: substring match over a distribution index

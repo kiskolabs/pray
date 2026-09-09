@@ -12,6 +12,36 @@ RSpec.describe Pray::Registry do
     FileUtils.rm_rf(workspace)
   end
 
+  describe ".registry_cache_directory" do
+    it "matches the shared cache identity fixture" do
+      fixture_path = File.expand_path("../../../../testdata/shared/registry-cache/identity-first.json", __dir__)
+      fixture = JSON.parse(File.read(fixture_path))
+
+      path = described_class.registry_cache_directory(
+        workspace,
+        fixture.fetch("source_key"),
+        fixture.fetch("package_name"),
+        fixture.fetch("version")
+      )
+
+      expect(path).to eq(File.join(workspace, fixture.fetch("relative_path")))
+    end
+
+    it "rejects unsafe package and version segments" do
+      %w[sample sample/base/extra sample//base ./base ../base sample/.. sample\\base].each do |package_name|
+        expect do
+          described_class.registry_cache_directory(workspace, "source", package_name, "1.0.0")
+        end.to raise_error(Pray::Error)
+      end
+
+      ["", ".", "..", "1/2", "1\\2"].each do |version|
+        expect do
+          described_class.registry_cache_directory(workspace, "source", "sample/base", version)
+        end.to raise_error(Pray::Error)
+      end
+    end
+  end
+
   describe ".fetch_package_metadata" do
     before do
       metadata_dir = File.join(distribution_root, "v1", "packages", "sample")
@@ -35,7 +65,7 @@ RSpec.describe Pray::Registry do
   end
 
   describe ".validate_and_unpack" do
-    let(:declaration) { Pray::ManifestPackage.new(name: "demo", constraint: "1.0.0") }
+    let(:declaration) { Pray::ManifestPackage.new(name: "sample/demo", constraint: "1.0.0") }
     let(:cache_directory) { File.join(workspace, "cache") }
     let(:package_root) do
       root = File.join(workspace, "package")
@@ -44,7 +74,7 @@ RSpec.describe Pray::Registry do
         File.join(root, "demo.prayspec"),
         <<~PRAYSPEC
           Package::Specification.new do |spec|
-            spec.name = "demo"
+            spec.name = "sample/demo"
             spec.version = "1.0.0"
             spec.files = []
           end
@@ -150,12 +180,12 @@ RSpec.describe Pray::Registry do
       artifact_path = File.join(distribution_root, "artifacts", "demo-1.0.0.praypkg")
       FileUtils.mkdir_p(File.dirname(artifact_path))
       File.binwrite(artifact_path, artifact_bytes)
-      metadata_dir = File.join(distribution_root, "v1", "packages")
+      metadata_dir = File.join(distribution_root, "v1", "packages", "sample")
       FileUtils.mkdir_p(metadata_dir)
       File.write(
         File.join(metadata_dir, "demo.json"),
         JSON.generate(
-          "name" => "demo",
+          "name" => "sample/demo",
           "versions" => [{
             "version" => "1.0.0",
             "artifact" => "artifacts/demo-1.0.0.praypkg",
@@ -166,7 +196,7 @@ RSpec.describe Pray::Registry do
       )
 
       cache_directory = described_class.registry_cache_directory(
-        workspace, "local", "demo", "1.0.0", selected.artifact_hash
+        workspace, "local", "sample/demo", "1.0.0"
       )
       FileUtils.mkdir_p(cache_directory)
 
