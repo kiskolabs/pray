@@ -69,8 +69,12 @@ pub struct RegistryPackageVersion {
     pub signer_fingerprint: Option<String>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub signer_public_key: Option<String>,
-    #[serde(default)]
-    pub published_at: Option<String>,
+    #[serde(
+        default,
+        skip_serializing_if = "Option::is_none",
+        deserialize_with = "crate::registry_timestamp::deserialize_optional_publish_timestamp"
+    )]
+    pub published_at: Option<u64>,
     #[serde(default)]
     pub signature: Option<String>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
@@ -89,7 +93,6 @@ impl RegistryPackageVersion {
             && self.signer == other.signer
             && self.signer_fingerprint == other.signer_fingerprint
             && self.signer_public_key == other.signer_public_key
-            && self.published_at == other.published_at
             && self.signature == other.signature
     }
 

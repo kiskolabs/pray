@@ -267,7 +267,7 @@ fn publish_recovers_after_server_restart_and_uploads_over_http() {
 
     let metadata_text = fs::read_to_string(registry_root.join("v1/packages/sample/base.json"))
         .expect("package metadata");
-    let metadata: Value = serde_json::from_str(&metadata_text).expect("metadata json");
+    let mut metadata: Value = serde_json::from_str(&metadata_text).expect("metadata json");
     assert_eq!(metadata["name"], "sample/base");
     assert_eq!(metadata["versions"][0]["signer"], publisher_email);
     assert!(metadata["versions"][0]["derived_metadata"]["summary"]
@@ -277,6 +277,27 @@ fn publish_recovers_after_server_restart_and_uploads_over_http() {
     assert!(registry_root
         .join("v1/artifacts/sample/base/1.4.3/sample-base-1.4.3.praypkg")
         .is_file());
+
+    metadata["versions"][0]["published_at"] = Value::String("1234567890".to_string());
+    fs::write(
+        registry_root.join("v1/packages/sample/base.json"),
+        serde_json::to_string_pretty(&metadata).expect("serialize metadata"),
+    )
+    .expect("write metadata");
+    let repeated_publish = run_pray(&source_repo, &["publish", "--server", &server_url]);
+    assert!(
+        repeated_publish.status.success(),
+        "repeated publish failed: {}",
+        String::from_utf8_lossy(&repeated_publish.stderr)
+    );
+    let repeated_metadata = fs::read_to_string(registry_root.join("v1/packages/sample/base.json"))
+        .expect("repeated metadata");
+    let repeated_metadata: Value =
+        serde_json::from_str(&repeated_metadata).expect("repeated metadata json");
+    assert_eq!(
+        repeated_metadata["versions"][0]["published_at"],
+        1_234_567_890_u64
+    );
 
     let _ = server.kill();
     let _ = server.wait();

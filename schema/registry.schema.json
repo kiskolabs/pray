@@ -23,6 +23,12 @@
       "type": "string",
       "pattern": "^sha256:[0-9a-f]{64}$"
     },
+    "unixTimestampSeconds": {
+      "type": "integer",
+      "minimum": 0,
+      "maximum": 253402300799,
+      "description": "Whole UTC seconds since 1970-01-01T00:00:00Z, through 9999-12-31T23:59:59Z."
+    },
     "registryPackageVersion": {
       "type": "object",
       "additionalProperties": false,
@@ -68,8 +74,8 @@
           "minLength": 1
         },
         "published_at": {
-          "type": ["string", "null"],
-          "minLength": 1
+          "$ref": "#/$defs/unixTimestampSeconds",
+          "description": "Time when this version's current package content was first published; unchanged republishes preserve the value."
         },
         "signature": {
           "type": ["string", "null"],

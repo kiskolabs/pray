@@ -191,9 +191,34 @@ export function versionFromHash(
     signerFingerprint: entry.signer_fingerprint
       ? String(entry.signer_fingerprint)
       : undefined,
-    publishedAt: entry.published_at ? String(entry.published_at) : undefined,
+    publishedAt: publishTimestampFromValue(entry.published_at),
     signature: entry.signature ? String(entry.signature) : undefined,
   };
+}
+
+function publishTimestampFromValue(value: unknown): number | undefined {
+  if (value === undefined) return undefined;
+  let timestamp = value;
+  if (typeof value === "string") {
+    const legacyDateTime =
+      /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(?:\.\d+)?(?:Z|[+-]\d{2}:\d{2})$/;
+    timestamp = /^\d+$/.test(value)
+      ? Number(value)
+      : legacyDateTime.test(value)
+        ? Math.floor(Date.parse(value) / 1000)
+        : Number.NaN;
+  }
+  if (
+    typeof timestamp !== "number" ||
+    !Number.isSafeInteger(timestamp) ||
+    timestamp < 0 ||
+    timestamp > 253_402_300_799
+  ) {
+    throw PrayError.integrity(
+      "registry published_at must be whole UTC Unix seconds",
+    );
+  }
+  return timestamp;
 }
 
 export function selectPackageVersion(

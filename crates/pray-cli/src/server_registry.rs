@@ -103,8 +103,7 @@ pub(crate) fn latest_publish_timestamp(metadata: &RegistryPackageMetadata) -> Op
     metadata
         .versions
         .iter()
-        .filter_map(|version| version.published_at.as_deref())
-        .filter_map(|published_at| published_at.parse::<u64>().ok())
+        .filter_map(|version| version.published_at)
         .max()
 }
 

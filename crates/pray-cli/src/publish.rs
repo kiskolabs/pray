@@ -1,4 +1,6 @@
 use crate::materialize::build_package_archive_bytes;
+use crate::publish_integrity::{stored_package_artifact, stored_publish_matches};
+use crate::publish_ssh::publish_to_ssh_server;
 use crate::revision::{record_root_revision, RevisionAction};
 use crate::sync_peers::map_transport_error;
 use crate::transport_metadata::transport_package_metadata;
@@ -49,7 +51,7 @@ pub(crate) fn publish_command(
             &project,
             &signer,
             signer_fingerprint.as_deref(),
-            &published_at,
+            published_at,
             signing_key.as_ref(),
             &root,
         )?;
@@ -61,7 +63,7 @@ pub(crate) fn publish_command(
                 &project,
                 &signer,
                 signer_fingerprint.as_deref(),
-                &published_at,
+                published_at,
                 signing_key.as_ref(),
                 &server_url,
                 runtime,
@@ -75,7 +77,7 @@ pub(crate) fn publish_to_root(
     project: &ResolvedProject,
     signer: &str,
     signer_fingerprint: Option<&str>,
-    published_at: &str,
+    published_at: u64,
     signing_key: Option<&ed25519_dalek::SigningKey>,
     root: &Path,
 ) -> PrayResult<()> {
@@ -87,17 +89,39 @@ pub(crate) fn publish_to_root(
         .collect::<std::collections::BTreeSet<_>>();
 
     for package in &project.packages {
-        let archive_bytes = build_package_archive_bytes(package)?;
         let artifact_path =
             registry_artifact_path(&package.declaration.name, &package.spec.version);
-        let artifact_output_path = root.join(&artifact_path);
-        write_output_bytes(&artifact_output_path, &archive_bytes)?;
-        write_torrent_manifest(root, package, &artifact_path, &archive_bytes)?;
-
         let metadata_path = registry_metadata_path(root, &package.declaration.name);
         let mut metadata =
             load_registry_package_metadata(&metadata_path, &package.declaration.name)?;
-        let version_entry = published_registry_package_version(
+        let existing = metadata
+            .versions
+            .iter()
+            .find(|entry| entry.version == package.spec.version);
+        let stored_artifact = existing
+            .and_then(|entry| stored_package_artifact(root, &artifact_path, package, entry));
+        if existing
+            .zip(stored_artifact.as_deref())
+            .is_some_and(|(entry, artifact_bytes)| {
+                stored_publish_matches(
+                    artifact_bytes,
+                    package,
+                    signer,
+                    signer_fingerprint,
+                    signing_key,
+                    entry,
+                )
+            })
+        {
+            package_names.insert(package.declaration.name.clone());
+            write_registry_package_metadata(&metadata_path, &metadata)?;
+            continue;
+        }
+
+        let archive_bytes = build_package_archive_bytes(package)?;
+        write_output_bytes(&root.join(&artifact_path), &archive_bytes)?;
+        write_torrent_manifest(root, package, &artifact_path, &archive_bytes)?;
+        let mut version_entry = published_registry_package_version(
             package,
             signer,
             signer_fingerprint,
@@ -106,6 +130,16 @@ pub(crate) fn publish_to_root(
             &artifact_path,
             &archive_bytes,
         )?;
+        if let Some(existing) = metadata
+            .versions
+            .iter()
+            .find(|entry| entry.version == version_entry.version)
+        {
+            version_entry.yanked = existing.yanked;
+            if stored_artifact.is_some() {
+                version_entry.published_at = existing.published_at;
+            }
+        }
         metadata
             .versions
             .retain(|entry| entry.version != version_entry.version);
@@ -123,7 +157,7 @@ pub(crate) fn published_registry_package_version(
     package: &pray_core::resolve::ResolvedPackage,
     signer: &str,
     signer_fingerprint: Option<&str>,
-    published_at: &str,
+    published_at: u64,
     signing_key: Option<&ed25519_dalek::SigningKey>,
     artifact_path: &str,
     archive_bytes: &[u8],
@@ -148,7 +182,7 @@ pub(crate) fn published_registry_package_version(
         signer: Some(signer.to_string()),
         signer_fingerprint: signer_fingerprint.map(str::to_string),
         signer_public_key: signature_material.signer_public_key,
-        published_at: Some(published_at.to_string()),
+        published_at: Some(published_at),
         signature: Some(signature_material.signature),
         derived_metadata: Some(derive_registry_derived_metadata_from_archive_bytes(
             archive_bytes,
@@ -160,7 +194,7 @@ pub(crate) fn publish_to_server(
     project: &ResolvedProject,
     signer: &str,
     signer_fingerprint: Option<&str>,
-    published_at: &str,
+    published_at: u64,
     signing_key: Option<&ed25519_dalek::SigningKey>,
     server_url: &str,
     runtime: &tokio::runtime::Runtime,
@@ -231,65 +265,4 @@ pub(crate) fn publish_to_server(
     }
 
     Ok(())
-}
-
-pub(crate) fn publish_to_ssh_server(
-    project: &ResolvedProject,
-    signer: &str,
-    signer_fingerprint: Option<&str>,
-    published_at: &str,
-    signing_key: Option<&ed25519_dalek::SigningKey>,
-    server_url: &str,
-) -> PrayResult<()> {
-    use base64::{engine::general_purpose::STANDARD, Engine as _};
-    use pray_core::ssh_client::with_pray_ssh_session;
-    use serde_json::json;
-
-    with_pray_ssh_session(server_url, |session| {
-        for package in &project.packages {
-            let archive_bytes = build_package_archive_bytes(package)?;
-            let artifact_path =
-                registry_artifact_path(&package.declaration.name, &package.spec.version);
-            session.call_json(
-                "artifact.put",
-                json!({
-                    "path": artifact_path,
-                    "body": STANDARD.encode(&archive_bytes),
-                }),
-            )?;
-            let torrent_path = torrent_manifest_path(&artifact_path);
-            session.call_json(
-                "artifact.put",
-                json!({
-                    "path": torrent_path,
-                    "body": STANDARD.encode(&torrent_manifest_bytes(
-                        package,
-                        &artifact_path,
-                        &archive_bytes,
-                    )?),
-                }),
-            )?;
-
-            let metadata = RegistryPackageMetadata {
-                name: package.declaration.name.clone(),
-                versions: vec![published_registry_package_version(
-                    package,
-                    signer,
-                    signer_fingerprint,
-                    published_at,
-                    signing_key,
-                    &artifact_path,
-                    &archive_bytes,
-                )?],
-            };
-            let transport_metadata = transport_package_metadata(&metadata);
-            session.call_json(
-                "sync.push",
-                json!({
-                    "metadata": transport_metadata,
-                }),
-            )?;
-        }
-        Ok(())
-    })
 }

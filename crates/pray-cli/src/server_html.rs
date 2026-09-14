@@ -74,10 +74,7 @@ fn render_package_page(
             details.push_str(&format!("<div>Signature: {}</div>", html_escape(signature)));
         }
         if let Some(published_at) = version.published_at.as_ref() {
-            details.push_str(&format!(
-                "<div>Published at: {}</div>",
-                html_escape(published_at)
-            ));
+            details.push_str(&format!("<div>Published at: {}</div>", published_at));
         }
         versions.push_str(&format!(
             "<li><a href=\"/{artifact}\">{version}</a>{details}</li>",

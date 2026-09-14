@@ -20,13 +20,21 @@ module Pray
       package_names = index.packages.to_set
 
       project.packages.each do |package|
-        archive_bytes = Archive.build_package_archive_bytes(package)
         artifact_path = registry_artifact_path(package.declaration.name, package.spec.version)
-        artifact_output_path = File.join(root, artifact_path)
-        write_output_bytes(artifact_output_path, archive_bytes)
-
         metadata_path = registry_metadata_path(root, package.declaration.name)
         metadata = load_registry_package_metadata(metadata_path, package.declaration.name)
+        existing = metadata.versions.find { |entry| entry.version == package.spec.version }
+        stored_artifact = stored_package_artifact(root, artifact_path, package, existing)
+        if stored_artifact && stored_publish_matches?(
+          stored_artifact, package, signer, signer_fingerprint, existing
+        )
+          package_names << package.declaration.name
+          write_registry_package_metadata(metadata_path, metadata)
+          next
+        end
+
+        archive_bytes = Archive.build_package_archive_bytes(package)
+        write_output_bytes(File.join(root, artifact_path), archive_bytes)
         version_entry = published_registry_package_version(
           package,
           signer,
@@ -34,6 +42,7 @@ module Pray
           archive_bytes,
           artifact_path
         )
+        preserve_existing_publish_metadata(metadata, version_entry, stored_artifact)
         metadata.versions.reject! { |entry| entry.version == version_entry.version }
         metadata.versions << version_entry
         write_registry_package_metadata(metadata_path, metadata)
@@ -81,9 +90,48 @@ module Pray
         exports: package.spec.exports.keys,
         signer: signer,
         signer_fingerprint: signer_fingerprint,
-        published_at: Time.now.utc.iso8601,
+        published_at: Time.now.to_i,
         signature: Registry.registry_artifact_signature(archive_bytes, package.tree_hash, signer)
       )
+    end
+
+    def stored_package_artifact(root, artifact_path, package, existing)
+      return unless existing&.artifact == artifact_path && existing.tree_hash == package.tree_hash
+
+      stored_path = File.join(root, artifact_path)
+      return unless File.file?(stored_path)
+
+      artifact_bytes = File.binread(stored_path)
+      return unless existing.artifact_hash == Hashing.sha256_prefixed(artifact_bytes)
+      return unless stored_prayspec_matches?(artifact_bytes, package.root)
+
+      artifact_bytes
+    end
+
+    def stored_publish_matches?(artifact_bytes, package, signer, signer_fingerprint, existing)
+      existing.signer == signer &&
+        existing.signer_fingerprint == signer_fingerprint &&
+        existing.signature == Registry.registry_artifact_signature(artifact_bytes, package.tree_hash, signer)
+    end
+
+    def stored_prayspec_matches?(artifact_bytes, package_root)
+      Dir.mktmpdir("pray-publish-check-") do |directory|
+        Archive.unpack_praypkg(artifact_bytes, directory)
+        stored_path = Resolve.find_prayspec_file(directory)
+        current_path = Resolve.find_prayspec_file(package_root)
+        File.basename(stored_path) == File.basename(current_path) &&
+          File.binread(stored_path) == File.binread(current_path)
+      end
+    rescue Error, SystemCallError
+      false
+    end
+
+    def preserve_existing_publish_metadata(metadata, version_entry, stored_artifact)
+      existing = metadata.versions.find { |entry| entry.version == version_entry.version }
+      return unless existing
+
+      version_entry.yanked = existing.yanked
+      version_entry.published_at = existing.published_at if stored_artifact
     end
 
     def load_registry_index(root)

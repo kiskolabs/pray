@@ -39,6 +39,7 @@ mod registry_http;
 pub mod registry_search;
 pub mod registry_select;
 mod registry_ssh;
+pub mod registry_timestamp;
 mod registry_torrent;
 mod registry_upload;
 pub mod render;

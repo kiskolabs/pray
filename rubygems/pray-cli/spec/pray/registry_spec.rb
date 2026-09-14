@@ -12,6 +12,32 @@ RSpec.describe Pray::Registry do
     FileUtils.rm_rf(workspace)
   end
 
+  describe ".version_from_hash" do
+    let(:version) do
+      {
+        "version" => "1.0.0",
+        "artifact" => "v1/artifacts/sample/base/1.0.0/package.praypkg"
+      }
+    end
+
+    it "normalizes legacy publish timestamps" do
+      rfc3339 = described_class.version_from_hash(
+        version.merge("published_at" => "2020-01-01T00:00:00.999Z")
+      )
+      numeric = described_class.version_from_hash(version.merge("published_at" => "1234567890"))
+      expect(rfc3339.published_at).to eq(1_577_836_800)
+      expect(numeric.published_at).to eq(1_234_567_890)
+    end
+
+    it "rejects non-canonical values outside migration formats" do
+      [nil, 1.5, -1, 253_402_300_800, "tomorrow"].each do |published_at|
+        expect do
+          described_class.version_from_hash(version.merge("published_at" => published_at))
+        end.to raise_error(Pray::Error, /whole UTC Unix seconds/)
+      end
+    end
+  end
+
   describe ".registry_cache_directory" do
     it "matches the shared cache identity fixture" do
       fixture_path = File.expand_path("../../../../testdata/shared/registry-cache/identity-first.json", __dir__)

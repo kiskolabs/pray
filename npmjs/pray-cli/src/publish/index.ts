@@ -11,6 +11,7 @@ import type {
   RegistryPackageVersion,
 } from "../registry/types.js";
 import type { ResolvedPackage, ResolvedProject } from "../resolve/types.js";
+import { storedPackageArtifact, storedPublishMatches } from "./integrity.js";
 
 export async function publishToRoot(
   project: ResolvedProject,
@@ -23,13 +24,10 @@ export async function publishToRoot(
   const packageNames = new Set(index.packages);
 
   for (const packageEntry of project.packages) {
-    const archiveBytes = buildPackageArchiveBytes(packageEntry);
     const artifactPath = registryArtifactPath(
       packageEntry.declaration.name,
       packageEntry.spec.version,
     );
-    writeOutputBytes(join(distributionRoot, artifactPath), archiveBytes);
-
     const metadataPath = registryMetadataPath(
       distributionRoot,
       packageEntry.declaration.name,
@@ -38,6 +36,33 @@ export async function publishToRoot(
       metadataPath,
       packageEntry.declaration.name,
     );
+    const existing = metadata.versions.find(
+      (entry) => entry.version === packageEntry.spec.version,
+    );
+    const storedArtifact = storedPackageArtifact(
+      distributionRoot,
+      artifactPath,
+      packageEntry,
+      existing,
+    );
+    if (
+      existing !== undefined &&
+      storedArtifact !== undefined &&
+      storedPublishMatches(
+        storedArtifact,
+        packageEntry,
+        signer,
+        signerFingerprint,
+        existing,
+      )
+    ) {
+      packageNames.add(packageEntry.declaration.name);
+      writeRegistryPackageMetadata(metadataPath, metadata);
+      continue;
+    }
+
+    const archiveBytes = buildPackageArchiveBytes(packageEntry);
+    writeOutputBytes(join(distributionRoot, artifactPath), archiveBytes);
     const versionEntry = publishedRegistryPackageVersion(
       packageEntry,
       signer,
@@ -45,6 +70,7 @@ export async function publishToRoot(
       archiveBytes,
       artifactPath,
     );
+    preserveExistingPublishMetadata(metadata, versionEntry, storedArtifact);
     metadata.versions = metadata.versions.filter(
       (entry) => entry.version !== versionEntry.version,
     );
@@ -129,13 +155,29 @@ function publishedRegistryPackageVersion(
     exports: [...packageEntry.spec.exports.keys()],
     signer,
     signerFingerprint,
-    publishedAt: new Date().toISOString(),
+    publishedAt: Math.floor(Date.now() / 1000),
     signature: registryArtifactSignature(
       archiveBytes,
       packageEntry.treeHash,
       signer,
     ),
   };
+}
+
+function preserveExistingPublishMetadata(
+  metadata: RegistryPackageMetadata,
+  versionEntry: RegistryPackageVersion,
+  storedArtifact: Buffer | undefined,
+): void {
+  const existing = metadata.versions.find(
+    (entry) => entry.version === versionEntry.version,
+  );
+  if (!existing) return;
+
+  versionEntry.yanked = existing.yanked;
+  if (storedArtifact !== undefined) {
+    versionEntry.publishedAt = existing.publishedAt;
+  }
 }
 
 function loadRegistryIndex(root: string): RegistryIndex {
@@ -201,7 +243,7 @@ function versionToHash(entry: RegistryPackageVersion): Record<string, unknown> {
   if (entry.signer) hash.signer = entry.signer;
   if (entry.signerFingerprint)
     hash.signer_fingerprint = entry.signerFingerprint;
-  if (entry.publishedAt) hash.published_at = entry.publishedAt;
+  if (entry.publishedAt !== undefined) hash.published_at = entry.publishedAt;
   if (entry.signature) hash.signature = entry.signature;
   return hash;
 }

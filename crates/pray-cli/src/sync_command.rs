@@ -13,8 +13,8 @@ use pray_core::package_integrity::verify_package_signature;
 use pray_core::registry::{RegistryPackageMetadata, RegistryPackageVersion};
 use pray_core::{PrayError, PrayResult};
 use pray_transport::{
-    ArtifactRef, PeerConfig, PeerInfo, SyncDirection, TransportAdapter, TransportRegistry,
-    TrustLevel,
+    ArtifactRef, PackageVersion, PeerConfig, PeerInfo, SyncDirection, TransportAdapter,
+    TransportRegistry, TrustLevel,
 };
 use std::collections::{BTreeMap, BTreeSet, VecDeque};
 use std::fs;
@@ -319,16 +319,13 @@ pub(crate) fn load_sync_peers(root: &Path) -> PrayResult<Vec<PeerInfo>> {
         kind: "peer list",
         message: error.to_string(),
     })?;
-    let mut normalized_peers = Vec::new();
-    for peer in peers {
-        normalized_peers.push(normalize_peer_info(peer)?);
-    }
-    Ok(normalized_peers)
+    peers.into_iter().map(normalize_peer_info).collect()
 }
 
 pub(crate) fn sync_package_version_from_transport(
-    version: &pray_transport::PackageVersion,
+    version: &PackageVersion,
 ) -> PrayResult<RegistryPackageVersion> {
+    crate::transport_metadata::validate_transport_publish_timestamp(version.published_at)?;
     if version.version.trim().is_empty() {
         return Err(PrayError::Resolution(
             "federation package version missing version string".to_string(),
@@ -385,7 +382,7 @@ pub(crate) fn sync_package_version_from_transport(
             .as_ref()
             .map(|signature| signature.public_key.clone())
             .filter(|value| !value.trim().is_empty()),
-        published_at: Some(version.published_at.clone()),
+        published_at: version.published_at,
         signature: version
             .signature
             .as_ref()

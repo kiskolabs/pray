@@ -128,7 +128,12 @@ pub struct PackageVersion {
     pub yanked: bool,
     pub targets: Vec<String>,
     pub exports: Vec<String>,
-    pub published_at: String,
+    #[serde(
+        default,
+        skip_serializing_if = "Option::is_none",
+        deserialize_with = "pray_core::registry_timestamp::deserialize_optional_publish_timestamp"
+    )]
+    pub published_at: Option<u64>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub publisher: Option<PublisherInfo>,
     #[serde(skip_serializing_if = "Option::is_none")]

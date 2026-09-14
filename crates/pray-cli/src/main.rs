@@ -25,6 +25,8 @@ mod lockfile_ops;
 mod materialize;
 mod project_paths;
 mod publish;
+mod publish_integrity;
+mod publish_ssh;
 mod registry_ops;
 mod revision;
 mod revision_backend;
