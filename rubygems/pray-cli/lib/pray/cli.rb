@@ -22,6 +22,7 @@ module Pray
     LOCKFILE_PATH = "Prayfile.lock"
 
     def run(arguments)
+      previous_context = Invocation.context
       arguments = arguments.dup
       if arguments.delete("--no-input")
         ENV["PRAY_NO_INPUT"] = "1"
@@ -35,6 +36,8 @@ module Pray
       else
         dispatch(command)
       end
+    ensure
+      Invocation.context = previous_context
     end
 
     def maybe_print_help(arguments)
