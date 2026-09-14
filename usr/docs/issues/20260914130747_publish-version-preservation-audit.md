@@ -82,6 +82,8 @@ The default parallel Rust suite also ran during validation. One run passed. A la
 
 The Ruby Makefile's parallel test target also ran during validation. Its linters passed, but one provisioned-destination example collided with a temporary git-distribution fixture from another concurrently running example. The same example passed alone, and the complete serial RSpec run above passed. No product failure was reproduced from that result.
 
+Later pass 20260914140500: this work ships as 1.14.0. See usr/docs/issues/20260914140500_prepare-1-14-0-release.md.
+
 ## Next
 
 Review RFC 0061 through 2026-09-28.
@@ -119,3 +121,7 @@ rfcs/0060-distribution.md
 rfcs/0061-publish-version-preservation.md
 
 schema/registry.schema.json
+
+usr/docs/issues/20260914140500_prepare-1-14-0-release.md
+
+CHANGELOG.md 1.14.0
