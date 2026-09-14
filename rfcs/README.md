@@ -64,4 +64,6 @@ Standards Track follow-ons (not yet the product contract): RFC 0033, 0034, 0100,
 
 Standards Track Proposed: RFC 0051 (registry authentication delivery and enrollment).
 
+Standards Track Proposed: RFC 0061 (publish version preservation).
+
 Reserved (see `ids/`): 0103 lockfile environment (optional field already in `lockfile.schema.json`; an RFC would canonize it); 0105 trust enrollment; 0106 host-language lock adapter; 0107 search ranking; 0110 marker-id stability; 0112 help/man/exit codes; 0113 independent parsers.

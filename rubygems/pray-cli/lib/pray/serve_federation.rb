@@ -34,7 +34,7 @@ module Pray
         )
         next if metadata.versions.empty?
 
-        updated_at = metadata.versions.map { |version| version.published_at.to_s }.max || "0"
+        updated_at = (metadata.versions.filter_map(&:published_at).max || 0).to_s
         {
           "name" => name,
           "updated_at" => updated_at,
@@ -57,7 +57,7 @@ module Pray
       metadata = Publish.load_registry_package_metadata(metadata_path, name)
       body = {
         "name" => metadata.name,
-        "updated_at" => metadata.versions.map { |version| version.published_at.to_s }.max || "0",
+        "updated_at" => (metadata.versions.filter_map(&:published_at).max || 0).to_s,
         "versions" => metadata.versions.map { |version| transport_version(version) }
       }
       Serve.ok_response("application/json", JSON.pretty_generate(body))
@@ -78,9 +78,9 @@ module Pray
         "tree_hash" => version.tree_hash.to_s,
         "yanked" => version.yanked,
         "targets" => version.targets,
-        "exports" => version.exports,
-        "published_at" => version.published_at.to_s
+        "exports" => version.exports
       }
+      hash["published_at"] = version.published_at if version.published_at
       if version.signer || version.signer_fingerprint
         hash["publisher"] = {
           "id" => version.signer.to_s,

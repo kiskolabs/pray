@@ -131,6 +131,8 @@ name, version, summary, description, artifact location, artifact hash, tree hash
 
 Remote registry installs must fail closed when `artifact_hash` or `tree_hash` is missing. Signature verification rules are defined in Section 59.
 
+RFC 0061 defines `published_at` as an optional JSON integer containing whole UTC seconds since the Unix epoch. A present value is between 0 and 253402300799 inclusive. A producer must not encode this field as a JSON string, fraction, negative number, or `null`.
+
 To reduce churn and privacy leakage, project lockfiles should not copy unnecessary registry metadata.
 
 ---

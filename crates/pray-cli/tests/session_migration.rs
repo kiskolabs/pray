@@ -64,6 +64,7 @@ fn login_upgrades_legacy_single_session_document_and_publish_uses_latest_session
     );
     let initial_metadata = published_metadata(&registry_root);
     assert_eq!(initial_metadata["versions"][0]["signer"], legacy_email);
+    let initial_published_at = initial_metadata["versions"][0]["published_at"].clone();
 
     let port = find_free_port();
     let server_url = format!("http://127.0.0.1:{port}");
@@ -118,6 +119,10 @@ fn login_upgrades_legacy_single_session_document_and_publish_uses_latest_session
     );
     let upgraded_metadata = published_metadata(&registry_root);
     assert_eq!(upgraded_metadata["versions"][0]["signer"], upgraded_email);
+    assert_eq!(
+        upgraded_metadata["versions"][0]["published_at"],
+        initial_published_at
+    );
 
     let _ = server.kill();
     let _ = server.wait();

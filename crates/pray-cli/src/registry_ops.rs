@@ -54,11 +54,11 @@ pub(crate) fn current_signer_fingerprint() -> Option<String> {
     current_signer_fingerprint_from_session(&workspace_root())
 }
 
-pub(crate) fn current_timestamp() -> PrayResult<String> {
+pub(crate) fn current_timestamp() -> PrayResult<u64> {
     SystemTime::now()
         .duration_since(UNIX_EPOCH)
         .map_err(|error| PrayError::Resolution(error.to_string()))
-        .map(|duration| duration.as_secs().to_string())
+        .map(|duration| duration.as_secs())
 }
 
 pub(crate) fn load_registry_index(root: &Path) -> PrayResult<RegistryIndex> {

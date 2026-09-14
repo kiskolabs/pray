@@ -46,6 +46,8 @@ RSpec.describe Pray::ServeFederation do
 
     package = described_class.package_response(workspace, "/v1/sync/package/sample/base")
     expect(package).to include("1.0.0")
+    package_body = JSON.parse(package.split("\r\n\r\n", 2).last)
+    expect(package_body.dig("versions", 0, "published_at")).to eq(1_767_225_600)
 
     confession = described_class.append_confession(
       workspace, JSON.generate({"package" => "sample/base", "status" => "accepted"})
@@ -69,5 +71,11 @@ RSpec.describe Pray::ServeFederation do
         JSON.generate({"package" => "sample/base", "status" => "rejected"})
       )
     ).to include("200 OK")
+  end
+
+  it "omits an unknown publish timestamp" do
+    version = Pray::RegistryPackageVersion.new(version: "1.0.0", artifact: "pkg.praypkg")
+
+    expect(described_class.send(:transport_version, version)).not_to have_key("published_at")
   end
 end

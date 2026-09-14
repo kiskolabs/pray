@@ -5,6 +5,7 @@ require "net/http"
 require "uri"
 require "fileutils"
 require "pathname"
+require "time"
 require_relative "path_safety"
 require_relative "http_body"
 
@@ -145,9 +146,24 @@ module Pray
         exports: entry["exports"] || [],
         signer: entry["signer"],
         signer_fingerprint: entry["signer_fingerprint"],
-        published_at: entry["published_at"],
+        published_at: entry.key?("published_at") ? publish_timestamp_from_value(entry["published_at"]) : nil,
         signature: entry["signature"]
       )
+    end
+
+    def publish_timestamp_from_value(value)
+      timestamp = case value
+      when Integer then value
+      when String
+        value.match?(/\A\d+\z/) ? value.to_i : Time.iso8601(value).to_i
+      end
+      unless timestamp&.between?(0, 253_402_300_799)
+        raise Error.integrity("registry published_at must be whole UTC Unix seconds")
+      end
+
+      timestamp
+    rescue ArgumentError
+      raise Error.integrity("registry published_at must be whole UTC Unix seconds")
     end
 
     def select_package_version(metadata, constraint, preferred_version)

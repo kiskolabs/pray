@@ -1,6 +1,7 @@
 use pray_core::registry::{
     registry_package_signing_identity, RegistryPackageMetadata, RegistryPackageVersion,
 };
+use pray_core::registry_timestamp::MAX_PUBLISH_TIMESTAMP;
 use pray_core::{PrayError, PrayResult};
 use pray_transport::{
     OriginInfo, PackageMetadata as TransportPackageMetadata, PackageVersion, PublisherInfo,
@@ -26,10 +27,6 @@ pub(crate) fn transport_package_metadata(
 }
 
 pub(crate) fn transport_package_version(version: &RegistryPackageVersion) -> PackageVersion {
-    let published_at = version
-        .published_at
-        .clone()
-        .unwrap_or_else(|| "0".to_string());
     let publisher = match (
         version
             .signer_fingerprint
@@ -67,7 +64,7 @@ pub(crate) fn transport_package_version(version: &RegistryPackageVersion) -> Pac
         .as_ref()
         .map(|published_at| OriginInfo {
             server: "local".to_string(),
-            first_seen: published_at.clone(),
+            first_seen: published_at.to_string(),
         });
     PackageVersion {
         version: version.version.clone(),
@@ -77,7 +74,7 @@ pub(crate) fn transport_package_version(version: &RegistryPackageVersion) -> Pac
         yanked: version.yanked,
         targets: version.targets.clone(),
         exports: version.exports.clone(),
-        published_at,
+        published_at: version.published_at,
         publisher,
         signature,
         origin,
@@ -89,8 +86,7 @@ fn latest_publish_timestamp(metadata: &RegistryPackageMetadata) -> Option<u64> {
     metadata
         .versions
         .iter()
-        .filter_map(|version| version.published_at.as_deref())
-        .filter_map(|published_at| published_at.parse::<u64>().ok())
+        .filter_map(|version| version.published_at)
         .max()
 }
 
@@ -125,6 +121,7 @@ pub(crate) fn registry_package_metadata_from_transport(
 pub(crate) fn registry_package_version_from_transport(
     version: &PackageVersion,
 ) -> PrayResult<RegistryPackageVersion> {
+    validate_transport_publish_timestamp(version.published_at)?;
     if version.version.trim().is_empty() {
         return Err(PrayError::Resolution(
             "federation package version missing version string".to_string(),
@@ -164,12 +161,6 @@ pub(crate) fn registry_package_version_from_transport(
         .as_ref()
         .map(|signature| signature.signature.clone())
         .filter(|signature| !signature.trim().is_empty());
-    let published_at = if version.published_at.trim().is_empty() {
-        None
-    } else {
-        Some(version.published_at.clone())
-    };
-
     Ok(RegistryPackageVersion {
         version: version.version.clone(),
         artifact: version.artifact.clone(),
@@ -185,7 +176,7 @@ pub(crate) fn registry_package_version_from_transport(
             .as_ref()
             .map(|value| value.public_key.clone())
             .and_then(|value| empty_string_to_none(&value)),
-        published_at,
+        published_at: version.published_at,
         signature,
         derived_metadata: version.derived_metadata.clone(),
     })
@@ -197,4 +188,13 @@ fn empty_string_to_none(value: &str) -> Option<String> {
     } else {
         Some(value.to_string())
     }
+}
+
+pub(crate) fn validate_transport_publish_timestamp(timestamp: Option<u64>) -> PrayResult<()> {
+    if timestamp.is_none_or(|value| value <= MAX_PUBLISH_TIMESTAMP) {
+        return Ok(());
+    }
+    Err(PrayError::Resolution(
+        "federation published_at must be whole UTC Unix seconds through year 9999".to_string(),
+    ))
 }

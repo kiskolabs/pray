@@ -106,11 +106,12 @@ fn registry_package_version_merges_derived_metadata_without_conflict() {
         signer: Some("publisher@example.com".to_string()),
         signer_fingerprint: None,
         signer_public_key: None,
-        published_at: Some("1".to_string()),
+        published_at: Some(1),
         signature: Some("signature".to_string()),
         derived_metadata: None,
     };
     let incoming = RegistryPackageVersion {
+        published_at: Some(2),
         derived_metadata: Some(RegistryDerivedMetadata {
             summary: "shared guidance".to_string(),
             topics: vec!["guidance".to_string()],
@@ -127,6 +128,7 @@ fn registry_package_version_merges_derived_metadata_without_conflict() {
 
     assert!(existing.same_identity(&incoming));
     existing.merge_annotations_from(&incoming);
+    assert_eq!(existing.published_at, Some(1));
     assert_eq!(existing.derived_metadata, incoming.derived_metadata);
 }
 

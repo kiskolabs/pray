@@ -8,7 +8,7 @@ export interface RegistryPackageVersion {
   exports: string[];
   signer?: string;
   signerFingerprint?: string;
-  publishedAt?: string;
+  publishedAt?: number;
   signature?: string;
 }
 

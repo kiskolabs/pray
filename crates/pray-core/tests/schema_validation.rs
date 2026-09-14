@@ -142,3 +142,64 @@ fn registry_metadata_validates_against_registry_schema() {
         "registry package schema should not accept registry index documents"
     );
 }
+
+#[test]
+fn registry_schema_requires_canonical_publish_timestamp() {
+    let validator = load_validator("registry.schema.json");
+    let base = serde_json::json!({
+        "name": "sample/base",
+        "versions": [{
+            "version": "1.0.0",
+            "artifact": "v1/artifacts/sample/base/1.0.0/package.praypkg"
+        }]
+    });
+
+    for timestamp in [serde_json::json!(0), serde_json::json!(253_402_300_799_u64)] {
+        let mut value = base.clone();
+        value["versions"][0]["published_at"] = timestamp;
+        assert!(validator.is_valid(&value), "valid timestamp: {value}");
+    }
+    for timestamp in [
+        serde_json::json!("1"),
+        serde_json::json!(1.5),
+        serde_json::json!(-1),
+        serde_json::Value::Null,
+        serde_json::json!(253_402_300_800_u64),
+    ] {
+        let mut value = base.clone();
+        value["versions"][0]["published_at"] = timestamp;
+        assert!(!validator.is_valid(&value), "invalid timestamp: {value}");
+    }
+}
+
+#[test]
+fn registry_reader_normalizes_legacy_numeric_publish_timestamp() {
+    let legacy = serde_json::json!({
+        "name": "sample/base",
+        "versions": [{
+            "version": "1.0.0",
+            "artifact": "v1/artifacts/sample/base/1.0.0/package.praypkg",
+            "published_at": "1234567890"
+        }]
+    });
+    let metadata: RegistryPackageMetadata =
+        serde_json::from_value(legacy).expect("legacy numeric timestamp");
+    assert_eq!(metadata.versions[0].published_at, Some(1_234_567_890));
+    let canonical = serde_json::to_value(metadata).expect("canonical metadata");
+    assert_eq!(canonical["versions"][0]["published_at"], 1_234_567_890_u64);
+
+    for timestamp in [
+        serde_json::json!("not-a-timestamp"),
+        serde_json::Value::Null,
+    ] {
+        let invalid = serde_json::json!({
+            "name": "sample/base",
+            "versions": [{
+                "version": "1.0.0",
+                "artifact": "v1/artifacts/sample/base/1.0.0/package.praypkg",
+                "published_at": timestamp
+            }]
+        });
+        assert!(serde_json::from_value::<RegistryPackageMetadata>(invalid).is_err());
+    }
+}
