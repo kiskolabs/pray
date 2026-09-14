@@ -1,7 +1,9 @@
 # CHANGELOG
 
-## Unreleased
+## 1.14.0 (2026-09-14)
 
+- Keep an unchanged package version's artifact, first-publish time, and yank when `pray publish` runs again (RFC 0061).
+- Write `published_at` as UTC Unix seconds in registry and federation JSON.
 - Emit absent package locators and an absent target `max_bytes` as null in the canonical manifest JSON so `manifest_hash` matches the other CLIs.
 
 ## 1.13.0 (2026-09-08)
