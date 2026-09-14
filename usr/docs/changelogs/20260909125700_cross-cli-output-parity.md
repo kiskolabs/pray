@@ -26,3 +26,4 @@ CHANGELOG.md 1.14.0
 npmjs/pray-cli/CHANGELOG.md 1.14.0
 rubygems/pray-cli/CHANGELOG.md 1.14.0
 usr/docs/issues/20260914140500_prepare-1-14-0-release.md
+usr/docs/changelogs/20260914142000_tag-1-14-0.md

@@ -124,4 +124,6 @@ schema/registry.schema.json
 
 usr/docs/issues/20260914140500_prepare-1-14-0-release.md
 
+usr/docs/changelogs/20260914142000_tag-1-14-0.md
+
 CHANGELOG.md 1.14.0
