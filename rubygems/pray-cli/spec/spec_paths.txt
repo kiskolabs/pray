@@ -2,6 +2,7 @@ spec/pray/archive_spec.rb
 spec/pray/clean_spec.rb
 spec/pray/cli_help_spec.rb
 spec/pray/cli_parse_spec.rb
+spec/pray/cli_run_context_spec.rb
 spec/pray/cli_suggest_spec.rb
 spec/pray/confess_spec.rb
 spec/pray/constraint_spec.rb

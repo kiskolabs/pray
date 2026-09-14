@@ -2,6 +2,10 @@ import { runLoginCommand } from "../auth/login.js";
 import { PrayError } from "../errors.js";
 import { readLockfile } from "../lockfile/index.js";
 import { PACKAGE_VERSION } from "../lockfile/types.js";
+import {
+  activeInvocationContext,
+  setActiveInvocationContext,
+} from "../project-context/runtime.js";
 import { initDistributionRoot } from "../publish/index.js";
 import { renderProject } from "../render/project.js";
 import { runTransaction } from "../transaction/index.js";
@@ -38,6 +42,7 @@ import { unknownCommandMessage } from "./suggest.js";
 import { runUpgradeCommand } from "./upgrade.js";
 
 export async function runCli(argumentsList: string[]): Promise<number> {
+  const previousContext = activeInvocationContext();
   try {
     const filteredArguments = [...argumentsList];
     if (filteredArguments.includes("--no-input")) {
@@ -236,5 +241,7 @@ export async function runCli(argumentsList: string[]): Promise<number> {
     const message = error instanceof Error ? error.message : String(error);
     process.stderr.write(`${message}\n`);
     return 1;
+  } finally {
+    setActiveInvocationContext(previousContext);
   }
 }

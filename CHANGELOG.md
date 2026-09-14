@@ -1,5 +1,9 @@
 # CHANGELOG
 
+## Unreleased
+
+- Use the current project for a later Ruby or TypeScript install after an earlier in-process command in another directory.
+
 ## 1.14.0 (2026-09-14)
 
 - Keep an unchanged package version's artifact, first-publish time, and yank when `pray publish` runs again (RFC 0061).
