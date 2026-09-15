@@ -1,0 +1,5 @@
+prayfile "1"
+source "dist", "distribution"
+compose "INSTRUCTIONS.md" do
+  pray "sample/base", source: "dist"
+end

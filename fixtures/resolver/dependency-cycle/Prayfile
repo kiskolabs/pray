@@ -1,0 +1,5 @@
+prayfile "1"
+compose "INSTRUCTIONS.md" do
+  pray "sample/alpha", path: "packages/alpha"
+  pray "sample/beta", path: "packages/beta"
+end

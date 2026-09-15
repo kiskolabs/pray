@@ -139,6 +139,8 @@ mod tests {
         assert!(version_satisfies("1.0.0", "1.0.0").expect("matches"));
         assert!(!version_satisfies("1.0.1", "1.0.0").expect("does not match"));
         assert!(version_satisfies("1.0.1", "~> 1.0").expect("pessimistic matches"));
+        assert!(!version_satisfies("1.5.0", "~> 1.4").expect("later minor"));
+        assert!(!version_satisfies("2.4.0", "~> 2.2").expect("later minor"));
     }
 
     #[test]

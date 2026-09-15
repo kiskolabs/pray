@@ -20,4 +20,4 @@ Current cases:
 - `registry-cache/identity-first` — namespaced package cache identity shared by every CLI
 - `package-tree/byte-order` — UTF-8 byte ordering shared by every CLI
 
-Fuller conformance packs also start under `fixtures/` (RFC 0100). Rust, Ruby, and TypeScript suites now run `fixtures/parser`, `fixtures/prayspec`, `fixtures/lockfile`, `fixtures/resolver`, and `fixtures/render/compose-fragment`.
+Fuller conformance packs also start under `fixtures/` (RFC 0100). Rust, Ruby, and TypeScript suites now run `fixtures/parser`, `fixtures/prayspec`, `fixtures/lockfile`, `fixtures/resolver` (path, constraint-mismatch, dependency-cycle, git-distribution, registry-distribution, tarball-package), and `fixtures/render/compose-fragment`.

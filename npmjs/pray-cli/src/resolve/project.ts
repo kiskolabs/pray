@@ -28,6 +28,7 @@ import {
 import type { PackageSpec } from "../package-spec/types.js";
 import { activeInvocationContext } from "../project-context/runtime.js";
 import { defaultResolveOptions, type ResolveOptions } from "./context.js";
+import { rejectDependencyCycles } from "./deps.js";
 import { loadExportBodies, selectExports } from "./exports.js";
 import {
   annotateFailedGitRefresh,
@@ -96,7 +97,6 @@ export async function resolveProject(
       resolutionErrors.push(`${declaration.name}: ${message}`);
     }
   }
-
   if (resolutionErrors.length > 0) {
     throw PrayError.resolution(resolutionErrors.join("\n"));
   }
@@ -115,7 +115,7 @@ export async function resolveProject(
   if (localErrors.length > 0) {
     throw PrayError.resolution(localErrors.join("\n"));
   }
-
+  rejectDependencyCycles(packages);
   return {
     manifestPath: resolve(manifestPath),
     projectRoot,

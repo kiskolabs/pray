@@ -40,7 +40,7 @@ Missing coverage: git, registry, tarball, dependency cycle as a polyglot reject.
 
 ## Next
 
-Git and registry resolver packs. Port reject_dependency_cycles to Ruby and TypeScript, then add a cycle fixture. PyO3 after RFC 0109 field freeze. Mix when a Phoenix repo asks.
+PyO3 bind of embed after RFC 0109 field freeze. Mix task when a Phoenix repo asks. Tarball resolver pack still open.
 
 ## Source
 

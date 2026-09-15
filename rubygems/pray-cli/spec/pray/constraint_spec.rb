@@ -22,6 +22,11 @@ RSpec.describe Pray::Constraint do
       expect(described_class.version_satisfies("2.0.0", "~> 1.4")).to be(false)
     end
 
+    it "rejects a later minor for a two-component pessimistic constraint" do
+      expect(described_class.version_satisfies("1.5.0", "~> 1.4")).to be(false)
+      expect(described_class.version_satisfies("2.4.0", "~> 2.2")).to be(false)
+    end
+
     it "accepts any version for wildcard constraints" do
       expect(described_class.version_satisfies("9.9.9", "*")).to be(true)
     end
@@ -30,6 +35,7 @@ RSpec.describe Pray::Constraint do
   describe ".latest_constraint_for_package" do
     it "keeps the operator family for a newer registry version" do
       expect(described_class.latest_constraint_for_package("~> 1.0", "2.0.0")).to eq("~> 2.0")
+      expect(described_class.latest_constraint_for_package("~> 2.2", "2.4.0")).to eq("~> 2.4")
       expect(described_class.latest_constraint_for_package("1.0.0", "2.0.0")).to eq("=2.0.0")
       expect(described_class.latest_constraint_for_package("^1.0", "2.1.0")).to eq("^2.1")
     end

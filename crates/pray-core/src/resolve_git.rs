@@ -267,19 +267,6 @@ pub(crate) fn require_distribution_root(repo_root: &Path) -> PrayResult<PathBuf>
     })
 }
 
-pub(crate) fn local_git_source_root(clone_url: &str) -> Option<PathBuf> {
-    let path = if let Some(path) = clone_url.strip_prefix("file://") {
-        PathBuf::from(path)
-    } else {
-        PathBuf::from(clone_url)
-    };
-
-    if !path.exists() {
-        return None;
-    }
-    discover_distribution_root(&path)
-}
-
 pub fn discover_distribution_root(path: &Path) -> Option<PathBuf> {
     if is_local_distribution_root(path) {
         return Some(path.to_path_buf());

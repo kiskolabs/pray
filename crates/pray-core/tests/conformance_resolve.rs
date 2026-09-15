@@ -94,3 +94,10 @@ fn resolver_constraint_mismatch_fixture() {
     resolve_project_with_options(&dir.join("Prayfile"), &offline_options())
         .expect_err("constraint mismatch");
 }
+
+#[test]
+fn resolver_dependency_cycle_fixture() {
+    let dir = fixture_dir("resolver/dependency-cycle");
+    resolve_project_with_options(&dir.join("Prayfile"), &offline_options())
+        .expect_err("dependency cycle");
+}

@@ -53,4 +53,16 @@ describe("RFC 0100 resolver fixtures", () => {
       PrayError,
     );
   });
+
+  it("rejects the dependency-cycle resolver fixture", async () => {
+    const dir = join(fixturesRoot, "resolver/dependency-cycle");
+    await assert.rejects(
+      () =>
+        resolveProject(join(dir, "Prayfile"), {
+          ...defaultResolveOptions(),
+          offline: true,
+        }),
+      PrayError,
+    );
+  });
 });

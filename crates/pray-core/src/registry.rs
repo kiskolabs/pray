@@ -4,7 +4,7 @@ use crate::package_integrity::{artifact_content_digest, require_remote_integrity
 use crate::paths::remove_path_if_exists;
 use crate::registry_http::{http_get, http_post, join_url};
 use crate::registry_select::{apply_yank_policy, select_package_version};
-use crate::registry_ssh::{resolve_ssh_registry_package_root, submit_confession_ssh};
+use crate::registry_ssh::submit_confession_ssh;
 use crate::resolve_context::PackageResolutionContext;
 use crate::{PrayError, PrayResult};
 use serde::{Deserialize, Serialize};
@@ -128,8 +128,13 @@ pub fn resolve_registry_package_root(
     declaration: &ManifestPackage,
     context: &PackageResolutionContext,
 ) -> PrayResult<RegistryPackageResolution> {
-    if crate::ssh_client::is_pray_ssh_url(source_url) {
-        return resolve_ssh_registry_package_root(project_root, source_url, declaration, context);
+    if let Some(resolved) = crate::registry_local::resolve_non_http_registry(
+        project_root,
+        source_url,
+        declaration,
+        context,
+    )? {
+        return Ok(resolved);
     }
 
     let metadata = fetch_registry_package_metadata(source_url, &declaration.name)?;
