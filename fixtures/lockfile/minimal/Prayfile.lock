@@ -1,0 +1,30 @@
+prayfile_lock = "1"
+spec = "0.1"
+generated_by = "pray test"
+manifest_hash = "sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+source = []
+
+[[package]]
+name = "sample/base"
+version = "1.0.0"
+path = "./packages/base"
+tree_hash = "sha256:bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"
+artifact_hash = "sha256:cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc"
+artifact = "path:./packages/base"
+exports = ["testing-basics"]
+dependencies = []
+
+[[target]]
+name = "tool_a"
+outputs = ["INSTRUCTIONS.md"]
+
+[[managed_span]]
+id = "621c7072"
+target = "INSTRUCTIONS.md"
+open_line = 9
+close_line = 12
+ideal_checksum = "sha256:dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd"
+package = "sample/base"
+export = "testing-basics"
+source_checksum = "sha256:bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"
+silenced = false

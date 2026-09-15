@@ -57,6 +57,7 @@ export { runServer } from "./serve/index.js";
 export { syncDistributionRoot } from "./sync/index.js";
 export { runTrustCommand } from "./trust/index.js";
 export { vendorProject } from "./vendor/index.js";
+export { inspectLockedDestinations } from "./verify/locked-dest.js";
 export type {
   VerificationFinding,
   VerificationReport,

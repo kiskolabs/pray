@@ -133,6 +133,7 @@ module Pray
   def resolve_project(...) = Resolve.resolve_project(...)
   def render_project(...) = Render.render_project(...)
   def inspect_project(...) = Verify.inspect_project(...)
+  def inspect_locked_destinations(...) = Verify.inspect_locked_destinations(...)
   def verify_project(...) = Verify.verify_project(...)
   def drift_project(...) = Verify.drift_project(...)
 end

@@ -74,4 +74,5 @@ pub mod verify;
 
 pub use error::{PrayError, PrayResult};
 
+pub mod embed;
 pub mod transaction;

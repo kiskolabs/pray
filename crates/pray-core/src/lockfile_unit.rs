@@ -1,6 +1,7 @@
 use super::{
-    build_lockfile, lockfiles_equivalent, normalize_lockfile_artifact, relative_lockfile_path,
-    LockSource, LockedPackage, Lockfile,
+    build_lockfile, lockfile_hash, lockfiles_equivalent, normalize_lockfile_artifact,
+    parse_lockfile, relative_lockfile_path, serialize_lockfile, LockSource, LockedPackage,
+    Lockfile,
 };
 use std::collections::BTreeMap;
 use std::path::Path;
@@ -78,6 +79,29 @@ fn build_lockfile_records_package_upstream() {
     let serialized = lockfile.serialized().expect("serialize lockfile");
     assert!(serialized.contains("sample/base"));
     assert!(serialized.contains("1.4.3"));
+}
+
+#[test]
+fn parse_lockfile_round_trips_serialized_bytes() {
+    let lockfile = Lockfile {
+        prayfile_lock: "1".to_string(),
+        spec: "0.1".to_string(),
+        generated_by: "pray 1.15.0".to_string(),
+        manifest_hash: "sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+            .to_string(),
+        ..Lockfile::default()
+    };
+    let serialized = serialize_lockfile(&lockfile).expect("serialize");
+    let parsed = parse_lockfile(&serialized).expect("parse");
+    assert!(lockfiles_equivalent(&lockfile.canonicalized(), &parsed));
+    let digest = lockfile_hash(&parsed).expect("hash");
+    assert!(digest.starts_with("sha256:"));
+}
+
+#[test]
+fn parse_lockfile_rejects_invalid_toml() {
+    let error = parse_lockfile("not = [lockfile").expect_err("invalid");
+    assert!(error.to_string().contains("lockfile parse error"));
 }
 
 #[test]

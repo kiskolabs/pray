@@ -70,7 +70,7 @@ The reference tree also keeps a smaller shared corpus at `testdata/shared/manife
 
 ## Implementation notes
 
-No resolver, render, or verify fixture packs yet.
+Level 0 parser and prayspec packs under `fixtures/` plus a lockfile parse pack, a path-package resolver pack with a constraint-mismatch reject pack, a compose render pack with a committed dest file, and lock adapter span packs (`inspect_locked_destinations` finding kinds) run in Rust, Ruby, and TypeScript test suites. No git or registry resolver packs yet.
 
 ## Drawbacks
 

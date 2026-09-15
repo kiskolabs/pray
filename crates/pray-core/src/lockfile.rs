@@ -144,13 +144,23 @@ pub fn write_lockfile(path: &Path, lockfile: &Lockfile) -> PrayResult<()> {
     Ok(())
 }
 
-pub fn read_lockfile(path: &Path) -> PrayResult<Lockfile> {
-    let text = fs::read_to_string(path)?;
-    let lockfile = toml::from_str(&text).map_err(|error| PrayError::Parse {
+pub fn parse_lockfile(text: &str) -> PrayResult<Lockfile> {
+    toml::from_str(text).map_err(|error| PrayError::Parse {
         kind: "lockfile",
         message: error.to_string(),
-    })?;
-    Ok(lockfile)
+    })
+}
+
+pub fn serialize_lockfile(lockfile: &Lockfile) -> PrayResult<String> {
+    lockfile.serialized()
+}
+
+pub fn lockfile_hash(lockfile: &Lockfile) -> PrayResult<String> {
+    lockfile.file_hash()
+}
+
+pub fn read_lockfile(path: &Path) -> PrayResult<Lockfile> {
+    parse_lockfile(&fs::read_to_string(path)?)
 }
 
 pub fn relative_lockfile_path(project_root: &Path, path: &Path) -> String {

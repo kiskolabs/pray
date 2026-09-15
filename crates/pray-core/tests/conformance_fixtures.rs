@@ -1,5 +1,4 @@
-use pray_core::manifest::parse_manifest;
-use pray_core::package_spec::parse_package_spec;
+use pray_core::embed::{parse_lockfile, parse_manifest, parse_package_spec};
 use serde::Deserialize;
 use std::fs;
 use std::path::PathBuf;
@@ -20,6 +19,14 @@ struct ExpectedPackage {
     name: String,
     version: String,
     files: Vec<String>,
+}
+
+#[derive(Debug, Deserialize)]
+struct ExpectedLockfile {
+    prayfile_lock: String,
+    spec: String,
+    package_names: Vec<String>,
+    managed_span_ids: Vec<String>,
 }
 
 #[test]
@@ -58,4 +65,36 @@ fn prayspec_minimal_package_fixture() {
     assert_eq!(package.name, expected.name);
     assert_eq!(package.version, expected.version);
     assert_eq!(package.files, expected.files);
+}
+
+#[test]
+fn lockfile_minimal_fixture() {
+    let dir = workspace_root().join("fixtures/lockfile/minimal");
+    let text = fs::read_to_string(dir.join("Prayfile.lock")).expect("lockfile");
+    let expected: ExpectedLockfile = serde_json::from_str(
+        &fs::read_to_string(dir.join("expected.json")).expect("expected.json"),
+    )
+    .expect("expected json");
+    let lockfile = parse_lockfile(&text).expect("parse");
+    assert_eq!(lockfile.prayfile_lock, expected.prayfile_lock);
+    assert_eq!(lockfile.spec, expected.spec);
+    let names: Vec<_> = lockfile
+        .package
+        .iter()
+        .map(|package| package.name.clone())
+        .collect();
+    assert_eq!(names, expected.package_names);
+    let span_ids: Vec<_> = lockfile
+        .managed_span
+        .iter()
+        .map(|span| span.id.clone())
+        .collect();
+    assert_eq!(span_ids, expected.managed_span_ids);
+}
+
+#[test]
+fn lockfile_invalid_toml_fixture() {
+    let dir = workspace_root().join("fixtures/lockfile/invalid-toml");
+    let text = fs::read_to_string(dir.join("Prayfile.lock")).expect("lockfile");
+    parse_lockfile(&text).expect_err("invalid lockfile");
 }

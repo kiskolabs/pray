@@ -1,0 +1,13 @@
+Package::Specification.new do |spec|
+  spec.name = "sample/base"
+  spec.version = "1.0.0"
+  spec.summary = "fixture"
+  spec.files = ["exports/note.md"]
+  spec.exports = {
+    "note" => {
+      type: "fragment",
+      path: "exports/note.md",
+      summary: "note"
+    }
+  }
+end

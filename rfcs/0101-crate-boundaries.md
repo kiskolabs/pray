@@ -36,4 +36,4 @@ Split everything now to match that diagram: large diff, no new user behavior. Ig
 
 ## Unresolved questions
 
-Public Rust API stability for `pray-core`. Whether Ruby/TS will ever call into Rust via FFI (if yes, crate split and C ABI are a different RFC).
+RFC 0109 lists the `pray_core::embed` names. Whether sibling `pub` modules become `pub(crate)`, and whether Ruby/TS or later FFI bind that module only, remain open.

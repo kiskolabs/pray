@@ -38,6 +38,7 @@ require_relative "pray/render_layout"
 require_relative "pray/verify_position"
 require_relative "pray/verify_provisioned"
 require_relative "pray/verify"
+require_relative "pray/verify_locked_dest"
 require_relative "pray/resource_limits"
 require_relative "pray/http_body"
 require_relative "pray/registry_install"
@@ -61,6 +62,6 @@ class << Pray
     :parse_package_spec, :parse_lockfile, :read_lockfile, :serialize_lockfile, :lockfile_hash,
     :write_lockfile, :write_lockfile_if_changed, :lockfiles_equivalent?, :build_lockfile,
     :resolve_project, :render_project, :materialize_project,
-    :inspect_project, :verify_project, :drift_project,
+    :inspect_project, :inspect_locked_destinations, :verify_project, :drift_project,
     :default_manifest_path, :default_lockfile_path, :project_root_from_manifest
 end
