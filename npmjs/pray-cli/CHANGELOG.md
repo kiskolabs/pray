@@ -1,5 +1,11 @@
 # CHANGELOG
 
+## 1.16.0 (2026-09-15)
+
+- Resolve a local `.praypkg` from `tarball:`, including offline when the archive is on disk.
+- Refuse two-package dependency cycles during resolve, matching the Rust CLI.
+- Check dest files against `Prayfile.lock` managed spans without resolving packages (`inspect_locked_destinations`, RFC 0106).
+
 ## 1.15.0 (2026-09-15)
 
 - Refresh path-fork trees with `pray update`. Rewrite `spec.upstream` pins with `pray update --latest` when the pin does not admit the latest upstream version. `pray update --latest --dry-run` prints the planned pin and does not write (RFC 0114). A rewritten fork spec keeps homepage, source URIs, prayfile version, and metadata.

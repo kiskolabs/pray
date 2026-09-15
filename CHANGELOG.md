@@ -1,6 +1,6 @@
 # CHANGELOG
 
-## Unreleased
+## 1.16.0 (2026-09-15)
 
 - Document `pray_core::embed` as the Rust library surface for parse, resolve, lock, render, and verify (RFC 0109).
 - Run RFC 0100 parser, prayspec, lockfile, path-package, git, registry, and tarball resolver, cycle-reject, and compose render fixtures in the Rust, Ruby, and TypeScript suites.

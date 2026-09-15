@@ -40,9 +40,12 @@ Learned systems: skipped.
 
 PyO3 bind of embed after RFC 0109 field freeze. Mix task when a Phoenix repo asks.
 
+Later pass 20260915144000: this work ships as 1.16.0. See usr/docs/issues/20260915144000_prepare-1-16-0-release.md.
+
 ## Source
 
 rfcs/0100-conformance.md
 fixtures/resolver/tarball-package/
 crates/pray-core/src/resolve_tarball.rs
 usr/docs/issues/20260915140000_git-registry-cycle-resolver-packs.md
+usr/docs/issues/20260915144000_prepare-1-16-0-release.md

@@ -16,6 +16,8 @@ Rust, Ruby, and TypeScript render the compose-fragment fixture to the same dest 
 
 Resolver fixture pack. PyO3 after field freeze. Mix when a Phoenix repo asks.
 
+Later pass 20260915144000: this work ships as 1.16.0. See usr/docs/issues/20260915144000_prepare-1-16-0-release.md.
+
 ## Source
 
 usr/docs/issues/20260915133000_render-fixtures-and-lock-adapter-ports.md
@@ -24,3 +26,5 @@ rfcs/0106-host-language-lock-adapter.md
 fixtures/render/compose-fragment/expected/INSTRUCTIONS.md
 rubygems/pray-cli/lib/pray/verify_locked_dest.rb
 npmjs/pray-cli/src/verify/locked-dest.ts
+CHANGELOG.md 1.16.0
+usr/docs/issues/20260915144000_prepare-1-16-0-release.md

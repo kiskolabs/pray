@@ -16,8 +16,12 @@ Rust inspect_locked_destinations reports missing dest files, edited spans, and o
 
 Ruby and TypeScript ports. Mix task and PyO3 bind when requested.
 
+Later pass 20260915144000: this work ships as 1.16.0. See usr/docs/issues/20260915144000_prepare-1-16-0-release.md.
+
 ## Source
 
 rfcs/0106-host-language-lock-adapter.md
 usr/docs/issues/20260915130000_host-language-lock-adapter.md
 crates/pray-core/src/verify/locked_dest.rs
+CHANGELOG.md 1.16.0
+usr/docs/issues/20260915144000_prepare-1-16-0-release.md

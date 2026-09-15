@@ -40,6 +40,8 @@ Missing coverage: resolver, render, verify. Futile coverage: none added; expecte
 
 Git and registry resolver packs. Polyglot dependency-cycle reject once Ruby and TypeScript refuse cycles the way Rust resolve does. PyO3 bind of embed after RFC 0109 field freeze. Mix task when a Phoenix repo asks.
 
+Later pass 20260915144000: this work ships as 1.16.0. See usr/docs/issues/20260915144000_prepare-1-16-0-release.md.
+
 ## Source
 
 rfcs/0100-conformance.md
@@ -50,3 +52,4 @@ npmjs/pray-cli/src/conformance-fixtures.test.ts
 usr/docs/changelogs/20260915124500_conformance-lockfile-fixtures.md
 usr/docs/issues/20260915133000_render-fixtures-and-lock-adapter-ports.md
 usr/docs/issues/20260915134500_conformance-resolver-fixtures.md
+usr/docs/issues/20260915144000_prepare-1-16-0-release.md
