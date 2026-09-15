@@ -60,10 +60,10 @@ Informational, Describes 1.8.1, Stable: RFC 0002, 0070, 0101.
 
 Standards Track, shipped design, Stable: RFC 0010, 0011, 0020, 0030, 0031, 0040, 0050, 0060, 0071, 0108.
 
-Standards Track follow-ons (not yet the product contract): RFC 0033, 0034, 0100, 0102, 0104, 0114.
+Standards Track follow-ons (not yet the product contract): RFC 0033, 0034, 0100, 0102, 0104, 0106, 0109, 0114.
 
 Standards Track Proposed: RFC 0051 (registry authentication delivery and enrollment).
 
 Standards Track Proposed: RFC 0061 (publish version preservation).
 
-Reserved (see `ids/`): 0103 lockfile environment (optional field already in `lockfile.schema.json`; an RFC would canonize it); 0105 trust enrollment; 0106 host-language lock adapter; 0107 search ranking; 0110 marker-id stability; 0112 help/man/exit codes; 0113 independent parsers.
+Reserved (see `ids/`): 0103 lockfile environment (optional field already in `lockfile.schema.json`; an RFC would canonize it); 0105 trust enrollment; 0107 search ranking; 0110 marker-id stability; 0112 help/man/exit codes; 0113 independent parsers.

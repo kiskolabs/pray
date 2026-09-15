@@ -266,6 +266,6 @@ Replace polyglot CLIs with wrappers around the Rust binary: simpler conformance,
 
 ## Unresolved questions
 
-Whether `pray-core` should export a documented Rust API for embedders or remain a CLI implementation crate.
+RFC 0109 lists `pray_core::embed`. Whether sibling modules shrink to `pub(crate)` is still open.
 
 How much of `registry_*` should move into `pray-transport`.

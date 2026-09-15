@@ -36,8 +36,10 @@ Open `rfcs/README.md` for types, statuses, numbering, and the current set. Open 
 - RFC 0071: project-local `.pray` directory and ignore policy
 - RFC 0100: conformance fixtures
 - RFC 0101: crate boundaries
+- RFC 0109: pray-core embedder API
 - RFC 0102: destination DSL as canonical examples
 - RFC 0104: federation and extra transports
+- RFC 0106: host-language lock adapter
 - RFC 0108: file-as-fragment
 - RFC 0114: package upstream (path fork pin)
 

@@ -1,0 +1,4 @@
+prayfile "1"
+compose "INSTRUCTIONS.md" do
+  pray "sample/base", "~> 1.0", path: "packages/base"
+end

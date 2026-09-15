@@ -1,0 +1,12 @@
+{
+  "packages": [
+    {
+      "name": "sample/base",
+      "version": "1.0.0",
+      "path": "./packages/base",
+      "tree_hash": "sha256:ff06129c4b7fd894a5857b74ae11d2cdb323e8b8458efc17f98b00ad05d3304d",
+      "artifact": "path:./packages/base",
+      "exports": ["note"]
+    }
+  ]
+}

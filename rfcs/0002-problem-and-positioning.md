@@ -20,7 +20,7 @@ Copied checklists and policy files fork silently. A library of review guidance d
 
 Declare packages in Prayfile. Lock hashes and managed span records in Prayfile.lock. Rendered files hold opaque `pray:` markers that cite the lock (RFC 0030).
 
-Packages are static text trees. There is no agent runtime, no hidden self-updater, and no install scripts. Resolve and render stay in the CLI. A later host-language adapter MAY read Prayfile.lock (reserved RFC 0106).
+Packages are static text trees. There is no agent runtime, no hidden self-updater, and no install scripts. Resolve and render stay in the CLI. A host-language adapter MAY read Prayfile.lock (RFC 0106).
 
 ## Reference-level explanation
 
@@ -123,7 +123,7 @@ Closest reference: dependency manifest/lockfile ecosystems.
 
 Difference: legacy registries may execute host code; Prayfile parses declarations only. Same supply-chain baseline (checksums, optional signing, vendoring) plus compact markers in rendered files.
 
-Prayfile does not replace language package managers. A planned host-language adapter may load from `Prayfile.lock` and cache; it does not replace CLI resolve/render.
+Prayfile does not replace language package managers. RFC 0106 may load from `Prayfile.lock`; it does not replace CLI resolve/render.
 
 ---
 

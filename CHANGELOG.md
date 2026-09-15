@@ -1,5 +1,11 @@
 # CHANGELOG
 
+## Unreleased
+
+- Document `pray_core::embed` as the Rust library surface for parse, resolve, lock, render, and verify (RFC 0109).
+- Run RFC 0100 parser, prayspec, lockfile, path-package resolver, and compose render fixtures in the Rust, Ruby, and TypeScript suites.
+- Check dest files against `Prayfile.lock` managed spans without resolving packages (`inspect_locked_destinations`, RFC 0106) in the Rust, Ruby, and TypeScript libraries.
+
 ## 1.15.0 (2026-09-15)
 
 - Refresh path-fork trees with `pray update` in the Rust, Ruby, and TypeScript CLIs (RFC 0114).
