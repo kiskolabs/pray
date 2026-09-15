@@ -69,6 +69,20 @@ pub fn merge_content_files(
     new_content: &BTreeMap<String, Vec<u8>>,
     local_content: &BTreeMap<String, Vec<u8>>,
 ) -> PrayResult<BTreeMap<String, Vec<u8>>> {
+    match try_merge_content_files(old_content, new_content, local_content) {
+        Ok(merged) => Ok(merged),
+        Err(paths) => Err(PrayError::Resolution(format!(
+            "upstream merge conflict in {}",
+            paths.join(", ")
+        ))),
+    }
+}
+
+pub fn try_merge_content_files(
+    old_content: &BTreeMap<String, Vec<u8>>,
+    new_content: &BTreeMap<String, Vec<u8>>,
+    local_content: &BTreeMap<String, Vec<u8>>,
+) -> Result<BTreeMap<String, Vec<u8>>, Vec<String>> {
     if is_clean_replica(old_content, local_content) {
         return Ok(new_content.clone());
     }
@@ -81,6 +95,7 @@ pub fn merge_content_files(
         paths.insert(path.clone(), ());
     }
     let mut merged = BTreeMap::new();
+    let mut conflicts = Vec::new();
     for path in paths.keys() {
         let old = old_content.get(path);
         let new = new_content.get(path);
@@ -107,13 +122,28 @@ pub fn merge_content_files(
                 merged.insert(path.clone(), new_bytes.clone());
             }
             _ => {
-                return Err(PrayError::Resolution(format!(
-                    "upstream merge conflict in {path}"
-                )));
+                conflicts.push(path.clone());
             }
         }
     }
-    Ok(merged)
+    if conflicts.is_empty() {
+        Ok(merged)
+    } else {
+        Err(conflicts)
+    }
+}
+
+pub fn upstream_merge_conflict_message(
+    fork: &str,
+    upstream_name: &str,
+    old_version: &str,
+    new_version: &str,
+    paths: &[String],
+) -> String {
+    format!(
+        "upstream merge conflict in {fork} while refreshing {upstream_name} {old_version} to {new_version}: {}",
+        paths.join(", ")
+    )
 }
 
 pub fn next_upstream_constraint(current: &str, new_version: &str) -> String {
@@ -163,6 +193,31 @@ mod tests {
         let local = BTreeMap::from([("exports/a.md".to_string(), b"edit".to_vec())]);
         let error = merge_content_files(&old, &new, &local).expect_err("conflict");
         assert!(error.to_string().contains("exports/a.md"));
+    }
+
+    #[test]
+    fn merge_lists_every_conflicting_path() {
+        let old = BTreeMap::from([
+            ("README.md".to_string(), b"old readme".to_vec()),
+            ("exports/a.md".to_string(), b"old".to_vec()),
+        ]);
+        let new = BTreeMap::from([
+            ("README.md".to_string(), b"new readme".to_vec()),
+            ("exports/a.md".to_string(), b"new".to_vec()),
+        ]);
+        let local = BTreeMap::from([
+            ("README.md".to_string(), b"local readme".to_vec()),
+            ("exports/a.md".to_string(), b"edit".to_vec()),
+        ]);
+        let paths = try_merge_content_files(&old, &new, &local).expect_err("conflict");
+        assert!(paths.contains(&"README.md".to_string()));
+        assert!(paths.contains(&"exports/a.md".to_string()));
+        let message =
+            upstream_merge_conflict_message("fork/base", "sample/base", "1.4.3", "1.4.4", &paths);
+        assert!(message.contains("fork/base"));
+        assert!(message.contains("sample/base 1.4.3 to 1.4.4"));
+        assert!(message.contains("README.md"));
+        assert!(message.contains("exports/a.md"));
     }
 
     #[test]

@@ -2,7 +2,7 @@
 mod support;
 
 use std::fs;
-use std::path::Path;
+use std::path::{Path, PathBuf};
 use std::process::{Command, Output};
 
 use support::{create_add_fixture, run_pray, temporary_directory};
@@ -44,7 +44,7 @@ fn init_distribution(distribution: &Path) {
     );
 }
 
-fn write_fork_package(catalog: &Path, source: &Path) {
+fn write_fork_package(catalog: &Path, source: &Path, upstream_constraint: &str) {
     let root = catalog.join("packages/fork-base");
     fs::create_dir_all(root.join("exports")).expect("fork directories");
     fs::copy(
@@ -59,22 +59,25 @@ fn write_fork_package(catalog: &Path, source: &Path) {
     .expect("copy testing");
     fs::write(
         root.join("fork-base.prayspec"),
-        r#"
+        format!(
+            r#"
 Package::Specification.new do |spec|
   spec.name = "fork/base"
   spec.version = "1.0.0"
   spec.summary = "forked guidance"
   spec.files = ["README.md", "exports/testing-basics.md"]
-  spec.exports = {
-    "testing-basics" => {
+  spec.exports = {{
+    "testing-basics" => {{
       type: "fragment",
       path: "exports/testing-basics.md",
       summary: "Testing guidance"
-    }
-  }
-  spec.upstream "sample/base", "~> 1.4"
+    }}
+  }}
+  spec.upstream "sample/base", "{constraint}"
 end
 "#,
+            constraint = upstream_constraint
+        ),
     )
     .expect("write fork prayspec");
 }
@@ -157,7 +160,7 @@ fn update_replaces_clean_fork_from_locked_upstream() {
     );
     init_distribution(&distribution_repo);
 
-    write_fork_package(&catalog_repo, &source_repo);
+    write_fork_package(&catalog_repo, &source_repo, "~> 1.4");
     write_fork_prayfile(&catalog_repo, &distribution_repo);
     assert_success(&run_pray(&catalog_repo, &["install"]), "install fork");
     let lockfile = fs::read_to_string(catalog_repo.join("Prayfile.lock")).expect("lockfile");
@@ -203,4 +206,119 @@ fn update_replaces_clean_fork_from_locked_upstream() {
         updated_lock.contains("1.4.4"),
         "update should lock upstream 1.4.4:\n{updated_lock}"
     );
+}
+
+fn catalog_after_upstream_bump(constraint: &str) -> PathBuf {
+    let workspace = temporary_directory("pray-package-upstream");
+    let source_repo = workspace.join("source");
+    let distribution_repo = workspace.join("distribution");
+    let prayers_root = distribution_repo.join("prayers");
+    let catalog_repo = workspace.join("catalog");
+    fs::create_dir_all(&source_repo).expect("source workspace");
+    fs::create_dir_all(&distribution_repo).expect("distribution workspace");
+    fs::create_dir_all(&catalog_repo).expect("catalog workspace");
+
+    create_add_fixture(&source_repo);
+    assert_success(
+        &run_pray(
+            &source_repo,
+            &["add", "sample/base", "--path", "packages/base"],
+        ),
+        "add base",
+    );
+    assert_success(
+        &run_pray(
+            &source_repo,
+            &[
+                "publish",
+                "--root",
+                prayers_root.to_str().expect("distribution path"),
+            ],
+        ),
+        "publish base",
+    );
+    init_distribution(&distribution_repo);
+
+    write_fork_package(&catalog_repo, &source_repo, constraint);
+    write_fork_prayfile(&catalog_repo, &distribution_repo);
+    assert_success(&run_pray(&catalog_repo, &["install"]), "install fork");
+
+    bump_upstream_version(&source_repo);
+    assert_success(
+        &run_pray(
+            &source_repo,
+            &[
+                "publish",
+                "--root",
+                prayers_root.to_str().expect("distribution path"),
+            ],
+        ),
+        "publish base 1.4.4",
+    );
+    assert_success(&git(&distribution_repo, &["add", "-A"]), "git add bump");
+    assert_success(
+        &git(&distribution_repo, &["commit", "-m", "publish 1.4.4"]),
+        "git commit bump",
+    );
+    catalog_repo
+}
+
+#[test]
+fn update_keeps_exact_upstream_pin_until_latest() {
+    let catalog = catalog_after_upstream_bump("= 1.4.3");
+    let update = run_pray(&catalog, &["update"]);
+    assert_success(&update, "update exact pin");
+    let testing = fs::read_to_string(catalog.join("packages/fork-base/exports/testing-basics.md"))
+        .expect("fork export");
+    assert_eq!(testing, "Testing guidance\n");
+    let spec =
+        fs::read_to_string(catalog.join("packages/fork-base/fork-base.prayspec")).expect("spec");
+    assert!(spec.contains("= 1.4.3"), "exact pin should stay:\n{spec}");
+    let lockfile = fs::read_to_string(catalog.join("Prayfile.lock")).expect("lockfile");
+    assert!(
+        lockfile.contains("1.4.3"),
+        "update should keep upstream 1.4.3:\n{lockfile}"
+    );
+    assert!(
+        !lockfile.contains("1.4.4"),
+        "update should not lock 1.4.4:\n{lockfile}"
+    );
+
+    let latest = run_pray(&catalog, &["update", "--latest"]);
+    assert_success(&latest, "update --latest exact pin");
+    let testing = fs::read_to_string(catalog.join("packages/fork-base/exports/testing-basics.md"))
+        .expect("fork export");
+    assert_eq!(testing, "Testing guidance v2\n");
+    let spec =
+        fs::read_to_string(catalog.join("packages/fork-base/fork-base.prayspec")).expect("spec");
+    assert!(
+        spec.contains("= 1.4.4"),
+        "latest should rewrite pin:\n{spec}"
+    );
+    let lockfile = fs::read_to_string(catalog.join("Prayfile.lock")).expect("lockfile");
+    assert!(
+        lockfile.contains("1.4.4"),
+        "update --latest should lock upstream 1.4.4:\n{lockfile}"
+    );
+}
+
+#[test]
+fn update_latest_dry_run_does_not_rewrite_upstream_pin() {
+    let catalog = catalog_after_upstream_bump("= 1.4.3");
+    let preview = run_pray(&catalog, &["update", "--latest", "--dry-run"]);
+    assert_success(&preview, "update --latest --dry-run");
+    let stdout = String::from_utf8_lossy(&preview.stdout);
+    assert!(
+        stdout.contains("fork/base upstream"),
+        "dry-run should name the fork pin:\n{stdout}"
+    );
+    let spec =
+        fs::read_to_string(catalog.join("packages/fork-base/fork-base.prayspec")).expect("spec");
+    assert!(
+        spec.contains("= 1.4.3"),
+        "dry-run should not write spec:\n{spec}"
+    );
+    let testing = fs::read_to_string(catalog.join("packages/fork-base/exports/testing-basics.md"))
+        .expect("fork export");
+    assert_eq!(testing, "Testing guidance\n");
 }

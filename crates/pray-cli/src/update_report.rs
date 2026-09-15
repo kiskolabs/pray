@@ -124,10 +124,12 @@ pub(crate) fn print_update_json_report(
     updated: &Lockfile,
     selected_package: Option<&str>,
     project: &ResolvedProject,
+    upstream_constraint_updates: &[serde_json::Value],
 ) -> PrayResult<()> {
     let summary = build_update_summary(previous, updated, selected_package, project)?;
     let constraint_blocked_packages = constraint_blocked_packages_json(project)?;
     let status = if manifest_constraint_updates.is_empty()
+        && upstream_constraint_updates.is_empty()
         && summary.updated_packages.is_empty()
         && install_preview.is_none()
         && constraint_blocked_packages.is_empty()
@@ -139,6 +141,7 @@ pub(crate) fn print_update_json_report(
     let mut output = serde_json::json!({
         "status": status,
         "manifest_constraint_updates": manifest_constraint_updates,
+        "upstream_constraint_updates": upstream_constraint_updates,
         "updated_packages": summary.updated_packages,
         "constraint_blocked_packages": constraint_blocked_packages,
     });

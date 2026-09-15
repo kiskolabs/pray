@@ -3,6 +3,8 @@
 ## Unreleased
 
 - Use the current project for a later Ruby or TypeScript install after an earlier in-process command in another directory.
+- Rewrite a path package `spec.upstream` pin with `pray update --latest` when the pin does not admit the latest upstream version, then refresh that tree. `pray update --latest --dry-run` prints the planned pin and does not write.
+- Name the fork, both upstream versions, and every conflicting path when an upstream refresh merge fails.
 
 ## 1.14.0 (2026-09-14)
 

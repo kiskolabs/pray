@@ -108,6 +108,7 @@ pub(crate) fn command_help_text(command: &str) -> Option<&'static str> {
             "refresh package versions within constraints\n\n\
              Usage: pray update [package] [--major] [--latest] [--dry-run] [--json]\n\n\
              --latest adjusts constraints to allow the latest package versions.\n\
+             --latest also rewrites exact spec.upstream pins in path packages, then refreshes those trees.\n\
              --latest --dry-run previews those versions and checks destination conflicts.\n\
              If a destination conflicts, inspect it and move it aside before retrying.\n\
              For files from an older pray, install the original package version first.",

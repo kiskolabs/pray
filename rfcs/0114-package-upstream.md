@@ -37,6 +37,8 @@ pray "fork/base", path: "packages/base"
 
 `pray update` (or `pray update fork/base`) resolves a newer upstream within the constraint. When path content files still match the previously locked upstream tree, pray replaces those files and keeps fork identity in `*.prayspec` (name, fork version, upstream field). When path content differs, pray three-way merges and fails closed on overlap.
 
+`pray update --latest` also rewrites a path fork's `spec.upstream` constraint when that constraint does not admit the latest resolved upstream version, using the same operator family as Prayfile `--latest`. It then refreshes the path tree as `pray update` does. `pray update --latest --dry-run` prints the planned constraint rewrite and does not write the prayspec or path tree.
+
 Consumers of `fork/base` do not fetch `sample/base`.
 
 ## Reference-level explanation
@@ -47,7 +49,7 @@ Key words follow RFC 2119.
 
 Install MUST resolve upstream only when the declaration has `path:`. Remote installs MAY copy name and constraint from the spec as provenance and MUST NOT fetch upstream solely because the field is present.
 
-When resolving a path fork, install MUST pin upstream to the locked version when a lock entry exists and the package is not being updated. `pray update` without a package name, or `pray update` of that fork, MUST resolve upstream from the spec constraint and MAY advance the git source revision (RFC 0020).
+When resolving a path fork, install MUST pin upstream to the locked version when a lock entry exists and the package is not being updated. `pray update` without a package name, or `pray update` of that fork, MUST resolve upstream from the spec constraint and MAY advance the git source revision (RFC 0020). `pray update --latest` MUST resolve the latest upstream version, rewrite `spec.upstream` when the current constraint does not admit it (same operator family as Prayfile `--latest`), then refresh as `pray update` does. `pray update --latest --dry-run` MUST print that planned rewrite and MUST NOT write the prayspec or path tree.
 
 Lock field `package.upstream` is optional. When present it MUST include `name`, `version`, `tree_hash`, and `artifact_hash`. `source` is the source handle used to resolve it.
 
@@ -55,7 +57,7 @@ Identity files are `*.prayspec` under the package root. Update MUST NOT overwrit
 
 A content file is any `spec.files` path that is not identity. Clean replica: every old-upstream content file exists in the path tree with identical bytes, and the path tree has no extra content files. Clean replica MUST replace content files from the new upstream and delete content files that existed only in the old upstream.
 
-Otherwise implementations MUST three-way merge each content path in the union of old upstream, new upstream, and the path tree. Take new when local equals old. Keep local when local equals new or old equals new. Otherwise fail with a resolution error that names the path. Extra local content files stay. A path file that equals old upstream and is absent from new upstream MUST be deleted; if it differs from old, fail.
+Otherwise implementations MUST three-way merge each content path in the union of old upstream, new upstream, and the path tree. Take new when local equals old. Keep local when local equals new or old equals new. Otherwise fail with a resolution error that names the fork package, the previously locked upstream version, the newly resolved upstream version, and every conflicting content path. Extra local content files stay. A path file that equals old upstream and is absent from new upstream MUST be deleted; if it differs from old, fail.
 
 `*.prayspec` is not merged as content.
 
@@ -66,7 +68,7 @@ Otherwise implementations MUST three-way merge each content path in the union of
 
 ## Drawbacks
 
-Catalogs must declare the upstream source. An exact `=` pin does not move until the spec changes or update rewrites that exact pin after a successful refresh.
+Catalogs must declare the upstream source. An exact `=` pin does not move on `pray update`. `pray update --latest` rewrites that pin so the latest version is admitted, then refresh writes `= NEW_VERSION`.
 
 ## Rationale and alternatives
 
@@ -82,4 +84,4 @@ Whether published registry metadata MUST echo upstream. Whether Ruby and TypeScr
 
 ## Future possibilities
 
-`pray update --latest` rewriting a range into a new exact pin. Overlay directories beside the path tree.
+Overlay directories beside the path tree.
