@@ -1,0 +1,14 @@
+{
+  "name": "sample/base",
+  "versions": [
+    {
+      "version": "1.0.0",
+      "artifact": "v1/artifacts/sample/base/1.0.0/sample-base-1.0.0.praypkg",
+      "artifact_hash": "sha256:958f2e84fdfba243ca043ea5b7a818bdf30d4ad2b351d146934ffdba585b1a59",
+      "tree_hash": "sha256:841acb6e504f908c32f05154f14fad8b31b0da1c40cb4ea6425acefdb3a9cbc2",
+      "exports": [
+        "note"
+      ]
+    }
+  ]
+}

@@ -70,7 +70,7 @@ The reference tree also keeps a smaller shared corpus at `testdata/shared/manife
 
 ## Implementation notes
 
-Level 0 parser and prayspec packs under `fixtures/` plus a lockfile parse pack, a path-package resolver pack with a constraint-mismatch reject pack, a compose render pack with a committed dest file, and lock adapter span packs (`inspect_locked_destinations` finding kinds) run in Rust, Ruby, and TypeScript test suites. No git or registry resolver packs yet.
+Level 0 parser and prayspec packs under `fixtures/` plus a lockfile parse pack, path-package, constraint-mismatch, dependency-cycle, git-distribution, registry-distribution, and tarball-package resolver packs, a compose render pack with a committed dest file, and lock adapter span packs (`inspect_locked_destinations` finding kinds) run in Rust, Ruby, and TypeScript test suites. Git, registry, and tarball packs copy the fixture to a temp directory before resolve so `.pray/cache` is not written into `fixtures/`. Compare lock slices (`name`, `version`, `tree_hash`, `exports`) for those packs; path-package also compares `path` and `artifact`. Local tarball resolve works with `offline: true`. RFC 0100 stays Experimental until remaining listed packs exist.
 
 ## Drawbacks
 

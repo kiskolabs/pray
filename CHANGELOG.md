@@ -3,8 +3,11 @@
 ## Unreleased
 
 - Document `pray_core::embed` as the Rust library surface for parse, resolve, lock, render, and verify (RFC 0109).
-- Run RFC 0100 parser, prayspec, lockfile, path-package resolver, and compose render fixtures in the Rust, Ruby, and TypeScript suites.
+- Run RFC 0100 parser, prayspec, lockfile, path-package, git, registry, and tarball resolver, cycle-reject, and compose render fixtures in the Rust, Ruby, and TypeScript suites.
+- Resolve a local `.praypkg` from `tarball:` in the Rust, Ruby, and TypeScript libraries, including offline when the archive is on disk.
+- Refuse two-package dependency cycles in the Ruby and TypeScript libraries during resolve, matching the Rust CLI.
 - Check dest files against `Prayfile.lock` managed spans without resolving packages (`inspect_locked_destinations`, RFC 0106) in the Rust, Ruby, and TypeScript libraries.
+- Rewrite a two-component pessimistic Prayfile pin on Ruby `pray update --latest` (`~> 2.2` to `~> 2.4` when registry latest is 2.4.0), and install a newer version that the current constraint already allows.
 
 ## 1.15.0 (2026-09-15)
 

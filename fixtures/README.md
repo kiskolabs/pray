@@ -23,4 +23,7 @@ Current packs exercised by all three runtimes:
 - `lockfile/minimal` and `lockfile/invalid-toml`
 - `lockfile/span-matching`, `span-edited`, `span-missing-dest`, `span-removed`, `span-orphan`
 - `resolver/path-package` and `resolver/constraint-mismatch`
+- `resolver/dependency-cycle`
+- `resolver/git-distribution` and `resolver/registry-distribution`
+- `resolver/tarball-package`
 - `render/compose-fragment`

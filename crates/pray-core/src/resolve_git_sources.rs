@@ -2,7 +2,7 @@ use crate::lockfile::Lockfile;
 use crate::manifest::{ManifestPackage, ManifestSource};
 use crate::registry::{resolve_local_registry_package_root, RegistryPackageResolution};
 use crate::resolve_context::{PackageResolutionContext, ResolveOptions};
-use crate::resolve_git::{ensure_git_repository, local_git_source_root, resolve_distribution_root};
+use crate::resolve_git::{ensure_git_repository, resolve_distribution_root};
 use crate::{PrayError, PrayResult};
 use std::collections::BTreeMap;
 use std::path::{Path, PathBuf};
@@ -53,8 +53,10 @@ pub(crate) fn prepare_git_sources(
             pinned_revision_for_source(lockfile, source)
         };
         let refresh = options.refresh_source_revisions;
-        if is_local_filesystem_source(clone_url) && local_git_repo_path(clone_url).is_none() {
-            if let Some(source_root) = local_git_source_root(clone_url) {
+        if is_local_filesystem_source(clone_url)
+            && local_git_repo_path(project_root, clone_url).is_none()
+        {
+            if let Some(source_root) = local_git_source_root(project_root, clone_url) {
                 git_sources.insert(
                     source.name.clone(),
                     GitSourceCheckout {
@@ -89,16 +91,32 @@ pub(crate) fn is_local_filesystem_source(clone_url: &str) -> bool {
     clone_url.starts_with("file://") || Path::new(clone_url).is_absolute()
 }
 
-pub(crate) fn local_git_repo_path(clone_url: &str) -> Option<PathBuf> {
-    let path = if let Some(path) = clone_url.strip_prefix("file://") {
-        PathBuf::from(path)
-    } else {
-        PathBuf::from(clone_url)
-    };
+pub(crate) fn local_git_repo_path(project_root: &Path, clone_url: &str) -> Option<PathBuf> {
+    let path = clone_url_filesystem_path(project_root, clone_url);
     if path.join(".git").is_dir() {
         Some(path)
     } else {
         None
+    }
+}
+
+pub(crate) fn local_git_source_root(project_root: &Path, clone_url: &str) -> Option<PathBuf> {
+    let path = clone_url_filesystem_path(project_root, clone_url);
+    if !path.exists() {
+        return None;
+    }
+    crate::resolve_git::discover_distribution_root(&path)
+}
+
+fn clone_url_filesystem_path(project_root: &Path, clone_url: &str) -> PathBuf {
+    let path = clone_url
+        .strip_prefix("file://")
+        .map(PathBuf::from)
+        .unwrap_or_else(|| PathBuf::from(clone_url));
+    if path.is_absolute() {
+        path
+    } else {
+        project_root.join(path)
     }
 }
 
@@ -156,7 +174,7 @@ pub(crate) fn resolve_git_package_root(
             )
         });
     }
-    if let Some(source_root) = local_git_source_root(clone_url) {
+    if let Some(source_root) = local_git_source_root(project_root, clone_url) {
         return resolve_local_registry_package_root(
             project_root,
             clone_url,
@@ -179,7 +197,9 @@ pub fn refresh_git_sources(manifest_path: &Path) -> PrayResult<()> {
             continue;
         }
         let clone_url = source.url.strip_prefix("git+").unwrap_or(&source.url);
-        if is_local_filesystem_source(clone_url) && local_git_repo_path(clone_url).is_none() {
+        if is_local_filesystem_source(clone_url)
+            && local_git_repo_path(&project_root, clone_url).is_none()
+        {
             continue;
         }
         let _ = ensure_git_repository(

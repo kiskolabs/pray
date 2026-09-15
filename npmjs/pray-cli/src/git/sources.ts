@@ -1,11 +1,23 @@
 import { spawnSync } from "node:child_process";
 import { existsSync, mkdirSync, rmSync } from "node:fs";
 import { homedir } from "node:os";
-import { isAbsolute, join } from "node:path";
+import { join } from "node:path";
 import { PrayError } from "../errors.js";
 import { sha256Hex } from "../hashing.js";
 import type { Lockfile } from "../lockfile/types.js";
 import type { ManifestSource } from "../manifest/types.js";
+import {
+  isLocalFilesystemSource,
+  localGitRepoPath,
+  localGitSourceRoot,
+} from "./local-root.js";
+
+export {
+  discoverDistributionRoot,
+  localDistributionRoot,
+  resolveDistributionRoot,
+} from "./distribution-root.js";
+export { localGitSourceRoot } from "./local-root.js";
 
 export interface GitSourceCheckout {
   cacheDirectory: string;
@@ -25,8 +37,11 @@ export function prepareGitSources(
       continue;
     }
     const cloneUrl = source.url.replace(/^git\+/, "");
-    if (isLocalFilesystemSource(cloneUrl) && !localGitRepoPath(cloneUrl)) {
-      const sourceRoot = localGitSourceRoot(cloneUrl);
+    if (
+      isLocalFilesystemSource(cloneUrl) &&
+      !localGitRepoPath(projectRoot, cloneUrl)
+    ) {
+      const sourceRoot = localGitSourceRoot(projectRoot, cloneUrl);
       if (sourceRoot) {
         checkouts.set(source.name, {
           cacheDirectory: sourceRoot,
@@ -53,54 +68,6 @@ export function prepareGitSources(
     });
   }
   return checkouts;
-}
-
-export function resolveDistributionRoot(
-  repositoryRoot: string,
-  subdir?: string,
-): string {
-  if (subdir) {
-    const path = join(repositoryRoot, subdir);
-    if (localDistributionRoot(path)) {
-      return path;
-    }
-    throw PrayError.resolution(
-      `no pray distribution root at subdir ${path} in git source ${repositoryRoot}`,
-    );
-  }
-  const discovered = discoverDistributionRoot(repositoryRoot);
-  if (discovered) {
-    return discovered;
-  }
-  throw PrayError.resolution(
-    `no pray distribution root in git source ${repositoryRoot}. ` +
-      "Expected v1/packages at the repository root or under prayers/.",
-  );
-}
-
-export function discoverDistributionRoot(path: string): string | undefined {
-  if (localDistributionRoot(path)) {
-    return path;
-  }
-  const prayersRoot = join(path, "prayers");
-  if (localDistributionRoot(prayersRoot)) {
-    return prayersRoot;
-  }
-  return undefined;
-}
-
-export function localDistributionRoot(path: string): boolean {
-  return existsSync(join(path, "v1", "packages"));
-}
-
-export function localGitSourceRoot(cloneUrl: string): string | undefined {
-  const path = cloneUrl.startsWith("file://")
-    ? cloneUrl.slice("file://".length)
-    : cloneUrl;
-  if (!existsSync(path)) {
-    return undefined;
-  }
-  return discoverDistributionRoot(path);
 }
 
 export function gitSourceCacheDirectory(
@@ -169,17 +136,6 @@ function pinnedRevisionForSource(
     return source.rev ?? source.tag;
   }
   return undefined;
-}
-
-function isLocalFilesystemSource(cloneUrl: string): boolean {
-  return cloneUrl.startsWith("file://") || isAbsolute(cloneUrl);
-}
-
-function localGitRepoPath(cloneUrl: string): string | undefined {
-  const path = cloneUrl.startsWith("file://")
-    ? cloneUrl.slice("file://".length)
-    : cloneUrl;
-  return existsSync(join(path, ".git")) ? path : undefined;
 }
 
 function cacheKey(text: string): string {

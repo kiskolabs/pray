@@ -15,5 +15,12 @@ module Pray
     )
       super
     end
+
+    def preferred_lock_version(lockfile, package_name)
+      return nil unless lockfile
+      return nil if ignore_locked_versions || unlocked_packages.include?(package_name)
+
+      lockfile.package.find { |entry| entry.name == package_name }&.version
+    end
   end
 end

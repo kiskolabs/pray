@@ -1,0 +1,14 @@
+Package::Specification.new do |spec|
+  spec.name = "sample/alpha"
+  spec.version = "1.0.0"
+  spec.summary = "alpha"
+  spec.files = ["exports/alpha.md"]
+  spec.exports = {
+    "alpha" => {
+      type: "fragment",
+      path: "exports/alpha.md",
+      summary: "alpha"
+    }
+  }
+  spec.add_dependency "sample/beta", "~> 1.0"
+end

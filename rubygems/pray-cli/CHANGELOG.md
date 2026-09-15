@@ -1,5 +1,9 @@
 # CHANGELOG
 
+## Unreleased
+
+- Rewrite a two-component pessimistic Prayfile pin on `pray update --latest` (`~> 2.2` to `~> 2.4` when registry latest is 2.4.0), matching the Rust and TypeScript CLIs. Install a newer version that the current constraint already allows.
+
 ## 1.15.0 (2026-09-15)
 
 - Refresh path-fork trees with `pray update` (RFC 0114). Rewrite `spec.upstream` pins with `pray update --latest` when the pin does not admit the latest upstream version. Rewrite Prayfile constraints with `pray update --latest` when they do not admit the registry latest version. `pray update --latest --dry-run` prints the planned rewrite and does not write.

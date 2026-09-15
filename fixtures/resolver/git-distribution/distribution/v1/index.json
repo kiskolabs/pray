@@ -1,0 +1,6 @@
+{
+  "spec": "pray-index-v1",
+  "packages": [
+    "sample/base"
+  ]
+}

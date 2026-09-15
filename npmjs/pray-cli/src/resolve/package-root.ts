@@ -7,14 +7,17 @@ import {
   localGitSourceRoot,
   resolveDistributionRoot,
 } from "../git/sources.js";
+import { isLocalSourceUrl } from "../http/client.js";
 import type { Lockfile } from "../lockfile/types.js";
 import type { ManifestPackage, ManifestSource } from "../manifest/types.js";
 import {
   resolveLocalRegistryPackageRoot,
   resolveRegistryPackageRoot,
 } from "../registry/index.js";
+import { localRegistryRoot } from "../registry/local-root.js";
 import { lockfilePreferredVersion, type ResolveOptions } from "./context.js";
 import { annotateMissingGitCatalog } from "./git-refresh.js";
+import { resolveTarballPackageRoot } from "./tarball.js";
 
 export interface PackageRootResolution {
   root: string;
@@ -32,6 +35,16 @@ export async function resolvePackageRoot(
 ): Promise<PackageRootResolution> {
   if (declaration.path) {
     return { root: resolve(projectRoot, declaration.path) };
+  }
+
+  if (declaration.tarball) {
+    return {
+      root: await resolveTarballPackageRoot(
+        projectRoot,
+        declaration.tarball,
+        options,
+      ),
+    };
   }
 
   const sourceName = impliedSourceName(declaration, sources);
@@ -57,12 +70,20 @@ export async function resolvePackageRoot(
     }
 
     if (source.kind === "registry" || source.kind === "static index") {
-      const resolved = await resolveRegistryPackageRoot(
-        projectRoot,
-        source.url,
-        declaration,
-        registryOptions,
-      );
+      const resolved = isLocalSourceUrl(source.url)
+        ? await resolveLocalRegistryPackageRoot(
+            projectRoot,
+            source.url,
+            localRegistryRoot(projectRoot, source.url),
+            declaration,
+            registryOptions,
+          )
+        : await resolveRegistryPackageRoot(
+            projectRoot,
+            source.url,
+            declaration,
+            registryOptions,
+          );
       return {
         root: resolved.root,
         signerFingerprint: resolved.signerFingerprint,
@@ -119,7 +140,7 @@ export async function resolvePackageRoot(
     );
   }
 
-  if (declaration.git || declaration.tarball || declaration.oci) {
+  if (declaration.git || declaration.oci) {
     throw PrayError.unsupported(
       "remote package sources are not implemented yet",
     );

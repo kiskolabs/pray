@@ -98,6 +98,8 @@ module Pray
       end
       raise Error.resolution(local_errors.join("\n")) unless local_errors.empty?
 
+      ResolveDeps.reject_dependency_cycles(packages)
+
       ResolvedProject.new(
         manifest_path: manifest_path,
         project_root: project_root,
@@ -152,7 +154,7 @@ module Pray
     def resolve_package(project_root, sources, git_sources, user_config, declaration, lockfile, offline: false, options: nil)
       options ||= ResolveOptions.new(offline: offline)
       root, registry_latest_version = resolve_package_root_with_metadata(
-        project_root, sources, git_sources, user_config, declaration, lockfile, offline: options.offline
+        project_root, sources, git_sources, user_config, declaration, lockfile, options
       )
       spec_path = find_prayspec_file(root)
       spec_text = File.read(spec_path)
@@ -194,12 +196,16 @@ module Pray
     end
 
     def resolve_package_root_with_metadata(
-      project_root, sources, git_sources, user_config, declaration, lockfile, offline: false
+      project_root, sources, git_sources, user_config, declaration, lockfile, options = nil
     )
+      options ||= ResolveOptions.new
+      offline = options.offline
+      preferred_version = options.preferred_lock_version(lockfile, declaration.name)
       if (local_path = user_config.local.package[declaration.name])
         return [File.expand_path(local_path, project_root), nil]
       end
       return [File.expand_path(declaration.path, project_root), nil] if declaration.path
+      return [ResolveTarball.package_root(project_root, declaration.tarball, offline: offline), nil] if declaration.tarball
       source_name = ResolveSource.implied_source_name(declaration, sources)
       if source_name
         source = sources[source_name]
@@ -212,7 +218,7 @@ module Pray
             "local:#{source_name}",
             source_root,
             declaration,
-            preferred_version: lockfile_preferred_version(lockfile, declaration.name),
+            preferred_version: preferred_version,
             offline: offline
           )
           return [resolved.root, resolved.registry_latest_version]
@@ -226,7 +232,7 @@ module Pray
             project_root,
             source.url,
             declaration,
-            preferred_version: lockfile_preferred_version(lockfile, declaration.name),
+            preferred_version: preferred_version,
             offline: offline
           )
           return [resolved.root, resolved.registry_latest_version]
@@ -245,7 +251,7 @@ module Pray
               source_key,
               distribution_root,
               declaration,
-              preferred_version: lockfile_preferred_version(lockfile, declaration.name),
+              preferred_version: preferred_version,
               offline: offline
             )
           rescue Error => error
@@ -262,21 +268,13 @@ module Pray
         end
       end
 
-      if declaration.git || declaration.tarball || declaration.oci
-        raise Error.unsupported("remote sources are not implemented yet")
-      end
+      raise Error.unsupported("remote sources are not implemented yet") if declaration.git || declaration.oci
 
       [File.join(project_root, declaration.name.tr("/", "-")), nil]
     end
 
     def resolve_package_root(project_root, sources, git_sources, user_config, declaration, lockfile = nil)
       resolve_package_root_with_metadata(project_root, sources, git_sources, user_config, declaration, lockfile).first
-    end
-
-    def lockfile_preferred_version(lockfile, package_name)
-      return nil unless lockfile
-
-      lockfile.package.find { |entry| entry.name == package_name }&.version
     end
 
     def resolve_local_file(project_root, declaration)

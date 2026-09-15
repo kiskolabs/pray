@@ -17,13 +17,26 @@ module Pray
     end
 
     def version_satisfies(version, constraint)
+      parts = constraint.to_s.split(",").map(&:strip).reject(&:empty?)
+      return true if parts.empty?
+
+      parsed = Gem::Version.new(version)
+      parts.all? { |part| version_satisfies_one(parsed, part) }
+    rescue ArgumentError => error
+      raise Error.resolution(error.message)
+    end
+
+    def version_satisfies_one(version, constraint)
       normalized = normalize_version_constraint(constraint)
       return true if normalized.empty? || normalized == "*"
 
-      requirement = Gem::Requirement.new(normalized.strip)
-      requirement.satisfied_by?(Gem::Version.new(version))
-    rescue ArgumentError => error
-      raise Error.resolution(error.message)
+      requirement_text = if normalized.lstrip.start_with?("~>")
+        ruby_pessimistic_to_semver(normalized)
+      else
+        normalized.strip
+      end
+      clauses = requirement_text.split(",").map(&:strip).reject(&:empty?)
+      Gem::Requirement.new(*clauses).satisfied_by?(version)
     end
 
     def pessimistic_constraint_for_version(version)

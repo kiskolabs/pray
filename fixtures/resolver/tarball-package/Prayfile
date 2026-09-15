@@ -1,0 +1,4 @@
+prayfile "1"
+compose "INSTRUCTIONS.md" do
+  pray "sample/base", "~> 1.0", tarball: "packages/sample-base-1.0.0.praypkg"
+end

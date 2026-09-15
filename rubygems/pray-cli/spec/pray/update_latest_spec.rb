@@ -24,7 +24,7 @@ RSpec.describe "pray update --latest" do
   end
 
   it "rewrites a Prayfile constraint that does not admit the registry latest" do
-    consumer = consumer_after_major_publish
+    consumer = consumer_after_published_version("2.0.0")
 
     expect { Dir.chdir(consumer) { Pray::CLI.run(["update", "--latest"]) } }
       .to output(/Prayfile: sample\/base constraint ~> 1.4 -> ~> 2.0/).to_stdout
@@ -33,8 +33,28 @@ RSpec.describe "pray update --latest" do
     expect(File.read(File.join(consumer, "Prayfile.lock"))).to include("2.0.0")
   end
 
+  it "rewrites a two-component pessimistic constraint to the registry latest minor" do
+    consumer = consumer_after_published_version("1.5.0")
+
+    expect { Dir.chdir(consumer) { Pray::CLI.run(["update", "--latest"]) } }
+      .to output(/Prayfile: sample\/base constraint ~> 1.4 -> ~> 1.5/).to_stdout
+
+    expect(File.read(File.join(consumer, "Prayfile"))).to include("~> 1.5")
+    expect(File.read(File.join(consumer, "Prayfile.lock"))).to include("1.5.0")
+  end
+
+  it "installs a newer patch when the current constraint already admits it" do
+    consumer = consumer_after_published_version("1.4.4")
+
+    expect { Dir.chdir(consumer) { Pray::CLI.run(["update", "--latest"]) } }
+      .to output(/All package constraints already allow latest versions/).to_stdout
+
+    expect(File.read(File.join(consumer, "Prayfile"))).to include("~> 1.4")
+    expect(File.read(File.join(consumer, "Prayfile.lock"))).to include("1.4.4")
+  end
+
   it "does not write Prayfile on --latest --dry-run" do
-    consumer = consumer_after_major_publish
+    consumer = consumer_after_published_version("2.0.0")
     original = File.read(File.join(consumer, "Prayfile"))
     lockfile = File.read(File.join(consumer, "Prayfile.lock"))
 
@@ -45,7 +65,7 @@ RSpec.describe "pray update --latest" do
     expect(File.read(File.join(consumer, "Prayfile.lock"))).to eq(lockfile)
   end
 
-  def consumer_after_major_publish
+  def consumer_after_published_version(version)
     source_repo = File.join(workspace, "source")
     distribution_repo = File.join(workspace, "distribution")
     prayers_root = File.join(distribution_repo, "prayers")
@@ -61,10 +81,10 @@ RSpec.describe "pray update --latest" do
     Dir.chdir(consumer_repo) { Pray::CLI.run(["install"]) }
     expect(File.read(File.join(consumer_repo, "Prayfile.lock"))).to include("1.4.3")
 
-    rewrite_base_version(source_repo, "2.0.0")
+    rewrite_base_version(source_repo, version)
     Dir.chdir(source_repo) { Pray::CLI.run(["publish", "--root", prayers_root]) }
     GitDistributionFixture.run_git(distribution_repo, "add", "-A")
-    GitDistributionFixture.run_git(distribution_repo, "commit", "-m", "publish major version")
+    GitDistributionFixture.run_git(distribution_repo, "commit", "-m", "publish #{version}")
     consumer_repo
   end
 

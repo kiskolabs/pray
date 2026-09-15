@@ -16,8 +16,8 @@ module Pray
         next unless source.kind == "git"
 
         clone_url = source.url.delete_prefix("git+")
-        if local_filesystem_source?(clone_url) && !local_git_repo_path(clone_url)
-          source_root = local_git_source_root(clone_url)
+        if local_filesystem_source?(clone_url) && !local_git_repo_path(project_root, clone_url)
+          source_root = local_git_source_root(project_root, clone_url)
           if source_root
             checkouts[source.name] = GitSourceCheckout.new(
               cache_directory: source_root,
@@ -76,12 +76,8 @@ module Pray
       File.directory?(File.join(path, "v1", "packages"))
     end
 
-    def local_git_source_root(clone_url)
-      path = if clone_url.start_with?("file://")
-        clone_url.delete_prefix("file://")
-      else
-        clone_url
-      end
+    def local_git_source_root(project_root, clone_url)
+      path = clone_url_filesystem_path(project_root, clone_url)
       return nil unless File.exist?(path)
 
       discover_distribution_root(path)
@@ -136,10 +132,15 @@ module Pray
       clone_url.start_with?("file://") || Pathname.new(clone_url).absolute?
     end
 
-    def local_git_repo_path(clone_url)
-      path = clone_url.delete_prefix("file://")
+    def local_git_repo_path(project_root, clone_url)
+      path = clone_url_filesystem_path(project_root, clone_url)
       git_directory = File.join(path, ".git")
       File.directory?(git_directory) ? path : nil
+    end
+
+    def clone_url_filesystem_path(project_root, clone_url)
+      path = clone_url.delete_prefix("file://")
+      Pathname.new(path).absolute? ? path : File.expand_path(path, project_root)
     end
 
     def global_cache_root

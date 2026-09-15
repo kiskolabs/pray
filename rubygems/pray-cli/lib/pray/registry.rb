@@ -8,6 +8,7 @@ require "pathname"
 require "time"
 require_relative "path_safety"
 require_relative "http_body"
+require_relative "registry_paths"
 
 module Pray
   RegistryPackageVersion = Struct.new(
@@ -40,6 +41,17 @@ module Pray
     module_function
 
     def resolve_registry_package_root(project_root, source_url, declaration, preferred_version: nil, offline: false)
+      if local_source?(source_url)
+        return resolve_local_registry_package_root(
+          project_root,
+          source_url,
+          RegistryPaths.local_registry_root(project_root, source_url),
+          declaration,
+          preferred_version: preferred_version,
+          offline: offline
+        )
+      end
+
       metadata = fetch_package_metadata(source_url, declaration.name)
       registry_latest_version = registry_latest_version_label(metadata)
       selected = select_package_version(metadata, declaration.constraint, preferred_version)

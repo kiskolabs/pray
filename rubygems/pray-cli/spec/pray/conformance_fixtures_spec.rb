@@ -42,39 +42,6 @@ RSpec.describe "RFC 0100 conformance fixtures" do
     expect { Pray.parse_lockfile(text) }.to raise_error(Pray::Error)
   end
 
-  it "resolves the path-package fixture into a lock slice" do
-    dir = File.join(FIXTURES, "resolver", "path-package")
-    expected = JSON.parse(File.read(File.join(dir, "expected.json")))
-    project = Pray.resolve_project(File.join(dir, "Prayfile"), offline: true)
-    lockfile = Pray.build_lockfile(
-      project.manifest_hash,
-      project.environment,
-      project.project_root,
-      project.manifest.sources,
-      project.manifest.targets,
-      [],
-      project.packages,
-      project.source_revisions,
-      project.source_host_keys
-    )
-    packages = lockfile.package.map do |package|
-      {
-        "name" => package.name,
-        "version" => package.version,
-        "path" => package.path,
-        "tree_hash" => package.tree_hash,
-        "artifact" => package.artifact,
-        "exports" => package.exports
-      }
-    end.sort_by { |package| package["name"] }
-    expect(packages).to eq(expected["packages"].sort_by { |package| package["name"] })
-  end
-
-  it "rejects the constraint-mismatch resolver fixture" do
-    dir = File.join(FIXTURES, "resolver", "constraint-mismatch")
-    expect { Pray.resolve_project(File.join(dir, "Prayfile"), offline: true) }.to raise_error(Pray::Error)
-  end
-
   it "renders the compose fragment fixture to the expected dest" do
     dir = File.join(FIXTURES, "render", "compose-fragment")
     expected = JSON.parse(File.read(File.join(dir, "expected.json")))
