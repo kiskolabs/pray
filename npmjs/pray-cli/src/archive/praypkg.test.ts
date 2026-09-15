@@ -27,6 +27,25 @@ describe("praypkg extraction", () => {
     }
   });
 
+  it("rejects aliased duplicate archive paths", () => {
+    const output = mkdtempSync(join(tmpdir(), "pray-archive-alias-"));
+    const tarBytes = Buffer.concat([
+      tarEntry("./rules.md", Buffer.from("first\n")),
+      tarEntry("rules.md", Buffer.from("second\n")),
+      Buffer.alloc(1024),
+    ]);
+    const compressed = spawnSync("zstd", ["-q", "-c"], { input: tarBytes });
+    try {
+      assert.throws(
+        () => unpackPraypkg(compressed.stdout, output),
+        (error: unknown) =>
+          error instanceof PrayError && error.message.includes("duplicate"),
+      );
+    } finally {
+      rmSync(output, { recursive: true, force: true });
+    }
+  });
+
   it("rejects parent directory escape paths and invalid checksums", () => {
     const output = mkdtempSync(join(tmpdir(), "pray-archive-escape-"));
     try {

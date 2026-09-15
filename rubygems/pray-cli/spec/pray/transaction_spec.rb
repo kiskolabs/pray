@@ -74,4 +74,18 @@ RSpec.describe "project write recovery" do
       expect(File.read(path)).to eq("original")
     end
   end
+
+  it "rolls back a deleted content file" do
+    Dir.mktmpdir("pray-transaction-delete-") do |root|
+      path = File.join(root, "removed.md")
+      File.write(path, "old\n")
+      expect do
+        Pray::Transaction.run(root) do
+          Pray::Transaction.remove_file(path)
+          raise "later failure"
+        end
+      end.to raise_error(/later failure/)
+      expect(File.read(path)).to eq("old\n")
+    end
+  end
 end

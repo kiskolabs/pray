@@ -108,6 +108,16 @@ RSpec.describe Pray::Archive do
       end.to raise_error(Pray::Error, /duplicate/)
     end
 
+    it "rejects aliased duplicate archive paths" do
+      tar_bytes = ustar_entry("./rules.md", "first\n") +
+        ustar_entry("rules.md", "second\n") + ("\0" * 1024)
+      artifact_bytes = zstd_bytes(tar_bytes)
+
+      expect do
+        described_class.unpack_praypkg(artifact_bytes, File.join(workspace, "alias-out"))
+      end.to raise_error(Pray::Error, /duplicate/)
+    end
+
     it "skips AppleDouble sidecar members" do
       tar_bytes = ustar_entry("demo.prayspec", "ok\n") +
         ustar_entry("._demo.prayspec", "sidecar\n") + ("\0" * 1024)
@@ -127,6 +137,28 @@ RSpec.describe Pray::Archive do
       expect do
         described_class.unpack_praypkg(oversized, output_directory)
       end.to raise_error(Pray::Error, /exceeds/)
+    end
+  end
+
+  describe ".build_package_archive_bytes" do
+    it "packs when spec.files lists the package spec" do
+      spec.files = ["demo.prayspec", "rules.md"]
+      package.spec = spec
+      expect { described_class.build_package_archive_bytes(package) }.not_to raise_error
+    end
+
+    it "rejects duplicate spec.files paths" do
+      spec.files = ["rules.md", "rules.md"]
+      package.spec = spec
+      expect { described_class.build_package_archive_bytes(package) }
+        .to raise_error(Pray::Error, /duplicate package archive path/)
+    end
+
+    it "rejects aliased spec.files paths" do
+      spec.files = ["./rules.md", "rules.md"]
+      package.spec = spec
+      expect { described_class.build_package_archive_bytes(package) }
+        .to raise_error(Pray::Error, /duplicate package archive path/)
     end
   end
 

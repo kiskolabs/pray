@@ -1,6 +1,9 @@
-use pray_core::derived_metadata::derive_registry_derived_metadata_from_root;
+use pray_core::derived_metadata::{
+    derive_registry_derived_metadata_from_archive_bytes, derive_registry_derived_metadata_from_root,
+};
 use pray_core::package_spec::parse_package_spec;
 use std::fs;
+use std::io::Write;
 use std::path::PathBuf;
 use std::time::{SystemTime, UNIX_EPOCH};
 
@@ -55,6 +58,78 @@ end
     assert_eq!(derived.embeddings.len(), 1);
     assert_eq!(derived.embeddings[0].model, "pray-hash-bucket-v1");
     assert_eq!(derived.embeddings[0].vector.len(), 16);
+}
+
+#[test]
+fn derives_metadata_from_unique_archive_members() {
+    let spec = sample_package_spec();
+    let artifact = pack_praypkg(&[
+        ("package.prayspec", spec.as_bytes()),
+        ("README.md", b"package readme\n"),
+        ("exports/testing-basics.md", b"Testing guidance\n"),
+    ]);
+    let derived = derive_registry_derived_metadata_from_archive_bytes(&artifact)
+        .expect("derive from unique archive");
+    assert_eq!(derived.file_count, Some(2));
+}
+
+#[test]
+fn refuses_derived_metadata_when_archive_repeats_a_path() {
+    let spec = sample_package_spec();
+    let artifact = pack_praypkg(&[
+        ("package.prayspec", spec.as_bytes()),
+        ("package.prayspec", spec.as_bytes()),
+        ("README.md", b"package readme\n"),
+        ("exports/testing-basics.md", b"Testing guidance\n"),
+    ]);
+    let error = derive_registry_derived_metadata_from_archive_bytes(&artifact)
+        .expect_err("duplicate archive path");
+    assert!(
+        error.to_string().contains("duplicate package archive path"),
+        "unexpected error: {error}"
+    );
+}
+
+fn sample_package_spec() -> &'static str {
+    r#"
+Package::Specification.new do |spec|
+  spec.name = "sample/base"
+  spec.version = "1.4.3"
+  spec.summary = "shared guidance"
+  spec.files = ["README.md", "exports/testing-basics.md"]
+  spec.exports = {
+    "testing-basics" => {
+      type: "fragment",
+      path: "exports/testing-basics.md",
+      summary: "Testing guidance"
+    }
+  }
+end
+"#
+}
+
+fn pack_praypkg(entries: &[(&str, &[u8])]) -> Vec<u8> {
+    let mut tar_bytes = Vec::new();
+    {
+        let mut builder = tar::Builder::new(&mut tar_bytes);
+        for (path, contents) in entries {
+            let mut header = tar::Header::new_gnu();
+            header.set_size(contents.len() as u64);
+            header.set_mode(0o644);
+            header.set_cksum();
+            builder
+                .append_data(&mut header, path, *contents)
+                .expect("append tar entry");
+        }
+        builder.finish().expect("finish tar");
+    }
+    let mut encoded = Vec::new();
+    {
+        let mut encoder = zstd::stream::write::Encoder::new(&mut encoded, 0).expect("zstd");
+        encoder.write_all(&tar_bytes).expect("write zstd");
+        encoder.finish().expect("finish zstd");
+    }
+    encoded
 }
 
 fn unique_temp_dir(prefix: &str) -> PathBuf {

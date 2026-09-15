@@ -4,6 +4,7 @@ import {
   fchmodSync,
   mkdirSync,
   openSync,
+  unlinkSync,
   writeFileSync,
 } from "node:fs";
 import { join, resolve } from "node:path";
@@ -87,4 +88,13 @@ export function writeProjectFile(path: string, bytes: string | Buffer): void {
     return;
   }
   journal.replace(path, snapshot(path), Buffer.from(bytes));
+}
+
+export function removeProjectFile(path: string): void {
+  const journal = active.getStore();
+  if (!journal) {
+    unlinkSync(path);
+    return;
+  }
+  journal.replace(path, snapshot(path), undefined);
 }

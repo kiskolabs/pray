@@ -1,4 +1,6 @@
+use crate::archive_members::append_unique_archive_file;
 use pray_core::{PrayError, PrayResult};
+use std::collections::BTreeSet;
 use std::fs;
 use std::io::Write;
 use std::path::{Path, PathBuf};
@@ -64,23 +66,39 @@ pub(crate) fn build_package_archive_bytes(
     package: &pray_core::resolve::ResolvedPackage,
 ) -> PrayResult<Vec<u8>> {
     let metadata = package_metadata(package)?;
+    let prayspec_path = find_prayspec_file(&package.root)?;
+    let prayspec_name = prayspec_path
+        .file_name()
+        .ok_or_else(|| PrayError::Integrity("missing prayspec filename".to_string()))?;
+    let prayspec_member = Path::new(prayspec_name);
+    let prayspec_bytes = fs::read(&prayspec_path)?;
     let mut tar_bytes = Vec::new();
     {
         let mut archive = tar::Builder::new(&mut tar_bytes);
-        append_archive_file(
+        let mut written_paths = BTreeSet::new();
+        append_unique_archive_file(
             &mut archive,
+            &mut written_paths,
             Path::new("metadata.json"),
             metadata.as_bytes(),
+            prayspec_member,
         )?;
-        let prayspec_path = find_prayspec_file(&package.root)?;
-        let prayspec_name = prayspec_path
-            .file_name()
-            .ok_or_else(|| PrayError::Integrity("missing prayspec filename".to_string()))?;
-        let prayspec_bytes = fs::read(&prayspec_path)?;
-        append_archive_file(&mut archive, Path::new(prayspec_name), &prayspec_bytes)?;
+        append_unique_archive_file(
+            &mut archive,
+            &mut written_paths,
+            prayspec_member,
+            &prayspec_bytes,
+            prayspec_member,
+        )?;
         for file in &package.spec.files {
             let content = read_package_file_bytes(&package.root, file)?;
-            append_archive_file(&mut archive, Path::new(file), &content)?;
+            append_unique_archive_file(
+                &mut archive,
+                &mut written_paths,
+                Path::new(file),
+                &content,
+                prayspec_member,
+            )?;
         }
         archive.finish()?;
     }
@@ -112,22 +130,6 @@ pub(crate) fn package_metadata(
             .collect::<Vec<_>>(),
     }))
     .map_err(|error| PrayError::Manifest(error.to_string()))
-}
-
-pub(crate) fn append_archive_file(
-    archive: &mut tar::Builder<&mut Vec<u8>>,
-    path: &Path,
-    contents: &[u8],
-) -> PrayResult<()> {
-    let mut header = tar::Header::new_gnu();
-    header.set_size(contents.len() as u64);
-    header.set_mode(0o644);
-    header.set_mtime(0);
-    header.set_uid(0);
-    header.set_gid(0);
-    header.set_cksum();
-    archive.append_data(&mut header, path, contents)?;
-    Ok(())
 }
 
 pub(crate) fn read_package_file_bytes(

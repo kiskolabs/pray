@@ -2,9 +2,11 @@
 
 ## Unreleased
 
-- Use the current project for a later Ruby or TypeScript install after an earlier in-process command in another directory.
-- Rewrite a path package `spec.upstream` pin with `pray update --latest` when the pin does not admit the latest upstream version, then refresh that tree. `pray update --latest --dry-run` prints the planned pin and does not write.
+- Refresh path-fork trees with `pray update` in the Rust, Ruby, and TypeScript CLIs (RFC 0114).
+- Rewrite a path package `spec.upstream` pin with `pray update --latest` when the pin does not admit the latest upstream version, then refresh that tree. `pray update --latest --dry-run` prints the planned pin and does not write. The Ruby CLI still rejects `--json` and `--major` on update.
 - Name the fork, both upstream versions, and every conflicting path when an upstream refresh merge fails.
+- Keep a listed package spec in `spec.files` when packing; refuse a repeated or aliased content path in the package archive.
+- Use the current project for a later Ruby or TypeScript install after an earlier in-process command in another directory.
 
 ## 1.14.0 (2026-09-14)
 

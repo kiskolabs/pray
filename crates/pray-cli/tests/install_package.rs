@@ -72,6 +72,73 @@ fn package_builds_a_tar_zst_archive_from_package_contents() {
 }
 
 #[test]
+fn package_packs_when_spec_files_lists_the_package_spec() {
+    let repo = temporary_directory("pray-package-listed-spec");
+    create_add_fixture(&repo);
+    rewrite_base_spec_files(
+        &repo,
+        r#"["sample-base.prayspec", "README.md", "exports/testing-basics.md"]"#,
+    );
+
+    let add = run_pray(&repo, &["add", "sample/base", "--path", "packages/base"]);
+    assert_success(&add, "add");
+
+    let package = run_pray(&repo, &["package"]);
+    assert_success(&package, "package listed spec");
+    assert!(repo.join("sample-base-1.4.3.praypkg").is_file());
+}
+
+#[test]
+fn package_refuses_duplicate_spec_files_paths() {
+    let repo = temporary_directory("pray-package-duplicate-files");
+    create_add_fixture(&repo);
+    rewrite_base_spec_files(
+        &repo,
+        r#"["README.md", "README.md", "exports/testing-basics.md"]"#,
+    );
+
+    let add = run_pray(&repo, &["add", "sample/base", "--path", "packages/base"]);
+    assert_success(&add, "add");
+
+    let package = run_pray(&repo, &["package"]);
+    assert!(
+        !package.status.success(),
+        "package should refuse a repeated path"
+    );
+    assert_eq!(package.status.code(), Some(4));
+    let stderr = String::from_utf8_lossy(&package.stderr);
+    assert!(
+        stderr.contains("duplicate package archive path") && stderr.contains("README.md"),
+        "unexpected stderr: {stderr}"
+    );
+}
+
+#[test]
+fn package_refuses_aliased_spec_files_paths() {
+    let repo = temporary_directory("pray-package-aliased-files");
+    create_add_fixture(&repo);
+    rewrite_base_spec_files(
+        &repo,
+        r#"["./README.md", "README.md", "exports/testing-basics.md"]"#,
+    );
+
+    let add = run_pray(&repo, &["add", "sample/base", "--path", "packages/base"]);
+    assert_success(&add, "add");
+
+    let package = run_pray(&repo, &["package"]);
+    assert!(
+        !package.status.success(),
+        "package should refuse aliased paths"
+    );
+    assert_eq!(package.status.code(), Some(4));
+    let stderr = String::from_utf8_lossy(&package.stderr);
+    assert!(
+        stderr.contains("duplicate package archive path") && stderr.contains("README.md"),
+        "unexpected stderr: {stderr}"
+    );
+}
+
+#[test]
 fn vendor_copies_package_contents_into_pray_vendor() {
     let repo = temporary_directory("pray-vendor");
     create_add_fixture(&repo);
@@ -203,4 +270,18 @@ render mode: :managed, conflict: :fail, churn: :minimal
         String::from_utf8_lossy(&offline.stderr)
     );
     assert!(consumer_repo.join("INSTRUCTIONS.md").is_file());
+}
+
+fn rewrite_base_spec_files(repo: &Path, files_literal: &str) {
+    let spec_path = repo.join("packages/base/sample-base.prayspec");
+    let original = fs::read_to_string(&spec_path).expect("read prayspec");
+    let rewritten = original.replace(
+        r#"spec.files = ["README.md", "exports/testing-basics.md"]"#,
+        &format!("spec.files = {files_literal}"),
+    );
+    assert_ne!(
+        rewritten, original,
+        "fixture spec.files assignment must match"
+    );
+    fs::write(spec_path, rewritten).expect("rewrite prayspec");
 }

@@ -13,7 +13,9 @@ module Pray
       frozen: false,
       locked: false,
       offline: false,
-      refresh: false
+      refresh: false,
+      ignore_locked_versions: false,
+      unlocked_packages: nil
     )
       context = Invocation.invocation_context
       manifest_path = File.expand_path(manifest_path || context.manifest_path)
@@ -25,6 +27,9 @@ module Pray
       options = ResolveOptions.new(
         offline: offline,
         refresh: refresh,
+        refresh_source_revisions: refresh,
+        ignore_locked_versions: ignore_locked_versions,
+        unlocked_packages: unlocked_packages ? Set.new(unlocked_packages) : Set.new,
         environment: context.environment
       )
       allow_git_refresh_fallback = !locked && !frozen

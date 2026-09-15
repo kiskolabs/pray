@@ -8,28 +8,6 @@ import type { ResolvedPackage } from "./types.js";
 
 type ResolveNamed = (declaration: ManifestPackage) => Promise<ResolvedPackage>;
 
-interface UpstreamRefreshCandidate {
-  declaration: Pick<ManifestPackage, "name" | "path">;
-  spec: Pick<PackageSpec, "upstream">;
-}
-
-export function assertPathUpstreamRefreshSupported(
-  packages: readonly UpstreamRefreshCandidate[],
-  selectedPackage?: string,
-): void {
-  const unsupported = packages.find(
-    (packageEntry) =>
-      packageEntry.declaration.path &&
-      packageEntry.spec.upstream &&
-      (!selectedPackage || packageEntry.declaration.name === selectedPackage),
-  );
-  if (unsupported) {
-    throw PrayError.unsupported(
-      `this installation cannot refresh upstream package ${unsupported.declaration.name}; install pray with Cargo and retry`,
-    );
-  }
-}
-
 export async function lockPathUpstream(
   declaration: ManifestPackage,
   spec: PackageSpec,

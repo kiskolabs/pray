@@ -1,11 +1,12 @@
 use crate::hashing::normalize_line_endings;
+use crate::package_archive::unpack_praypkg;
 use crate::package_spec::parse_package_spec;
-use crate::{PrayError, PrayResult};
+use crate::paths::find_prayspec_file;
+use crate::PrayResult;
 use serde::{Deserialize, Serialize};
 use sha2::{Digest, Sha256};
 use std::collections::{BTreeMap, BTreeSet};
 use std::fs;
-use std::io::Cursor;
 use std::path::{Path, PathBuf};
 
 const DERIVED_EMBEDDING_MODEL: &str = "pray-hash-bucket-v1";
@@ -61,7 +62,7 @@ pub fn derive_registry_derived_metadata_from_archive_bytes(
 ) -> PrayResult<RegistryDerivedMetadata> {
     let temp_dir = unique_temp_dir("pray-derived-metadata");
     fs::create_dir_all(&temp_dir)?;
-    let unpack_result = unpack_archive_bytes(archive_bytes, &temp_dir)
+    let unpack_result = unpack_praypkg(archive_bytes, &temp_dir)
         .and_then(|_| derive_registry_derived_metadata_from_root(&temp_dir));
     let _ = fs::remove_dir_all(&temp_dir);
     unpack_result
@@ -134,35 +135,6 @@ fn derive_registry_derived_metadata_from_spec(
         character_count: Some(character_count),
         token_count: Some(tokens.len()),
     })
-}
-
-fn unpack_archive_bytes(archive_bytes: &[u8], root: &Path) -> PrayResult<()> {
-    let decoder = zstd::stream::read::Decoder::new(Cursor::new(archive_bytes))?;
-    let mut archive = tar::Archive::new(decoder);
-    archive.unpack(root)?;
-    Ok(())
-}
-
-fn find_prayspec_file(root: &Path) -> PrayResult<PathBuf> {
-    let mut prayspec_files = Vec::new();
-    for entry in fs::read_dir(root)? {
-        let entry = entry?;
-        let path = entry.path();
-        if path.extension().and_then(|value| value.to_str()) == Some("prayspec") {
-            prayspec_files.push(path);
-        }
-    }
-    match prayspec_files.len() {
-        1 => Ok(prayspec_files.remove(0)),
-        0 => Err(PrayError::Resolution(format!(
-            "no prayspec file found in {:?}",
-            root
-        ))),
-        _ => Err(PrayError::Resolution(format!(
-            "multiple prayspec files found in {:?}",
-            root
-        ))),
-    }
 }
 
 fn build_summary(candidates: &[String]) -> String {
@@ -327,9 +299,12 @@ fn truncate(text: &str, limit: usize) -> String {
 }
 
 fn unique_temp_dir(prefix: &str) -> PathBuf {
+    use std::sync::atomic::{AtomicU64, Ordering};
+    static COUNTER: AtomicU64 = AtomicU64::new(0);
     let unique = std::time::SystemTime::now()
         .duration_since(std::time::UNIX_EPOCH)
         .expect("system clock before unix epoch")
         .as_nanos();
-    std::env::temp_dir().join(format!("{prefix}-{unique}"))
+    let sequence = COUNTER.fetch_add(1, Ordering::Relaxed);
+    std::env::temp_dir().join(format!("{prefix}-{unique}-{sequence}"))
 }

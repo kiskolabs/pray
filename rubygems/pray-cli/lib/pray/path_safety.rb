@@ -39,20 +39,24 @@ module Pray
     end
 
     def validate_archive_member_path!(path)
-      cleaned = path.to_s.delete_prefix("./")
-      if cleaned.empty? || Pathname.new(cleaned).absolute? || cleaned.start_with?("/")
+      text = path.to_s.tr("\\", "/")
+      if text.empty? || Pathname.new(text).absolute? || text.start_with?("/")
         raise Error.integrity("package path must be relative: #{path}")
       end
 
-      cleaned.split("/").each do |part|
+      parts = []
+      text.split("/").each do |part|
         next if part.empty? || part == "."
 
         if part == ".." || part.include?("\0")
           raise Error.integrity("package path escapes package root: #{path}")
         end
-      end
 
-      cleaned
+        parts << part
+      end
+      raise Error.integrity("package path must be relative: #{path}") if parts.empty?
+
+      parts.join("/")
     end
 
     def validate_project_relative_path!(value)
