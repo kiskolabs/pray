@@ -18,7 +18,7 @@ Published registry metadata still does not echo upstream.
 
 ## Next
 
-Decide whether published registry metadata must echo upstream.
+Closed in usr/docs/changelogs/20260915102100_registry-metadata-and-ruby-latest.md. Published registry metadata must not echo spec.upstream. Ruby pray update --latest now rewrites Prayfile constraints.
 
 ## Source
 

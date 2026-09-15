@@ -32,6 +32,13 @@ RSpec.describe "pray CLI help" do
     expect(stdout).to include("--offline")
   end
 
+  it "prints update help for constraint rewrites" do
+    stdout, _stderr, status = run_pray("help", "update")
+    expect(status).to be_success
+    expect(stdout).to include("latest package versions")
+    expect(stdout).to include("spec.upstream")
+  end
+
   it "prints help for listed commands" do
     %w[remove list format version].each do |command|
       stdout, stderr, status = run_pray("help", command)

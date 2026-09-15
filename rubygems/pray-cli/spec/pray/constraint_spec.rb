@@ -26,4 +26,12 @@ RSpec.describe Pray::Constraint do
       expect(described_class.version_satisfies("9.9.9", "*")).to be(true)
     end
   end
+
+  describe ".latest_constraint_for_package" do
+    it "keeps the operator family for a newer registry version" do
+      expect(described_class.latest_constraint_for_package("~> 1.0", "2.0.0")).to eq("~> 2.0")
+      expect(described_class.latest_constraint_for_package("1.0.0", "2.0.0")).to eq("=2.0.0")
+      expect(described_class.latest_constraint_for_package("^1.0", "2.1.0")).to eq("^2.1")
+    end
+  end
 end

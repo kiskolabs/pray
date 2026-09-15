@@ -72,6 +72,17 @@ RSpec.describe "package upstream refresh" do
       .to eq("Testing guidance\n")
   end
 
+  it "does not copy spec.upstream into published registry metadata" do
+    catalog = catalog_after_upstream_bump("~> 1.4")
+    prayers = File.join(workspace, "catalog-prayers")
+    Dir.chdir(catalog) { Pray::CLI.run(["publish", "--root", prayers]) }
+    metadata = JSON.parse(File.read(File.join(prayers, "v1/packages/fork/base.json")))
+    expect(metadata["name"]).to eq("fork/base")
+    expect(metadata["versions"].first.keys).not_to include("upstream")
+    spec = File.read(File.join(catalog, "packages/fork-base/fork-base.prayspec"))
+    expect(spec).to include("sample/base")
+  end
+
   def catalog_after_upstream_bump(constraint)
     source_repo = File.join(workspace, "source")
     distribution_repo = File.join(workspace, "distribution")

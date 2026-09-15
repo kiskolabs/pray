@@ -44,6 +44,7 @@ spec/pray/transaction_spec.rb
 spec/pray/trust_cli_spec.rb
 spec/pray/trust_spec.rb
 spec/pray/update_destinations_spec.rb
+spec/pray/update_latest_spec.rb
 spec/pray/upstream_refresh_spec.rb
 spec/pray/upstream_spec.rb
 spec/pray/verify_position_spec.rb
