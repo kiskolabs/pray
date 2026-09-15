@@ -26,3 +26,4 @@ fixtures/resolver/tarball-package/expected.json
 crates/pray-core/src/resolve_tarball.rs
 CHANGELOG.md 1.16.0
 usr/docs/issues/20260915144000_prepare-1-16-0-release.md
+usr/docs/changelogs/20260915144600_tag-1-16-0.md
