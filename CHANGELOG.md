@@ -1,6 +1,6 @@
 # CHANGELOG
 
-## Unreleased
+## 1.15.0 (2026-09-15)
 
 - Refresh path-fork trees with `pray update` in the Rust, Ruby, and TypeScript CLIs (RFC 0114).
 - Rewrite a path package `spec.upstream` pin with `pray update --latest` when the pin does not admit the latest upstream version, then refresh that tree. `pray update --latest --dry-run` prints the planned pin and does not write. The Ruby CLI still rejects `--json` and `--major` on update.

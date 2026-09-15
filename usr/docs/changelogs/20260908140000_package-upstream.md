@@ -20,9 +20,13 @@ Later pass 20260908174500: this work ships as 1.13.0. See usr/docs/issues/202609
 
 Later pass 20260915102100: published registry metadata must not echo spec.upstream. Ruby and TypeScript now refresh path forks. See usr/docs/changelogs/20260915102100_registry-metadata-and-ruby-latest.md.
 
+Later pass 20260915103600: this work ships as 1.15.0. See usr/docs/issues/20260915103600_prepare-1-15-0-release.md.
+
 ## Source
 
 RFC 0114
 CHANGELOG.md 1.13.0
+CHANGELOG.md 1.15.0
 usr/docs/issues/20260908174500_prepare-1-13-0-release.md
 usr/docs/changelogs/20260908174400_tag-1-13-0.md
+usr/docs/issues/20260915103600_prepare-1-15-0-release.md

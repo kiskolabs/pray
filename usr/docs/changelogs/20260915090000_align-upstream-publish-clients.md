@@ -20,9 +20,12 @@ Published registry metadata still does not echo upstream.
 
 Closed in usr/docs/changelogs/20260915102100_registry-metadata-and-ruby-latest.md. Published registry metadata must not echo spec.upstream. Ruby pray update --latest now rewrites Prayfile constraints.
 
+Later pass 20260915103600: this work ships as 1.15.0. See usr/docs/issues/20260915103600_prepare-1-15-0-release.md.
+
 ## Source
 
 RFC 0114
 RFC 0061
-CHANGELOG.md Unreleased
+CHANGELOG.md 1.15.0
 usr/docs/changelogs/20260915083000_update-latest-upstream-pins.md
+usr/docs/issues/20260915103600_prepare-1-15-0-release.md

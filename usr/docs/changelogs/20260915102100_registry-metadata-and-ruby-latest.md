@@ -12,12 +12,13 @@ Ruby pray update --latest rewrites a pessimistic Prayfile pin across a major reg
 
 ## Next
 
-None.
+Later pass 20260915103600: this work ships as 1.15.0. See usr/docs/issues/20260915103600_prepare-1-15-0-release.md.
 
 ## Source
 
 RFC 0114
 RFC 0060
 schema/registry.schema.json
-CHANGELOG.md Unreleased
+CHANGELOG.md 1.15.0
 usr/docs/changelogs/20260915090000_align-upstream-publish-clients.md
+usr/docs/issues/20260915103600_prepare-1-15-0-release.md

@@ -14,9 +14,10 @@ Ruby CLI.run and TypeScript runCli no longer leave the previous project selected
 
 ## Next
 
-Open a pull request from patch/cli-invocation-context-restore when asked.
+Later pass 20260915103600: this work ships as 1.15.0. See usr/docs/issues/20260915103600_prepare-1-15-0-release.md.
 
 ## Source
 
 usr/docs/issues/20260914154400_cli-invocation-context-restore.md
+usr/docs/issues/20260915103600_prepare-1-15-0-release.md
 https://github.com/kiskolabs/pray/actions/runs/34838034114

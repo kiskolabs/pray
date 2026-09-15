@@ -18,7 +18,7 @@ Ruby pray update --latest rewrites a Prayfile pessimistic constraint when the re
 
 ## Next
 
-None.
+Later pass 20260915103600: this work ships as 1.15.0. See usr/docs/issues/20260915103600_prepare-1-15-0-release.md.
 
 ## Source
 
@@ -28,3 +28,4 @@ schema/registry.schema.json
 usr/docs/changelogs/20260915102100_registry-metadata-and-ruby-latest.md
 usr/docs/changelogs/20260915090000_align-upstream-publish-clients.md
 usr/docs/changelogs/20260908140000_package-upstream.md
+usr/docs/issues/20260915103600_prepare-1-15-0-release.md
