@@ -20,4 +20,5 @@ Later pass 20260915103600: this work ships as 1.15.0. See usr/docs/issues/202609
 
 usr/docs/issues/20260914154400_cli-invocation-context-restore.md
 usr/docs/issues/20260915103600_prepare-1-15-0-release.md
+usr/docs/changelogs/20260915105000_tag-1-15-0.md
 https://github.com/kiskolabs/pray/actions/runs/34838034114

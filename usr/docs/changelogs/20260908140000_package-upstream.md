@@ -30,3 +30,4 @@ CHANGELOG.md 1.15.0
 usr/docs/issues/20260908174500_prepare-1-13-0-release.md
 usr/docs/changelogs/20260908174400_tag-1-13-0.md
 usr/docs/issues/20260915103600_prepare-1-15-0-release.md
+usr/docs/changelogs/20260915105000_tag-1-15-0.md
