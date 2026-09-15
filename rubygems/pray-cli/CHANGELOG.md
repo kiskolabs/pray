@@ -1,10 +1,11 @@
 # CHANGELOG
 
-## Unreleased
+## 1.15.0 (2026-09-15)
 
 - Refresh path-fork trees with `pray update` (RFC 0114). Rewrite `spec.upstream` pins with `pray update --latest` when the pin does not admit the latest upstream version. Rewrite Prayfile constraints with `pray update --latest` when they do not admit the registry latest version. `pray update --latest --dry-run` prints the planned rewrite and does not write.
 - Keep `spec.upstream` in the packaged prayspec. Published registry metadata does not copy that pin.
 - Keep a listed package spec in `spec.files` when packing; refuse a repeated or aliased content path in the package archive.
+- Use the current project for a later install after an earlier in-process command in another directory.
 
 ## 1.14.0 (2026-09-14)
 

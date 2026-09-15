@@ -14,8 +14,11 @@ A unique archive still derives catalog metadata. A crafted duplicate or aliased 
 
 Optional later: reject *.prayspec in spec.files at parse time.
 
+Later pass 20260915103600: this work ships as 1.15.0. See usr/docs/issues/20260915103600_prepare-1-15-0-release.md.
+
 ## Source
 
 usr/docs/issues/20260915084500_pack-duplicate-archive-paths.md
 RFC 0011 section 26
-CHANGELOG.md Unreleased
+CHANGELOG.md 1.15.0
+usr/docs/issues/20260915103600_prepare-1-15-0-release.md

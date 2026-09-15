@@ -32,6 +32,8 @@ Optional later: reject *.prayspec in spec.files at parse time if authors keep li
 
 A repo checker that only inspects path packages would still miss a bad archive. Pack and catalog unpack are the gates.
 
+Later pass 20260915103600: this work ships as 1.15.0. See usr/docs/issues/20260915103600_prepare-1-15-0-release.md.
+
 ## Source
 
 RFC 0011 section 26 (duplicate normalized paths)
@@ -45,3 +47,4 @@ rubygems/pray-cli/lib/pray/archive.rb
 npmjs/pray-cli/src/archive/praypkg.ts
 usr/docs/changelogs/20260915084500_pack-duplicate-archive-paths.md
 usr/docs/changelogs/20260915090000_align-upstream-publish-clients.md
+usr/docs/issues/20260915103600_prepare-1-15-0-release.md
