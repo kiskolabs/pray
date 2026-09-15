@@ -1,6 +1,7 @@
 import { PrayError } from "../errors.js";
 import { stringFromLiteral } from "../literal/call-parser.js";
 import { prepareParserLines } from "../literal/lines.js";
+import { parseLiteralMap } from "../literal/parser.js";
 import { StatementReader } from "../literal/statements.js";
 import {
   arrayOfStrings,
@@ -132,6 +133,18 @@ class BlockParser {
       case "license":
         spec.license = stringFromLiteral(value, PARSE_CONTEXT);
         return;
+      case "homepage":
+        spec.homepage = stringFromLiteral(value, PARSE_CONTEXT);
+        return;
+      case "source_code_uri":
+        spec.sourceCodeUri = stringFromLiteral(value, PARSE_CONTEXT);
+        return;
+      case "changelog_uri":
+        spec.changelogUri = stringFromLiteral(value, PARSE_CONTEXT);
+        return;
+      case "prayfile_version":
+        spec.prayfileVersion = stringFromLiteral(value, PARSE_CONTEXT);
+        return;
       case "files":
         spec.files = arrayOfStrings(value);
         return;
@@ -149,6 +162,9 @@ class BlockParser {
         return;
       case "adapters":
         spec.adapters = parseStringMap(value);
+        return;
+      case "metadata":
+        spec.metadata = parseLiteralMap(value);
         return;
       default:
         throw PrayError.parse(

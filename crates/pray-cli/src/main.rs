@@ -1,4 +1,5 @@
 mod apply_report;
+mod archive_members;
 mod auth_client;
 mod auth_session_store;
 mod cache_clean;

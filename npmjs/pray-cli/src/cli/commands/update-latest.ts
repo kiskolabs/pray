@@ -1,14 +1,25 @@
-import { readFileSync } from "node:fs";
+import { existsSync, readFileSync } from "node:fs";
 import {
   latestConstraintForPackage,
   versionSatisfies,
 } from "../../constraint.js";
 import { PrayError } from "../../errors.js";
+import { readLockfile } from "../../lockfile/index.js";
 import { parseManifest } from "../../manifest/index.js";
 import { replacePackageDeclaration } from "../../manifest/package-declaration.js";
 import { defaultResolveOptions } from "../../resolve/context.js";
 import { resolveProject } from "../../resolve/project.js";
-import { manifestPath, resolveCurrentProject } from "../invocation.js";
+import {
+  applyPathUpstreamLatestConstraints,
+  type PathUpstreamLatestConstraint,
+  planPathUpstreamLatestConstraints,
+} from "../../resolve/upstream-latest.js";
+import { applyPathUpstreamRefreshes } from "../../resolve/upstream-refresh.js";
+import {
+  lockfilePath,
+  manifestPath,
+  resolveCurrentProject,
+} from "../invocation.js";
 import { writeUpdate } from "./update-core.js";
 
 export async function updateLatestCommand(
@@ -19,11 +30,12 @@ export async function updateLatestCommand(
   const path = manifestPath();
   const originalText = readFileSync(path, "utf8");
   let manifestText = originalText;
-  const project = await resolveCurrentProject({
+  const previewOptions = {
     ...defaultResolveOptions(),
     refreshSourceRevisions: true,
     ignoreLockedVersions: true,
-  });
+  };
+  const project = await resolveCurrentProject(previewOptions);
   if (
     packageName &&
     !project.manifest.packages.some((entry) => entry.name === packageName)
@@ -70,29 +82,66 @@ export async function updateLatestCommand(
     });
   }
 
-  if (manifestUpdates.length === 0) {
-    if (!json)
+  const previous = existsSync(lockfilePath())
+    ? readLockfile(lockfilePath())
+    : undefined;
+  const upstreamPlans = await planPathUpstreamLatestConstraints(
+    project,
+    previous,
+    packageName,
+    previewOptions,
+  );
+  const upstreamConstraintUpdates = upstreamPlans.map((plan) => ({
+    name: plan.packageName,
+    from_constraint: plan.currentConstraint,
+    to_constraint: plan.newConstraint,
+    latest_version: plan.latestVersion,
+  }));
+
+  if (!json) {
+    if (manifestUpdates.length === 0 && upstreamPlans.length === 0) {
       process.stdout.write(
-        "All package constraints already allow registry latest versions\n",
+        "All package constraints already allow latest versions\n",
       );
-  } else if (!json) {
-    for (const update of manifestUpdates) {
-      process.stdout.write(
-        `Prayfile: ${update.name} constraint ${update.from_constraint} -> ${update.to_constraint} (registry latest ${update.registry_latest_version})\n`,
-      );
+    } else {
+      for (const update of manifestUpdates) {
+        process.stdout.write(
+          `Prayfile: ${update.name} constraint ${update.from_constraint} -> ${update.to_constraint} (registry latest ${update.registry_latest_version})\n`,
+        );
+      }
+      printLatestUpstreamConstraints(upstreamPlans);
     }
   }
 
-  const candidate = await resolveProject(
+  const options = {
+    ...defaultResolveOptions(),
+    refreshSourceRevisions: true,
+    ignoreLockedVersions: packageName === undefined,
+    unlockedPackages: packageName ? new Set([packageName]) : new Set<string>(),
+  };
+  if (!dryRun) {
+    applyPathUpstreamLatestConstraints(upstreamPlans);
+  }
+  let candidate = await resolveProject(
     path,
-    {
-      ...defaultResolveOptions(),
-      refreshSourceRevisions: true,
-      ignoreLockedVersions: packageName === undefined,
-      unlockedPackages: packageName ? new Set([packageName]) : new Set(),
-    },
+    options,
     parseManifest(manifestText),
   );
+  if (
+    !dryRun &&
+    (await applyPathUpstreamRefreshes(
+      candidate,
+      previous,
+      packageName,
+      options,
+    ))
+  ) {
+    candidate = await resolveProject(
+      path,
+      options,
+      parseManifest(manifestText),
+    );
+  }
   await writeUpdate(
     candidate,
     packageName,
@@ -100,5 +149,16 @@ export async function updateLatestCommand(
     manifestUpdates,
     manifestText === originalText ? undefined : manifestText,
     dryRun,
+    upstreamConstraintUpdates,
   );
+}
+
+function printLatestUpstreamConstraints(
+  plans: readonly PathUpstreamLatestConstraint[],
+): void {
+  for (const plan of plans) {
+    process.stdout.write(
+      `${plan.packageName} upstream ${plan.currentConstraint} -> ${plan.newConstraint} (latest ${plan.latestVersion})\n`,
+    );
+  }
 }

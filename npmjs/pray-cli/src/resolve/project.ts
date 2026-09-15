@@ -34,6 +34,7 @@ import {
   resolutionMayBenefitFromGitSourceRefresh,
 } from "./git-refresh.js";
 import { resolvePackageRoot, vendoredPackageRoot } from "./package-root.js";
+import { sourceMap } from "./source-map.js";
 import type {
   ResolvedLocalFile,
   ResolvedPackage,
@@ -163,7 +164,7 @@ function canonicalProjectRoot(manifestPath: string): string {
   return root.length === 0 ? process.cwd() : root;
 }
 
-async function resolvePackage(
+export async function resolvePackage(
   projectRoot: string,
   sources: Map<string, ManifestSource>,
   gitSources: ReturnType<typeof prepareGitSources>,
@@ -269,10 +270,6 @@ export function missingLocalEmbedGuidance(path: string): string {
     `Prayfile lists \`local "${path}"\` but the file does not exist. ` +
     "Create the file or remove the entry from Prayfile, then run `pray install`."
   );
-}
-
-function sourceMap(sources: ManifestSource[]): Map<string, ManifestSource> {
-  return new Map(sources.map((source) => [source.name, source]));
 }
 
 function buildSkillFileIndex(spec: PackageSpec): Map<string, string[]> {

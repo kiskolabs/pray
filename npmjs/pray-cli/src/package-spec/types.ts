@@ -1,4 +1,5 @@
 import type { PackageExportKind } from "../domain/types.js";
+import type { LiteralValue } from "../literal/types.js";
 
 export interface PackageExport {
   kind: PackageExportKind;
@@ -48,7 +49,7 @@ export interface PackageSpec {
   adapters: Map<string, string>;
   targets: string[];
   dependencies: PackageDependency[];
-  metadata: Map<string, unknown>;
+  metadata: Map<string, LiteralValue>;
   upstream?: PackageUpstream;
 }
 

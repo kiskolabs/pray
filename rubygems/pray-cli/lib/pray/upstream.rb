@@ -4,19 +4,6 @@ module Pray
   module Upstream
     module_function
 
-    def ensure_update_supported!(packages, selected = nil)
-      unsupported = packages.find do |package|
-        package.declaration.path && package.spec.upstream &&
-          (selected.nil? || package.declaration.name == selected)
-      end
-      return unless unsupported
-
-      raise Error.unsupported(
-        "this installation cannot refresh upstream package #{unsupported.declaration.name}; " \
-        "install pray with Cargo and retry"
-      )
-    end
-
     def to_lock_hash(entry)
       hash = {
         "name" => entry.name,

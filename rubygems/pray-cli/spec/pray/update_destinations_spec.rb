@@ -67,12 +67,16 @@ RSpec.describe "destination recovery" do
   it "rejects unavailable update options before changing the project" do
     manifest = File.read(manifest_path)
     lockfile = File.read(File.join(root, "Prayfile.lock"))
-    %w[--latest --major --dry-run --json].each do |option|
+    %w[--major --json].each do |option|
       expect { Pray::CLI.run(["--path", root, "update", option]) }
         .to raise_error(Pray::Error)
       expect(File.read(manifest_path)).to eq(manifest)
       expect(File.read(File.join(root, "Prayfile.lock"))).to eq(lockfile)
     end
+    expect { Pray::CLI.run(["--path", root, "update", "--dry-run"]) }
+      .to raise_error(Pray::Error)
+    expect(File.read(manifest_path)).to eq(manifest)
+    expect(File.read(File.join(root, "Prayfile.lock"))).to eq(lockfile)
   end
 
   it "rejects oversized destinations before changing output" do

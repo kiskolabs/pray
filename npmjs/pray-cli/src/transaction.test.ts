@@ -11,7 +11,11 @@ import {
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { it } from "node:test";
-import { runTransaction, writeProjectFile } from "./transaction/index.js";
+import {
+  removeProjectFile,
+  runTransaction,
+  writeProjectFile,
+} from "./transaction/index.js";
 
 it("rolls back writes and recovers a terminated writer without overwriting edits", () => {
   const root = mkdtempSync(join(tmpdir(), "pray-transaction-"));
@@ -96,6 +100,25 @@ it("excludes a second writer while an asynchronous operation owns the project", 
     assert.equal(readFileSync(join(root, "output"), "utf8"), "first");
   } finally {
     release();
+    rmSync(root, { recursive: true, force: true });
+  }
+});
+
+it("rolls back a deleted content file", () => {
+  const root = mkdtempSync(join(tmpdir(), "pray-transaction-delete-"));
+  const path = join(root, "removed.md");
+  try {
+    writeFileSync(path, "old\n");
+    assert.throws(
+      () =>
+        runTransaction(root, () => {
+          removeProjectFile(path);
+          throw new Error("later failure");
+        }),
+      /later failure/,
+    );
+    assert.equal(readFileSync(path, "utf8"), "old\n");
+  } finally {
     rmSync(root, { recursive: true, force: true });
   }
 });

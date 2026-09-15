@@ -15,7 +15,7 @@ import {
 } from "../../render/project.js";
 import { defaultResolveOptions } from "../../resolve/context.js";
 import type { ResolvedProject } from "../../resolve/types.js";
-import { assertPathUpstreamRefreshSupported } from "../../resolve/upstream.js";
+import { applyPathUpstreamRefreshes } from "../../resolve/upstream-refresh.js";
 import { writeProjectFile } from "../../transaction/index.js";
 import { lockfilePath, resolveCurrentProject } from "../invocation.js";
 import {
@@ -81,15 +81,37 @@ export async function updateWithManifestConstraints(
     to_constraint: string;
     registry_latest_version: string;
   }>,
+  upstreamConstraintUpdates: Array<{
+    name: string;
+    from_constraint: string;
+    to_constraint: string;
+    latest_version: string;
+  }> = [],
 ): Promise<void> {
-  const project = await resolveCurrentProject({
+  const options = {
     ...defaultResolveOptions(),
     refreshSourceRevisions: true,
     ignoreLockedVersions: packageName === undefined,
-    unlockedPackages: packageName ? new Set([packageName]) : new Set(),
-  });
-  assertPathUpstreamRefreshSupported(project.packages, packageName);
-  await writeUpdate(project, packageName, json, manifestConstraintUpdates);
+    unlockedPackages: packageName ? new Set([packageName]) : new Set<string>(),
+  };
+  let project = await resolveCurrentProject(options);
+  const previous = existsSync(lockfilePath())
+    ? readLockfile(lockfilePath())
+    : undefined;
+  if (
+    await applyPathUpstreamRefreshes(project, previous, packageName, options)
+  ) {
+    project = await resolveCurrentProject(options);
+  }
+  await writeUpdate(
+    project,
+    packageName,
+    json,
+    manifestConstraintUpdates,
+    undefined,
+    false,
+    upstreamConstraintUpdates,
+  );
 }
 
 export async function writeUpdate(
@@ -101,6 +123,12 @@ export async function writeUpdate(
   >[2],
   manifestUpdate?: string,
   dryRun = false,
+  upstreamConstraintUpdates: Array<{
+    name: string;
+    from_constraint: string;
+    to_constraint: string;
+    latest_version: string;
+  }> = [],
 ): Promise<void> {
   if (
     packageName &&
@@ -152,6 +180,7 @@ export async function writeUpdate(
       merged,
       packageName,
       project,
+      upstreamConstraintUpdates,
     );
     return;
   }
@@ -176,6 +205,12 @@ export function printUpdateJsonReport(
   updated: Lockfile | undefined,
   selectedPackage: string | undefined,
   project: ResolvedProject,
+  upstreamConstraintUpdates: Array<{
+    name: string;
+    from_constraint: string;
+    to_constraint: string;
+    latest_version: string;
+  }> = [],
 ): void {
   const summary = buildUpdateSummary(
     previous,
@@ -196,6 +231,7 @@ export function printUpdateJsonReport(
   const constraintBlocked = constraintBlockedPackagesJson(project);
   const status =
     manifestConstraintUpdates.length === 0 &&
+    upstreamConstraintUpdates.length === 0 &&
     summary.updatedPackages.length === 0 &&
     constraintBlocked.length === 0
       ? "up_to_date"
@@ -205,6 +241,7 @@ export function printUpdateJsonReport(
       {
         status,
         manifest_constraint_updates: manifestConstraintUpdates,
+        upstream_constraint_updates: upstreamConstraintUpdates,
         updated_packages: summary.updatedPackages,
         constraint_blocked_packages: constraintBlocked,
       },

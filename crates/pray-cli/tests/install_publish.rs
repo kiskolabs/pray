@@ -3,7 +3,7 @@ mod support;
 
 use serde_json::Value;
 use std::fs;
-use std::path::PathBuf;
+use std::path::{Path, PathBuf};
 
 use support::{
     create_add_fixture, find_free_port, run_pray, run_pray_login_passkey, signing_key_from_seed,
@@ -72,6 +72,7 @@ fn publish_writes_torrent_manifest_sidecar_for_registry_artifacts() {
     let package_metadata: Value =
         serde_json::from_str(&package_metadata_text).expect("package metadata json");
     let derived = &package_metadata["versions"][0]["derived_metadata"];
+    assert_eq!(derived["file_count"], 2);
     assert!(derived["summary"]
         .as_str()
         .expect("summary")
@@ -85,6 +86,41 @@ fn publish_writes_torrent_manifest_sidecar_for_registry_artifacts() {
         .as_array()
         .expect("embeddings")
         .is_empty());
+}
+
+#[test]
+fn publish_packs_when_spec_files_lists_the_package_spec() {
+    let repo = temporary_directory("pray-publish-listed-spec");
+    let registry_root = temporary_directory("pray-publish-listed-spec-root");
+    create_add_fixture(&repo);
+    rewrite_base_spec_files(
+        &repo,
+        r#"["sample-base.prayspec", "README.md", "exports/testing-basics.md"]"#,
+    );
+
+    let add = run_pray(&repo, &["add", "sample/base", "--path", "packages/base"]);
+    assert!(
+        add.status.success(),
+        "add failed: {}",
+        String::from_utf8_lossy(&add.stderr)
+    );
+
+    let publish = run_pray(
+        &repo,
+        &[
+            "publish",
+            "--root",
+            registry_root.to_str().expect("registry path"),
+        ],
+    );
+    assert!(
+        publish.status.success(),
+        "publish listed spec failed: {}",
+        String::from_utf8_lossy(&publish.stderr)
+    );
+    assert!(registry_root
+        .join("v1/artifacts/sample/base/1.4.3/sample-base-1.4.3.praypkg")
+        .is_file());
 }
 
 #[test]
@@ -400,4 +436,18 @@ fn publish_without_signing_key_keeps_legacy_content_digest() {
         "expected legacy content digest, got {signature}"
     );
     assert!(version["signer_public_key"].is_null());
+}
+
+fn rewrite_base_spec_files(repo: &Path, files_literal: &str) {
+    let spec_path = repo.join("packages/base/sample-base.prayspec");
+    let original = fs::read_to_string(&spec_path).expect("read prayspec");
+    let rewritten = original.replace(
+        r#"spec.files = ["README.md", "exports/testing-basics.md"]"#,
+        &format!("spec.files = {files_literal}"),
+    );
+    assert_ne!(
+        rewritten, original,
+        "fixture spec.files assignment must match"
+    );
+    fs::write(spec_path, rewritten).expect("rewrite prayspec");
 }

@@ -1,5 +1,10 @@
 # CHANGELOG
 
+## Unreleased
+
+- Refresh path-fork trees with `pray update` (RFC 0114). Rewrite `spec.upstream` pins with `pray update --latest` when the pin does not admit the latest upstream version. `pray update --latest --dry-run` prints the planned pin and does not write.
+- Keep a listed package spec in `spec.files` when packing; refuse a repeated or aliased content path in the package archive.
+
 ## 1.14.0 (2026-09-14)
 
 - Keep an unchanged package version's artifact, first-publish time, and yank when `pray publish` runs again (RFC 0061).

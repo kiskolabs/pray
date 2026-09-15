@@ -22,6 +22,13 @@ export function buildPackageArchiveBytes(
   packageEntry: ResolvedPackage,
 ): Buffer {
   const prayspecPath = findPrayspecFile(packageEntry.root);
+  const prayspecName = validateArchiveMemberPath(basename(prayspecPath));
+  const writtenPaths = new Set<string>();
+  recordArchivePath(writtenPaths, "metadata.json", prayspecName);
+  recordArchivePath(writtenPaths, prayspecName, prayspecName);
+  for (const file of packageEntry.spec.files) {
+    recordArchivePath(writtenPaths, file, prayspecName);
+  }
   const staging = mkdtempSync(join(tmpdir(), "pray-package-"));
   try {
     writeFileSync(
@@ -29,12 +36,13 @@ export function buildPackageArchiveBytes(
       packageMetadataJson(packageEntry),
       "utf8",
     );
-    writeFileSync(
-      join(staging, basename(prayspecPath)),
-      readFileSync(prayspecPath),
-    );
+    writeFileSync(join(staging, prayspecName), readFileSync(prayspecPath));
     for (const file of packageEntry.spec.files) {
-      const destination = join(staging, file);
+      const member = validateArchiveMemberPath(file);
+      if (member === prayspecName) {
+        continue;
+      }
+      const destination = join(staging, member);
       mkdirSync(dirname(destination), { recursive: true });
       copyFileSync(join(packageEntry.root, file), destination);
     }
@@ -43,6 +51,22 @@ export function buildPackageArchiveBytes(
   } finally {
     rmSync(staging, { recursive: true, force: true });
   }
+}
+
+function recordArchivePath(
+  writtenPaths: Set<string>,
+  path: string,
+  autoIncludedPrayspec: string,
+): boolean {
+  const normalized = validateArchiveMemberPath(path);
+  if (!writtenPaths.has(normalized)) {
+    writtenPaths.add(normalized);
+    return true;
+  }
+  if (normalized === autoIncludedPrayspec) {
+    return false;
+  }
+  throw PrayError.integrity(`duplicate package archive path: ${normalized}`);
 }
 
 export function unpackPraypkg(

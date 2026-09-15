@@ -10,7 +10,9 @@ module Pray
         frozen: flags[:frozen],
         locked: flags[:locked],
         offline: flags[:offline],
-        refresh: flags[:refresh]
+        refresh: flags[:refresh],
+        ignore_locked_versions: flags[:ignore_locked_versions],
+        unlocked_packages: flags[:unlocked_packages]
       )
     end
 
@@ -84,10 +86,10 @@ module Pray
     end
 
     def update_command(arguments)
-      if arguments.any? { |argument| %w[--dry-run --json].include?(argument) }
+      if arguments.include?("--json") || (arguments.include?("--dry-run") && !arguments.include?("--latest"))
         raise Error.unsupported("this Ruby CLI does not support --dry-run or --json for update; use `pray plan` to preview the current Prayfile")
       end
-      if arguments.any? { |argument| %w[--latest --major].include?(argument) }
+      if arguments.include?("--major")
         raise Error.unsupported(
           "to update beyond the current constraint, edit the package version in Prayfile, then run `pray update`"
         )
@@ -100,9 +102,29 @@ module Pray
           raise Error.manifest("package #{package} not found")
         end
       end
-      current = resolve_current_project(ResolveOptions.new(offline: offline))
-      Upstream.ensure_update_supported!(current.packages, package)
-      install_command({locked: false, frozen: false, offline: offline, refresh: true})
+      if arguments.include?("--latest")
+        return update_latest_command(package, dry_run: arguments.include?("--dry-run"), offline: offline)
+      end
+      unlocked = package ? Set[package] : Set.new
+      options = ResolveOptions.new(
+        offline: offline,
+        refresh: true,
+        refresh_source_revisions: true,
+        ignore_locked_versions: package.nil?,
+        unlocked_packages: unlocked
+      )
+      current = resolve_current_project(options)
+      Upstream.apply_path_upstream_refreshes(current, current.previous_lockfile, package, options)
+      install_command(
+        {
+          locked: false,
+          frozen: false,
+          offline: offline,
+          refresh: true,
+          ignore_locked_versions: package.nil?,
+          unlocked_packages: unlocked
+        }
+      )
     end
 
     def unlock_command(name)

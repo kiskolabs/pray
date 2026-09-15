@@ -23,6 +23,7 @@ spec/pray/lockfile_performance_spec.rb
 spec/pray/lockfile_spec.rb
 spec/pray/login_spec.rb
 spec/pray/manifest_json_spec.rb
+spec/pray/package_spec_render_spec.rb
 spec/pray/package_tree_hash_spec.rb
 spec/pray/parser_spec.rb
 spec/pray/project_context_spec.rb
@@ -43,6 +44,7 @@ spec/pray/transaction_spec.rb
 spec/pray/trust_cli_spec.rb
 spec/pray/trust_spec.rb
 spec/pray/update_destinations_spec.rb
+spec/pray/upstream_refresh_spec.rb
 spec/pray/upstream_spec.rb
 spec/pray/verify_position_spec.rb
 spec/pray/verify_spec.rb

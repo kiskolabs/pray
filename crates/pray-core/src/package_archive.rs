@@ -1,4 +1,4 @@
-use crate::paths::validate_package_relative_path;
+use crate::paths::normalize_package_relative_path;
 use crate::resource_limits::{
     MAX_ARCHIVE_ENTRIES, MAX_ARCHIVE_ENTRY_BYTES, MAX_ARCHIVE_TOTAL_BYTES,
 };
@@ -46,7 +46,7 @@ pub(crate) fn unpack_praypkg(artifact_bytes: &[u8], output_directory: &Path) -> 
             .path()
             .map_err(|error| PrayError::Integrity(error.to_string()))?
             .into_owned();
-        validate_package_relative_path(&path)?;
+        let path = normalize_package_relative_path(&path)?;
         if !written_paths.insert(path.clone()) {
             return Err(PrayError::Integrity(format!(
                 "duplicate package archive path: {}",
@@ -177,6 +177,28 @@ mod tests {
         let error = unpack_praypkg(&oversized, &output).expect_err("oversize");
         assert!(
             error.to_string().contains("exceeds"),
+            "unexpected error: {error}"
+        );
+    }
+
+    #[test]
+    fn unpack_praypkg_rejects_duplicate_archive_path() {
+        let artifact = pack_praypkg(&[("rules.md", b"first\n"), ("rules.md", b"second\n")]);
+        let output = temporary_directory("pray-archive-duplicate");
+        let error = unpack_praypkg(&artifact, &output).expect_err("duplicate");
+        assert!(
+            error.to_string().contains("duplicate package archive path"),
+            "unexpected error: {error}"
+        );
+    }
+
+    #[test]
+    fn unpack_praypkg_rejects_aliased_duplicate_archive_path() {
+        let artifact = pack_praypkg(&[("./rules.md", b"first\n"), ("rules.md", b"second\n")]);
+        let output = temporary_directory("pray-archive-alias");
+        let error = unpack_praypkg(&artifact, &output).expect_err("alias");
+        assert!(
+            error.to_string().contains("duplicate package archive path"),
             "unexpected error: {error}"
         );
     }

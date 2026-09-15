@@ -206,6 +206,13 @@ fn update_replaces_clean_fork_from_locked_upstream() {
         updated_lock.contains("1.4.4"),
         "update should lock upstream 1.4.4:\n{updated_lock}"
     );
+    assert!(
+        fork_spec.contains("fork-base.prayspec"),
+        "refresh should list the fork spec:\n{fork_spec}"
+    );
+    let package = run_pray(&catalog_repo, &["package"]);
+    assert_success(&package, "package after refresh");
+    assert!(catalog_repo.join("fork-base-1.0.0.praypkg").is_file());
 }
 
 fn catalog_after_upstream_bump(constraint: &str) -> PathBuf {

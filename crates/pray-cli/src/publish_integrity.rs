@@ -2,7 +2,7 @@ use crate::materialize::find_prayspec_file;
 use crate::torrent_manifest_path;
 use pray_core::hashing::sha256_prefixed;
 use pray_core::package_integrity::package_signature_for_publish;
-use pray_core::paths::validate_package_relative_path;
+use pray_core::paths::normalize_package_relative_path;
 use pray_core::registry::RegistryPackageVersion;
 use pray_core::resolve::ResolvedPackage;
 use pray_core::resource_limits::{
@@ -95,7 +95,10 @@ fn stored_prayspec_matches(artifact_bytes: &[u8], package_root: &Path) -> bool {
         let Ok(path) = entry.path() else {
             return false;
         };
-        if validate_package_relative_path(&path).is_err() || !paths.insert(path.to_path_buf()) {
+        let Ok(normalized) = normalize_package_relative_path(&path) else {
+            return false;
+        };
+        if !paths.insert(normalized.clone()) {
             return false;
         }
         entry_count += 1;
@@ -107,7 +110,7 @@ fn stored_prayspec_matches(artifact_bytes: &[u8], package_root: &Path) -> bool {
         {
             return false;
         }
-        if path.as_ref() != Path::new(current_name) {
+        if normalized != Path::new(current_name) {
             continue;
         }
         let mut stored_bytes = Vec::new();

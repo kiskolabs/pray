@@ -101,7 +101,10 @@ module Pray
         "update" => <<~TEXT.strip,
           refresh package versions within constraints
 
-          Usage: pray update [package]
+          Usage: pray update [package] [--latest] [--latest --dry-run]
+
+          --latest rewrites exact spec.upstream pins in path packages, then refreshes those trees.
+          --latest --dry-run prints the planned pin and does not write.
         TEXT
         "plan" => <<~TEXT.strip,
           preview install/apply changes

@@ -57,5 +57,12 @@ module Pray
 
       journal.replace(path, TransactionJournal.snapshot(path), bytes.b)
     end
+
+    def remove_file(path)
+      journal = Thread.current[:pray_write_transaction]
+      return File.delete(path) unless journal
+
+      journal.replace(path, TransactionJournal.snapshot(path), nil)
+    end
   end
 end

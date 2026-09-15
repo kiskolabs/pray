@@ -90,15 +90,30 @@ pub fn find_prayspec_file(root: &Path) -> PrayResult<PathBuf> {
 }
 
 pub fn validate_package_relative_path(path: &Path) -> PrayResult<()> {
-    if path.is_absolute() {
+    normalize_package_relative_path(path).map(|_| ())
+}
+
+pub fn normalize_package_relative_path(path: &Path) -> PrayResult<PathBuf> {
+    let text = path.to_string_lossy().replace('\\', "/");
+    if Path::new(&text).is_absolute() {
         return Err(PrayError::Integrity(format!(
             "package path must be relative: {}",
             path.display()
         )));
     }
-    for component in path.components() {
+    let mut relative = PathBuf::new();
+    for component in Path::new(&text).components() {
         match component {
-            Component::Normal(_) | Component::CurDir => {}
+            Component::Normal(part) => {
+                if part.to_string_lossy().contains('\0') {
+                    return Err(PrayError::Integrity(format!(
+                        "package path escapes package root: {}",
+                        path.display()
+                    )));
+                }
+                relative.push(part);
+            }
+            Component::CurDir => {}
             _ => {
                 return Err(PrayError::Integrity(format!(
                     "package path escapes package root: {}",
@@ -107,7 +122,13 @@ pub fn validate_package_relative_path(path: &Path) -> PrayResult<()> {
             }
         }
     }
-    Ok(())
+    if relative.as_os_str().is_empty() {
+        return Err(PrayError::Integrity(format!(
+            "package path must be relative: {}",
+            path.display()
+        )));
+    }
+    Ok(relative)
 }
 
 pub fn validate_registry_cache_identity<'a>(
@@ -215,6 +236,16 @@ mod tests {
     #[test]
     fn validate_package_relative_path_accepts_nested_file() {
         validate_package_relative_path(Path::new("exports/guidance.md")).expect("nested file");
+    }
+
+    #[test]
+    fn normalize_package_relative_path_collapses_current_dir() {
+        let normalized = normalize_package_relative_path(Path::new("exports/./guidance.md"))
+            .expect("nested current dir");
+        assert_eq!(normalized, PathBuf::from("exports/guidance.md"));
+        let dotted =
+            normalize_package_relative_path(Path::new("./README.md")).expect("leading dot");
+        assert_eq!(dotted, PathBuf::from("README.md"));
     }
 
     #[test]
