@@ -26,3 +26,4 @@ crates/pray-core/src/embed.rs
 crates/pray-core/tests/embedder_api.rs
 CHANGELOG.md 1.16.0
 usr/docs/issues/20260915144000_prepare-1-16-0-release.md
+usr/docs/changelogs/20260915144600_tag-1-16-0.md
