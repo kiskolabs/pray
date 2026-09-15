@@ -2,7 +2,9 @@ use super::{source_map, ResolvedPackage, ResolvedProject};
 use crate::config::load_user_config;
 use crate::lockfile::Lockfile;
 use crate::package_spec_render::{fork_spec_after_refresh, render_package_spec};
-use crate::package_upstream::{is_clean_replica, merge_content_files, LockedUpstream};
+use crate::package_upstream::{
+    is_clean_replica, try_merge_content_files, upstream_merge_conflict_message, LockedUpstream,
+};
 use crate::paths::find_prayspec_file;
 use crate::resolve_context::ResolveOptions;
 use crate::resolve_git_sources::prepare_git_sources;
@@ -11,12 +13,18 @@ use std::collections::BTreeMap;
 
 #[path = "resolve_upstream_io.rs"]
 mod input_output;
+#[path = "resolve_upstream_latest.rs"]
+mod latest;
 #[path = "resolve_upstream_lock.rs"]
 mod lock;
 #[path = "resolve_upstream_context.rs"]
 mod resolution_context;
 
 use input_output::{content_file_bytes, write_content_files};
+pub use latest::{
+    apply_path_upstream_latest_constraints, plan_path_upstream_latest_constraints,
+    PathUpstreamLatestConstraint,
+};
 use lock::ensure_locked_upstream_matches;
 pub(super) use lock::lock_path_upstream;
 pub(super) use resolution_context::UpstreamResolutionContext;
@@ -113,7 +121,18 @@ fn apply_one_path_upstream(
     let old_content = content_file_bytes(&old_package.root, &old_package.spec)?;
     let new_content = content_file_bytes(&new_package.root, &new_package.spec)?;
     let local_content = content_file_bytes(&package.root, &package.spec)?;
-    let merged = merge_content_files(&old_content, &new_content, &local_content)?;
+    let merged = match try_merge_content_files(&old_content, &new_content, &local_content) {
+        Ok(merged) => merged,
+        Err(paths) => {
+            return Err(PrayError::Resolution(upstream_merge_conflict_message(
+                &package.declaration.name,
+                &old_upstream.name,
+                &old_upstream.version,
+                &new_upstream.version,
+                &paths,
+            )));
+        }
+    };
     let clean = is_clean_replica(&old_content, &local_content);
     write_content_files(&package.root, &old_content, &merged)?;
     let spec_path = find_prayspec_file(&package.root)?;

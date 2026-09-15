@@ -102,6 +102,7 @@ fn update_command_with_manifest_constraints(
         manifest_constraint_updates,
         None,
         false,
+        Vec::new(),
     )
 }
 
@@ -124,6 +125,7 @@ fn write_update(
     manifest_constraint_updates: Vec<serde_json::Value>,
     manifest_update: Option<String>,
     dry_run: bool,
+    upstream_constraint_updates: Vec<serde_json::Value>,
 ) -> PrayResult<()> {
     let previous_lockfile = read_lockfile(&lockfile_path()).ok();
     let rendered = render_project(&project)?;
@@ -159,6 +161,7 @@ fn write_update(
             &merged_lockfile,
             package.as_deref(),
             &project,
+            &upstream_constraint_updates,
         )?;
     } else {
         print_materialization_report(&preview, MaterializationMode::Install);

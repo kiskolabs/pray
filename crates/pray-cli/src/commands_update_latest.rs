@@ -4,6 +4,13 @@ use pray_core::constraint::{latest_constraint_for_package, version_satisfies};
 use pray_core::manifest::{parse_manifest, read_manifest_text, replace_package_declaration};
 use pray_core::{PrayError, PrayResult};
 
+#[path = "commands_update_upstream.rs"]
+mod upstream;
+use upstream::{
+    latest_upstream_constraint_updates_json, plan_latest_upstream_constraints,
+    print_latest_upstream_constraints, resolve_after_latest_upstream,
+};
+
 pub(super) fn update_latest_command(
     package: Option<String>,
     json: bool,
@@ -77,28 +84,35 @@ pub(super) fn update_latest_command(
             },
         )
         .collect();
+    let upstream_plans =
+        plan_latest_upstream_constraints(&project, package.as_deref(), &preview_options)?;
+    let upstream_constraint_updates = latest_upstream_constraint_updates_json(&upstream_plans);
 
-    if manifest_updates.is_empty() {
-        if !json {
-            println!("All package constraints already allow registry latest versions");
-        }
-    } else if !json {
-        for (name, previous_constraint, new_constraint, registry_latest_version) in
-            &manifest_updates
-        {
-            println!(
-                "Prayfile: {name} constraint {previous_constraint} -> {new_constraint} (registry latest {registry_latest_version})"
-            );
+    if !json {
+        if manifest_updates.is_empty() && upstream_plans.is_empty() {
+            println!("All package constraints already allow latest versions");
+        } else {
+            for (name, previous_constraint, new_constraint, registry_latest_version) in
+                &manifest_updates
+            {
+                println!(
+                    "Prayfile: {name} constraint {previous_constraint} -> {new_constraint} (registry latest {registry_latest_version})"
+                );
+            }
+            print_latest_upstream_constraints(&upstream_plans);
         }
     }
 
     let mut options = update_resolve_options(package.as_deref());
-    options.environment = project.environment;
-    let candidate = pray_core::resolve::resolve_manifest_in_context(
+    options.environment = project.environment.clone();
+    let candidate = resolve_after_latest_upstream(
         &manifest_path,
         &project.project_root,
         parse_manifest(&updated_text)?,
         &options,
+        package.as_deref(),
+        &upstream_plans,
+        dry_run,
     )?;
     write_update(
         candidate,
@@ -107,5 +121,6 @@ pub(super) fn update_latest_command(
         manifest_constraint_updates,
         (updated_text != manifest_text).then_some(updated_text),
         dry_run,
+        upstream_constraint_updates,
     )
 }

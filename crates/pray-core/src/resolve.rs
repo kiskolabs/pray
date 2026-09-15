@@ -136,7 +136,7 @@ mod project;
 pub use project::{resolve_manifest_in_context, resolve_project_in_context};
 
 #[path = "resolve_upstream.rs"]
-mod resolve_upstream;
+pub mod resolve_upstream;
 pub use resolve_upstream::apply_path_upstream_refreshes;
 
 fn resolve_package(

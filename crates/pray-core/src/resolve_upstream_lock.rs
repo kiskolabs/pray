@@ -65,7 +65,7 @@ pub(in crate::resolve) fn lock_path_upstream(
     Ok(Some(resolved_upstream))
 }
 
-fn implied_upstream_source(
+pub(super) fn implied_upstream_source(
     name: &str,
     sources: &BTreeMap<String, crate::manifest::ManifestSource>,
 ) -> PrayResult<Option<String>> {
