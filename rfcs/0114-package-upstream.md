@@ -39,7 +39,7 @@ pray "fork/base", path: "packages/base"
 
 `pray update --latest` also rewrites a path fork's `spec.upstream` constraint when that constraint does not admit the latest resolved upstream version, using the same operator family as Prayfile `--latest`. It then refreshes the path tree as `pray update` does. `pray update --latest --dry-run` prints the planned constraint rewrite and does not write the prayspec or path tree.
 
-Consumers of `fork/base` do not fetch `sample/base`.
+Consumers of `fork/base` do not fetch `sample/base`. Publishing the fork does not put `upstream` in catalog JSON. Readers who need the pin unpack the packaged prayspec.
 
 ## Reference-level explanation
 
@@ -47,7 +47,7 @@ Key words follow RFC 2119.
 
 `spec.upstream NAME, CONSTRAINT` is a prayspec method (RFC 0011). Implementations MUST reject `spec.upstream =`. At most one upstream. NAME MUST be a package name and MUST NOT equal `spec.name`. CONSTRAINT uses RFC 0010 rules; omitted CONSTRAINT is `*`. Upstream MUST NOT be treated as `add_dependency`.
 
-Install MUST resolve upstream only when the declaration has `path:`. Remote installs MAY copy name and constraint from the spec as provenance and MUST NOT fetch upstream solely because the field is present.
+Install MUST resolve upstream only when the declaration has `path:`. Remote installs MAY copy name and constraint from the packaged spec as provenance and MUST NOT fetch upstream solely because the field is present. Published registry metadata MUST NOT echo `spec.upstream`. Catalog JSON stays hashes, yank, targets, exports, signer, and derived content annotations (RFC 0060).
 
 When resolving a path fork, install MUST pin upstream to the locked version when a lock entry exists and the package is not being updated. `pray update` without a package name, or `pray update` of that fork, MUST resolve upstream from the spec constraint and MAY advance the git source revision (RFC 0020). `pray update --latest` MUST resolve the latest upstream version, rewrite `spec.upstream` when the current constraint does not admit it (same operator family as Prayfile `--latest`), then refresh as `pray update` does. `pray update --latest --dry-run` MUST print that planned rewrite and MUST NOT write the prayspec or path tree.
 
@@ -74,13 +74,15 @@ Catalogs must declare the upstream source. An exact `=` pin does not move on `pr
 
 Prayfile `upstream:` was rejected; the fork contract belongs on the package. `add_dependency` was rejected; consumers would fetch and compose upstream. `pray sync` was rejected; it does not rename.
 
+Catalog JSON does not echo upstream because consumers must not fetch it, and a second copy would drift from the archived prayspec. Discovery of forks stays a path-catalog concern.
+
 ## Prior art
 
 Bundler and Cargo lock exact versions while the manifest holds a constraint. Debian records an upstream version beside a downstream revision.
 
 ## Unresolved questions
 
-Whether published registry metadata MUST echo upstream. Whether Ruby and TypeScript update refresh must match Rust in the same release.
+None.
 
 ## Future possibilities
 

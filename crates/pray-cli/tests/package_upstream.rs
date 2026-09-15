@@ -1,6 +1,7 @@
 #[path = "install_support.rs"]
 mod support;
 
+use serde_json::Value;
 use std::fs;
 use std::path::{Path, PathBuf};
 use std::process::{Command, Output};
@@ -328,4 +329,33 @@ fn update_latest_dry_run_does_not_rewrite_upstream_pin() {
     let testing = fs::read_to_string(catalog.join("packages/fork-base/exports/testing-basics.md"))
         .expect("fork export");
     assert_eq!(testing, "Testing guidance\n");
+}
+
+#[test]
+fn publish_omits_upstream_from_registry_metadata() {
+    let catalog = catalog_after_upstream_bump("~> 1.4");
+    let registry_root = catalog.join("published");
+    let publish = run_pray(
+        &catalog,
+        &[
+            "publish",
+            "--root",
+            registry_root.to_str().expect("registry path"),
+        ],
+    );
+    assert_success(&publish, "publish fork");
+    let metadata_text = fs::read_to_string(registry_root.join("v1/packages/fork/base.json"))
+        .expect("package metadata");
+    let metadata: Value = serde_json::from_str(&metadata_text).expect("package metadata json");
+    assert_eq!(metadata["name"], "fork/base");
+    assert!(
+        metadata["versions"][0].get("upstream").is_none(),
+        "catalog JSON must not echo spec.upstream:\n{metadata_text}"
+    );
+    let spec = fs::read_to_string(catalog.join("packages/fork-base/fork-base.prayspec"))
+        .expect("fork spec");
+    assert!(
+        spec.contains("sample/base"),
+        "packaged spec still holds the pin:\n{spec}"
+    );
 }

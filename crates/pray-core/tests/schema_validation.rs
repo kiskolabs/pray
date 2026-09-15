@@ -203,3 +203,24 @@ fn registry_reader_normalizes_legacy_numeric_publish_timestamp() {
         assert!(serde_json::from_value::<RegistryPackageMetadata>(invalid).is_err());
     }
 }
+
+#[test]
+fn registry_schema_rejects_upstream_on_package_version() {
+    let validator = load_validator("registry.schema.json");
+    let mut value = serde_json::json!({
+        "name": "fork/base",
+        "versions": [{
+            "version": "1.0.0",
+            "artifact": "v1/artifacts/fork/base/1.0.0/package.praypkg"
+        }]
+    });
+    assert_valid(&validator, &value, "fork metadata without upstream");
+    value["versions"][0]["upstream"] = serde_json::json!({
+        "name": "sample/base",
+        "constraint": "~> 1.4"
+    });
+    assert!(
+        !validator.is_valid(&value),
+        "catalog JSON must not echo spec.upstream: {value}"
+    );
+}

@@ -14,11 +14,11 @@ RFC 0114 is Experimental. All three runtimes reject duplicate upstream declarati
 
 ## Next
 
-Port update file refresh to Ruby and TypeScript. Decide whether published registry metadata must echo upstream.
-
 Adding upstream fields to public Rust structs is source-incompatible for callers that construct those structs. Release the Rust API in the next major version or redesign those additions before publish.
 
 Later pass 20260908174500: this work ships as 1.13.0. See usr/docs/issues/20260908174500_prepare-1-13-0-release.md.
+
+Later pass 20260915102100: published registry metadata must not echo spec.upstream. Ruby and TypeScript now refresh path forks. See usr/docs/changelogs/20260915102100_registry-metadata-and-ruby-latest.md.
 
 ## Source
 
