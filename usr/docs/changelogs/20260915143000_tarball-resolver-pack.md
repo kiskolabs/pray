@@ -16,9 +16,13 @@ All three libraries unpack sample/base 1.0.0 from packages/sample-base-1.0.0.pra
 
 PyO3 after RFC 0109 field freeze. Mix when a Phoenix repo asks.
 
+Later pass 20260915144000: this work ships as 1.16.0. See usr/docs/issues/20260915144000_prepare-1-16-0-release.md.
+
 ## Source
 
 usr/docs/issues/20260915143000_tarball-resolver-pack.md
 rfcs/0100-conformance.md
 fixtures/resolver/tarball-package/expected.json
 crates/pray-core/src/resolve_tarball.rs
+CHANGELOG.md 1.16.0
+usr/docs/issues/20260915144000_prepare-1-16-0-release.md

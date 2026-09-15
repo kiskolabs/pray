@@ -20,7 +20,7 @@ Confirming checks: bundle exec rspec spec/pray/constraint_spec.rb spec/pray/reso
 
 ## Next
 
-None.
+Later pass 20260915144000: this work ships as 1.16.0. See usr/docs/issues/20260915144000_prepare-1-16-0-release.md.
 
 ## Source
 
@@ -30,3 +30,4 @@ crates/pray-core/src/constraint.rs
 npmjs/pray-cli/src/constraint.ts
 rubygems/pray-cli/lib/pray/constraint.rb
 rubygems/pray-cli/lib/pray/cli/commands/update_latest.rb
+usr/docs/issues/20260915144000_prepare-1-16-0-release.md

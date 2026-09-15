@@ -1,8 +1,11 @@
 # CHANGELOG
 
-## Unreleased
+## 1.16.0 (2026-09-15)
 
 - Rewrite a two-component pessimistic Prayfile pin on `pray update --latest` (`~> 2.2` to `~> 2.4` when registry latest is 2.4.0), matching the Rust and TypeScript CLIs. Install a newer version that the current constraint already allows.
+- Resolve a local `.praypkg` from `tarball:`, including offline when the archive is on disk.
+- Refuse two-package dependency cycles during resolve, matching the Rust CLI.
+- Check dest files against `Prayfile.lock` managed spans without resolving packages (`inspect_locked_destinations`, RFC 0106).
 
 ## 1.15.0 (2026-09-15)
 

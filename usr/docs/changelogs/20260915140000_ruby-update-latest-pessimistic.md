@@ -12,7 +12,7 @@ Ruby pray update --latest rewrites ~> 1.4 to ~> 1.5 when registry latest is 1.5.
 
 ## Next
 
-None.
+Later pass 20260915144000: this work ships as 1.16.0. See usr/docs/issues/20260915144000_prepare-1-16-0-release.md.
 
 ## Source
 
@@ -21,3 +21,5 @@ rubygems/pray-cli/lib/pray/constraint.rb
 rubygems/pray-cli/lib/pray/resolve_context.rb
 rubygems/pray-cli/spec/pray/constraint_spec.rb
 rubygems/pray-cli/spec/pray/update_latest_spec.rb
+CHANGELOG.md 1.16.0
+usr/docs/issues/20260915144000_prepare-1-16-0-release.md

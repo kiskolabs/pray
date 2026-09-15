@@ -40,6 +40,8 @@ Missing coverage: no test imported only the listed names. Futile coverage: none 
 
 RFC 0100 fixture packs for lock and render so the same verbs cannot drift across Rust, Ruby, and TypeScript. Then RFC 0106 lock adapter as a subset of embed names.
 
+Later pass 20260915144000: this work ships as 1.16.0. See usr/docs/issues/20260915144000_prepare-1-16-0-release.md.
+
 ## Source
 
 rfcs/0101-crate-boundaries.md
@@ -49,3 +51,4 @@ crates/pray-core/src/embed.rs
 rubygems/pray-cli/lib/pray.rb
 npmjs/pray-cli/src/index.ts
 usr/docs/changelogs/20260915123000_pray-core-embedder-api.md
+usr/docs/issues/20260915144000_prepare-1-16-0-release.md

@@ -16,8 +16,12 @@ crates/pray-core/tests/conformance_fixtures.rs now parses through pray_core::emb
 
 RFC 0106 lock adapter. Resolver and render packs remain open.
 
+Later pass 20260915144000: this work ships as 1.16.0. See usr/docs/issues/20260915144000_prepare-1-16-0-release.md.
+
 ## Source
 
 rfcs/0100-conformance.md
 usr/docs/issues/20260915124500_conformance-lockfile-fixtures.md
 fixtures/lockfile/minimal/Prayfile.lock
+CHANGELOG.md 1.16.0
+usr/docs/issues/20260915144000_prepare-1-16-0-release.md

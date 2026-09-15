@@ -42,6 +42,8 @@ Missing coverage: git, registry, tarball, dependency cycle as a polyglot reject.
 
 PyO3 bind of embed after RFC 0109 field freeze. Mix task when a Phoenix repo asks. Tarball resolver pack still open.
 
+Later pass 20260915144000: this work ships as 1.16.0. See usr/docs/issues/20260915144000_prepare-1-16-0-release.md.
+
 ## Source
 
 rfcs/0100-conformance.md
@@ -50,3 +52,4 @@ fixtures/resolver/constraint-mismatch/
 crates/pray-core/tests/conformance_resolve.rs
 usr/docs/changelogs/20260915134500_conformance-resolver-fixtures.md
 usr/docs/issues/20260915133000_render-fixtures-and-lock-adapter-ports.md
+usr/docs/issues/20260915144000_prepare-1-16-0-release.md

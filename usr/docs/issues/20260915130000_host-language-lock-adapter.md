@@ -38,6 +38,8 @@ Python and Elixir: house stack wants them. A fourth resolver is still rejected. 
 
 PyO3 bind of embed after RFC 0109 field freeze. Mix task when a Phoenix repo asks.
 
+Later pass 20260915144000: this work ships as 1.16.0. See usr/docs/issues/20260915144000_prepare-1-16-0-release.md.
+
 ## Source
 
 rfcs/0106-host-language-lock-adapter.md
@@ -45,3 +47,4 @@ crates/pray-core/src/verify/locked_dest.rs
 crates/pray-core/tests/locked_dest.rs
 usr/docs/changelogs/20260915130000_host-language-lock-adapter.md
 usr/docs/issues/20260915133000_render-fixtures-and-lock-adapter-ports.md
+usr/docs/issues/20260915144000_prepare-1-16-0-release.md
