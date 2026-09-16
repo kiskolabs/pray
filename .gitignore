@@ -10,3 +10,4 @@
 /fuzz/Cargo.lock
 /lcov.info
 /coverage/
+/mutants.out

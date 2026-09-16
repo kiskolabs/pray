@@ -1,5 +1,4 @@
 use pray_core::lockfile::{lockfiles_equivalent, Lockfile};
-use pray_core::manifest::ManifestPackage;
 use pray_core::render::{
     provisioned_destination_statuses, ProvisionedDestinationStatus, RenderedTarget,
 };
@@ -7,6 +6,10 @@ use pray_core::resolve::ResolvedProject;
 use pray_core::verify::{inspect_project, VerificationFinding};
 use pray_core::PrayResult;
 use std::path::{Path, PathBuf};
+
+#[path = "apply_report_lines.rs"]
+mod lines;
+pub(crate) use lines::outdated_local_lines;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum MaterializationMode {
@@ -45,7 +48,7 @@ pub fn build_materialization_preview(
     lockfile_path: &Path,
     previous_lockfile: Option<&Lockfile>,
 ) -> PrayResult<MaterializationPreview> {
-    let package_lines = package_summary_lines(previous_lockfile, lockfile, project);
+    let package_lines = lines::materialization_summary_lines(previous_lockfile, lockfile, project);
     let lockfile_change = lockfile_change_status(lockfile_path, lockfile)?;
     let targets = rendered
         .iter()
@@ -154,7 +157,7 @@ pub fn print_materialization_report(preview: &MaterializationPreview, mode: Mate
     }
 
     println!();
-    println!("{}", summary_footer(preview, mode));
+    println!("{}", lines::summary_footer(preview, mode));
 }
 
 impl MaterializationMode {
@@ -177,51 +180,6 @@ impl MaterializationMode {
             Self::Apply => "Apply complete",
         }
     }
-}
-
-fn package_summary_lines(
-    previous: Option<&Lockfile>,
-    updated: &Lockfile,
-    project: &ResolvedProject,
-) -> Vec<String> {
-    let previous_versions: std::collections::BTreeMap<&str, &str> = previous
-        .into_iter()
-        .flat_map(|lockfile| lockfile.package.iter())
-        .map(|package| (package.name.as_str(), package.version.as_str()))
-        .collect();
-    let sources: std::collections::BTreeMap<&str, String> = project
-        .packages
-        .iter()
-        .map(|package| {
-            (
-                package.declaration.name.as_str(),
-                package_source_label(&package.declaration),
-            )
-        })
-        .collect();
-
-    let mut lines = Vec::new();
-    for package in &updated.package {
-        let source = sources
-            .get(package.name.as_str())
-            .cloned()
-            .unwrap_or_else(|| "unknown".to_string());
-        match previous_versions.get(package.name.as_str()) {
-            None => lines.push(format!(
-                "Installing {} {} ({source})",
-                package.name, package.version
-            )),
-            Some(previous_version) if *previous_version == package.version => lines.push(format!(
-                "Using {} {} ({source})",
-                package.name, package.version
-            )),
-            Some(previous_version) => lines.push(format!(
-                "Using {} {} (was {previous_version}) ({source})",
-                package.name, package.version
-            )),
-        }
-    }
-    lines
 }
 
 fn lockfile_change_status(path: &Path, lockfile: &Lockfile) -> PrayResult<LockfileChange> {
@@ -346,87 +304,9 @@ fn target_verb(change: TargetChange, mode: MaterializationMode) -> &'static str 
     }
 }
 
-fn summary_footer(preview: &MaterializationPreview, mode: MaterializationMode) -> String {
-    let package_count = preview.package_lines.len();
-    let changed_targets = preview
-        .targets
-        .iter()
-        .filter(|(_, change)| *change != TargetChange::Unchanged)
-        .count();
-    let changed_provisioned = preview
-        .provisioned
-        .iter()
-        .filter(|(_, change)| *change != TargetChange::Unchanged)
-        .count();
-    let lockfile_changed = preview.lockfile != LockfileChange::Unchanged;
-    let has_warnings = !preview.warnings.is_empty();
-
-    if changed_targets == 0 && changed_provisioned == 0 && !lockfile_changed && !has_warnings {
-        return format!(
-            "{}. {package_count} packages, everything up to date.",
-            mode.completion_label()
-        );
-    }
-
-    let mut parts = Vec::new();
-    if lockfile_changed {
-        parts.push("lockfile changed".to_string());
-    }
-    if changed_targets > 0 {
-        parts.push(format!(
-            "{changed_targets} target file{} changed",
-            if changed_targets == 1 { "" } else { "s" }
-        ));
-    }
-    if changed_provisioned > 0 {
-        parts.push(format!(
-            "{changed_provisioned} provisioned file{} changed",
-            if changed_provisioned == 1 { "" } else { "s" }
-        ));
-    }
-    if has_warnings {
-        parts.push(format!(
-            "{} warning{}",
-            preview.warnings.len(),
-            if preview.warnings.len() == 1 { "" } else { "s" }
-        ));
-    }
-
-    let detail = parts.join(", ");
-    format!(
-        "{}. {package_count} packages, {detail}.",
-        mode.completion_label()
-    )
-}
-
-fn package_source_label(declaration: &ManifestPackage) -> String {
-    if let Some(path) = &declaration.path {
-        return format!("path:{path}");
-    }
-    if let Some(source) = &declaration.source {
-        return format!("source:{source}");
-    }
-    "default".to_string()
-}
-
 #[cfg(test)]
 mod tests {
     use super::*;
-
-    #[test]
-    fn summary_reports_up_to_date_when_nothing_changes() {
-        let preview = MaterializationPreview {
-            package_lines: vec!["Using sample/base 1.0.0 (path:packages/base)".to_string()],
-            lockfile: LockfileChange::Unchanged,
-            targets: vec![(PathBuf::from("INSTRUCTIONS.md"), TargetChange::Unchanged)],
-            provisioned: Vec::new(),
-            warnings: Vec::new(),
-        };
-
-        assert!(
-            summary_footer(&preview, MaterializationMode::Apply).contains("everything up to date")
-        );
-    }
 
     #[test]
     fn target_verb_uses_past_tense_for_apply() {

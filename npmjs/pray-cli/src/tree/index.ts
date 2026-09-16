@@ -1,3 +1,4 @@
+import { recordedPackageVersion } from "../package-spec/index.js";
 import type { ResolvedPackage, ResolvedProject } from "../resolve/types.js";
 
 export function renderDependencyTree(project: ResolvedProject): string[] {
@@ -23,7 +24,7 @@ function renderTreeNode(
 ): void {
   const indent = "  ".repeat(depth);
   lines.push(
-    `${indent}${packageEntry.declaration.name} ${packageEntry.spec.version}`,
+    `${indent}${packageEntry.declaration.name} ${recordedPackageVersion(packageEntry.spec)}`,
   );
   if (ancestry.has(packageEntry.declaration.name)) {
     lines.push(`${indent}  (cycle)`);

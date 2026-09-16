@@ -1,0 +1,31 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://raw.githubusercontent.com/kiskolabs/pray/main/schema/distribution.schema.json",
+  "title": "Pray distribution root protocol policy",
+  "description": "JSON document at v1/distribution.json on a distribution root (RFC 0062).",
+  "type": "object",
+  "additionalProperties": false,
+  "properties": {
+    "spec": {
+      "type": "string",
+      "const": "pray-distribution-config-1"
+    },
+    "protocols": {
+      "type": "array",
+      "items": {
+        "type": "string",
+        "enum": ["torrent"]
+      }
+    },
+    "bootstrap_trackers": {
+      "type": "array",
+      "items": {
+        "type": "string",
+        "minLength": 1
+      }
+    },
+    "enable_dht": {
+      "type": "boolean"
+    }
+  }
+}

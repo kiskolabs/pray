@@ -70,4 +70,13 @@ RSpec.describe Pray::Upstream do
     merged = described_class.merge_content_files(old, {}, old)
     expect(merged).not_to have_key("gone.md")
   end
+
+  it "names overlay drift for changed local-only and missing paths" do
+    local = {"README.md" => "edit", "extra.md" => "local"}
+    upstream = {"README.md" => "base", "gone.md" => "upstream"}
+    changes = described_class.overlay_file_changes(local, upstream)
+    expect(changes).to include(["README.md", :changed], ["extra.md", :local_only], ["gone.md", :missing])
+    expect(described_class.overlay_drift_line("fork/base", "sample/base", "1.4.3", "README.md", :changed))
+      .to include("differs")
+  end
 end

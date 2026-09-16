@@ -10,12 +10,13 @@ Package::Specification.new do |spec|
   spec.summary = "summary"
   spec.description = "description"
   spec.authors = ["Author"]
+  spec.maintainers = ["Kim"]
   spec.license = "MIT"
   spec.homepage = "https://example.com"
   spec.source_code_uri = "https://example.com/source"
   spec.changelog_uri = "https://example.com/changelog"
   spec.prayfile_version = "1"
-  spec.files = ["a.md", "fork.prayspec"]
+  spec.files = ["a.md"]
   spec.exports = {
     "a" => {
       type: "fragment",
@@ -41,6 +42,22 @@ end
 `;
 
 describe("package spec render", () => {
+  it("parses maintainers and the pray_version alias", () => {
+    const spec = parsePackageSpec(`
+Package::Specification.new do |spec|
+  spec.name = "sample/base"
+  spec.version = "1.4.3"
+  spec.authors = ["Pat"]
+  spec.maintainers = ["Kim", "Alex"]
+  spec.pray_version = ">= 0.1"
+  spec.files = ["README.md"]
+end
+`);
+    assert.deepEqual(spec.authors, ["Pat"]);
+    assert.deepEqual(spec.maintainers, ["Alex", "Kim"]);
+    assert.equal(spec.prayfileVersion, ">= 0.1");
+  });
+
   it("round-trips a fork spec with upstream", () => {
     const spec = parsePackageSpec(`
 Package::Specification.new do |spec|
@@ -72,6 +89,7 @@ end
     assert.equal(parsed.sourceCodeUri, "https://example.com/source");
     assert.equal(parsed.changelogUri, "https://example.com/changelog");
     assert.equal(parsed.prayfileVersion, "1");
+    assert.deepEqual(parsed.maintainers, ["Kim"]);
     assert.equal(parsed.exports.get("a")?.defaultPath, "A.md");
     assert.equal(parsed.skills.get("review")?.path, "skills/review");
     assert.equal(parsed.templates.get("note")?.path, "templates/note.md");
@@ -79,5 +97,16 @@ end
     assert.equal(parsed.dependencies[0]?.optional, true);
     assert.equal(parsed.metadata.get("priority")?.kind, "integer");
     assert.deepEqual(parsed, expected);
+  });
+
+  it("omits an empty version", () => {
+    const spec = parsePackageSpec(`
+Package::Specification.new do |spec|
+  spec.name = "project"
+  spec.files = ["exports/project.md"]
+end
+`);
+    const rendered = renderPackageSpec(spec);
+    assert.equal(rendered.includes("spec.version"), false);
   });
 });

@@ -100,7 +100,7 @@ export async function runCli(argumentsList: string[]): Promise<number> {
           if (rest[0] !== "init") {
             throw PrayError.unsupported("prayer requires init");
           }
-          runPrayerInit();
+          runPrayerInit(rest.slice(1));
           return 0;
         case "repo":
           if (rest[0] !== "init") {

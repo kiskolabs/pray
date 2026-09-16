@@ -3,6 +3,7 @@ import { parse } from "smol-toml";
 import { PrayError } from "../errors.js";
 import { sha256Prefixed } from "../hashing.js";
 import type { ManifestSource, ManifestTarget } from "../manifest/types.js";
+import { recordedPackageVersion } from "../package-spec/index.js";
 import { provisionedLockRecords } from "../render/dest.js";
 import { layoutRenderedTargets } from "../render/project.js";
 import type { RenderedTarget } from "../render/types.js";
@@ -108,7 +109,7 @@ export function buildLockfile(input: {
     ),
     package: input.packages.map((packageEntry) => ({
       name: packageEntry.declaration.name,
-      version: packageEntry.spec.version,
+      version: recordedPackageVersion(packageEntry.spec),
       ...(packageEntry.declaration.source
         ? { source: packageEntry.declaration.source }
         : {}),

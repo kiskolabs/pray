@@ -36,7 +36,7 @@ module Pray
       project = resolve_current_project
       lines = ["Package list"]
       project.packages.each do |package|
-        lines << "#{package.declaration.name} #{package.spec.version} source=#{package_source_summary(package)} exports=#{format_list(package.selected_exports)}"
+        lines << "#{package.declaration.name} #{package.spec.recorded_version} source=#{package_source_summary(package)} exports=#{format_list(package.selected_exports)}"
       end
       puts lines.join("\n")
     end
@@ -54,6 +54,7 @@ module Pray
     def package_command
       project = resolve_current_project
       project.packages.each do |package|
+        package.spec.require_release_version!
         output_path = Archive.package_archive_path(package.declaration.name, package.spec.version)
         Archive.write_package_archive(package, output_path)
       end
@@ -72,7 +73,7 @@ module Pray
       lines = ["Package explanation"]
       lines << "name: #{package.declaration.name}"
       lines << "constraint: #{package.declaration.constraint}"
-      lines << "resolved version: #{package.spec.version}"
+      lines << "resolved version: #{package.spec.recorded_version}"
       if package.registry_latest_version
         lines << "registry latest: #{package.registry_latest_version}"
       end
@@ -101,6 +102,16 @@ module Pray
         puts "All packages up to date"
       else
         Plan.package_summary_lines(previous_lockfile, latest_lockfile, project).each { |line| puts line }
+      end
+      local_lines = ApplyReport.outdated_local_lines(previous_lockfile, project)
+      unless local_lines.empty?
+        puts "Outdated local files"
+        local_lines.each { |line| puts line }
+      end
+      fork_lines = Upstream.path_fork_drift_lines(project, previous_lockfile, ResolveOptions.new)
+      unless fork_lines.empty?
+        puts "Outdated path forks"
+        fork_lines.each { |line| puts line }
       end
     end
   end

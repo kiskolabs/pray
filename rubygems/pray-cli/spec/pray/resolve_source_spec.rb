@@ -28,6 +28,33 @@ RSpec.describe Pray::ResolveSource do
       expect(described_class.implied_source_name(declaration, sole)).to eq("sample")
     end
 
+    it "uses the unique path source for an unqualified name" do
+      catalog = {
+        "amkisko" => Pray::ManifestSource.new("amkisko", "git", "git+https://example.com/prayers.git", nil, nil, nil),
+        "local" => Pray::ManifestSource.new("local", "path", "prayers", nil, nil, nil)
+      }
+      declaration = Pray::ManifestPackage.new(name: "project", constraint: "*")
+      expect(described_class.implied_source_name(declaration, catalog)).to eq("local")
+    end
+
+    it "still matches a git namespace when a path source exists" do
+      catalog = {
+        "amkisko" => Pray::ManifestSource.new("amkisko", "git", "git+https://example.com/prayers.git", nil, nil, nil),
+        "local" => Pray::ManifestSource.new("local", "path", "prayers", nil, nil, nil)
+      }
+      declaration = Pray::ManifestPackage.new(name: "amkisko/rules", constraint: "*")
+      expect(described_class.implied_source_name(declaration, catalog)).to eq("amkisko")
+    end
+
+    it "uses a namespaced name to pick a path source when several exist" do
+      catalog = {
+        "local" => Pray::ManifestSource.new("local", "path", "prayers", nil, nil, nil),
+        "vendor" => Pray::ManifestSource.new("vendor", "path", "vendor", nil, nil, nil)
+      }
+      declaration = Pray::ManifestPackage.new(name: "local/project", constraint: "*")
+      expect(described_class.implied_source_name(declaration, catalog)).to eq("local")
+    end
+
     it "requires source when multiple sources do not match the namespace" do
       declaration = Pray::ManifestPackage.new(name: "third/rules", constraint: "1.0.0")
       expect do
@@ -38,7 +65,7 @@ RSpec.describe Pray::ResolveSource do
 
   it "resolves a path package from a namespace-matching source without source:" do
     Dir.mktmpdir("pray-implied-source-") do |root|
-      package_dir = File.join(root, "packages", "amkisko-rules")
+      package_dir = File.join(root, "packages", "rules")
       FileUtils.mkdir_p(package_dir)
       File.write(
         File.join(package_dir, "rules.prayspec"),

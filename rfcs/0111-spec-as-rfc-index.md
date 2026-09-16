@@ -32,6 +32,7 @@ Open `rfcs/README.md` for types, statuses, numbering, and the current set. Open 
 - RFC 0050: security and trust
 - RFC 0051: registry authentication delivery and enrollment
 - RFC 0060: static registry and sources
+- RFC 0062: distribution protocol descriptors
 - RFC 0070: reference implementation
 - RFC 0071: project-local `.pray` directory and ignore policy
 - RFC 0100: conformance fixtures
@@ -42,6 +43,7 @@ Open `rfcs/README.md` for types, statuses, numbering, and the current set. Open 
 - RFC 0106: host-language lock adapter
 - RFC 0108: file-as-fragment
 - RFC 0114: package upstream (path fork pin)
+- RFC 0116: path-fork first material and overlay files
 
 Implementation PRs cite `RFC-NNNN`. JSON Schema and fixtures win for field presence. RFC reference-level text wins for algorithms until RFC 0100 is Stable.
 

@@ -289,7 +289,7 @@ Prayfile packages may be fetched from distribution points.
 
 A distribution point is a registry-like source for package metadata, package archives, signatures, checksums, derived metadata, confessions, usage feedback, and optional web documentation.
 
-Deployment notes for `pray serve` on Heroku, Fly.io, Hetzner, Cloudflare, and Dokku live in `docs/serve-platforms.md`.
+Deployment notes for `pray serve` on Heroku, Fly.io, Hetzner, Cloudflare, and Dokku live in `docs/serve-platforms.md`. Git-free static hosting (Cloudflare Pages, R2, S3) lives in `docs/static-distribution.md`.
 
 An example public or private distribution point could be:
 
@@ -502,6 +502,8 @@ cloudflared tunnel --url http://127.0.0.1:7429
 
 Keep publish and moderation routes behind Cloudflare Access or another stronger auth layer when those actions are exposed publicly.
 
+Cloudflare Access in front of GET `/v1/` is a browser login. `pray install` does not send Access service-token headers or complete an identity-provider redirect. For a private registry on the public internet, use an overlay (Tailscale Serve or WireGuard) or `pray+ssh`. Do not expect Access IdP login to unlock install.
+
 The server should provide API endpoints for package metadata, archive retrieval, signature retrieval, and confession submission. It may also provide simple human-readable HTML pages.
 
 The server is a distribution and feedback mechanism, not an inference runtime.
@@ -697,7 +699,7 @@ After render, `pray apply` **refreshes** `Prayfile.lock`:
 * updates opening and closing marker line positions
 * adds, updates, or removes managed span records when prayers are introduced, re-rendered, or silenced
 
-`apply` is the only normal command that should rewrite managed span checksums and line positions after intentional materialization.
+`pray install` and `pray render` also write dest and `Prayfile.lock`. `pray plan` is the dry-run of those writes.
 
 ### `pray verify`
 
@@ -735,7 +737,7 @@ To accept intentional changes after plan review, run `pray apply`.
 
 ### `pray render`
 
-May be used as a non-interactive rendering command for CI and automation. Rendering alone does not replace the plan/apply lock refresh contract unless the invocation is explicitly documented as also updating managed span records (for example `pray apply` or `pray install` after resolve).
+Writes dest and `Prayfile.lock` from current inputs. `--check` writes nothing and fails unless dest already matches that fresh render. The dry-run of a write is `pray plan`.
 
 ### Other commands
 

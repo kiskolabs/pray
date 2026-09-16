@@ -60,12 +60,7 @@ export function serializeRecommended(manifest: Manifest): string {
       const path = target.skills[0] ?? "";
       lines.push(`tree "${path}" do`);
       for (const entry of target.entries ?? []) {
-        if (entry.kind === "package") {
-          const packageEntry = findPackage(manifest, entry.name);
-          if (packageEntry) {
-            lines.push(`  ${formatPackageDeclaration(packageEntry)}`);
-          }
-        }
+        lines.push(`  ${formatDestinationEntry(entry, manifest)}`);
       }
       lines.push("end");
     }

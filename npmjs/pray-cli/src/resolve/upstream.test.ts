@@ -5,6 +5,8 @@ import { ensureLockedUpstreamMatches } from "./upstream.js";
 import {
   mergeContentFiles,
   nextUpstreamConstraint,
+  overlayDriftLine,
+  overlayFileChanges,
   tryMergeContentFiles,
   upstreamMergeConflictMessage,
 } from "./upstream-merge.js";
@@ -100,5 +102,32 @@ describe("package upstream", () => {
     const localContent = new Map([["gone.md", Buffer.from("old")]]);
     const merged = mergeContentFiles(oldContent, newContent, localContent);
     assert.equal(merged.has("gone.md"), false);
+  });
+
+  it("names overlay drift for changed local-only and missing paths", () => {
+    const localContent = new Map([
+      ["README.md", Buffer.from("edit")],
+      ["extra.md", Buffer.from("local")],
+    ]);
+    const upstreamContent = new Map([
+      ["README.md", Buffer.from("base")],
+      ["gone.md", Buffer.from("upstream")],
+    ]);
+    const changes = overlayFileChanges(localContent, upstreamContent);
+    assert.deepEqual(changes, [
+      ["README.md", "changed"],
+      ["extra.md", "local_only"],
+      ["gone.md", "missing"],
+    ]);
+    assert.match(
+      overlayDriftLine(
+        "fork/base",
+        "sample/base",
+        "1.4.3",
+        "README.md",
+        "changed",
+      ),
+      /differs/,
+    );
   });
 });

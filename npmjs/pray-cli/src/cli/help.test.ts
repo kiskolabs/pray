@@ -25,6 +25,36 @@ describe("help", () => {
     assert.ok(text);
     assert.match(text, /--offline/);
     assert.doesNotMatch(text, /Documentation:/);
+    assert.match(text, /listed local compose/);
+    assert.match(text, /spec.upstream/);
+  });
+
+  it("names dest versus lock and dest versus fresh render", () => {
+    const list = conciseHelpText();
+    assert.match(
+      list,
+      /re-resolve packages and git sources within constraints/,
+    );
+    assert.doesNotMatch(list, /without updating the lockfile/);
+    const verify = commandHelpText("verify");
+    assert.ok(verify);
+    assert.match(verify, /dest managed spans versus Prayfile.lock/);
+    const drift = commandHelpText("drift");
+    assert.ok(drift);
+    assert.match(drift, /fresh render/);
+    const render = commandHelpText("render");
+    assert.ok(render);
+    assert.match(render, /write dest and Prayfile.lock/);
+    assert.doesNotMatch(render, /without updating the lockfile/);
+    const plan = commandHelpText("plan");
+    assert.ok(plan);
+    assert.match(plan, /dry-run/);
+    const update = commandHelpText("update");
+    assert.ok(update);
+    assert.match(update, /pray install/);
+    const prayer = commandHelpText("prayer");
+    assert.ok(prayer);
+    assert.match(prayer, /prayers\//);
   });
 
   it("documents login and upgrade", () => {

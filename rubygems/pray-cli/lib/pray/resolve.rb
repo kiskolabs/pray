@@ -17,7 +17,7 @@ module Pray
   )
 
   ResolvedLocalFile = Struct.new(
-    :path, :manifest_path, :content, :position, :optional
+    :path, :manifest_path, :content, :source_checksum, :position, :optional
   )
 
   module Resolve
@@ -92,6 +92,7 @@ module Pray
       local_files = []
       local_errors = []
       manifest.local.each do |local|
+        next unless Destination.local_compose_embed?(manifest, local)
         local_files << resolve_local_file(project_root, local)
       rescue Error => error
         local_errors << "local #{local.path}: #{error.message}"
@@ -146,11 +147,6 @@ module Pray
       GitRefresh.resolution_may_benefit_from_git_source_refresh?(error)
     end
 
-    def missing_local_embed_guidance(path)
-      "Prayfile lists `local \"#{path}\"` but the file does not exist. " \
-        "Create the file or remove the entry from Prayfile, then run `pray install`."
-    end
-
     def resolve_package(project_root, sources, git_sources, user_config, declaration, lockfile, offline: false, options: nil)
       options ||= ResolveOptions.new(offline: offline)
       root, registry_latest_version = resolve_package_root_with_metadata(
@@ -164,11 +160,7 @@ module Pray
           "package path #{root.inspect} declares #{spec.name.inspect}, expected #{declaration.name.inspect}"
         )
       end
-      unless Constraint.version_satisfies(spec.version, declaration.constraint)
-        raise Error.resolution(
-          "package #{declaration.name} version #{spec.version} does not satisfy constraint #{declaration.constraint}"
-        )
-      end
+      spec.satisfy_constraint!(declaration.constraint)
 
       selected_exports = select_exports(declaration, spec)
       file_bytes = load_package_file_bytes(root, spec)
@@ -226,7 +218,8 @@ module Pray
 
         case source.kind
         when "path"
-          return [File.join(project_root, source.url, declaration.name.tr("/", "-")), nil]
+          directory = LocalPrayer.path_source_package_directory(source_name, declaration.name)
+          return [File.join(project_root, source.url, directory), nil]
         when "registry", "static index"
           resolved = Registry.resolve_registry_package_root(
             project_root,
@@ -275,30 +268,6 @@ module Pray
 
     def resolve_package_root(project_root, sources, git_sources, user_config, declaration, lockfile = nil)
       resolve_package_root_with_metadata(project_root, sources, git_sources, user_config, declaration, lockfile).first
-    end
-
-    def resolve_local_file(project_root, declaration)
-      path = File.join(project_root, declaration.path)
-      unless File.exist?(path)
-        if declaration.optional
-          return ResolvedLocalFile.new(
-            path: path,
-            manifest_path: declaration.path,
-            content: "",
-            position: declaration.position,
-            optional: true
-          )
-        end
-        raise Error.resolution(missing_local_embed_guidance(declaration.path))
-      end
-
-      ResolvedLocalFile.new(
-        path: path,
-        manifest_path: declaration.path,
-        content: Hashing.normalize_line_endings(File.read(path)),
-        position: declaration.position,
-        optional: declaration.optional
-      )
     end
 
     def find_prayspec_file(root)

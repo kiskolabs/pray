@@ -8,6 +8,7 @@ import {
 import { renderProject } from "../../render/project.js";
 import { defaultResolveOptions } from "../../resolve/context.js";
 import type { ResolvedProject } from "../../resolve/types.js";
+import { localSummaryLines } from "../apply-report.js";
 import {
   lockfilePath,
   resolveCurrentProject,
@@ -43,6 +44,9 @@ export async function runPlanCommand(argumentsList: string[]): Promise<void> {
     : undefined;
   const destinations = provisionedDestinationStatuses(project, previous);
   process.stdout.write("Plan\n");
+  for (const line of localSummaryLines(previous, project)) {
+    process.stdout.write(`${line}\n`);
+  }
   for (const target of rendered) {
     process.stdout.write(`would render ${target.path}\n`);
   }

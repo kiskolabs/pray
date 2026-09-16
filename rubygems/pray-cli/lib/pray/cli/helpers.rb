@@ -80,11 +80,19 @@ module Pray
 
     def remove_manifest_statement(text, name)
       lines = text.lines.map(&:chomp)
-      package_prefix = "agent \"#{name}\""
-      alternate_prefix = "agent '#{name}'"
+      prefixes = [
+        %(pray "#{name}"),
+        %(pray '#{name}'),
+        %(use "#{name}"),
+        %(include "#{name}"),
+        %(agent "#{name}"),
+        %(agent '#{name}'),
+        %(package "#{name}"),
+        %(package '#{name}')
+      ]
       index = lines.index do |line|
         trimmed = line.lstrip
-        trimmed.start_with?(package_prefix, alternate_prefix)
+        prefixes.any? { |prefix| trimmed.start_with?(prefix) }
       end
       if index
         lines.delete_at(index)
@@ -141,14 +149,14 @@ module Pray
 
     def render_tree_node(package, package_map, depth, ancestry, lines)
       indent = "  " * depth
-      lines << "#{indent}#{package.declaration.name} #{package.spec.version}"
+      lines << "#{indent}#{package.declaration.name} #{package.spec.recorded_version}"
       return unless ancestry.add?(package.declaration.name)
 
       package.spec.dependencies.each do |dependency|
         resolved = package_map[dependency.name]
         if resolved
           if ancestry.include?(resolved.declaration.name)
-            lines << "#{indent}  #{resolved.declaration.name} #{resolved.spec.version} (cycle)"
+            lines << "#{indent}  #{resolved.declaration.name} #{resolved.spec.recorded_version} (cycle)"
           else
             render_tree_node(resolved, package_map, depth + 1, ancestry, lines)
           end

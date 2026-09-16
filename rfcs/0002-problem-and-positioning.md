@@ -108,7 +108,7 @@ Self-recovery: reconstruct from Prayfile.lock. Self-update: explicit `pray updat
 - distribution point: registry-like source
 - CLI / project / crate: pray
 
-The names Prayfile, Prayfile.lock, prayspec, and pray are fixed. Distribution repo root inside a larger checkout: `prayers/` (`pray repo init`). Resolve and render may be internal phases, not CLI aliases.
+The names Prayfile, Prayfile.lock, prayspec, and pray are fixed. In a consumer project, local prayers live under a path source directory of the author's choosing (RFC 0117). `prayers/` is the default init directory. Distribution checkout root inside a larger tree is `prayers/v1/` (`pray repo init`). The folder name `v1` is reserved as a prayer name. Resolve and render may be internal phases, not CLI aliases.
 
 ---
 

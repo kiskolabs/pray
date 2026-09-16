@@ -10,6 +10,8 @@ mod cli_parse_remote;
 mod cli_release;
 mod command;
 mod commands_init;
+mod commands_init_prayer;
+mod commands_init_prayer_manifest;
 mod commands_inspect;
 mod commands_manifest_edit;
 mod commands_materialize;
@@ -66,10 +68,9 @@ mod yank;
 pub(crate) use command::Command;
 pub(crate) use project_paths::{locked_package, lockfile_path, manifest_path, resolve_project};
 pub(crate) use registry_ops::{
-    current_signer, current_signer_fingerprint, current_timestamp, load_registry_index,
-    load_registry_package_metadata, registry_artifact_path, registry_metadata_path,
-    torrent_manifest_bytes, torrent_manifest_path, write_output_bytes, write_registry_index,
-    write_registry_package_metadata, write_torrent_manifest,
+    current_signer, load_registry_index, load_registry_package_metadata, registry_artifact_path,
+    registry_metadata_path, torrent_manifest_bytes, torrent_manifest_path, write_registry_index,
+    write_registry_package_metadata,
 };
 
 use cli_parse::parse_command;
@@ -148,7 +149,7 @@ fn run(arguments: Vec<String>) -> PrayResult<()> {
     let execute = || match parse_command(filtered.clone())? {
         Command::Manifest => manifest_command(),
         Command::Init { targets } => init_command(targets),
-        Command::PrayerInit => prayer_init_command(),
+        Command::PrayerInit { name, directory } => prayer_init_command(name, directory),
         Command::RepoInit => repo_init_command(),
         Command::Add {
             name,

@@ -6,6 +6,7 @@ export interface ResolvedLocalFile {
   path: string;
   manifestPath: string;
   content: string;
+  sourceChecksum: string;
   position: LocalPosition;
   optional: boolean;
 }

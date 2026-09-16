@@ -123,6 +123,48 @@ export function upstreamMergeConflictMessage(
   return `upstream merge conflict in ${fork} while refreshing ${upstreamName} ${oldVersion} to ${newVersion}: ${paths.join(", ")}`;
 }
 
+export type OverlayFileChange = "changed" | "local_only" | "missing";
+
+export function overlayFileChanges(
+  localContent: Map<string, Buffer>,
+  upstreamContent: Map<string, Buffer>,
+): Array<[string, OverlayFileChange]> {
+  const paths = new Set([...localContent.keys(), ...upstreamContent.keys()]);
+  const changes: Array<[string, OverlayFileChange]> = [];
+  for (const path of [...paths].sort()) {
+    const local = localContent.get(path);
+    const upstream = upstreamContent.get(path);
+    if (
+      local !== undefined &&
+      upstream !== undefined &&
+      !local.equals(upstream)
+    ) {
+      changes.push([path, "changed"]);
+    } else if (local !== undefined && upstream === undefined) {
+      changes.push([path, "local_only"]);
+    } else if (local === undefined && upstream !== undefined) {
+      changes.push([path, "missing"]);
+    }
+  }
+  return changes;
+}
+
+export function overlayDriftLine(
+  fork: string,
+  upstreamName: string,
+  upstreamVersion: string,
+  path: string,
+  change: OverlayFileChange,
+): string {
+  if (change === "changed") {
+    return `${fork} ${path} differs from ${upstreamName} ${upstreamVersion}`;
+  }
+  if (change === "local_only") {
+    return `${fork} ${path} local`;
+  }
+  return `${fork} ${path} missing from fork`;
+}
+
 export function nextUpstreamConstraint(
   current: string,
   newVersion: string,

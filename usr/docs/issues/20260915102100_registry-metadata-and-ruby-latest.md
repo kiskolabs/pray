@@ -8,7 +8,7 @@ Published registry metadata must not echo spec.upstream. Consumers of a publishe
 
 Ruby pray update --latest must rewrite Prayfile constraints the same way Rust and TypeScript do, including dry-run. --json and --major stay rejected on this CLI.
 
-Stay on the current branch. No new RFC. The contract lives in RFC 0114.
+No new RFC. The contract lives in RFC 0114.
 
 ## Effects
 

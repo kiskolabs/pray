@@ -16,3 +16,13 @@ This gives Prayfile a path to resilient distribution that does not depend on a s
 1. Add a short note in `README.md` describing P2P seeding and DHT discovery as a future distribution transport.
 2. Add a matching normative note in `SPEC.md` under distribution points.
 3. Keep the core guarantee unchanged: distribution stays static, hash-verified, and non-executable.
+
+## Next
+
+README already has the future-tense P2P sentence. SPEC.md was retired; RFC 0060, RFC 0062, and RFC 0104 hold the contract. DHT announce still fails parse. Magnet and tracker announce are not implemented. Follow usr/docs/issues/20260916225000_git-free-distribution.md for static-host recipes and the e2e recommendation.
+
+## Source
+
+usr/docs/issues/20260916225000_git-free-distribution.md
+rfcs/0062-distribution-protocols.md
+rfcs/0104-federation-transports.md

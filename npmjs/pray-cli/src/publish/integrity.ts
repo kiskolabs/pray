@@ -2,17 +2,20 @@ import { existsSync, mkdtempSync, readFileSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { basename, join } from "node:path";
 import { unpackPraypkg } from "../archive/praypkg.js";
+import type { RegistryDistributionSettings } from "../distribution.js";
 import { sha256Prefixed } from "../hashing.js";
 import { findPrayspecFile } from "../package-spec/index.js";
 import { registryArtifactSignature } from "../registry/index.js";
 import type { RegistryPackageVersion } from "../registry/types.js";
 import type { ResolvedPackage } from "../resolve/types.js";
+import { torrentDescriptorPresent } from "./torrent-manifest.js";
 
 export function storedPackageArtifact(
   root: string,
   artifactPath: string,
   packageEntry: ResolvedPackage,
   existing: RegistryPackageVersion | undefined,
+  distribution: RegistryDistributionSettings,
 ): Buffer | undefined {
   if (
     existing?.artifact !== artifactPath ||
@@ -25,7 +28,8 @@ export function storedPackageArtifact(
 
   const artifactBytes = readFileSync(storedPath);
   return existing.artifactHash === sha256Prefixed(artifactBytes) &&
-    storedPrayspecMatches(artifactBytes, packageEntry.root)
+    storedPrayspecMatches(artifactBytes, packageEntry.root) &&
+    torrentDescriptorPresent(root, artifactPath, distribution)
     ? artifactBytes
     : undefined;
 }

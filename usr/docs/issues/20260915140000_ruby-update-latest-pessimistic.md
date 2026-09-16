@@ -10,8 +10,6 @@ Ruby version_satisfies for ~> must use the same conversion as Rust and TypeScrip
 
 Ignore locked versions during Ruby update --latest so a constraint that already admits latest still installs that version. Rust and TypeScript already drop the lock hint when ignore_locked_versions is set.
 
-Stay on the current branch.
-
 ## Effects
 
 Ruby Constraint.version_satisfies now uses ruby_pessimistic_to_semver, so ~> 2.2 does not admit 2.4.0. update --latest rewrites that pin to ~> 2.4. ResolveOptions.preferred_lock_version drops the lock pin when ignore_locked_versions is set, so a constraint that already admits latest still installs it.

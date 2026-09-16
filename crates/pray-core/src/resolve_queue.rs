@@ -1,4 +1,3 @@
-use crate::constraint::version_satisfies;
 use crate::manifest::{ManifestPackage, ManifestSource};
 use crate::package_spec::PackageDependency;
 use crate::resolve::ResolvedPackage;
@@ -171,13 +170,7 @@ pub(crate) fn ensure_resolved_satisfies(
     package: &ResolvedPackage,
     constraint: &str,
 ) -> PrayResult<()> {
-    if version_satisfies(&package.spec.version, constraint)? {
-        return Ok(());
-    }
-    Err(PrayError::Resolution(format!(
-        "package {} version {} does not satisfy merged constraint {}",
-        package.declaration.name, package.spec.version, constraint
-    )))
+    package.spec.satisfy_constraint(constraint)
 }
 
 fn merge_constraint(existing: &str, incoming: &str) -> PrayResult<String> {

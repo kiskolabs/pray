@@ -87,6 +87,7 @@ module Pray
         "optional" => entry.optional
       }
       fields["bound"] = true if entry.bound
+      fields["file"] = entry.file if entry.file
       fields
     end
 

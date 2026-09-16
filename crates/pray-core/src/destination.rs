@@ -10,7 +10,6 @@ pub fn is_local_path_form(value: &str) -> bool {
         || value.ends_with(".md")
         || value.ends_with(".txt")
         || value.ends_with(".markdown")
-        || !value.contains('/')
 }
 
 pub fn destination_target_name(mode: DestinationMode, path: &str) -> String {
@@ -124,6 +123,9 @@ pub fn upsert_local(manifest: &mut Manifest, local: ManifestLocal) {
         if existing.position == "after" && local.position != "after" {
             existing.position = local.position;
         }
+        if existing.file.is_none() {
+            existing.file = local.file;
+        }
         return;
     }
     manifest.local.push(local);
@@ -187,4 +189,64 @@ pub fn export_kind_matches_role(kind: &str, role: ExportRole) -> bool {
         ExportRole::Folder => matches!(kind, "folder" | "skill"),
         ExportRole::File => kind == "file",
     }
+}
+
+pub fn local_is_compose_embed(manifest: &Manifest, local: &ManifestLocal) -> bool {
+    if local.file.is_some() {
+        return false;
+    }
+    !manifest.targets.iter().any(|target| {
+        target.mode == DestinationMode::Tree
+            && target.entries.iter().any(|entry| match entry {
+                DestinationEntry::Local { path } => path == &local.path,
+                DestinationEntry::Package { .. } => false,
+            })
+    })
+}
+
+pub fn try_apply_local_pray(
+    manifest: &mut Manifest,
+    path: &str,
+    file_dest: Option<&str>,
+    other_package_signal: bool,
+    destination_index: Option<usize>,
+) -> PrayResult<bool> {
+    if !is_local_path_form(path) {
+        return Ok(false);
+    }
+    if file_dest.is_some() {
+        if other_package_signal {
+            return Ok(false);
+        }
+        return Err(PrayError::Parse {
+            kind: "manifest",
+            message: "a local file cannot use file:".to_string(),
+        });
+    }
+    if other_package_signal {
+        return Ok(false);
+    }
+    let Some(index) = destination_index else {
+        return Err(PrayError::Parse {
+            kind: "manifest",
+            message: "local pray paths are only valid inside compose".to_string(),
+        });
+    };
+    let mode = manifest.targets[index].mode;
+    if mode != DestinationMode::Compose {
+        return Err(PrayError::Parse {
+            kind: "manifest",
+            message: "local pray paths are only valid inside compose".to_string(),
+        });
+    }
+    let local = ManifestLocal {
+        path: path.to_string(),
+        position: "after".to_string(),
+        optional: false,
+        bound: true,
+        file: None,
+    };
+    bind_local_entry(&mut manifest.targets[index], &local.path);
+    upsert_local(manifest, local);
+    Ok(true)
 }

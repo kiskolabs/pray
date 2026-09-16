@@ -73,6 +73,55 @@ end
 }
 
 #[test]
+fn parses_package_spec_without_version() {
+    let package = parse_package_spec(
+        r#"
+Package::Specification.new do |spec|
+  spec.name = "project"
+  spec.files = ["exports/project.md"]
+  spec.exports = {
+    "project" => {
+      type: "fragment",
+      path: "exports/project.md"
+    }
+  }
+end
+"#,
+    )
+    .expect("package spec parses");
+
+    assert_eq!(package.name, "project");
+    assert_eq!(package.version, "");
+    assert_eq!(package.recorded_version(), "local");
+    let value = serde_json::to_value(&package).expect("json");
+    assert!(value.get("version").is_none());
+}
+
+#[test]
+fn parses_package_spec_maintainers_and_pray_version_alias() {
+    let package = parse_package_spec(
+        r#"
+Package::Specification.new do |spec|
+  spec.name = "sample/base"
+  spec.version = "1.4.3"
+  spec.authors = ["Pat"]
+  spec.maintainers = ["Kim", "Alex"]
+  spec.pray_version = ">= 0.1"
+  spec.files = ["README.md"]
+end
+"#,
+    )
+    .expect("package spec parses");
+
+    assert_eq!(package.authors, vec!["Pat".to_string()]);
+    assert_eq!(
+        package.maintainers,
+        vec!["Alex".to_string(), "Kim".to_string()]
+    );
+    assert_eq!(package.prayfile_version.as_deref(), Some(">= 0.1"));
+}
+
+#[test]
 fn parses_package_spec_upstream() {
     let package = parse_package_spec(
         r#"
@@ -578,4 +627,108 @@ end
     )
     .expect_err("markers");
     assert!(error.to_string().contains("does not accept"));
+}
+
+#[test]
+fn rejects_local_path_inside_tree() {
+    let error = parse_manifest(
+        r#"
+prayfile "1"
+tree ".agents/skills" do
+  pray "sample/audit", "~> 2.0"
+  pray ".agents/local-skills"
+end
+"#,
+    )
+    .expect_err("tree local");
+    assert!(error.to_string().contains("compose"));
+}
+
+#[test]
+fn rejects_local_exclusive_file() {
+    let error = parse_manifest(
+        r#"
+prayfile "1"
+pray ".agents/zshrc", file: ".zshrc"
+"#,
+    )
+    .expect_err("local file:");
+    assert!(
+        error.to_string().contains("file:"),
+        "expected file: refusal, got: {error}"
+    );
+}
+
+#[test]
+fn rejects_file_block_with_a_local_path() {
+    let error = parse_manifest(
+        r#"
+prayfile "1"
+file ".gitignore" do
+  pray ".agents/gitignore"
+end
+"#,
+    )
+    .expect_err("file block local");
+    assert!(
+        error.to_string().contains("package"),
+        "expected package requirement, got: {error}"
+    );
+}
+
+#[test]
+fn rejects_a_file_block_without_a_pray_declaration() {
+    let error = parse_manifest(
+        r#"
+prayfile "1"
+file "SECURITY.md" do
+end
+"#,
+    )
+    .expect_err("empty file block");
+    assert!(
+        error.to_string().contains("requires a pray package"),
+        "expected package requirement, got: {error}"
+    );
+}
+
+#[test]
+fn rejects_bare_local_path_outside_compose() {
+    let error = parse_manifest(
+        r#"
+prayfile "1"
+pray ".agents/project.md"
+"#,
+    )
+    .expect_err("top-level local");
+    assert!(error.to_string().contains("compose"));
+    assert!(!error.to_string().contains("tree"));
+}
+
+#[test]
+fn unqualified_pray_name_is_a_package() {
+    let manifest = parse_manifest(
+        r#"
+prayfile "1"
+source "local", path: "prayers"
+compose "AGENTS.md" do
+  pray "project"
+  pray ".agents/project.md"
+end
+pray "notes"
+"#,
+    )
+    .expect("manifest parses");
+    assert!(manifest
+        .packages
+        .iter()
+        .any(|package| package.name == "project"));
+    assert!(manifest
+        .packages
+        .iter()
+        .any(|package| package.name == "notes"));
+    assert!(manifest
+        .local
+        .iter()
+        .any(|entry| entry.path == ".agents/project.md"));
 }

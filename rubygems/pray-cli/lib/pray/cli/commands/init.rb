@@ -25,26 +25,6 @@ module Pray
       File.write(path, "#{lines.join("\n")}\n")
     end
 
-    def prayer_init_command
-      root = Dir.pwd
-      package_name = File.basename(root)
-      package_name = "prayer-package" if package_name.strip.empty?
-      prayspec_path = File.join(root, "#{package_name}.prayspec")
-      raise Error.manifest("package spec already exists: #{prayspec_path}") if File.exist?(prayspec_path)
-
-      File.write(
-        prayspec_path,
-        <<~SPEC
-          Package::Specification.new do |spec|
-            spec.name = "#{package_name}"
-            spec.version = "0.1.0"
-            spec.summary = "Prayer package"
-            spec.files = []
-          end
-        SPEC
-      )
-    end
-
     def repo_init_command
       distribution_root = repo_distribution_root(Dir.pwd)
       index_path = File.join(distribution_root, "v1", "index.json")
@@ -53,6 +33,7 @@ module Pray
       FileUtils.mkdir_p(File.join(distribution_root, "v1", "packages"))
       FileUtils.mkdir_p(File.join(distribution_root, "v1", "artifacts"))
       Publish.write_registry_index(distribution_root, RegistryIndex.new)
+      Distribution.write_settings(distribution_root)
     end
 
     def repo_distribution_root(root)

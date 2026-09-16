@@ -5,10 +5,13 @@ import {
   defaultLockfilePath,
   defaultManifestPath,
 } from "../../lockfile/paths.js";
+import { recordedPackageVersion } from "../../package-spec/index.js";
 import { renderProject } from "../../render/project.js";
 import { defaultResolveOptions } from "../../resolve/context.js";
 import { resolveProject } from "../../resolve/project.js";
+import { pathForkDriftLines } from "../../resolve/upstream-drift.js";
 import { packageSourceSummary } from "../../tree/index.js";
+import { outdatedLocalLines } from "../apply-report.js";
 import { previewRemoteUpdates } from "./update.js";
 import {
   printConstraintBlockedPackages,
@@ -20,7 +23,7 @@ export async function runList(): Promise<void> {
   const lines = ["Package list"];
   for (const packageEntry of project.packages) {
     lines.push(
-      `${packageEntry.declaration.name} ${packageEntry.spec.version} source=${packageSourceSummary(packageEntry)} exports=${packageEntry.selectedExports.join(", ")}`,
+      `${packageEntry.declaration.name} ${recordedPackageVersion(packageEntry.spec)} source=${packageSourceSummary(packageEntry)} exports=${packageEntry.selectedExports.join(", ")}`,
     );
   }
   process.stdout.write(`${lines.join("\n")}\n`);
@@ -78,6 +81,26 @@ export async function runOutdated(argumentsList: string[] = []): Promise<void> {
   reported =
     printConstraintBlockedPackages(project, "Outdated packages", !reported) ||
     reported;
+  const localLines = outdatedLocalLines(previous, project);
+  if (localLines.length > 0) {
+    process.stdout.write("Outdated local files\n");
+    for (const line of localLines) {
+      process.stdout.write(`${line}\n`);
+    }
+    reported = true;
+  }
+  const forkLines = await pathForkDriftLines(project, previous, {
+    ...defaultResolveOptions(),
+    refreshSourceRevisions: true,
+    ignoreLockedVersions: true,
+  });
+  if (forkLines.length > 0) {
+    process.stdout.write("Outdated path forks\n");
+    for (const line of forkLines) {
+      process.stdout.write(`${line}\n`);
+    }
+    reported = true;
+  }
   if (!reported) {
     process.stdout.write("Outdated packages\n");
     process.stdout.write("All packages up to date\n");
@@ -106,7 +129,7 @@ export async function runExplain(name: string | undefined): Promise<void> {
     "Package explanation",
     `name: ${packageEntry.declaration.name}`,
     `constraint: ${packageEntry.declaration.constraint}`,
-    `resolved version: ${packageEntry.spec.version}`,
+    `resolved version: ${recordedPackageVersion(packageEntry.spec)}`,
   ];
   if (packageEntry.registryLatestVersion) {
     lines.push(`registry latest: ${packageEntry.registryLatestVersion}`);

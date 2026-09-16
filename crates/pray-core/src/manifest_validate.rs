@@ -29,6 +29,9 @@ pub(crate) fn validate_manifest_semantics(manifest: &Manifest) -> PrayResult<()>
     }
     for local in &manifest.local {
         validate_project_relative_path(&local.path)?;
+        if let Some(file) = &local.file {
+            validate_destination_path(file)?;
+        }
     }
     Ok(())
 }

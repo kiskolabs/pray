@@ -5,6 +5,7 @@
 Do not edit managed blocks in `AGENTS.md` or provisioned files under `.agents/`.
 To change shared guidance, update `Prayfile` and run `pray install`.
 
+<!-- pray:ae5d334a -->
 ## Additional instructions
 
 ### .agents/project.md
@@ -36,6 +37,7 @@ Enforce with `make loc-check` (warn >=150, fail >300 unless ratcheted in `script
 Test coverage must follow `spec/README.md` guidelines.
 
 ## Shared instructions
+<!-- pray:ae5d334a -->
 
 <!-- pray:9068e4a2 -->
 - when fixing or refactoring code, add or update tests first to expose the current bug/regression path (or missing contract), then implement the fix, then run focused and broader checks, and do not ship behavior changes without proving before/after via specs;

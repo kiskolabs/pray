@@ -11,12 +11,13 @@ fn complete_spec() -> PackageSpec {
         summary: Some("summary".to_string()),
         description: Some("description".to_string()),
         authors: vec!["Author".to_string()],
+        maintainers: vec!["Kim".to_string()],
         license: Some("MIT".to_string()),
         homepage: Some("https://example.com".to_string()),
         source_code_uri: Some("https://example.com/source".to_string()),
         changelog_uri: Some("https://example.com/changelog".to_string()),
         prayfile_version: Some("1".to_string()),
-        files: vec!["a.md".to_string(), "fork.prayspec".to_string()],
+        files: vec!["a.md".to_string()],
         exports: BTreeMap::from([(
             "a".to_string(),
             PackageExport {
@@ -74,6 +75,19 @@ fn complete_spec() -> PackageSpec {
 }
 
 #[test]
+fn render_omits_empty_version() {
+    let spec = PackageSpec {
+        name: "project".to_string(),
+        files: vec!["exports/project.md".to_string()],
+        ..PackageSpec::default()
+    };
+    let rendered = render_package_spec(&spec);
+    assert!(!rendered.contains("spec.version"));
+    let parsed = crate::package_spec::parse_package_spec(&rendered).expect("parses");
+    assert_eq!(parsed.version, "");
+}
+
+#[test]
 fn render_round_trips_every_supported_field() {
     let expected = complete_spec().canonicalized();
     let rendered = render_package_spec(&expected);
@@ -87,10 +101,15 @@ fn refresh_keeps_local_only_content_in_a_dirty_fork() {
     local.files.push("extra.md".to_string());
     let mut upstream = complete_spec();
     upstream.name = "sample/base".to_string();
-    upstream.files = vec!["a.md".to_string(), "sample.prayspec".to_string()];
+    upstream.files = vec!["a.md".to_string()];
     let merged = vec!["a.md".to_string(), "extra.md".to_string()];
-    let refreshed = fork_spec_after_refresh(&local, &upstream, "fork.prayspec", false, &merged);
-    assert!(refreshed.files.contains(&"fork.prayspec".to_string()));
-    assert!(refreshed.files.contains(&"a.md".to_string()));
-    assert!(refreshed.files.contains(&"extra.md".to_string()));
+    let refreshed = fork_spec_after_refresh(&local, &upstream, false, &merged);
+    assert_eq!(
+        refreshed.files,
+        vec!["a.md".to_string(), "extra.md".to_string()]
+    );
+    assert!(!refreshed
+        .files
+        .iter()
+        .any(|path| path.ends_with(".prayspec")));
 }

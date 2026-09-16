@@ -1,10 +1,8 @@
 import { existsSync, readFileSync } from "node:fs";
 import { resolve } from "node:path";
-import { versionSatisfies } from "../constraint.js";
 import { validateEnvironment } from "../environment.js";
 import { PrayError } from "../errors.js";
 import { prepareGitSources } from "../git/sources.js";
-import { normalizeLineEndings } from "../hashing.js";
 import { readLockfile } from "../lockfile/index.js";
 import { defaultLockfilePath } from "../lockfile/paths.js";
 import type { Lockfile } from "../lockfile/types.js";
@@ -14,15 +12,16 @@ import {
   parseManifest,
   readManifestText,
 } from "../manifest/index.js";
+import { localIsComposeEmbed } from "../manifest/local-pray.js";
 import type {
   Manifest,
-  ManifestLocal,
   ManifestPackage,
   ManifestSource,
 } from "../manifest/types.js";
 import {
   findPrayspecFile,
   parsePackageSpec,
+  satisfyPackageConstraint,
   treeHashForRoot,
 } from "../package-spec/index.js";
 import type { PackageSpec } from "../package-spec/types.js";
@@ -34,6 +33,7 @@ import {
   annotateFailedGitRefresh,
   resolutionMayBenefitFromGitSourceRefresh,
 } from "./git-refresh.js";
+import { resolveLocalFile } from "./local.js";
 import { resolvePackageRoot, vendoredPackageRoot } from "./package-root.js";
 import { sourceMap } from "./source-map.js";
 import type {
@@ -105,6 +105,9 @@ export async function resolveProject(
   const localFiles: ResolvedLocalFile[] = [];
   const localErrors: string[] = [];
   for (const local of manifest.local) {
+    if (!localIsComposeEmbed(manifest, local)) {
+      continue;
+    }
     try {
       localFiles.push(resolveLocalFile(projectRoot, local));
     } catch (error) {
@@ -198,11 +201,7 @@ export async function resolvePackage(
       `package path ${root} declares ${spec.name}, expected ${declaration.name}`,
     );
   }
-  if (!versionSatisfies(spec.version, declaration.constraint)) {
-    throw PrayError.resolution(
-      `package ${declaration.name} version ${spec.version} does not satisfy constraint ${declaration.constraint}`,
-    );
-  }
+  satisfyPackageConstraint(spec, declaration.constraint);
   const selectedExports = selectExports(declaration, spec);
   const treeHash = treeHashForRoot(root, spec);
   const exportBodies = loadExportBodies(root, spec, selectedExports);
@@ -238,38 +237,6 @@ export async function resolvePackage(
       ),
   );
   return resolved;
-}
-function resolveLocalFile(
-  projectRoot: string,
-  declaration: ManifestLocal,
-): ResolvedLocalFile {
-  const path = resolve(projectRoot, declaration.path);
-  if (!existsSync(path)) {
-    if (declaration.optional) {
-      return {
-        path,
-        manifestPath: declaration.path,
-        content: "",
-        position: declaration.position,
-        optional: true,
-      };
-    }
-    throw PrayError.resolution(missingLocalEmbedGuidance(declaration.path));
-  }
-  return {
-    path,
-    manifestPath: declaration.path,
-    content: normalizeLineEndings(readFileSync(path, "utf8")),
-    position: declaration.position,
-    optional: declaration.optional,
-  };
-}
-
-export function missingLocalEmbedGuidance(path: string): string {
-  return (
-    `Prayfile lists \`local "${path}"\` but the file does not exist. ` +
-    "Create the file or remove the entry from Prayfile, then run `pray install`."
-  );
 }
 
 function buildSkillFileIndex(spec: PackageSpec): Map<string, string[]> {

@@ -255,7 +255,7 @@ pub fn build_lockfile(
             .iter()
             .map(|package| LockedPackage {
                 name: package.declaration.name.clone(),
-                version: package.spec.version.clone(),
+                version: package.spec.recorded_version().to_string(),
                 source: package.declaration.source.clone(),
                 path: relative_lockfile_path(project_root, &package.root),
                 tree_hash: package.tree_hash.clone(),

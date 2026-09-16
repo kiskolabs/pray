@@ -16,8 +16,7 @@ module Pray
 
     def local_path_form?(value)
       value.start_with?(".", "/") ||
-        value.end_with?(".md", ".txt", ".markdown") ||
-        !value.include?("/")
+        value.end_with?(".md", ".txt", ".markdown")
     end
 
     def destination_target_name(mode, path)
@@ -106,6 +105,7 @@ module Pray
       if existing.position == "after" && local.position != "after"
         existing.position = local.position
       end
+      existing.file ||= local.file
     end
 
     def bind_package_entry(target, package_name)
@@ -153,6 +153,36 @@ module Pray
       when "file" then kind == "file"
       else false
       end
+    end
+
+    def local_compose_embed?(manifest, local)
+      return false if local.file
+
+      manifest.targets.none? do |target|
+        target.mode == "tree" &&
+          target.entries.any? { |entry| entry.kind == "local" && entry.path == local.path }
+      end
+    end
+
+    def try_apply_local_pray(manifest, path, file_dest, other_package_signal, destination_index)
+      return false unless local_path_form?(path)
+
+      if file_dest
+        return false if other_package_signal
+        raise Error.parse("manifest", "a local file cannot use file:")
+      end
+      return false if other_package_signal
+      unless destination_index
+        raise Error.parse("manifest", "local pray paths are only valid inside compose")
+      end
+      mode = manifest.targets[destination_index].mode
+      unless mode == "compose"
+        raise Error.parse("manifest", "local pray paths are only valid inside compose")
+      end
+      local = ManifestLocal.new(path: path, bound: true)
+      bind_local_entry(manifest.targets[destination_index], local.path)
+      upsert_local(manifest, local)
+      true
     end
   end
 end

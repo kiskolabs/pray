@@ -1,5 +1,6 @@
 use crate::apply_report::{
-    build_materialization_preview, print_materialization_report, MaterializationMode,
+    build_materialization_preview, outdated_local_lines, print_materialization_report,
+    MaterializationMode,
 };
 use crate::cache_clean::clean_unused_registry_cache;
 use crate::commands_materialize::resolve_project_for_materialization;
@@ -88,7 +89,7 @@ pub(crate) fn list_command() -> PrayResult<()> {
         lines.push(format!(
             "{} {} source={} exports={}",
             package.declaration.name,
-            package.spec.version,
+            package.spec.recorded_version(),
             package_source_summary(package),
             format_list(&package.selected_exports)
         ));
@@ -115,6 +116,26 @@ pub(crate) fn outdated_command(remote: bool) -> PrayResult<()> {
         "Outdated packages",
     )?;
     reported |= print_constraint_blocked_packages(&project, "Outdated packages", !reported)?;
+    let local_lines = outdated_local_lines(previous_lockfile.as_ref(), &project);
+    if !local_lines.is_empty() {
+        println!("Outdated local files");
+        for line in &local_lines {
+            println!("{line}");
+        }
+        reported = true;
+    }
+    let fork_lines = pray_core::resolve::path_fork_drift_lines(
+        &project,
+        previous_lockfile.as_ref(),
+        &constraint_preview_options(),
+    )?;
+    if !fork_lines.is_empty() {
+        println!("Outdated path forks");
+        for line in &fork_lines {
+            println!("{line}");
+        }
+        reported = true;
+    }
     if !reported {
         println!("Outdated packages");
         println!("All packages up to date");
@@ -137,7 +158,10 @@ pub(crate) fn explain_command(package_name: String) -> PrayResult<()> {
     let mut lines = vec!["Package explanation".to_string()];
     lines.push(format!("name: {}", package.declaration.name));
     lines.push(format!("constraint: {}", package.declaration.constraint));
-    lines.push(format!("resolved version: {}", package.spec.version));
+    lines.push(format!(
+        "resolved version: {}",
+        package.spec.recorded_version()
+    ));
     if let Some(registry_latest_version) = &package.registry_latest_version {
         lines.push(format!("registry latest: {registry_latest_version}"));
         if version_is_greater_than(registry_latest_version, &package.spec.version)? {
@@ -192,7 +216,8 @@ fn render_tree_node(
     let indent = "  ".repeat(depth);
     lines.push(format!(
         "{indent}{} {}",
-        package.declaration.name, package.spec.version
+        package.declaration.name,
+        package.spec.recorded_version()
     ));
     if !ancestry.insert(package.declaration.name.clone()) {
         return;
@@ -203,7 +228,9 @@ fn render_tree_node(
             if ancestry.contains(&resolved.declaration.name) {
                 lines.push(format!(
                     "{}  {} {} (cycle)",
-                    indent, resolved.declaration.name, resolved.spec.version
+                    indent,
+                    resolved.declaration.name,
+                    resolved.spec.recorded_version()
                 ));
             } else {
                 render_tree_node(resolved, package_map, depth + 1, ancestry, lines);

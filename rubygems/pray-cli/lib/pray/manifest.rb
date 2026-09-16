@@ -46,8 +46,8 @@ module Pray
     end
   end
 
-  ManifestLocal = Struct.new(:path, :position, :optional, :bound) do
-    def initialize(path:, position: "after", optional: false, bound: false)
+  ManifestLocal = Struct.new(:path, :position, :optional, :bound, :file) do
+    def initialize(path:, position: "after", optional: false, bound: false, file: nil)
       super
     end
   end
@@ -135,7 +135,10 @@ module Pray
         PathSafety.validate_project_relative_path!(package.path) if package.path
         PathSafety.validate_destination_path!(package.file) if package.file
       end
-      manifest.local.each { |local| PathSafety.validate_project_relative_path!(local.path) }
+      manifest.local.each do |local|
+        PathSafety.validate_project_relative_path!(local.path)
+        PathSafety.validate_destination_path!(local.file) if local.file
+      end
     end
   end
 

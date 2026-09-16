@@ -2,10 +2,13 @@ import { packageMatchesEnvironment } from "../environment.js";
 import { packageBoundToCompose } from "../manifest/destination.js";
 import type { ManifestTarget } from "../manifest/types.js";
 import type { ResolvedLocalFile, ResolvedProject } from "../resolve/types.js";
-import { substitutePraySymbols } from "../substitute.js";
 import { ContentBuilder } from "./content-builder.js";
 import { appendHeaderIfEnabled } from "./header.js";
-import { appendManagedExport, shouldInlineExport } from "./managed-export.js";
+import {
+  appendManagedExport,
+  appendManagedLocal,
+  shouldInlineExport,
+} from "./managed-export.js";
 import type { RenderedTarget } from "./types.js";
 
 export function renderLegacyCompose(
@@ -15,12 +18,12 @@ export function renderLegacyCompose(
 ): RenderedTarget {
   const builder = new ContentBuilder();
   appendHeaderIfEnabled(builder, project, target, output);
-  appendUnboundLocals(builder, project);
+  const managedSpans: RenderedTarget["managedSpans"] = [];
+  appendUnboundLocals(builder, managedSpans, project, target, output);
 
   builder.appendLine("## Shared instructions");
   builder.appendEmptyLine();
 
-  const managedSpans: RenderedTarget["managedSpans"] = [];
   for (const packageEntry of project.packages) {
     if (
       !packageMatchesEnvironment(
@@ -58,7 +61,10 @@ export function renderLegacyCompose(
 
 function appendUnboundLocals(
   builder: ContentBuilder,
+  managedSpans: RenderedTarget["managedSpans"],
   project: ResolvedProject,
+  target: ManifestTarget,
+  output: string,
 ): void {
   const unboundLocals = project.localFiles.filter((local) =>
     isUnbound(project, local),
@@ -73,10 +79,14 @@ function appendUnboundLocals(
       continue;
     }
     builder.appendLine(`### ${local.manifestPath}`);
-    builder.appendBody(
-      substitutePraySymbols(local.content, project.manifest.symbols ?? {}),
+    appendManagedLocal(
+      builder,
+      managedSpans,
+      local,
+      target,
+      output,
+      project.manifest.symbols ?? {},
     );
-    builder.appendEmptyLine();
   }
 }
 

@@ -453,7 +453,7 @@ fn add_remove_and_update_package_declaration() {
     );
 
     let manifest = fs::read_to_string(repo.join("Prayfile")).expect("manifest exists");
-    assert!(manifest.contains("agent \"sample/base\", path: \"packages/base\""));
+    assert!(manifest.contains("pray \"sample/base\", path: \"packages/base\""));
 
     let install = run_pray(&repo, &["install"]);
     assert!(

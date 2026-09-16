@@ -2,10 +2,13 @@ import { packageMatchesEnvironment } from "../environment.js";
 import { targetEntries } from "../manifest/destination.js";
 import type { ManifestTarget } from "../manifest/types.js";
 import type { ResolvedProject } from "../resolve/types.js";
-import { substitutePraySymbols } from "../substitute.js";
 import { ContentBuilder } from "./content-builder.js";
 import { appendHeaderIfEnabled } from "./header.js";
-import { appendManagedExport, shouldInlineExport } from "./managed-export.js";
+import {
+  appendManagedExport,
+  appendManagedLocal,
+  shouldInlineExport,
+} from "./managed-export.js";
 import type { RenderedTarget } from "./types.js";
 
 export function renderScopedCompose(
@@ -19,7 +22,14 @@ export function renderScopedCompose(
   const managedSpans: RenderedTarget["managedSpans"] = [];
   for (const entry of targetEntries(target)) {
     if (entry.kind === "local") {
-      appendLocalEntry(builder, project, entry.path);
+      appendLocalEntry(
+        builder,
+        managedSpans,
+        project,
+        target,
+        output,
+        entry.path,
+      );
       continue;
     }
     appendPackageEntry(
@@ -41,7 +51,10 @@ export function renderScopedCompose(
 
 function appendLocalEntry(
   builder: ContentBuilder,
+  managedSpans: RenderedTarget["managedSpans"],
   project: ResolvedProject,
+  target: ManifestTarget,
+  output: string,
   path: string,
 ): void {
   const local = project.localFiles.find(
@@ -50,13 +63,14 @@ function appendLocalEntry(
   if (!local) {
     return;
   }
-  if (local.content.length === 0 && local.optional) {
-    return;
-  }
-  builder.appendBody(
-    substitutePraySymbols(local.content, project.manifest.symbols ?? {}),
+  appendManagedLocal(
+    builder,
+    managedSpans,
+    local,
+    target,
+    output,
+    project.manifest.symbols ?? {},
   );
-  builder.appendEmptyLine();
 }
 
 function appendPackageEntry(

@@ -13,6 +13,19 @@ export interface PlannedProvisionedFile {
   export: string;
 }
 
+function dedupeByPath(
+  files: PlannedProvisionedFile[],
+): PlannedProvisionedFile[] {
+  const result: PlannedProvisionedFile[] = [];
+  for (const file of files) {
+    if (result.length > 0 && result.at(-1)?.path === file.path) {
+      continue;
+    }
+    result.push(file);
+  }
+  return result;
+}
+
 export function plannedProvisionedFiles(
   project: ResolvedProject,
 ): PlannedProvisionedFile[] {
@@ -52,19 +65,6 @@ export function plannedProvisionedFiles(
     left.path.localeCompare(right.path),
   );
   return dedupeByPath(sorted);
-}
-
-function dedupeByPath(
-  files: PlannedProvisionedFile[],
-): PlannedProvisionedFile[] {
-  const result: PlannedProvisionedFile[] = [];
-  for (const file of files) {
-    if (result.length > 0 && result.at(-1)?.path === file.path) {
-      continue;
-    }
-    result.push(file);
-  }
-  return result;
 }
 
 export function expectedProvisionedBytes(

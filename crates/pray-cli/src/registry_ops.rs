@@ -5,6 +5,7 @@ use crate::auth_client::{
 use crate::project_paths::workspace_root;
 #[cfg(feature = "auth")]
 use pray_core::auth::RegistryAuthStore;
+use pray_core::distribution::RegistryDistributionSettings;
 use pray_core::registry::{RegistryIndex, RegistryPackageMetadata};
 use pray_core::ssh_identity::active_ssh_user_fingerprint;
 use pray_core::{PrayError, PrayResult};
@@ -155,6 +156,7 @@ pub(crate) fn torrent_manifest_bytes(
     package: &pray_core::resolve::ResolvedPackage,
     artifact_path: &str,
     archive_bytes: &[u8],
+    trackers: Vec<String>,
 ) -> PrayResult<Vec<u8>> {
     let torrent_config = TorrentConfig::default();
     let manifest = TorrentTransport::build_manifest(
@@ -164,7 +166,7 @@ pub(crate) fn torrent_manifest_bytes(
         archive_bytes,
         torrent_config.piece_size,
         vec![artifact_path.to_string()],
-        torrent_config.bootstrap_trackers,
+        trackers,
     );
     serde_json::to_vec_pretty(&manifest).map_err(|error| PrayError::Manifest(error.to_string()))
 }
@@ -174,11 +176,20 @@ pub(crate) fn write_torrent_manifest(
     package: &pray_core::resolve::ResolvedPackage,
     artifact_path: &str,
     archive_bytes: &[u8],
+    settings: &RegistryDistributionSettings,
 ) -> PrayResult<()> {
+    if !settings.allows_torrent() {
+        return Ok(());
+    }
     let manifest_path = root.join(torrent_manifest_path(artifact_path));
     write_output_bytes(
         &manifest_path,
-        &torrent_manifest_bytes(package, artifact_path, archive_bytes)?,
+        &torrent_manifest_bytes(
+            package,
+            artifact_path,
+            archive_bytes,
+            settings.bootstrap_trackers.clone(),
+        )?,
     )
 }
 

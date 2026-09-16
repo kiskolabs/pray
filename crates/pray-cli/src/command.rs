@@ -5,7 +5,10 @@ pub(crate) enum Command {
     Init {
         targets: Vec<String>,
     },
-    PrayerInit,
+    PrayerInit {
+        name: Option<String>,
+        directory: Option<String>,
+    },
     RepoInit,
     Install {
         locked: bool,

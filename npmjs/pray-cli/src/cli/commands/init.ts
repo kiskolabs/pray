@@ -1,7 +1,8 @@
 import { existsSync, writeFileSync } from "node:fs";
-import { join } from "node:path";
 import { PrayError } from "../../errors.js";
 import { defaultManifestPath } from "../../lockfile/paths.js";
+
+export { runPrayerInit } from "./init-prayer.js";
 
 export function runInit(argumentsList: string[]): void {
   const manifestPath = defaultManifestPath();
@@ -29,24 +30,4 @@ render mode: :managed,
 `;
   writeFileSync(manifestPath, content, "utf8");
   process.stdout.write(`created ${manifestPath}\n`);
-}
-
-export function runPrayerInit(): void {
-  const root = process.cwd();
-  const packageName = root.split("/").pop() || "prayer-package";
-  const prayspecPath = join(root, `${packageName}.prayspec`);
-  if (existsSync(prayspecPath)) {
-    throw PrayError.manifest(`package spec already exists: ${prayspecPath}`);
-  }
-  writeFileSync(
-    prayspecPath,
-    `Package::Specification.new do |spec|
-  spec.name = "${packageName}"
-  spec.version = "0.1.0"
-  spec.summary = "Prayer package"
-  spec.files = []
-end
-`,
-    "utf8",
-  );
 }

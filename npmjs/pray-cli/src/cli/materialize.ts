@@ -12,7 +12,9 @@ import { manifestToJson } from "../manifest/types.js";
 import { renderProject, writeRenderedTargets } from "../render/project.js";
 import { defaultResolveOptions } from "../resolve/context.js";
 import { resolveProject } from "../resolve/project.js";
+import { applyPathUpstreamRefreshes } from "../resolve/upstream-refresh.js";
 import { runTransaction } from "../transaction/index.js";
+import { localSummaryLines } from "./apply-report.js";
 import {
   projectRoot,
   resolveCurrentProjectWithGitRefreshFallback,
@@ -42,19 +44,35 @@ async function materializeInTransaction(
     );
   }
 
-  const project = await resolveCurrentProjectWithGitRefreshFallback(
-    {
-      ...defaultResolveOptions(),
-      offline: options.offline ?? false,
-      refreshSourceRevisions: options.refreshSourceRevisions ?? false,
-    },
+  const resolveOptions = {
+    ...defaultResolveOptions(),
+    offline: options.offline ?? false,
+    refreshSourceRevisions: options.refreshSourceRevisions ?? false,
+  };
+  let project = await resolveCurrentProjectWithGitRefreshFallback(
+    resolveOptions,
     !options.locked && !options.frozen,
   );
-  const rendered = renderProject(project);
   const lockfilePath = defaultLockfilePath(project.projectRoot);
   const previousLockfile = existsSync(lockfilePath)
     ? readLockfile(lockfilePath)
     : undefined;
+  if (!options.locked && !options.frozen) {
+    if (
+      await applyPathUpstreamRefreshes(
+        project,
+        previousLockfile,
+        undefined,
+        resolveOptions,
+      )
+    ) {
+      project = await resolveCurrentProjectWithGitRefreshFallback(
+        resolveOptions,
+        true,
+      );
+    }
+  }
+  const rendered = renderProject(project);
   const nextLockfile = buildLockfile({
     manifestHash: project.manifestHash,
     ...(project.environment ? { environment: project.environment } : {}),
@@ -93,6 +111,11 @@ async function materializeInTransaction(
 
   writeRenderedTargets(project, rendered, previousLockfile);
   writeLockfileIfChanged(lockfilePath, nextLockfile);
+  if (!options.frozen && !options.locked) {
+    for (const line of localSummaryLines(previousLockfile, project)) {
+      process.stdout.write(`${line}\n`);
+    }
+  }
 }
 
 export async function printManifest(

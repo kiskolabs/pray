@@ -17,14 +17,16 @@ module Pray
     def publish_to_root(project, root, signer: "local", signer_fingerprint: nil)
       root = File.expand_path(root)
       index = load_registry_index(root)
+      distribution = Distribution.read_settings(root)
       package_names = index.packages.to_set
 
       project.packages.each do |package|
+        package.spec.require_release_version!
         artifact_path = registry_artifact_path(package.declaration.name, package.spec.version)
         metadata_path = registry_metadata_path(root, package.declaration.name)
         metadata = load_registry_package_metadata(metadata_path, package.declaration.name)
         existing = metadata.versions.find { |entry| entry.version == package.spec.version }
-        stored_artifact = stored_package_artifact(root, artifact_path, package, existing)
+        stored_artifact = stored_package_artifact(root, artifact_path, package, existing, distribution)
         if stored_artifact && stored_publish_matches?(
           stored_artifact, package, signer, signer_fingerprint, existing
         )
@@ -35,6 +37,14 @@ module Pray
 
         archive_bytes = Archive.build_package_archive_bytes(package)
         write_output_bytes(File.join(root, artifact_path), archive_bytes)
+        TorrentManifest.write(
+          root,
+          name: package.declaration.name,
+          version: package.spec.version,
+          artifact_path: artifact_path,
+          archive_bytes: archive_bytes,
+          settings: distribution
+        )
         version_entry = published_registry_package_version(
           package,
           signer,
@@ -54,10 +64,24 @@ module Pray
     end
 
     def publish_to_server(project, server_url, signer: "local", signer_fingerprint: nil)
+      distribution = Distribution.fetch_settings(server_url)
       project.packages.each do |package|
         archive_bytes = Archive.build_package_archive_bytes(package)
         artifact_path = registry_artifact_path(package.declaration.name, package.spec.version)
         Registry.http_put(join_url(server_url, artifact_path), "application/octet-stream", archive_bytes)
+        if distribution.allows_torrent?
+          Registry.http_put(
+            join_url(server_url, TorrentManifest.path_for(artifact_path)),
+            "application/json",
+            TorrentManifest.bytes(
+              name: package.declaration.name,
+              version: package.spec.version,
+              artifact_path: artifact_path,
+              archive_bytes: archive_bytes,
+              trackers: distribution.bootstrap_trackers
+            )
+          )
+        end
 
         metadata = RegistryPackageMetadata.new(
           name: package.declaration.name,
@@ -95,7 +119,7 @@ module Pray
       )
     end
 
-    def stored_package_artifact(root, artifact_path, package, existing)
+    def stored_package_artifact(root, artifact_path, package, existing, distribution)
       return unless existing&.artifact == artifact_path && existing.tree_hash == package.tree_hash
 
       stored_path = File.join(root, artifact_path)
@@ -104,6 +128,7 @@ module Pray
       artifact_bytes = File.binread(stored_path)
       return unless existing.artifact_hash == Hashing.sha256_prefixed(artifact_bytes)
       return unless stored_prayspec_matches?(artifact_bytes, package.root)
+      return unless TorrentManifest.descriptor_present?(root, artifact_path, distribution)
 
       artifact_bytes
     end

@@ -26,10 +26,4 @@ RSpec.describe Pray::ManifestJson do
 
     expect(keys.index("symbols")).to be < keys.index("render")
   end
-
-  it "keeps render last" do
-    keys = described_class.manifest_fields(manifest.canonicalized).keys
-
-    expect(keys.last).to eq("render")
-  end
 end

@@ -1,6 +1,8 @@
 use crate::commands_materialize::install_command;
 use crate::project_paths::manifest_path;
-use pray_core::manifest::{parse_manifest, read_manifest_text};
+use pray_core::manifest::{
+    format_package_declaration, parse_manifest, read_manifest_text, ManifestPackage,
+};
 use pray_core::resolve_context::ResolveOptions;
 use pray_core::{PrayError, PrayResult};
 
@@ -18,17 +20,12 @@ pub(crate) fn add_command(
         )));
     }
 
-    let declaration = if let Some(path) = path {
-        if let Some(constraint) = constraint {
-            format!("agent \"{name}\", \"{constraint}\", path: \"{path}\"")
-        } else {
-            format!("agent \"{name}\", path: \"{path}\"")
-        }
-    } else if let Some(constraint) = constraint {
-        format!("agent \"{name}\", \"{constraint}\"")
-    } else {
-        format!("agent \"{name}\"")
-    };
+    let declaration = format_package_declaration(&ManifestPackage {
+        name,
+        constraint: constraint.unwrap_or_else(|| "*".to_string()),
+        path,
+        ..ManifestPackage::default()
+    });
 
     pray_core::transaction::write_file(
         &manifest_path,
@@ -53,7 +50,7 @@ pub(crate) fn remove_command(name: String) -> PrayResult<()> {
     Ok(())
 }
 
-fn insert_manifest_statement(text: &str, statement: &str) -> String {
+pub(crate) fn insert_manifest_statement(text: &str, statement: &str) -> String {
     let mut lines: Vec<String> = text.lines().map(|line| line.to_string()).collect();
     let insertion_index = lines
         .iter()
@@ -71,11 +68,22 @@ fn insert_manifest_statement(text: &str, statement: &str) -> String {
 }
 
 fn remove_manifest_statement(text: &str, name: &str) -> String {
+    let prefixes = [
+        format!("pray \"{name}\""),
+        format!("pray '{name}'"),
+        format!("use \"{name}\""),
+        format!("include \"{name}\""),
+        format!("agent \"{name}\""),
+        format!("agent '{name}'"),
+        format!("package \"{name}\""),
+        format!("package '{name}'"),
+    ];
     let mut lines: Vec<String> = text.lines().map(|line| line.to_string()).collect();
-    let package_prefix = format!("agent \"{name}\"");
     if let Some(index) = lines.iter().position(|line| {
         let trimmed = line.trim_start();
-        trimmed.starts_with(&package_prefix) || trimmed.starts_with(&format!("agent '{name}'"))
+        prefixes
+            .iter()
+            .any(|prefix| trimmed.starts_with(prefix.as_str()))
     }) {
         lines.remove(index);
         if index < lines.len() && lines[index].trim().is_empty() {

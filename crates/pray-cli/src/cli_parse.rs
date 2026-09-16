@@ -38,7 +38,7 @@ pub(crate) fn parse_command(arguments: Vec<String>) -> PrayResult<Command> {
             }
             Ok(Command::Init { targets })
         }
-        "prayer" => parse_namespaced_init_command("prayer", iter, Command::PrayerInit),
+        "prayer" => parse_prayer_init_command(iter),
         "repo" => parse_namespaced_init_command("repo", iter, Command::RepoInit),
         "install" => {
             let mut locked = false;
@@ -147,6 +147,41 @@ fn parse_completion_command(mut arguments: std::vec::IntoIter<String>) -> PrayRe
         _ => Err(PrayError::Usage(
             "completion requires bash, zsh, or fish\nSee 'pray --help'.".to_string(),
         )),
+    }
+}
+
+fn parse_prayer_init_command(mut arguments: std::vec::IntoIter<String>) -> PrayResult<Command> {
+    match arguments.next() {
+        Some(subcommand) if subcommand == "init" => {
+            let mut name = None;
+            let mut directory = None;
+            while let Some(argument) = arguments.next() {
+                if argument == "--path" {
+                    let value = arguments.next().ok_or_else(|| {
+                        PrayError::Usage("--path requires a directory".to_string())
+                    })?;
+                    if value.starts_with('-') {
+                        return Err(PrayError::Usage("--path requires a directory".to_string()));
+                    }
+                    directory = Some(value);
+                } else if argument.starts_with('-') {
+                    return Err(PrayError::Unsupported(format!(
+                        "unexpected prayer argument: {argument}"
+                    )));
+                } else if name.is_none() {
+                    name = Some(argument);
+                } else {
+                    return Err(PrayError::Unsupported(format!(
+                        "unexpected prayer argument: {argument}"
+                    )));
+                }
+            }
+            Ok(Command::PrayerInit { name, directory })
+        }
+        Some(other) => Err(PrayError::Unsupported(format!(
+            "unknown prayer command: {other}"
+        ))),
+        None => Err(PrayError::Unsupported("prayer requires init".to_string())),
     }
 }
 

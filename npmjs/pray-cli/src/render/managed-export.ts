@@ -1,8 +1,11 @@
 import { PrayError } from "../errors.js";
 import { checksumManagedSpanContent, markerId } from "../hashing.js";
-import type { ManagedSpanRecord } from "../lockfile/types.js";
+import {
+  LOCAL_EMBED_PACKAGE,
+  type ManagedSpanRecord,
+} from "../lockfile/types.js";
 import type { ManifestTarget } from "../manifest/types.js";
-import type { ResolvedPackage } from "../resolve/types.js";
+import type { ResolvedLocalFile, ResolvedPackage } from "../resolve/types.js";
 import { substitutePraySymbols } from "../substitute.js";
 import type { ContentBuilder } from "./content-builder.js";
 
@@ -40,9 +43,53 @@ export function appendManagedExport(
     );
   }
   const body = substitutePraySymbols(raw, symbols);
-  const id = markerId(
+  appendManagedSpan(
+    builder,
+    managedSpans,
     `${packageEntry.declaration.name}:${exportName}:${target.name}`,
+    body,
+    output,
+    packageEntry.declaration.name,
+    exportName,
+    packageEntry.sourceChecksum,
   );
+}
+
+export function appendManagedLocal(
+  builder: ContentBuilder,
+  managedSpans: ManagedSpanRecord[],
+  local: ResolvedLocalFile,
+  target: ManifestTarget,
+  output: string,
+  symbols: Record<string, string>,
+): void {
+  if (local.content.length === 0 && local.optional) {
+    return;
+  }
+  const body = substitutePraySymbols(local.content, symbols);
+  appendManagedSpan(
+    builder,
+    managedSpans,
+    `local:${local.manifestPath}:${target.name}`,
+    body,
+    output,
+    LOCAL_EMBED_PACKAGE,
+    local.manifestPath,
+    local.sourceChecksum,
+  );
+}
+
+function appendManagedSpan(
+  builder: ContentBuilder,
+  managedSpans: ManagedSpanRecord[],
+  seed: string,
+  body: string,
+  output: string,
+  packageName: string,
+  exportName: string,
+  sourceChecksum: string,
+): void {
+  const id = markerId(seed);
   const openLine = builder.nextLineNumber();
   builder.appendLine(`<!-- pray:${id} -->`);
   builder.appendBody(body);
@@ -54,9 +101,9 @@ export function appendManagedExport(
     open_line: openLine,
     close_line: closeLine,
     ideal_checksum: checksumManagedSpanContent(body),
-    package: packageEntry.declaration.name,
+    package: packageName,
     export: exportName,
-    source_checksum: packageEntry.sourceChecksum,
+    source_checksum: sourceChecksum,
     silenced: false,
   });
   builder.appendEmptyLine();

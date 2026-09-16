@@ -42,7 +42,7 @@ module Pray
       when "prayer"
         raise Error.unsupported("prayer requires init") unless arguments.shift == "init"
 
-        [:prayer_init]
+        [:prayer_init, *parse_prayer_init_arguments(arguments)]
       when "repo"
         raise Error.unsupported("repo requires init") unless arguments.shift == "init"
 
@@ -75,6 +75,26 @@ module Pray
       else
         raise Error.usage(Suggest.unknown_command_message(command))
       end
+    end
+
+    def parse_prayer_init_arguments(arguments)
+      name = nil
+      directory = nil
+      while (argument = arguments.shift)
+        if argument == "--path"
+          directory = arguments.shift
+          if directory.nil? || directory.start_with?("-")
+            raise Error.usage("--path requires a directory")
+          end
+        elsif argument.start_with?("-")
+          raise Error.unsupported("unexpected prayer argument: #{argument}")
+        elsif name.nil?
+          name = argument
+        else
+          raise Error.unsupported("unexpected prayer argument: #{argument}")
+        end
+      end
+      [name, directory]
     end
 
     def extract_flag!(arguments, flag)

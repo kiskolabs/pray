@@ -4,9 +4,9 @@ module Pray
   module PackageSpecRender
     module_function
 
-    def fork_spec_after_refresh(local, new_upstream, local_prayspec_file, clean_replica, merged_content_paths)
+    def fork_spec_after_refresh(local, new_upstream, clean_replica, merged_content_paths)
       spec = local.dup
-      spec.files = [local_prayspec_file, *merged_content_paths]
+      spec.files = merged_content_paths.dup
       if clean_replica
         spec.exports = new_upstream.exports.dup
         spec.templates = new_upstream.templates.dup
@@ -32,10 +32,11 @@ module Pray
 
     def push_identity_fields(lines, spec)
       push_assignment(lines, "name", spec.name)
-      push_assignment(lines, "version", spec.version)
+      push_assignment(lines, "version", spec.version) unless spec.version.to_s.empty?
       push_optional(lines, "summary", spec.summary)
       push_optional(lines, "description", spec.description)
       push_array(lines, "authors", spec.authors) unless spec.authors.nil? || spec.authors.empty?
+      push_array(lines, "maintainers", spec.maintainers) unless spec.maintainers.nil? || spec.maintainers.empty?
       push_optional(lines, "license", spec.license)
       push_optional(lines, "homepage", spec.homepage)
       push_optional(lines, "source_code_uri", spec.source_code_uri)

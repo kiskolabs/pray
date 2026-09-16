@@ -53,7 +53,7 @@ When resolving a path fork, install MUST pin upstream to the locked version when
 
 Lock field `package.upstream` is optional. When present it MUST include `name`, `version`, `tree_hash`, and `artifact_hash`. `source` is the source handle used to resolve it.
 
-Identity files are `*.prayspec` under the package root. Update MUST NOT overwrite the fork prayspec with the upstream prayspec. After a successful file refresh, implementations MUST rewrite the fork prayspec so `spec.files` lists the fork prayspec path plus the new upstream content files, exports match the new upstream when the tree was a clean replica, and an exact upstream constraint (`=` or a bare version) becomes `= NEW_VERSION`. A range constraint MUST stay.
+Identity files are `*.prayspec` under the package root. Update MUST NOT overwrite the fork prayspec with the upstream prayspec. After a successful file refresh, implementations MUST rewrite the fork prayspec so `spec.files` lists the new content files, exports match the new upstream when the tree was a clean replica, and an exact upstream constraint (`=` or a bare version) becomes `= NEW_VERSION`. A range constraint MUST stay. The fork prayspec stays on disk and MUST NOT be a `spec.files` entry. Pack includes it.
 
 A content file is any `spec.files` path that is not identity. Clean replica: every old-upstream content file exists in the path tree with identical bytes, and the path tree has no extra content files. Clean replica MUST replace content files from the new upstream and delete content files that existed only in the old upstream.
 
@@ -86,4 +86,4 @@ None.
 
 ## Future possibilities
 
-Overlay directories beside the path tree.
+A sibling overlay root. First material of an empty path tree and overlay-file drift listing live in RFC 0116.

@@ -17,9 +17,31 @@ export function patchRenderedContent(existing: string, fresh: string): string {
   );
   if (!overlaps) return fresh;
 
+  const existingIds = new Set(
+    existingSegments
+      .filter((segment) => segment.kind === "managed")
+      .map((segment) => segment.id),
+  );
   const used = new Set<string>();
   let output = "";
-  for (const segment of existingSegments) {
+  let remaining = existingSegments;
+  if ([...freshManaged.keys()].some((id) => !existingIds.has(id))) {
+    const shared = freshSegments.find(
+      (segment) => segment.kind === "managed" && existingIds.has(segment.id),
+    );
+    if (shared?.kind !== "managed") return fresh;
+    for (const segment of freshSegments) {
+      if (segment.kind === "managed" && segment.id === shared.id) break;
+      if (segment.kind === "text") {
+        output += segment.text;
+        continue;
+      }
+      used.add(segment.id);
+      output += managedSegment(segment.id, segment.body);
+    }
+    remaining = skipUntilManaged(existingSegments, shared.id);
+  }
+  for (const segment of remaining) {
     if (segment.kind === "text") {
       output += segment.text;
       continue;
@@ -34,6 +56,13 @@ export function patchRenderedContent(existing: string, fresh: string): string {
     }
   }
   return output.endsWith("\n") ? output : `${output}\n`;
+}
+
+function skipUntilManaged(segments: Segment[], id: string): Segment[] {
+  const index = segments.findIndex(
+    (segment) => segment.kind === "managed" && segment.id === id,
+  );
+  return index >= 0 ? segments.slice(index) : segments;
 }
 
 export function relocateManagedSpans(

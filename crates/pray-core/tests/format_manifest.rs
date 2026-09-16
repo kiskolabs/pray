@@ -206,7 +206,7 @@ fn resolves_package_from_sole_source_without_source_keyword() {
     let root = unique_temp_dir("pray-sole-source");
     write_package(
         &root,
-        "sample-rules",
+        "rules",
         "sample/rules",
         "rules",
         "fragment",
@@ -235,7 +235,7 @@ fn resolves_package_from_namespace_matching_source_handle() {
     let root = unique_temp_dir("pray-namespace-source");
     write_package(
         &root,
-        "amkisko-rules",
+        "rules",
         "amkisko/rules",
         "rules",
         "fragment",

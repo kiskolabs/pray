@@ -33,7 +33,7 @@ RSpec.describe "package upstream refresh" do
     lockfile = File.read(File.join(catalog, "Prayfile.lock"))
     expect(lockfile).to include("1.4.4")
     spec = File.read(File.join(catalog, "packages/fork-base/fork-base.prayspec"))
-    expect(spec).to include("fork-base.prayspec")
+    expect(spec).to include("exports/testing-basics.md")
     Dir.chdir(catalog) { Pray::CLI.run(["package"]) }
     expect(File).to exist(File.join(catalog, ".pray/packages/fork-base-1.0.0.praypkg"))
   end
@@ -81,6 +81,86 @@ RSpec.describe "package upstream refresh" do
     expect(metadata["versions"].first.keys).not_to include("upstream")
     spec = File.read(File.join(catalog, "packages/fork-base/fork-base.prayspec"))
     expect(spec).to include("sample/base")
+  end
+
+  it "copies an empty path fork from upstream on install" do
+    catalog, _source = publish_upstream_catalog
+    write_empty_fork_package(catalog, "~> 1.4")
+    Dir.chdir(catalog) { Pray::CLI.run(["install"]) }
+
+    expect(File.read(File.join(catalog, "packages/fork-base/exports/testing-basics.md")))
+      .to eq("Testing guidance\n")
+    spec = File.read(File.join(catalog, "packages/fork-base/fork-base.prayspec"))
+    expect(spec).to include("fork/base")
+    expect(spec).to include("exports/testing-basics.md")
+  end
+
+  it "keeps an overlay file when upstream moves" do
+    catalog, source = publish_upstream_catalog
+    write_empty_fork_package(catalog, "~> 1.4")
+    Dir.chdir(catalog) { Pray::CLI.run(["install"]) }
+    FileUtils.mkdir_p(File.join(catalog, "packages/fork-base/overlays"))
+    File.write(File.join(catalog, "packages/fork-base/overlays/note.md"), "local overlay\n")
+    spec_path = File.join(catalog, "packages/fork-base/fork-base.prayspec")
+    spec = File.read(spec_path).sub("\"README.md\"", "\"README.md\", \"overlays/note.md\"")
+    File.write(spec_path, spec)
+    Dir.chdir(catalog) { Pray::CLI.run(["install"]) }
+
+    bump_upstream_version(source)
+    prayers_root = File.join(workspace, "distribution/prayers")
+    Dir.chdir(source) { Pray::CLI.run(["publish", "--root", prayers_root]) }
+    distribution = File.join(workspace, "distribution")
+    GitDistributionFixture.run_git(distribution, "add", "-A")
+    GitDistributionFixture.run_git(distribution, "commit", "-m", "publish 1.4.4")
+    Dir.chdir(catalog) { Pray::CLI.run(["update"]) }
+
+    expect(File.read(File.join(catalog, "packages/fork-base/overlays/note.md"))).to eq("local overlay\n")
+    expect(File.read(File.join(catalog, "packages/fork-base/exports/testing-basics.md")))
+      .to eq("Testing guidance v2\n")
+  end
+
+  it "lists path-fork file drift on outdated" do
+    catalog, _source = publish_upstream_catalog
+    write_empty_fork_package(catalog, "~> 1.4")
+    Dir.chdir(catalog) { Pray::CLI.run(["install"]) }
+    File.write(File.join(catalog, "packages/fork-base/README.md"), "edited readme\n")
+    expect { Dir.chdir(catalog) { Pray::CLI.run(["outdated"]) } }
+      .to output(/README.md.*differs/m).to_stdout
+  end
+
+  def publish_upstream_catalog
+    source_repo = File.join(workspace, "source")
+    distribution_repo = File.join(workspace, "distribution")
+    prayers_root = File.join(distribution_repo, "prayers")
+    catalog_repo = File.join(workspace, "catalog")
+    FileUtils.mkdir_p(source_repo)
+    FileUtils.mkdir_p(distribution_repo)
+    FileUtils.mkdir_p(catalog_repo)
+
+    GitDistributionFixture.create_add_fixture(source_repo)
+    Dir.chdir(source_repo) do
+      GitDistributionFixture.publish_source_to_prayers(source_repo, prayers_root)
+    end
+    GitDistributionFixture.init_distribution_repo(distribution_repo, prayers_root)
+    write_fork_prayfile(catalog_repo, distribution_repo)
+    [catalog_repo, source_repo]
+  end
+
+  def write_empty_fork_package(catalog, constraint)
+    root = File.join(catalog, "packages/fork-base")
+    FileUtils.mkdir_p(root)
+    File.write(
+      File.join(root, "fork-base.prayspec"),
+      <<~PRAYSPEC
+        Package::Specification.new do |spec|
+          spec.name = "fork/base"
+          spec.version = "1.0.0"
+          spec.summary = "forked guidance"
+          spec.files = []
+          spec.upstream "sample/base", "#{constraint}"
+        end
+      PRAYSPEC
+    )
   end
 
   def catalog_after_upstream_bump(constraint)

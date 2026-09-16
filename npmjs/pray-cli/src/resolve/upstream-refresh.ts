@@ -1,6 +1,3 @@
-import { mkdirSync, readFileSync, statSync } from "node:fs";
-import { basename, dirname, join } from "node:path";
-import { validateArchiveMemberPath } from "../archive/path-safety.js";
 import { PrayError } from "../errors.js";
 import { prepareGitSources } from "../git/sources.js";
 import type { LockedUpstream, Lockfile } from "../lockfile/types.js";
@@ -8,19 +5,18 @@ import type { ManifestPackage, ManifestSource } from "../manifest/types.js";
 import { findPrayspecFile } from "../package-spec/discovery.js";
 import { renderPackageSpec } from "../package-spec/render.js";
 import type { PackageSpec } from "../package-spec/types.js";
-import {
-  MAX_ARCHIVE_ENTRIES,
-  MAX_ARCHIVE_ENTRY_BYTES,
-  MAX_ARCHIVE_TOTAL_BYTES,
-} from "../resource-limits.js";
-import { removeProjectFile, writeProjectFile } from "../transaction/index.js";
+import { writeProjectFile } from "../transaction/index.js";
 import type { ResolveOptions } from "./context.js";
 import { resolvePackage } from "./project.js";
 import { sourceMap } from "./source-map.js";
 import type { ResolvedPackage, ResolvedProject } from "./types.js";
 import { ensureLockedUpstreamMatches } from "./upstream.js";
 import {
-  contentPaths,
+  contentFileBytes,
+  localContentForRefresh,
+  writeContentFiles,
+} from "./upstream-io.js";
+import {
   isCleanReplica,
   nextUpstreamConstraint,
   tryMergeContentFiles,
@@ -73,6 +69,21 @@ async function applyOnePathUpstream(
   if (!newUpstream || !packageEntry.declaration.path) {
     return false;
   }
+  const localContent = localContentForRefresh(
+    packageEntry.root,
+    packageEntry.spec,
+  );
+  if (localContent.size === 0) {
+    return materializeEmptyPathFork(
+      project,
+      packageEntry,
+      previous,
+      sources,
+      gitSources,
+      options,
+      newUpstream,
+    );
+  }
   const oldUpstream = previous?.package.find(
     (entry) => entry.name === packageEntry.declaration.name,
   )?.upstream;
@@ -115,7 +126,6 @@ async function applyOnePathUpstream(
   );
   const oldContent = contentFileBytes(oldPackage.root, oldPackage.spec);
   const newContent = contentFileBytes(newPackage.root, newPackage.spec);
-  const localContent = contentFileBytes(packageEntry.root, packageEntry.spec);
   const merged = tryMergeContentFiles(oldContent, newContent, localContent);
   if (Array.isArray(merged)) {
     throw PrayError.resolution(
@@ -129,28 +139,65 @@ async function applyOnePathUpstream(
     );
   }
   writeContentFiles(packageEntry.root, oldContent, merged);
+  writeRefreshedSpec(
+    packageEntry,
+    newPackage,
+    isCleanReplica(oldContent, localContent),
+    [...merged.keys()],
+  );
+  return true;
+}
+
+async function materializeEmptyPathFork(
+  project: ResolvedProject,
+  packageEntry: ResolvedPackage,
+  previous: Lockfile | undefined,
+  sources: Map<string, ManifestSource>,
+  gitSources: ReturnType<typeof prepareGitSources>,
+  options: ResolveOptions,
+  newUpstream: LockedUpstream,
+): Promise<boolean> {
+  const newPackage = await resolveNamed(
+    project.projectRoot,
+    sources,
+    gitSources,
+    previous,
+    options,
+    newUpstream.name,
+    `= ${newUpstream.version}`,
+    newUpstream.source,
+  );
+  const newContent = contentFileBytes(newPackage.root, newPackage.spec);
+  writeContentFiles(packageEntry.root, new Map(), newContent);
+  writeRefreshedSpec(packageEntry, newPackage, true, [...newContent.keys()]);
+  return true;
+}
+
+function writeRefreshedSpec(
+  packageEntry: ResolvedPackage,
+  newPackage: ResolvedPackage,
+  cleanReplica: boolean,
+  mergedContentPaths: readonly string[],
+): void {
   const specPath = findPrayspecFile(packageEntry.root);
   const updated = forkSpecAfterRefresh(
     packageEntry.spec,
     newPackage.spec,
-    basename(specPath),
-    isCleanReplica(oldContent, localContent),
-    [...merged.keys()],
+    cleanReplica,
+    mergedContentPaths,
   );
   writeProjectFile(specPath, renderPackageSpec(updated));
-  return true;
 }
 
 function forkSpecAfterRefresh(
   local: PackageSpec,
   newUpstream: PackageSpec,
-  localPrayspecFile: string,
   cleanReplica: boolean,
   mergedContentPaths: readonly string[],
 ): PackageSpec {
   return {
     ...local,
-    files: [localPrayspecFile, ...mergedContentPaths],
+    files: [...mergedContentPaths],
     exports: cleanReplica ? new Map(newUpstream.exports) : local.exports,
     templates: cleanReplica ? new Map(newUpstream.templates) : local.templates,
     upstream: local.upstream
@@ -195,61 +242,4 @@ function resolveNamed(
     lockfile,
     options,
   );
-}
-
-function contentFileBytes(
-  root: string,
-  spec: PackageSpec,
-): Map<string, Buffer> {
-  const paths = contentPaths(spec.files);
-  if (paths.length > MAX_ARCHIVE_ENTRIES) {
-    throw PrayError.integrity(
-      `package content exceeds ${MAX_ARCHIVE_ENTRIES} files`,
-    );
-  }
-  const files = new Map<string, Buffer>();
-  let totalBytes = 0;
-  for (const relative of paths) {
-    validateArchiveMemberPath(relative);
-    const path = join(root, relative);
-    let size: number;
-    try {
-      size = statSync(path).size;
-    } catch {
-      throw PrayError.integrity(`package file missing: ${relative}`);
-    }
-    if (size > MAX_ARCHIVE_ENTRY_BYTES) {
-      throw PrayError.integrity(
-        `package file exceeds ${MAX_ARCHIVE_ENTRY_BYTES} bytes: ${relative}`,
-      );
-    }
-    totalBytes += size;
-    if (totalBytes > MAX_ARCHIVE_TOTAL_BYTES) {
-      throw PrayError.integrity(
-        `package content exceeds ${MAX_ARCHIVE_TOTAL_BYTES} bytes`,
-      );
-    }
-    files.set(relative, readFileSync(path));
-  }
-  return files;
-}
-
-function writeContentFiles(
-  root: string,
-  oldContent: Map<string, Buffer>,
-  merged: Map<string, Buffer>,
-): void {
-  for (const path of [...oldContent.keys(), ...merged.keys()]) {
-    validateArchiveMemberPath(path);
-  }
-  for (const path of oldContent.keys()) {
-    if (!merged.has(path)) {
-      removeProjectFile(join(root, path));
-    }
-  }
-  for (const [relative, bytes] of merged) {
-    const destination = join(root, relative);
-    mkdirSync(dirname(destination), { recursive: true });
-    writeProjectFile(destination, bytes);
-  }
 }

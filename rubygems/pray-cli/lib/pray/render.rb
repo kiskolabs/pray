@@ -3,6 +3,7 @@
 require "fileutils"
 require "pathname"
 require_relative "render_content"
+require_relative "render_managed"
 
 module Pray
   RenderedTarget = Struct.new(:path, :content, :managed_spans) do
@@ -76,7 +77,7 @@ module Pray
 
       (target.entries || []).each do |entry|
         if entry.kind == "local"
-          append_scoped_local(builder, project, entry.path, symbols)
+          append_scoped_local(builder, managed_spans, project, target, output, entry.path, symbols)
         else
           append_scoped_package(builder, managed_spans, project, target, output, entry.name, symbols)
         end
@@ -99,18 +100,17 @@ module Pray
         builder.append_empty_line
       end
       symbols = project.manifest.symbols || {}
+      managed_spans = []
       unbound_locals.each do |local|
         next if local.content.empty? && local.optional
 
         builder.append_line("### #{local.manifest_path}")
-        builder.append_body(Substitute.substitute_pray_symbols(local.content, symbols))
-        builder.append_empty_line
+        append_managed_local(builder, managed_spans, local, target, output, symbols)
       end
 
       builder.append_line("## Shared instructions")
       builder.append_empty_line
 
-      managed_spans = []
       project.packages.each do |package|
         next unless Environment.package_matches_environment?(package.declaration.groups, project.environment)
         next unless Destination.package_bound_to_compose?(package.declaration, target)
@@ -133,13 +133,11 @@ module Pray
       builder.append_empty_line
     end
 
-    def append_scoped_local(builder, project, path, symbols)
+    def append_scoped_local(builder, managed_spans, project, target, output, path, symbols)
       local = project.local_files.find { |candidate| candidate.manifest_path == path }
       return unless local
-      return if local.content.empty? && local.optional
 
-      builder.append_body(Substitute.substitute_pray_symbols(local.content, symbols))
-      builder.append_empty_line
+      append_managed_local(builder, managed_spans, local, target, output, symbols)
     end
 
     def append_scoped_package(builder, managed_spans, project, target, output, package_name, symbols)
@@ -152,34 +150,6 @@ module Pray
 
         append_managed_export(builder, managed_spans, package, export, target, output, symbols)
       end
-    end
-
-    def append_managed_export(builder, managed_spans, package, export, target, output, symbols)
-      body = package.export_bodies[export]
-      unless body
-        raise Error.integrity("compose cannot write binary export #{export}; use file: for unmarked bytes") if package.spec.exports[export]&.kind == "file"
-        raise Error.render("package #{package.declaration.name} is missing cached export #{export}")
-      end
-
-      body = Substitute.substitute_pray_symbols(body, symbols)
-      identifier = Hashing.marker_id("#{package.declaration.name}:#{export}:#{target.name}")
-      open_line = builder.next_line_number
-      builder.append_line("<!-- pray:#{identifier} -->")
-      builder.append_body(body)
-      close_line = builder.next_line_number
-      builder.append_line("<!-- pray:#{identifier} -->")
-      managed_spans << ManagedSpanRecord.new(
-        id: identifier,
-        target: output,
-        open_line: open_line,
-        close_line: close_line,
-        ideal_checksum: Hashing.checksum_managed_span_content(body),
-        package: package.declaration.name,
-        export: export,
-        source_checksum: package.source_checksum,
-        silenced: false
-      )
-      builder.append_empty_line
     end
 
     def should_inline_export?(package, export_name)

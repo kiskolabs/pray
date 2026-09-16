@@ -11,6 +11,8 @@ use std::collections::BTreeMap;
 mod maps;
 #[path = "package_spec_hash.rs"]
 mod package_hash;
+#[path = "package_spec_version.rs"]
+mod package_version;
 use maps::{
     array_of_strings, parse_exports, parse_metadata, parse_skills, parse_string_map,
     parse_templates, string_from_literal, string_from_value,
@@ -19,10 +21,13 @@ use maps::{
 #[derive(Debug, Clone, Default, Serialize, Deserialize, PartialEq)]
 pub struct PackageSpec {
     pub name: String,
+    #[serde(default, skip_serializing_if = "String::is_empty")]
     pub version: String,
     pub summary: Option<String>,
     pub description: Option<String>,
     pub authors: Vec<String>,
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub maintainers: Vec<String>,
     pub license: Option<String>,
     pub homepage: Option<String>,
     pub source_code_uri: Option<String>,
@@ -154,11 +159,14 @@ impl<'a> BlockParser<'a> {
             "summary" => spec.summary = Some(string_from_literal(value)?),
             "description" => spec.description = Some(string_from_literal(value)?),
             "authors" => spec.authors = array_of_strings(value)?,
+            "maintainers" => spec.maintainers = array_of_strings(value)?,
             "license" => spec.license = Some(string_from_literal(value)?),
             "homepage" => spec.homepage = Some(string_from_literal(value)?),
             "source_code_uri" => spec.source_code_uri = Some(string_from_literal(value)?),
             "changelog_uri" => spec.changelog_uri = Some(string_from_literal(value)?),
-            "prayfile_version" => spec.prayfile_version = Some(string_from_literal(value)?),
+            "prayfile_version" | "pray_version" => {
+                spec.prayfile_version = Some(string_from_literal(value)?)
+            }
             "files" => spec.files = array_of_strings(value)?,
             "targets" => spec.targets = array_of_strings(value)?,
             "exports" => spec.exports = parse_exports(value)?,

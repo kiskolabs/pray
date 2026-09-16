@@ -20,7 +20,7 @@ Operators and CI scripts need a stable verb list and exit codes.
 
 Core loop: `init` / `add` / `install` / `plan` / `apply` / `verify` / `drift`. Package loop: `package` / `publish` / `yank` / `search` / `serve`. Identity: `login`, `token`, `trust`, `confess`. Hygiene: `format`, `vendor`, `clean`, `tree`, `list`, `outdated`, `explain`.
 
-`prayer init` and `repo init` scaffold a package tree and a distribution root.
+`prayer init [name] [--path DIR]` scaffolds a local prayer under a path source when a Prayfile is present (RFC 0117), or a versioned package in the current directory otherwise. `repo init` scaffolds a distribution root.
 
 Unknown commands MUST fail toward `pray --help` (exit 2). `pray help <command>` MUST document every listed command.
 
@@ -80,6 +80,7 @@ Also useful: `remove`, `unlock`, `tree`, `list`, `outdated`, `explain`, `manifes
 - upgrade: install the latest Rust CLI via `cargo install`
 - completion: emit bash, zsh, or fish completion
 - version: print CLI version
+- prayer init [name] [--path DIR]: local prayer under a path source, or a versioned package scaffold without a Prayfile
 - list / outdated / explain: inventory locked packages
 
 ---

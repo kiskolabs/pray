@@ -2,7 +2,7 @@ use super::call::{parse_call, string_from_literal, string_from_value};
 use super::decls::{parse_local_decl, parse_package_decl};
 use super::policy::destination_header_keyword;
 use super::BlockParser;
-use crate::manifest::{DestinationMode, ExportRole, Manifest, ManifestLocal};
+use crate::manifest::{DestinationMode, ExportRole, Manifest};
 use crate::statement_surface::split_symbol_assignment;
 use crate::{PrayError, PrayResult};
 
@@ -130,7 +130,7 @@ impl BlockParser<'_> {
                 if !saw_package {
                     return Err(PrayError::Parse {
                         kind: "manifest",
-                        message: "file block requires a pray package declaration".to_string(),
+                        message: "file block requires a pray package".to_string(),
                     });
                 }
                 return Ok(());
@@ -142,6 +142,16 @@ impl BlockParser<'_> {
                 .or_else(|| statement.strip_prefix("agent "))
                 .or_else(|| statement.strip_prefix("package "))
             {
+                let (values, keywords) = parse_call(pray_rest)?;
+                if values.len() == 1 && keywords.is_empty() {
+                    let first = string_from_value(&values[0])?;
+                    if crate::destination::is_local_path_form(&first) {
+                        return Err(PrayError::Parse {
+                            kind: "manifest",
+                            message: "file: requires a package".to_string(),
+                        });
+                    }
+                }
                 let mut package = self.parse_package_with_groups(pray_rest)?;
                 if package.file.is_some() {
                     return Err(PrayError::Parse {
@@ -183,11 +193,11 @@ impl BlockParser<'_> {
             });
         }
         let first = string_from_value(&values[0])?;
-        let has_package_signal = values.len() > 1
+        let file_dest = keywords.get("file").map(string_from_value).transpose()?;
+        let other_package_signal = values.len() > 1
             || keywords.contains_key("source")
             || keywords.contains_key("export")
             || keywords.contains_key("exports")
-            || keywords.contains_key("file")
             || keywords.contains_key("optional")
             || keywords.contains_key("path")
             || keywords.contains_key("git")
@@ -198,30 +208,13 @@ impl BlockParser<'_> {
             || keywords.contains_key("targets")
             || keywords.contains_key("features");
 
-        let in_compose = destination_index.is_some_and(|index| {
-            manifest
-                .targets
-                .get(index)
-                .is_some_and(|target| target.mode == DestinationMode::Compose)
-        });
-
-        if !has_package_signal && crate::destination::is_local_path_form(&first) {
-            if !in_compose {
-                return Err(PrayError::Parse {
-                    kind: "manifest",
-                    message: "local pray paths are only valid inside compose blocks".to_string(),
-                });
-            }
-            let local = ManifestLocal {
-                path: first,
-                position: "after".to_string(),
-                optional: false,
-                bound: true,
-            };
-            if let Some(index) = destination_index {
-                crate::destination::bind_local_entry(&mut manifest.targets[index], &local.path);
-            }
-            crate::destination::upsert_local(manifest, local);
+        if crate::destination::try_apply_local_pray(
+            manifest,
+            &first,
+            file_dest.as_deref(),
+            other_package_signal,
+            destination_index,
+        )? {
             return Ok(());
         }
 

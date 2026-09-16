@@ -42,7 +42,7 @@ fn record_archive_path(
     if written_paths.insert(normalized.clone()) {
         return Ok(Some(normalized));
     }
-    // RFC 0114 lists the fork prayspec in spec.files after refresh; pack already includes it.
+    // Pack already includes the prayspec. A spec.files entry that names it is skipped once.
     if normalized == auto_included {
         return Ok(None);
     }

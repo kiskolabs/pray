@@ -1,16 +1,20 @@
 use crate::materialize::build_package_archive_bytes;
+use crate::project_paths::manifest_path;
 use crate::publish_integrity::{stored_package_artifact, stored_publish_matches};
 use crate::publish_ssh::publish_to_ssh_server;
-use crate::revision::{record_root_revision, RevisionAction};
-use crate::sync_peers::map_transport_error;
-use crate::transport_metadata::transport_package_metadata;
-use crate::{
+use crate::registry_ops::{
     current_signer, current_signer_fingerprint, current_timestamp, load_registry_index,
-    load_registry_package_metadata, manifest_path, registry_artifact_path, registry_metadata_path,
+    load_registry_package_metadata, registry_artifact_path, registry_metadata_path,
     torrent_manifest_bytes, torrent_manifest_path, write_output_bytes, write_registry_index,
     write_registry_package_metadata, write_torrent_manifest,
 };
+use crate::revision::{record_root_revision, RevisionAction};
+use crate::sync_peers::map_transport_error;
+use crate::transport_metadata::transport_package_metadata;
 use pray_core::derived_metadata::derive_registry_derived_metadata_from_archive_bytes;
+use pray_core::distribution::{
+    fetch_registry_distribution_settings, read_registry_distribution_settings,
+};
 use pray_core::hashing::sha256_prefixed;
 use pray_core::package_integrity::{package_signature_for_publish, resolve_publish_signing_key};
 use pray_core::registry::{
@@ -29,6 +33,9 @@ pub(crate) fn publish_command(
     signing_key_path: Option<PathBuf>,
 ) -> PrayResult<()> {
     let project = resolve_project(&manifest_path())?;
+    for package in &project.packages {
+        package.spec.require_release_version()?;
+    }
     let signer = current_signer()?;
     let signer_fingerprint = current_signer_fingerprint();
     let published_at = current_timestamp()?;
@@ -82,6 +89,7 @@ pub(crate) fn publish_to_root(
     root: &Path,
 ) -> PrayResult<()> {
     let mut registry_index = load_registry_index(root)?;
+    let distribution = read_registry_distribution_settings(root)?;
     let mut package_names = registry_index
         .packages
         .iter()
@@ -98,8 +106,9 @@ pub(crate) fn publish_to_root(
             .versions
             .iter()
             .find(|entry| entry.version == package.spec.version);
-        let stored_artifact = existing
-            .and_then(|entry| stored_package_artifact(root, &artifact_path, package, entry));
+        let stored_artifact = existing.and_then(|entry| {
+            stored_package_artifact(root, &artifact_path, package, entry, &distribution)
+        });
         if existing
             .zip(stored_artifact.as_deref())
             .is_some_and(|(entry, artifact_bytes)| {
@@ -120,7 +129,7 @@ pub(crate) fn publish_to_root(
 
         let archive_bytes = build_package_archive_bytes(package)?;
         write_output_bytes(&root.join(&artifact_path), &archive_bytes)?;
-        write_torrent_manifest(root, package, &artifact_path, &archive_bytes)?;
+        write_torrent_manifest(root, package, &artifact_path, &archive_bytes, &distribution)?;
         let mut version_entry = published_registry_package_version(
             package,
             signer,
@@ -228,6 +237,7 @@ pub(crate) fn publish_to_server(
     };
     let registry = TransportRegistry::new();
     let transport = registry.create(&peer).map_err(map_transport_error)?;
+    let distribution = fetch_registry_distribution_settings(server_url)?;
 
     for package in &project.packages {
         let archive_bytes = build_package_archive_bytes(package)?;
@@ -239,12 +249,19 @@ pub(crate) fn publish_to_server(
             &archive_bytes,
             authorization.as_deref(),
         )?;
-        upload_registry_artifact_with_authorization(
-            server_url,
-            &torrent_manifest_path(&artifact_path),
-            &torrent_manifest_bytes(package, &artifact_path, &archive_bytes)?,
-            authorization.as_deref(),
-        )?;
+        if distribution.allows_torrent() {
+            upload_registry_artifact_with_authorization(
+                server_url,
+                &torrent_manifest_path(&artifact_path),
+                &torrent_manifest_bytes(
+                    package,
+                    &artifact_path,
+                    &archive_bytes,
+                    distribution.bootstrap_trackers.clone(),
+                )?,
+                authorization.as_deref(),
+            )?;
+        }
 
         let metadata = RegistryPackageMetadata {
             name: package.declaration.name.clone(),

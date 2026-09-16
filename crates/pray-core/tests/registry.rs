@@ -25,7 +25,7 @@ fn prefers_torrent_sidecar_when_available() {
     let artifact_bytes = build_artifact_bytes();
     let piece_size = 4;
     let artifact_path = "v1/artifacts/sample/base/1.0.0/package.praypkg";
-    let source_url = start_registry_fixture(&artifact_bytes, artifact_path, true, piece_size);
+    let source_url = start_registry_fixture(&artifact_bytes, artifact_path, true, piece_size, true);
     let project_root = unique_temp_dir("pray-core-torrent-sidecar");
     let declaration = ManifestPackage {
         name: "sample/base".to_string(),
@@ -137,7 +137,8 @@ fn falls_back_to_direct_artifact_when_sidecar_is_missing() {
     let artifact_bytes = build_artifact_bytes();
     let piece_size = 4;
     let artifact_path = "v1/artifacts/sample/base/1.0.0/package.praypkg";
-    let source_url = start_registry_fixture(&artifact_bytes, artifact_path, false, piece_size);
+    let source_url =
+        start_registry_fixture(&artifact_bytes, artifact_path, false, piece_size, true);
     let project_root = unique_temp_dir("pray-core-torrent-fallback");
     let declaration = ManifestPackage {
         name: "sample/base".to_string(),
@@ -157,6 +158,36 @@ fn falls_back_to_direct_artifact_when_sidecar_is_missing() {
     assert!(resolved_root.join("package.prayspec").exists());
     let counts = read_request_counts(&source_url);
     assert_eq!(counts.metadata.load(Ordering::SeqCst), 1);
+    assert_eq!(counts.sidecar.load(Ordering::SeqCst), 1);
+    assert_eq!(counts.direct_artifact.load(Ordering::SeqCst), 1);
+    assert_eq!(counts.range_artifact.load(Ordering::SeqCst), 0);
+}
+
+#[test]
+fn torrent_sidecar_accepts_full_body_when_range_is_ignored() {
+    let artifact_bytes = build_artifact_bytes();
+    let piece_size = 4;
+    let artifact_path = "v1/artifacts/sample/base/1.0.0/package.praypkg";
+    let source_url =
+        start_registry_fixture(&artifact_bytes, artifact_path, true, piece_size, false);
+    let project_root = unique_temp_dir("pray-core-torrent-full-body");
+    let declaration = ManifestPackage {
+        name: "sample/base".to_string(),
+        source: Some("default".to_string()),
+        ..ManifestPackage::default()
+    };
+
+    let resolved_root = resolve_registry_package_root(
+        &project_root,
+        &source_url,
+        &declaration,
+        &PackageResolutionContext::default(),
+    )
+    .expect("full-body torrent sidecar should resolve")
+    .root;
+
+    assert!(resolved_root.join("package.prayspec").exists());
+    let counts = read_request_counts(&source_url);
     assert_eq!(counts.sidecar.load(Ordering::SeqCst), 1);
     assert_eq!(counts.direct_artifact.load(Ordering::SeqCst), 1);
     assert_eq!(counts.range_artifact.load(Ordering::SeqCst), 0);
@@ -189,6 +220,7 @@ fn start_registry_fixture(
     artifact_path: &str,
     include_sidecar: bool,
     piece_size: usize,
+    honor_range: bool,
 ) -> String {
     let listener = TcpListener::bind("127.0.0.1:0").expect("bind registry fixture");
     let address = listener.local_addr().expect("fixture address");
@@ -198,6 +230,7 @@ fn start_registry_fixture(
         sidecar: Arc::new(AtomicUsize::new(0)),
         direct_artifact: Arc::new(AtomicUsize::new(0)),
         range_artifact: Arc::new(AtomicUsize::new(0)),
+        honor_range,
     });
     request_counts()
         .lock()
@@ -211,7 +244,7 @@ fn start_registry_fixture(
     let artifact_path = artifact_path.to_string();
     let counts_for_thread = counts;
 
-    let expected_requests = if include_sidecar {
+    let expected_requests = if include_sidecar && honor_range {
         2 + expected_piece_count(&artifact_bytes, piece_size)
     } else {
         3
@@ -280,20 +313,22 @@ fn handle_registry_request(
 
     let artifact_request_path = format!("/{}", artifact_path);
     if path == artifact_request_path {
-        if let Some(range_header) = range_header {
-            counts.range_artifact.fetch_add(1, Ordering::SeqCst);
-            let (start, end) = parse_range(&range_header, artifact_bytes.len());
-            respond_partial(
-                stream,
-                &artifact_bytes[start..=end],
-                start,
-                end,
-                artifact_bytes.len(),
-            );
-        } else {
-            counts.direct_artifact.fetch_add(1, Ordering::SeqCst);
-            respond_ok(stream, artifact_bytes);
+        if counts.honor_range {
+            if let Some(range_header) = range_header {
+                counts.range_artifact.fetch_add(1, Ordering::SeqCst);
+                let (start, end) = parse_range(&range_header, artifact_bytes.len());
+                respond_partial(
+                    stream,
+                    &artifact_bytes[start..=end],
+                    start,
+                    end,
+                    artifact_bytes.len(),
+                );
+                return;
+            }
         }
+        counts.direct_artifact.fetch_add(1, Ordering::SeqCst);
+        respond_ok(stream, artifact_bytes);
         return;
     }
 
@@ -490,6 +525,7 @@ struct FixtureCounts {
     sidecar: Arc<AtomicUsize>,
     direct_artifact: Arc<AtomicUsize>,
     range_artifact: Arc<AtomicUsize>,
+    honor_range: bool,
 }
 
 #[derive(Serialize)]

@@ -16,6 +16,12 @@ fn publish_writes_torrent_manifest_sidecar_for_registry_artifacts() {
     let repo = temporary_directory("pray-publish-torrent");
     let registry_root = temporary_directory("pray-publish-torrent-root");
     create_add_fixture(&repo);
+    fs::create_dir_all(registry_root.join("v1")).expect("v1");
+    fs::write(
+        registry_root.join("v1/distribution.json"),
+        r#"{"spec":"pray-distribution-config-1","protocols":["torrent"]}"#,
+    )
+    .expect("distribution json");
 
     let add = run_pray(&repo, &["add", "sample/base", "--path", "packages/base"]);
     assert!(
@@ -86,6 +92,40 @@ fn publish_writes_torrent_manifest_sidecar_for_registry_artifacts() {
         .as_array()
         .expect("embeddings")
         .is_empty());
+}
+
+#[test]
+fn publish_skips_torrent_descriptor_when_distribution_protocols_are_empty() {
+    let repo = temporary_directory("pray-publish-no-torrent");
+    let registry_root = temporary_directory("pray-publish-no-torrent-root");
+    create_add_fixture(&repo);
+
+    let add = run_pray(&repo, &["add", "sample/base", "--path", "packages/base"]);
+    assert!(
+        add.status.success(),
+        "add failed: {}",
+        String::from_utf8_lossy(&add.stderr)
+    );
+
+    let publish = run_pray(
+        &repo,
+        &[
+            "publish",
+            "--root",
+            registry_root.to_str().expect("registry path"),
+        ],
+    );
+    assert!(
+        publish.status.success(),
+        "publish failed: {}",
+        String::from_utf8_lossy(&publish.stderr)
+    );
+
+    let artifact_path =
+        registry_root.join("v1/artifacts/sample/base/1.4.3/sample-base-1.4.3.praypkg");
+    assert!(artifact_path.is_file());
+    let manifest_path = PathBuf::from(format!("{}.praytorrent.json", artifact_path.display()));
+    assert!(!manifest_path.exists());
 }
 
 #[test]

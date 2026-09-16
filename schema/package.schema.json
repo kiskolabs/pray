@@ -7,7 +7,6 @@
   "additionalProperties": false,
   "required": [
     "name",
-    "version",
     "authors",
     "files",
     "exports",
@@ -36,6 +35,13 @@
       "minLength": 1
     },
     "authors": {
+      "type": "array",
+      "items": {
+        "type": "string",
+        "minLength": 1
+      }
+    },
+    "maintainers": {
       "type": "array",
       "items": {
         "type": "string",

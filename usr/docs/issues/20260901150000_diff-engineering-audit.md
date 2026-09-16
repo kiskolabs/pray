@@ -6,7 +6,7 @@ Andrei Makarov
 
 ## Decisions
 
-Audit radius is the uncommitted working tree on patch/fix-ruby-praypkg-unpack-cache versus HEAD 9bd41b4. That tree is the 1.9.2 unpack and cache work plus the EA-001 through EA-008 smallest-fix remediation.
+Audit radius is the uncommitted working tree versus HEAD 9bd41b4. That tree is the 1.9.2 unpack and cache work plus the EA-001 through EA-008 smallest-fix remediation.
 
 Prior notes claimed those eight items closed. This pass re-read the current Rust, TypeScript, and Ruby sources rather than the remediation changelog.
 
@@ -58,13 +58,11 @@ Boundary and control: zstd and tar are commanded processes. Encoding.default_int
 
 ## Next
 
-D-001 through D-012 are implemented on this branch. D-004: verification codes are delivered to `.pray/verification-deliveries.jsonl`, verify mints an email session, enroll requires that bearer, and email-only session issue stays 403. RFC 0051.
+D-001 through D-012 are implemented. D-004: verification codes are delivered to `.pray/verification-deliveries.jsonl`, verify mints an email session, enroll requires that bearer, and email-only session issue stays 403. RFC 0051.
 
 Remaining residuals: Ruby trust feed GET still buffers the full body; unpack still expands full zstd then tar in TypeScript and Ruby; no shared sparse or symlink hostile-archive fixture across the three clients.
 
 ## Source
-
-Working tree on patch/fix-ruby-praypkg-unpack-cache.
 
 Prior notes: usr/docs/issues/20260901133800_audit-ruby-praypkg-unpack-cache.md, usr/docs/issues/20260901135528_engineering-audit-auth-integrity-parity.md, usr/docs/changelogs/20260901143628_engineering-audit-remediation.md.
 
