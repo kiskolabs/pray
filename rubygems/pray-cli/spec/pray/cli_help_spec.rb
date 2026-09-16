@@ -23,6 +23,7 @@ RSpec.describe "pray CLI help" do
     stdout, _stderr, status = run_pray("help", "install")
     expect(status).to be_success
     expect(stdout).to include("--offline")
+    expect(stdout).to include("spec.upstream")
     expect(stdout).not_to include("Documentation:")
   end
 
@@ -37,6 +38,34 @@ RSpec.describe "pray CLI help" do
     expect(status).to be_success
     expect(stdout).to include("latest package versions")
     expect(stdout).to include("spec.upstream")
+    expect(stdout).to include("pray install")
+    expect(stdout).to include("local compose")
+  end
+
+  it "describes update on the packages list" do
+    stdout, _stderr, status = run_pray("--help")
+    expect(status).to be_success
+    expect(stdout).to include("re-resolve packages and git sources within constraints")
+  end
+
+  it "names dest versus lock on verify and dest write on render" do
+    stdout, _stderr, status = run_pray("help", "verify")
+    expect(status).to be_success
+    expect(stdout).to include("dest managed spans versus Prayfile.lock")
+    stdout, _stderr, status = run_pray("help", "render")
+    expect(status).to be_success
+    expect(stdout).not_to include("without updating the lockfile")
+    expect(stdout).to include("write dest")
+    stdout, _stderr, status = run_pray("help", "plan")
+    expect(status).to be_success
+    expect(stdout).to include("dry-run")
+  end
+
+  it "documents local prayer init" do
+    stdout, _stderr, status = run_pray("help", "prayer")
+    expect(status).to be_success
+    expect(stdout).to include("prayers/")
+    expect(stdout).to include("pray prayer init")
   end
 
   it "prints help for listed commands" do

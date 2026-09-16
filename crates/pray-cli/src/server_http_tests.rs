@@ -85,3 +85,40 @@ fn handle_rpc_and_http_dispatch_share_sync_package_path() {
     assert_ne!(first, second);
     let _ = fs::remove_dir_all(&root);
 }
+
+#[test]
+fn missing_static_file_returns_not_found() {
+    let root = temporary_root("missing-static");
+    let auth = ServeAuth::http("127.0.0.1", false);
+    let response =
+        dispatch_http_request(&root, &auth, "GET", "/v1/distribution.json", &[]).expect("dispatch");
+    assert_eq!(response.status, 404);
+    let _ = fs::remove_dir_all(&root);
+}
+
+#[test]
+fn apply_byte_range_returns_partial_content() {
+    let (status, body, range) =
+        super::apply_byte_range(200, b"abcdefgh".to_vec(), Some("bytes=2-4")).expect("range");
+    assert_eq!(status, 206);
+    assert_eq!(body, b"cde");
+    assert_eq!(range.as_deref(), Some("bytes 2-4/8"));
+}
+
+#[test]
+fn apply_byte_range_accepts_a_range_from_the_first_byte() {
+    let (status, body, range) =
+        super::apply_byte_range(200, b"abcdefgh".to_vec(), Some("bytes=0-2")).expect("range");
+    assert_eq!(status, 206);
+    assert_eq!(body, b"abc");
+    assert_eq!(range.as_deref(), Some("bytes 0-2/8"));
+}
+
+#[test]
+fn apply_byte_range_rejects_unsatisfiable_range() {
+    let (status, body, range) =
+        super::apply_byte_range(200, b"ab".to_vec(), Some("bytes=5-9")).expect("range");
+    assert_eq!(status, 416);
+    assert!(body.is_empty());
+    assert_eq!(range.as_deref(), Some("bytes */2"));
+}

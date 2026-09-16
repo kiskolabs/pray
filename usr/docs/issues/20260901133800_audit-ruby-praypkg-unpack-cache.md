@@ -10,7 +10,7 @@ Audit covers the 1.9.2 Ruby unpack and cache-ready changes plus nearby install c
 
 ## Effects
 
-Findings ranked below. Highest residual risk from the first pass (path-unsafe tar unpack, in-place cache install, implied source gap) was addressed on patch/fix-ruby-praypkg-unpack-cache.
+Findings ranked below. Highest residual risk from the first pass (path-unsafe tar unpack, in-place cache install, implied source gap) was addressed.
 
 Unused tempfile require removed from archive.rb. Root CHANGELOG 1.9.2 bullets rewritten away from Encoding.default_internal naming. Safe unpack, staging install, and Ruby implied source shipped with specs.
 
@@ -20,7 +20,6 @@ Publish 1.9.2 after review. Optional later: share one archive fixture corpus acr
 
 ## Source
 
-patch/fix-ruby-praypkg-unpack-cache
 rubygems/pray-cli/lib/pray/archive.rb
 rubygems/pray-cli/lib/pray/registry.rb
 crates/pray-core/src/package_archive.rs

@@ -1,5 +1,6 @@
 use crate::materialize::find_prayspec_file;
 use crate::torrent_manifest_path;
+use pray_core::distribution::RegistryDistributionSettings;
 use pray_core::hashing::sha256_prefixed;
 use pray_core::package_integrity::package_signature_for_publish;
 use pray_core::paths::normalize_package_relative_path;
@@ -19,6 +20,7 @@ pub(crate) fn stored_package_artifact(
     artifact_path: &str,
     package: &ResolvedPackage,
     existing: &RegistryPackageVersion,
+    distribution: &RegistryDistributionSettings,
 ) -> Option<Vec<u8>> {
     if existing.artifact != artifact_path
         || existing.tree_hash.as_deref() != Some(package.tree_hash.as_str())
@@ -29,10 +31,12 @@ pub(crate) fn stored_package_artifact(
         return None;
     };
     let artifact_hash = sha256_prefixed(&artifact_bytes);
+    let descriptor_ok =
+        !distribution.allows_torrent() || root.join(torrent_manifest_path(artifact_path)).is_file();
     (existing.artifact_hash.as_deref() == Some(artifact_hash.as_str())
         && stored_prayspec_matches(&artifact_bytes, &package.root)
-        && root.join(torrent_manifest_path(artifact_path)).is_file())
-    .then_some(artifact_bytes)
+        && descriptor_ok)
+        .then_some(artifact_bytes)
 }
 
 pub(crate) fn stored_publish_matches(

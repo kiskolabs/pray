@@ -42,10 +42,7 @@ module Pray
           path = target.skills.first || ""
           lines << %(tree "#{path}" do)
           target.entries.each do |entry|
-            next unless entry.kind == "package"
-
-            package = find_package(manifest, entry.name)
-            lines << "  #{ManifestMethods.format_package_declaration(package)}" if package
+            lines << "  #{format_destination_entry(entry, manifest)}"
           end
           lines << "end"
         end

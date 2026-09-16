@@ -99,7 +99,8 @@ local ".agents/project.md", position: :after
 
 Rules:
 
-- store human-owned project context under `.agents/` (for example `.agents/project.md`), not under alternate trees such as `agent/local/`
+- store a short human-owned compose file under `.agents/` (for example `.agents/project.md`), not under alternate trees such as `agent/local/`
+- when that text is meant to grow into a shareable prayer, keep it as a path-source package (RFC 0117)
 - never overwritten by pray on disk
 - content is re-embedded into rendered root files on each render run
 - agents edit local source files, not the embed copy inside INSTRUCTIONS.md

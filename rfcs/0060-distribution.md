@@ -38,10 +38,14 @@ Recommended layout:
 
 ```
 /v1/index.json
+/v1/distribution.json
+/v1/trust.json
 /v1/packages/sample/base.json
 /v1/packages/sample/webapp.json
 /v1/artifacts/sample/base/1.4.3/sample-base-1.4.3.praypkg
 ```
+
+`v1/distribution.json` is protocol policy (RFC 0062). `v1/trust.json` is authentication. Protocol descriptor files such as `.praytorrent.json` are not part of this layout unless that policy lists them.
 
 index.json:
 

@@ -53,7 +53,7 @@ For a local distribution root, a publisher MUST look for a row with the package 
 - its archived prayspec filename and bytes equal the current package prayspec;
 - its signer, signer fingerprint, public key, and signature equal the publish input.
 
-An implementation with required sidecars MAY require those sidecars to exist before treating the row as current. When the row is current, the publisher MUST preserve the artifact and complete version row.
+An implementation with required protocol descriptors MAY require those descriptors to exist before treating the row as current. When the row is current, the publisher MUST preserve the artifact and complete version row.
 
 When the row is absent or not current, the publisher builds and writes the artifact and version row. If a row for that version already exists, publish MUST preserve its `yanked` value. Publish MUST preserve `published_at` when the prior artifact passes its hash check and its package tree and prayspec match the current package. A changed tree or prayspec receives the current publish time. Artifact encoding, signer, or signature changes do not change the first-publish time when package content is unchanged.
 

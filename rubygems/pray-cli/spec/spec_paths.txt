@@ -1,3 +1,4 @@
+spec/pray/apply_report_spec.rb
 spec/pray/archive_spec.rb
 spec/pray/clean_spec.rb
 spec/pray/cli_help_spec.rb
@@ -5,9 +6,12 @@ spec/pray/cli_parse_spec.rb
 spec/pray/cli_run_context_spec.rb
 spec/pray/cli_suggest_spec.rb
 spec/pray/confess_spec.rb
+spec/pray/conformance_fixtures_spec.rb
+spec/pray/conformance_resolve_spec.rb
 spec/pray/constraint_spec.rb
 spec/pray/deprecation_spec.rb
 spec/pray/destination_render_spec.rb
+spec/pray/distribution_spec.rb
 spec/pray/dotenv_spec.rb
 spec/pray/environment_spec.rb
 spec/pray/format_manifest_spec.rb
@@ -19,6 +23,7 @@ spec/pray/install_git_global_cache_spec.rb
 spec/pray/install_spec.rb
 spec/pray/invocation_spec.rb
 spec/pray/library_spec.rb
+spec/pray/local_prayer_spec.rb
 spec/pray/lockfile_performance_spec.rb
 spec/pray/lockfile_spec.rb
 spec/pray/login_spec.rb
@@ -32,6 +37,7 @@ spec/pray/publish_spec.rb
 spec/pray/registry_spec.rb
 spec/pray/render_content_spec.rb
 spec/pray/render_spec.rb
+spec/pray/resolve_context_spec.rb
 spec/pray/resolve_source_spec.rb
 spec/pray/serve_federation_spec.rb
 spec/pray/serve_spec.rb
@@ -40,6 +46,7 @@ spec/pray/shared_corpus_spec.rb
 spec/pray/statement_surface_spec.rb
 spec/pray/substitute_spec.rb
 spec/pray/sync_spec.rb
+spec/pray/torrent_manifest_spec.rb
 spec/pray/transaction_spec.rb
 spec/pray/trust_cli_spec.rb
 spec/pray/trust_spec.rb

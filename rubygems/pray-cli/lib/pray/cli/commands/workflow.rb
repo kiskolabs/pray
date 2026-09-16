@@ -5,6 +5,7 @@ require "fileutils"
 module Pray
   module CLI
     def install_command(flags)
+      previous_lockfile = File.exist?(lockfile_path) ? Pray.read_lockfile(lockfile_path) : nil
       Pray.materialize_project(
         manifest_path: manifest_path,
         frozen: flags[:frozen],
@@ -14,6 +15,10 @@ module Pray
         ignore_locked_versions: flags[:ignore_locked_versions],
         unlocked_packages: flags[:unlocked_packages]
       )
+      return if flags[:frozen] || flags[:locked]
+
+      project = resolve_current_project
+      ApplyReport.local_summary_lines(previous_lockfile, project).each { |line| puts line }
     end
 
     def render_command(flags)

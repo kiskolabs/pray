@@ -70,6 +70,7 @@ export interface ManifestLocal {
   position: LocalPosition;
   optional: boolean;
   bound?: boolean;
+  file?: string;
 }
 
 export interface RenderPolicy {
@@ -175,7 +176,8 @@ export function manifestToJson(manifest: Manifest): Record<string, unknown> {
       path: entry.path,
       position: entry.position,
       optional: entry.optional,
-      bound: entry.bound ?? false,
+      ...(entry.bound ? { bound: true } : {}),
+      ...(entry.file ? { file: entry.file } : {}),
     })),
     ...(Object.keys(canonical.symbols ?? {}).length > 0
       ? { symbols: canonical.symbols }

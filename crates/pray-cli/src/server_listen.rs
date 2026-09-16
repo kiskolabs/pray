@@ -1,5 +1,5 @@
 use crate::server::{dispatch_http_request, ServeAuth};
-use crate::server_http::write_response;
+use crate::server_http::{apply_byte_range, write_response, write_response_with_range};
 use pray_core::resource_limits::{
     MAX_SERVE_BODY_BYTES, MAX_SERVE_CONCURRENT_CONNECTIONS, MAX_SERVE_HEADER_BYTES,
     SERVE_SOCKET_TIMEOUT_SECS,
@@ -71,6 +71,7 @@ fn handle_connection(root: PathBuf, auth: ServeAuth, mut stream: TcpStream) -> P
     let mut content_length = 0usize;
     let mut header_bytes = 0usize;
     let mut authorization = None;
+    let mut range = None;
     loop {
         let mut header_line = String::new();
         reader.read_line(&mut header_line)?;
@@ -96,6 +97,8 @@ fn handle_connection(root: PathBuf, auth: ServeAuth, mut stream: TcpStream) -> P
                     .map_err(|error| PrayError::Resolution(error.to_string()))?;
             } else if name.eq_ignore_ascii_case("authorization") {
                 authorization = Some(value.trim().to_string());
+            } else if name.eq_ignore_ascii_case("range") {
+                range = Some(value.trim().to_string());
             }
         }
     }
@@ -118,12 +121,15 @@ fn handle_connection(root: PathBuf, auth: ServeAuth, mut stream: TcpStream) -> P
     }
 
     let response = dispatch_http_request(&root, &auth, method, path, &body)?;
+    let (status, body, content_range) =
+        apply_byte_range(response.status, response.body, range.as_deref())?;
 
-    write_response(
+    write_response_with_range(
         &mut stream,
-        response.status,
+        status,
         &response.content_type,
-        response.body,
+        content_range.as_deref(),
+        body,
     )?;
     Ok(())
 }

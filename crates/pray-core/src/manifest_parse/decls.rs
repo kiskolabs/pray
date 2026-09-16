@@ -202,6 +202,7 @@ pub(super) fn parse_local_decl(rest: &str) -> PrayResult<ManifestLocal> {
             .and_then(|value| value.as_bool())
             .unwrap_or(false),
         bound: false,
+        file: None,
     })
 }
 

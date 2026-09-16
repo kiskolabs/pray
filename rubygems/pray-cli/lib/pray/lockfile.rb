@@ -5,6 +5,8 @@ require "perfect_toml"
 require_relative "lockfile_serialize"
 
 module Pray
+  LOCAL_EMBED_PACKAGE = "local"
+
   LockSource = Struct.new(:name, :kind, :url, :revision, :host_key_fingerprint)
   LockedPackage = Struct.new(
     :name, :version, :source, :path, :tree_hash, :artifact_hash, :artifact,
@@ -20,7 +22,11 @@ module Pray
   ManagedSpanRecord = Struct.new(
     :id, :target, :open_line, :close_line, :ideal_checksum, :package, :export,
     :source_checksum, :silenced
-  )
+  ) do
+    def local_embed?
+      package == LOCAL_EMBED_PACKAGE
+    end
+  end
   ProvisionedFileRecord = Struct.new(:path, :content_hash, :package, :export)
 
   Lockfile = Struct.new(
@@ -179,7 +185,7 @@ module Pray
         package: packages.map do |package|
           LockedPackage.new(
             name: package.declaration.name,
-            version: package.spec.version,
+            version: package.spec.recorded_version,
             source: package.declaration.source,
             path: relative_lockfile_path(project_root, package.root),
             tree_hash: package.tree_hash,

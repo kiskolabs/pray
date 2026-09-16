@@ -116,7 +116,7 @@ module Pray
         while (statement = next_statement)
           if statement == "end"
             unless saw_package
-              raise Error.parse("manifest", "file block requires a pray package declaration")
+              raise Error.parse("manifest", "file block requires a pray package")
             end
             return
           end
@@ -132,7 +132,15 @@ module Pray
           return true
         end
         if (match = statement.match(/\A(?:pray|use|include|package) (.+)\z/))
-          bind_file_package(manifest, match[1], file_path)
+          rest = match[1]
+          values, keywords = parse_call(rest)
+          if values.length == 1 && keywords.empty?
+            first = string_from_value(values.first)
+            if Destination.local_path_form?(first)
+              raise Error.parse("manifest", "file: requires a package")
+            end
+          end
+          bind_file_package(manifest, rest, file_path)
           return true
         end
         raise Error.parse("manifest", "unsupported statement inside file block: #{statement}")
@@ -161,19 +169,11 @@ module Pray
       end
 
       def apply_local_pray_path(manifest, first, keywords, values, destination_index)
-        return false if package_signal?(values, keywords)
-        return false unless Destination.local_path_form?(first)
-
-        in_compose = destination_index &&
-          manifest.targets[destination_index]&.mode == "compose"
-        unless in_compose
-          raise Error.parse("manifest", "local pray paths are only valid inside compose blocks")
-        end
-
-        local = ManifestLocal.new(path: first, position: "after", optional: false, bound: true)
-        Destination.bind_local_entry(manifest.targets[destination_index], local.path)
-        Destination.upsert_local(manifest, local)
-        true
+        file_dest = keywords["file"]&.as_string
+        other_package_signal = values.length > 1 ||
+          %w[source export exports optional path git tag rev tarball oci targets features]
+            .any? { |key| keywords.key?(key) }
+        Destination.try_apply_local_pray(manifest, first, file_dest, other_package_signal, destination_index)
       end
 
       def package_signal?(values, keywords)

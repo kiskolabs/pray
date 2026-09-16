@@ -280,6 +280,10 @@
         },
         "bound": {
           "type": "boolean"
+        },
+        "file": {
+          "type": "string",
+          "minLength": 1
         }
       }
     },

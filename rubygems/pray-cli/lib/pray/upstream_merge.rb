@@ -76,6 +76,31 @@ module Pray
 
       "= #{new_version}"
     end
+
+    def overlay_file_changes(local_content, upstream_content)
+      (local_content.keys + upstream_content.keys).uniq.sort.filter_map do |path|
+        local = local_content[path]
+        upstream = upstream_content[path]
+        if local && upstream && local != upstream
+          [path, :changed]
+        elsif local && upstream.nil?
+          [path, :local_only]
+        elsif local.nil? && upstream
+          [path, :missing]
+        end
+      end
+    end
+
+    def overlay_drift_line(fork, upstream_name, upstream_version, path, change)
+      case change
+      when :changed
+        "#{fork} #{path} differs from #{upstream_name} #{upstream_version}"
+      when :local_only
+        "#{fork} #{path} local"
+      else
+        "#{fork} #{path} missing from fork"
+      end
+    end
     private_class_method :merge_one_content_path, :merge_all_present
   end
 end

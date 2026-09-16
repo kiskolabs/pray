@@ -33,6 +33,8 @@ export interface LockedTarget {
   outputs: string[];
 }
 
+export const LOCAL_EMBED_PACKAGE = "local";
+
 export interface ManagedSpanRecord {
   id: string;
   target: string;
@@ -94,5 +96,5 @@ export function canonicalLockfile(lockfile: Lockfile): Lockfile {
   };
 }
 
-export const PACKAGE_VERSION = "1.16.0";
+export const PACKAGE_VERSION = "1.17.0";
 export const GENERATED_BY = `pray ${PACKAGE_VERSION} (typescript)`;

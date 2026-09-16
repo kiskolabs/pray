@@ -1,5 +1,16 @@
 # CHANGELOG
 
+## 1.17.0 (2026-09-16)
+
+- Locate local prayers through a path source of any directory name (RFC 0117). `pray prayer init` adds `source "local"` when needed and declares `pray "local/project"` once. Version is optional until `pray package` or `pray publish`. `.agents/project.md` remains a compose shortcut for one local file.
+- Copy upstream files into an empty path-fork tree on `pray install` and `pray update` (RFC 0116). Extra listed overlay files stay. `pray outdated` lists fork files that differ from the locked upstream. An identity-only fork uses empty `spec.files`; refresh lists content paths, not the prayspec file.
+- Refuse a local path with `file:` and a local path inside `tree`. Compose still embeds local fragments. Package `file:` and package `tree` stay. RFC 0115 proposed those dest copies and is not adopted.
+- Name dest versus lock on `pray verify`, dest versus a fresh render on `pray drift`, and dest write on `pray render`. Dry-run of a write is `pray plan`. `pray update` has a Packages-list description. Listed local compose files stay on `pray install`.
+- Write `.praytorrent.json` when `v1/distribution.json` lists `protocols: ["torrent"]` (RFC 0062). `pray repo init` writes empty protocols. `pray serve` returns 404 for a missing file and 206 for a satisfiable Range.
+- Parse `spec.maintainers` as a string array, and accept `spec.pray_version` as an alias for `spec.prayfile_version` (RFC 0011).
+- Re-embed a changed local compose source on `pray install`, `pray update`, and `pray plan`, and print its `sha256` as `checked` or `was`.
+- List local checksum drift under `pray outdated`. The Rust CLI install footer counts local files separately from packages.
+
 ## 1.16.0 (2026-09-15)
 
 - Document `pray_core::embed` as the Rust library surface for parse, resolve, lock, render, and verify (RFC 0109).

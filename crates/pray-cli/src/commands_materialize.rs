@@ -57,7 +57,18 @@ pub(crate) fn materialize_command(
     resolve_options: ResolveOptions,
     silent_report: bool,
 ) -> PrayResult<Option<MaterializationPreview>> {
-    let project = resolve_project_for_materialization(&resolve_options, locked, frozen)?;
+    let mut project = resolve_project_for_materialization(&resolve_options, locked, frozen)?;
+    if !locked && !frozen {
+        let previous = read_lockfile(&lockfile_path()).ok();
+        if pray_core::resolve::apply_path_upstream_refreshes(
+            &project,
+            previous.as_ref(),
+            None,
+            &resolve_options,
+        )? {
+            project = resolve_project_for_materialization(&resolve_options, locked, frozen)?;
+        }
+    }
     let rendered = render_project(&project)?;
     let lockfile_path = lockfile_path();
     if locked {

@@ -24,6 +24,7 @@ function resolvedPackage(
     version: "1.0.0",
     summary: "summary",
     authors: [],
+    maintainers: [],
     files: [],
     exports: new Map([
       [

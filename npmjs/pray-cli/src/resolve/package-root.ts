@@ -8,6 +8,7 @@ import {
   resolveDistributionRoot,
 } from "../git/sources.js";
 import { isLocalSourceUrl } from "../http/client.js";
+import { pathSourcePackageDirectory } from "../local-prayer.js";
 import type { Lockfile } from "../lockfile/types.js";
 import type { ManifestPackage, ManifestSource } from "../manifest/types.js";
 import {
@@ -65,8 +66,11 @@ export async function resolvePackageRoot(
     };
 
     if (source.kind === "path") {
-      const slug = declaration.name.replaceAll("/", "-");
-      return { root: resolve(projectRoot, source.url, slug) };
+      const directory = pathSourcePackageDirectory(
+        sourceName,
+        declaration.name,
+      );
+      return { root: resolve(projectRoot, source.url, directory) };
     }
 
     if (source.kind === "registry" || source.kind === "static index") {
@@ -165,6 +169,14 @@ export function impliedSourceName(
   const namespace = packageNamespace(declaration.name);
   if (namespace && sources.has(namespace)) {
     return namespace;
+  }
+  if (!declaration.name.includes("/")) {
+    const pathSources = [...sources.entries()].filter(
+      ([, source]) => source.kind === "path",
+    );
+    if (pathSources.length === 1) {
+      return pathSources[0]?.[0];
+    }
   }
   if (sources.size === 1) {
     return sources.keys().next()?.value;

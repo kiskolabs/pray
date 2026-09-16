@@ -54,9 +54,15 @@ module Pray
           raise
         end
       end
+      previous_lockfile = project.previous_lockfile
+      unless locked || frozen
+        if Upstream.apply_path_upstream_refreshes(project, previous_lockfile, nil, options)
+          project = Resolve.resolve_project_in_context(manifest_path, project_root, options)
+          previous_lockfile = project.previous_lockfile
+        end
+      end
       rendered = Render.render_project(project)
       lockfile_path = default_lockfile_path(project.project_root)
-      previous_lockfile = project.previous_lockfile
       next_lockfile = LockfileIO.build_lockfile(
         project.manifest_hash,
         project.environment,

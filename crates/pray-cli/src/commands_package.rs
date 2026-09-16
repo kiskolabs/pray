@@ -51,6 +51,7 @@ pub(crate) fn format_command() -> PrayResult<()> {
 pub(crate) fn package_command() -> PrayResult<()> {
     let project = resolve_project(&manifest_path())?;
     for package in &project.packages {
+        package.spec.require_release_version()?;
         let output_path = package_archive_path(&package.declaration.name, &package.spec.version);
         write_package_archive(package, &output_path)?;
     }

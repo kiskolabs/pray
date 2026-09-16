@@ -280,7 +280,7 @@ Stable ordering:
 - targets sorted by name
 - arrays sorted unless order is semantic
 
-The lockfile should record: manifest hash, resolved package versions, source identity, artifact hashes, tree hashes, selected exports, dependency graph, and managed span records (ideal checksums and marker line positions per prayer).
+The lockfile should record: manifest hash, resolved package versions, source identity, artifact hashes, tree hashes, selected exports, dependency graph, and managed span records (ideal checksums and marker line positions per prayer). A path package with no `spec.version` records `version = "local"` (RFC 0117).
 
 Per-target `render_hash` may summarize an entire output file. Managed span records are the authoritative per-prayer contract for verify and drift.
 

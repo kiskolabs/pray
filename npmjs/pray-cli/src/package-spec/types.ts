@@ -37,6 +37,7 @@ export interface PackageSpec {
   summary?: string;
   description?: string;
   authors: string[];
+  maintainers: string[];
   license?: string;
   homepage?: string;
   sourceCodeUri?: string;
@@ -58,6 +59,7 @@ export function canonicalPackageSpec(spec: PackageSpec): PackageSpec {
     ...spec,
     files: [...spec.files].sort(),
     authors: [...spec.authors].sort(),
+    maintainers: [...(spec.maintainers ?? [])].sort(),
     targets: [...spec.targets].sort(),
     dependencies: [...spec.dependencies].sort(
       (left, right) =>

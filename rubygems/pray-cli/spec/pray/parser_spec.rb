@@ -63,6 +63,39 @@ RSpec.describe "Pray parser" do
     expect(package.dependencies.first.name).to eq("sample/common")
   end
 
+  it "parses a package spec without version" do
+    package = Pray.parse_package_spec(<<~SPEC)
+      Package::Specification.new do |spec|
+        spec.name = "project"
+        spec.files = ["exports/project.md"]
+      end
+    SPEC
+
+    expect(package.name).to eq("project")
+    expect(package.version).to eq("")
+    expect(package.recorded_version).to eq("local")
+    expect { package.satisfy_constraint!("*") }.not_to raise_error
+    expect { package.satisfy_constraint!("~> 1.0") }.to raise_error(Pray::Error, /has no version/)
+    expect { package.require_release_version! }.to raise_error(Pray::Error, /needs a version/)
+  end
+
+  it "parses package spec maintainers and pray_version alias" do
+    package = Pray.parse_package_spec(<<~SPEC)
+      Package::Specification.new do |spec|
+        spec.name = "sample/base"
+        spec.version = "1.4.3"
+        spec.authors = ["Pat"]
+        spec.maintainers = ["Kim", "Alex"]
+        spec.pray_version = ">= 0.1"
+        spec.files = ["README.md"]
+      end
+    SPEC
+
+    expect(package.authors).to eq(["Pat"])
+    expect(package.maintainers).to eq(%w[Alex Kim])
+    expect(package.prayfile_version).to eq(">= 0.1")
+  end
+
   it "parses package spec upstream" do
     package = Pray.parse_package_spec(<<~SPEC)
       Package::Specification.new do |spec|
@@ -305,6 +338,47 @@ RSpec.describe "Pray parser" do
     expect(manifest.packages[0].roles).to eq(["folder"])
   end
 
+  it "rejects a local path inside a tree block" do
+    expect do
+      Pray.parse_manifest(<<~PRAYFILE)
+        prayfile "1"
+        tree ".agents/skills" do
+          pray "sample/audit", "~> 2.0"
+          pray ".agents/local-skills"
+        end
+      PRAYFILE
+    end.to raise_error(Pray::Error, /compose/)
+  end
+
+  it "rejects a local exclusive file" do
+    expect do
+      Pray.parse_manifest(<<~PRAYFILE)
+        prayfile "1"
+        pray ".agents/zshrc", file: ".zshrc"
+      PRAYFILE
+    end.to raise_error(Pray::Error, /file:/)
+  end
+
+  it "rejects a file block with a local path" do
+    expect do
+      Pray.parse_manifest(<<~PRAYFILE)
+        prayfile "1"
+        file ".gitignore" do
+          pray ".agents/gitignore"
+        end
+      PRAYFILE
+    end.to raise_error(Pray::Error, /package/)
+  end
+
+  it "rejects a bare local path outside compose" do
+    expect do
+      Pray.parse_manifest(<<~PRAYFILE)
+        prayfile "1"
+        pray ".agents/project.md"
+      PRAYFILE
+    end.to raise_error(Pray::Error, /compose/)
+  end
+
   it "parses file: on a pray declaration for exact bindings" do
     manifest = Pray.parse_manifest(<<~PRAYFILE)
       prayfile "1"
@@ -335,7 +409,7 @@ RSpec.describe "Pray parser" do
         file "SECURITY.md" do
         end
       PRAYFILE
-    end.to raise_error(Pray::Error, /requires a pray package declaration/)
+    end.to raise_error(Pray::Error, /requires a pray package/)
   end
 
   it "parses pray symbol block" do
@@ -428,5 +502,19 @@ RSpec.describe "Pray parser" do
         end
       PRAYFILE
     end.to raise_error(Pray::Error, /duplicate pray symbol/)
+  end
+
+  it "treats an unqualified pray name as a package" do
+    manifest = Pray.parse_manifest(<<~PRAYFILE)
+      prayfile "1"
+      source "local", path: "prayers"
+      compose "AGENTS.md" do
+        pray "project"
+        pray ".agents/project.md"
+      end
+      pray "notes"
+    PRAYFILE
+    expect(manifest.packages.map(&:name)).to include("project", "notes")
+    expect(manifest.local.map(&:path)).to include(".agents/project.md")
   end
 end

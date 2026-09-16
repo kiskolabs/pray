@@ -79,6 +79,18 @@ fn parsed_example_manifests_validate_against_manifest_schema() {
 }
 
 #[test]
+fn exclusive_local_file_is_rejected_by_the_parser() {
+    let error = parse_manifest(
+        r#"
+prayfile "1"
+pray ".agents/zshrc", file: ".zshrc"
+"#,
+    )
+    .expect_err("local file:");
+    assert!(error.to_string().contains("file:"));
+}
+
+#[test]
 fn manifest_schema_rejects_non_fail_conflict() {
     let validator = load_validator("manifest.schema.json");
     let path = workspace_root().join("examples/simple-project/Prayfile");
@@ -100,6 +112,23 @@ fn parsed_example_package_spec_validates_against_package_schema() {
     let package_spec = parse_package_spec(&package_text).expect("parse prayspec");
     let value = serde_json::to_value(package_spec.canonicalized()).expect("serialize package spec");
     assert_valid(&validator, &value, path.to_str().expect("utf-8 path"));
+}
+
+#[test]
+fn package_schema_accepts_omitted_version() {
+    let validator = load_validator("package.schema.json");
+    let package_spec = parse_package_spec(
+        r#"
+Package::Specification.new do |spec|
+  spec.name = "project"
+  spec.files = ["exports/project.md"]
+end
+"#,
+    )
+    .expect("parse");
+    let value = serde_json::to_value(package_spec.canonicalized()).expect("serialize");
+    assert!(value.get("version").is_none());
+    assert_valid(&validator, &value, "unversioned path package");
 }
 
 #[test]
@@ -222,5 +251,28 @@ fn registry_schema_rejects_upstream_on_package_version() {
     assert!(
         !validator.is_valid(&value),
         "catalog JSON must not echo spec.upstream: {value}"
+    );
+}
+
+#[test]
+fn distribution_config_validates_against_schema() {
+    let validator = load_validator("distribution.schema.json");
+    let empty = serde_json::json!({
+        "spec": "pray-distribution-config-1",
+        "protocols": []
+    });
+    assert_valid(&validator, &empty, "empty protocols");
+    let torrent = serde_json::json!({
+        "spec": "pray-distribution-config-1",
+        "protocols": ["torrent"]
+    });
+    assert_valid(&validator, &torrent, "torrent protocol");
+    let unknown = serde_json::json!({
+        "spec": "pray-distribution-config-1",
+        "protocols": ["ipfs"]
+    });
+    assert!(
+        !validator.is_valid(&unknown),
+        "schema should reject unknown protocol names"
     );
 }

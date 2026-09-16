@@ -34,8 +34,8 @@ fn drift_reports_position_changes_in_sections() {
     let rendered_path = repo.join("INSTRUCTIONS.md");
     let rendered = fs::read_to_string(&rendered_path).expect("rendered file exists");
     let rendered = rendered.replace(
-        "## Shared instructions\n\n<!-- pray:",
-        "## Shared instructions\n\n\n<!-- pray:",
+        "## Additional instructions\n\n",
+        "## Additional instructions\n\n\n",
     );
     fs::write(&rendered_path, rendered).expect("rendered file rewritten");
 
@@ -58,7 +58,10 @@ fn install_groups_position_drift_with_local_cause() {
 
     let rendered_path = repo.join("INSTRUCTIONS.md");
     let rendered = fs::read_to_string(&rendered_path).expect("rendered file exists");
-    let rendered = rendered.replace("Local guidance\n", "Local guidance\nExtra unmarked line\n");
+    let rendered = rendered.replace(
+        "## Additional instructions\n",
+        "## Additional instructions\n\nExtra unmarked line\n",
+    );
     fs::write(&rendered_path, rendered).expect("rendered file rewritten");
 
     let install = run_pray(&repo, &["install"]);
@@ -88,7 +91,10 @@ fn install_records_patched_marker_positions_so_verify_passes() {
 
     let rendered_path = repo.join("INSTRUCTIONS.md");
     let rendered = fs::read_to_string(&rendered_path).expect("rendered file exists");
-    let rendered = rendered.replace("Local guidance\n", "Local guidance\nExtra unmarked line\n");
+    let rendered = rendered.replace(
+        "## Additional instructions\n",
+        "## Additional instructions\n\nExtra unmarked line\n",
+    );
     fs::write(&rendered_path, rendered).expect("rendered file rewritten");
 
     let install = run_pray(&repo, &["install"]);

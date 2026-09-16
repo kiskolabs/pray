@@ -11,7 +11,7 @@ pub use crate::registry_http::{
 };
 pub use crate::resource_limits::{MAX_HTTP_RESPONSE_BYTES, MAX_TORRENT_ARTIFACT_BYTES};
 
-/// Download a registry artifact using torrent pieces when a sidecar exists, else bounded HTTP GET.
+/// Download a registry artifact using torrent pieces when a protocol descriptor exists, else bounded HTTP GET.
 pub fn download_registry_artifact(
     source_url: &str,
     artifact_relative_path: &str,

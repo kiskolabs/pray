@@ -17,7 +17,10 @@ export function validateManifestPaths(manifest: Manifest): void {
     if (packageEntry.path) validateProjectRelativePath(packageEntry.path);
     if (packageEntry.file) validateDestinationPath(packageEntry.file);
   }
-  for (const local of manifest.local) validateProjectRelativePath(local.path);
+  for (const local of manifest.local) {
+    validateProjectRelativePath(local.path);
+    if (local.file) validateDestinationPath(local.file);
+  }
 }
 
 export function validateProjectRelativePath(value: string): string {

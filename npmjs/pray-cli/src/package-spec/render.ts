@@ -9,11 +9,16 @@ import type {
 export function renderPackageSpec(spec: PackageSpec): string {
   const lines = ["Package::Specification.new do |spec|"];
   pushAssignment(lines, "name", spec.name);
-  pushAssignment(lines, "version", spec.version);
+  if (spec.version.length > 0) {
+    pushAssignment(lines, "version", spec.version);
+  }
   pushOptional(lines, "summary", spec.summary);
   pushOptional(lines, "description", spec.description);
   if (spec.authors.length > 0) {
     pushArray(lines, "authors", spec.authors);
+  }
+  if (spec.maintainers.length > 0) {
+    pushArray(lines, "maintainers", spec.maintainers);
   }
   pushOptional(lines, "license", spec.license);
   pushOptional(lines, "homepage", spec.homepage);

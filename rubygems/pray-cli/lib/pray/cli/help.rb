@@ -4,19 +4,19 @@ module Pray
   module CLI
     module Help
       WORKFLOW_COMMANDS = [
-        "install [--locked|--frozen|--offline]  resolve, render, and write Prayfile.lock",
-        "plan [--remote]                        preview materialization changes",
+        "install [--locked|--frozen|--offline]  keep locked versions, re-embed listed locals",
+        "plan [--remote]                        dry-run of install: dest after patch",
         "apply                                  apply the current plan",
-        "verify [--strict]                      check rendered output against the lockfile",
-        "drift [--semantic]                     compare lockfile to current resolution",
-        "render [--check]                       render targets without updating the lockfile",
+        "verify [--strict]                      dest managed spans versus Prayfile.lock",
+        "drift [--semantic]                     dest versus lock, then dest versus a fresh render",
+        "render [--check]                       write dest from current inputs",
         "format, fmt                            rewrite Prayfile to recommended destination DSL"
       ].freeze
 
       PACKAGE_COMMANDS = [
         "add <name> [constraint] [--path PATH]  declare a package in Prayfile",
         "remove <name>                          remove a package from Prayfile",
-        "update [package]",
+        "update [package]                       re-resolve packages and git sources within constraints",
         "unlock <package>                       clear a locked package pin",
         "vendor                                 copy resolved packages locally",
         "clean                                  remove local cache and vendor trees"
@@ -43,7 +43,7 @@ module Pray
 
       META_COMMANDS = [
         "init [--targets tool_a,tool_b]         create a starter Prayfile",
-        "prayer init                            scaffold a prayer package",
+        "prayer init [name] [--path DIR]       scaffold a local prayer",
         "repo init                              scaffold a distribution root",
         "manifest                               print canonical Prayfile JSON",
         "package                                build a distributable prayer archive",
@@ -58,33 +58,49 @@ module Pray
 
       COMMAND_HELP = {
         "install" => <<~TEXT.strip,
-          resolve packages, render targets, and update Prayfile.lock
+          keep locked package versions and re-embed listed local compose sources
 
           Usage: pray install [--locked|--frozen|--offline]
 
+          Install renders dest and writes Prayfile.lock. Package versions stay at the lock.
+          Listed local compose files are re-embedded and their span checksums refresh.
+          A path package with spec.upstream copies upstream files when the path tree has no content yet.
+          Use pray update to re-resolve package versions and git sources.
+          Use pray plan to preview a write.
+
           --locked   require an existing lockfile
-          --frozen   require lockfile to match Prayfile exactly
+          --frozen   fail if dest or lock would change
           --offline  use cache only
         TEXT
         "verify" => <<~TEXT.strip,
-          check rendered files against Prayfile.lock
+          compare dest managed spans versus Prayfile.lock
 
           Usage: pray verify [--strict]
+
+          Read-only integrity check. It does not compare dest to a fresh render from current sources.
+          A changed local compose file is clean here when dest and lock still match.
+          Use pray drift to compare dest with a fresh render. Use pray plan to preview a write.
 
           Without --strict, orphan-marker warnings print to stderr but exit 0.
           With --strict, any finding fails with exit code 6.
         TEXT
         "drift" => <<~TEXT.strip,
-          report differences between lockfile and current resolution
+          compare dest versus Prayfile.lock, then dest versus a fresh render
 
           Usage: pray drift [--semantic]
 
+          Read-only finding report from current packages and listed local files. Not a line diff.
           Exits with code 6 when drift is found.
+          Use pray plan to preview a write. Use pray verify for dest versus lock alone.
         TEXT
         "render" => <<~TEXT.strip,
-          render targets without updating the lockfile
+          write dest from current inputs
 
           Usage: pray render [--check]
+
+          Without --check, render writes dest. It does not write Prayfile.lock.
+          Use pray plan to preview a write.
+          --check writes nothing. It fails unless dest already matches a fresh render from current inputs.
         TEXT
         "format" => <<~TEXT.strip,
           rewrite Prayfile to recommended destination DSL
@@ -99,18 +115,25 @@ module Pray
                  pray fmt
         TEXT
         "update" => <<~TEXT.strip,
-          refresh package versions within constraints
+          re-resolve package versions and git sources within current constraints
 
           Usage: pray update [package] [--latest] [--latest --dry-run]
+
+          With no package name, update re-resolves the whole graph within constraints
+          and refreshes git source revisions. A package name unlocks that package only.
+          Path-fork packages can refresh from upstream.
+          Listed local compose files are re-embedded by pray install, not by update.
 
           --latest adjusts constraints to allow the latest package versions.
           --latest also rewrites exact spec.upstream pins in path packages, then refreshes those trees.
           --latest --dry-run prints the planned rewrite and does not write.
         TEXT
         "plan" => <<~TEXT.strip,
-          preview install/apply changes
+          preview what install or apply would write after patch
 
           Usage: pray plan [--remote]
+
+          This is the dry-run of a write. It does not write dest or the lock.
         TEXT
         "apply" => "materialize the current resolution plan\n\nUsage: pray apply",
         "add" => <<~TEXT.strip,
@@ -159,6 +182,8 @@ module Pray
           show constraint vs resolved versions
 
           Usage: pray outdated [--remote]
+
+          Path-fork files that differ from the locked upstream are listed.
         TEXT
         "explain" => <<~TEXT.strip,
           show why a package was selected
@@ -171,7 +196,19 @@ module Pray
 
           Usage: pray init [--targets tool_a,tool_b]
         TEXT
-        "prayer" => "scaffold a prayer package\n\nUsage: pray prayer init",
+        "prayer" => <<~TEXT.strip,
+          scaffold a local prayer under a path source
+
+          Usage: pray prayer init [name] [--path DIR]
+
+          With a Prayfile, writes <name>/ under the path source directory without a version.
+          The default directory is prayers/. Use --path to choose another.
+          Declares pray "<source>/<name>" once, such as pray "local/project", inside compose when a compose block exists.
+          The default name is project. The name v1 is reserved for the distribution layout.
+          Without a Prayfile, writes a versioned package spec in the current directory.
+          Add spec.version before pray package or pray publish.
+          A compose file such as .agents/project.md remains a shortcut for one local file.
+        TEXT
         "repo" => "scaffold a distribution root\n\nUsage: pray repo init",
         "manifest" => "print canonical Prayfile JSON\n\nUsage: pray manifest",
         "package" => "build a distributable prayer archive\n\nUsage: pray package",

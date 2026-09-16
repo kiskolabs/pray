@@ -21,6 +21,7 @@ import {
   MAX_SERVE_HEADER_BYTES,
   SERVE_SOCKET_TIMEOUT_MILLISECONDS,
 } from "../resource-limits.js";
+import { applyByteRange } from "./range.js";
 
 export function runServer(options: {
   root: string;
@@ -126,7 +127,15 @@ async function handleRequest(
     return;
   }
   const body = readFileSync(filePath);
-  writeResponse(response, 200, contentTypeFor(filePath), body, requestId);
+  const ranged = applyByteRange(200, body, request.headers.range);
+  writeResponse(
+    response,
+    ranged.status,
+    contentTypeFor(filePath),
+    ranged.body,
+    requestId,
+    ranged.contentRange,
+  );
 }
 
 async function handlePut(
@@ -205,15 +214,20 @@ function writeResponse(
   contentType: string,
   body: string | Buffer,
   requestId: string,
+  contentRange?: string,
 ): void {
   if (response.headersSent || response.writableEnded) return;
   const buffer = typeof body === "string" ? Buffer.from(body, "utf8") : body;
-  response.writeHead(status, {
+  const headers: Record<string, string | number> = {
     "Content-Type": contentType,
     "Content-Length": buffer.length,
     Connection: "close",
     "X-Request-ID": requestId,
-  });
+  };
+  if (contentRange) {
+    headers["Content-Range"] = contentRange;
+  }
+  response.writeHead(status, headers);
   response.end(buffer);
 }
 

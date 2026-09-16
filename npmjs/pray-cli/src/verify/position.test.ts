@@ -69,6 +69,7 @@ describe("summarizePositionDrift", () => {
         path: ".agents/project.md",
         manifestPath: ".agents/project.md",
         content: "Local alpha\nLocal beta\n",
+        sourceChecksum: "sha256:local",
         position: "before",
         optional: false,
       },

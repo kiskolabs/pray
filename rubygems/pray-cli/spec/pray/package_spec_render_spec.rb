@@ -37,12 +37,13 @@ RSpec.describe Pray::PackageSpecRender do
         spec.summary = "summary"
         spec.description = "description"
         spec.authors = ["Author"]
+        spec.maintainers = ["Kim"]
         spec.license = "MIT"
         spec.homepage = "https://example.com"
         spec.source_code_uri = "https://example.com/source"
         spec.changelog_uri = "https://example.com/changelog"
         spec.prayfile_version = "1"
-        spec.files = ["a.md", "fork.prayspec"]
+        spec.files = ["a.md"]
         spec.exports = {
           "a" => {
             type: "fragment",
@@ -89,8 +90,19 @@ RSpec.describe Pray::PackageSpecRender do
     PRAYSPEC
 
     refreshed = described_class.fork_spec_after_refresh(
-      local, upstream, "fork.prayspec", false, ["a.md", "extra.md"]
+      local, upstream, false, ["a.md", "extra.md"]
     )
-    expect(refreshed.files).to include("fork.prayspec", "a.md", "extra.md")
+    expect(refreshed.files).to eq(["a.md", "extra.md"])
+  end
+
+  it "omits an empty version" do
+    spec = Pray.parse_package_spec(<<~PRAYSPEC)
+      Package::Specification.new do |spec|
+        spec.name = "project"
+        spec.files = ["exports/project.md"]
+      end
+    PRAYSPEC
+    rendered = described_class.render_package_spec(spec)
+    expect(rendered).not_to include("spec.version")
   end
 end

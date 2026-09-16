@@ -83,10 +83,10 @@ module Pray
               message: "Package `#{package.declaration.name}` no longer matches the locked tree hash. Run `pray install` to re-resolve packages."
             )
           end
-          if locked.version != package.spec.version
+          if locked.version != package.spec.recorded_version
             report.findings << VerificationFinding.new(
               kind: "verify_error",
-              message: "Package `#{package.declaration.name}` resolved to version #{package.spec.version} but `Prayfile.lock` has #{locked.version}. Run `pray install` to refresh the lockfile."
+              message: "Package `#{package.declaration.name}` resolved to version #{package.spec.recorded_version} but `Prayfile.lock` has #{locked.version}. Run `pray install` to refresh the lockfile."
             )
           end
         else

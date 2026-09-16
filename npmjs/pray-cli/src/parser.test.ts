@@ -141,6 +141,17 @@ end
     assert.equal(packageSpec.dependencies[0]?.name, "sample/common");
   });
 
+  it("parses a package spec without version", () => {
+    const packageSpec = parsePackageSpec(`
+Package::Specification.new do |spec|
+  spec.name = "project"
+  spec.files = ["exports/project.md"]
+end
+`);
+    assert.equal(packageSpec.name, "project");
+    assert.equal(packageSpec.version, "");
+  });
+
   it("parses package spec upstream", () => {
     const packageSpec = parsePackageSpec(`
 Package::Specification.new do |spec|
@@ -190,6 +201,85 @@ end
     assert.equal(manifest.packages[0]?.bound, true);
   });
 
+  it("rejects a local path inside a tree block", () => {
+    assert.throws(
+      () =>
+        parseManifest(`
+prayfile "1"
+tree ".agents/skills" do
+  pray "sample/audit", "~> 2.0"
+  pray ".agents/local-skills"
+end
+`),
+      (error: unknown) =>
+        error instanceof PrayError &&
+        error.kind === "parse" &&
+        error.message.includes("compose"),
+    );
+  });
+
+  it("rejects a local exclusive file", () => {
+    assert.throws(
+      () =>
+        parseManifest(`
+prayfile "1"
+pray ".agents/zshrc", file: ".zshrc"
+`),
+      (error: unknown) =>
+        error instanceof PrayError &&
+        error.kind === "parse" &&
+        error.message.includes("file:"),
+    );
+  });
+
+  it("rejects a file block with a local path", () => {
+    assert.throws(
+      () =>
+        parseManifest(`
+prayfile "1"
+file ".gitignore" do
+  pray ".agents/gitignore"
+end
+`),
+      (error: unknown) =>
+        error instanceof PrayError &&
+        error.kind === "parse" &&
+        error.message.includes("package"),
+    );
+  });
+
+  it("rejects a bare local path outside compose", () => {
+    assert.throws(
+      () =>
+        parseManifest(`
+prayfile "1"
+pray ".agents/project.md"
+`),
+      (error: unknown) =>
+        error instanceof PrayError &&
+        error.kind === "parse" &&
+        error.message.includes("compose") &&
+        !error.message.includes("tree"),
+    );
+  });
+
+  it("treats an unqualified pray name as a package", () => {
+    const manifest = parseManifest(`
+prayfile "1"
+source "local", path: "prayers"
+compose "AGENTS.md" do
+  pray "project"
+  pray ".agents/project.md"
+end
+pray "notes"
+`);
+    assert.ok(manifest.packages.some((entry) => entry.name === "project"));
+    assert.ok(manifest.packages.some((entry) => entry.name === "notes"));
+    assert.ok(
+      manifest.local.some((entry) => entry.path === ".agents/project.md"),
+    );
+  });
+
   it("parses tree blocks scoping packages to a provisioned folder", () => {
     const manifest = parseManifest(`
 prayfile "1"
@@ -236,7 +326,7 @@ end
       (error: unknown) =>
         error instanceof PrayError &&
         error.kind === "parse" &&
-        error.message.includes("requires a pray package declaration"),
+        error.message.includes("requires a pray package"),
     );
   });
 

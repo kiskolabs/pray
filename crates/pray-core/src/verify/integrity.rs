@@ -25,12 +25,12 @@ pub(super) fn push_package_lock_findings(
                         ),
                     });
                 }
-                if locked.version != package.spec.version {
+                if locked.version != package.spec.recorded_version() {
                     report_findings.push(VerificationFinding {
                         kind: "verify_error".to_string(),
                         message: format!(
                             "Package `{}` resolved to version {} but `Prayfile.lock` has {}. Run `pray install` to refresh the lockfile.",
-                            package.declaration.name, package.spec.version, locked.version
+                            package.declaration.name, package.spec.recorded_version(), locked.version
                         ),
                     });
                 }

@@ -146,6 +146,8 @@ pub struct ManifestLocal {
     pub optional: bool,
     #[serde(default, skip_serializing_if = "std::ops::Not::not")]
     pub bound: bool,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub file: Option<String>,
 }
 
 fn default_local_position() -> String {

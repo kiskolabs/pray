@@ -64,6 +64,10 @@ pub fn is_clean_replica(
     local_content == old_content
 }
 
+#[path = "package_upstream_overlay.rs"]
+mod overlay;
+pub use overlay::{overlay_drift_line, overlay_file_changes, OverlayFileChange};
+
 pub fn merge_content_files(
     old_content: &BTreeMap<String, Vec<u8>>,
     new_content: &BTreeMap<String, Vec<u8>>,

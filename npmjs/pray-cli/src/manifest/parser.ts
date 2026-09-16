@@ -19,7 +19,6 @@ import {
   bindLocalEntry,
   bindPackageEntry,
   destinationHeaderKeyword,
-  isLocalPathForm,
   newDestinationTarget,
   packageRoles,
   roleForDestination,
@@ -27,6 +26,7 @@ import {
   upsertLocal,
   upsertPackage,
 } from "./destination.js";
+import { tryApplyFileBlockPray, tryApplyLocalPray } from "./local-pray.js";
 import {
   applyTargetStatement,
   parseGroupHeader,
@@ -40,7 +40,6 @@ import {
   type DestinationMode,
   defaultRenderPolicy,
   type Manifest,
-  type ManifestLocal,
   type ManifestPackage,
 } from "./types.js";
 
@@ -360,7 +359,7 @@ class BlockParser {
         if (!sawPackage) {
           throw PrayError.parse(
             PARSE_CONTEXT,
-            "file block requires a pray package declaration",
+            "file block requires a pray package",
           );
         }
         return;
@@ -370,9 +369,12 @@ class BlockParser {
         statement.startsWith(prefix),
       );
       if (prayPrefix) {
-        const packageEntry = this.parsePackageWithGroups(
-          statement.slice(prayPrefix.length),
-        );
+        const prayRest = statement.slice(prayPrefix.length);
+        if (tryApplyFileBlockPray(manifest, prayRest, filePath)) {
+          sawPackage = true;
+          continue;
+        }
+        const packageEntry = this.parsePackageWithGroups(prayRest);
         if (packageEntry.file) {
           throw PrayError.parse(
             PARSE_CONTEXT,
@@ -407,13 +409,15 @@ class BlockParser {
       throw PrayError.parse(PARSE_CONTEXT, "pray missing package or path");
     }
     const first = stringFromValue(values[0]!, PARSE_CONTEXT);
-    const hasPackageSignal =
+    const fileDest = keywords.has("file")
+      ? stringFromValue(keywords.get("file")!, PARSE_CONTEXT)
+      : undefined;
+    const otherPackageSignal =
       values.length > 1 ||
       [
         "source",
         "export",
         "exports",
-        "file",
         "optional",
         "path",
         "git",
@@ -424,28 +428,15 @@ class BlockParser {
         "targets",
         "features",
       ].some((key) => keywords.has(key));
-
-    const inCompose =
-      destinationIndex !== undefined &&
-      targetMode(manifest.targets[destinationIndex]!) === "compose";
-
-    if (!hasPackageSignal && isLocalPathForm(first)) {
-      if (!inCompose) {
-        throw PrayError.parse(
-          PARSE_CONTEXT,
-          "local pray paths are only valid inside compose blocks",
-        );
-      }
-      const local: ManifestLocal = {
-        path: first,
-        position: "after",
-        optional: false,
-        bound: true,
-      };
-      if (destinationIndex !== undefined) {
-        bindLocalEntry(manifest.targets[destinationIndex]!, local.path);
-      }
-      upsertLocal(manifest, local);
+    if (
+      tryApplyLocalPray(
+        manifest,
+        first,
+        fileDest,
+        otherPackageSignal,
+        destinationIndex,
+      )
+    ) {
       return;
     }
 

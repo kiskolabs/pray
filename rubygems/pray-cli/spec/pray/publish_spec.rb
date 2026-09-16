@@ -76,4 +76,78 @@ RSpec.describe Pray::Publish do
     changed = JSON.parse(File.read(metadata_path))["versions"].first
     expect(changed["artifact_hash"]).not_to eq(specification_changed["artifact_hash"])
   end
+
+  it "writes a torrent descriptor when the root lists torrent" do
+    project_dir = File.join(workspace, "project")
+    publish_root = File.join(workspace, "dist")
+    FileUtils.cp_r(simple_project, project_dir)
+    FileUtils.mkdir_p(File.join(publish_root, "v1"))
+    File.write(
+      File.join(publish_root, "v1", "distribution.json"),
+      JSON.generate(
+        "spec" => "pray-distribution-config-1",
+        "protocols" => ["torrent"],
+        "bootstrap_trackers" => ["http://tracker.example/announce"]
+      )
+    )
+
+    project = Pray::Resolve.resolve_project(File.join(project_dir, "Prayfile"))
+    described_class.publish_to_root(project, publish_root)
+
+    artifact = File.join(
+      publish_root,
+      "v1", "artifacts", "sample", "base", "1.4.3", "sample-base-1.4.3.praypkg"
+    )
+    descriptor = "#{artifact}.praytorrent.json"
+    expect(File).to exist(descriptor)
+    manifest = JSON.parse(File.read(descriptor))
+    expect(manifest["spec"]).to eq("pray-torrent-v1")
+    expect(manifest["name"]).to eq("sample/base")
+    expect(manifest["version"]).to eq("1.4.3")
+    expect(manifest["artifact_url"]).to eq(
+      "v1/artifacts/sample/base/1.4.3/sample-base-1.4.3.praypkg"
+    )
+    expect(manifest["artifact_hash"]).to start_with("sha256:")
+    expect(manifest["pieces"]).not_to be_empty
+    expect(manifest["sources"]).to include(
+      "v1/artifacts/sample/base/1.4.3/sample-base-1.4.3.praypkg"
+    )
+    expect(manifest["trackers"]).to eq(["http://tracker.example/announce"])
+  end
+
+  it "skips the torrent descriptor when protocols are empty" do
+    project_dir = File.join(workspace, "project")
+    publish_root = File.join(workspace, "dist")
+    FileUtils.cp_r(simple_project, project_dir)
+    project = Pray::Resolve.resolve_project(File.join(project_dir, "Prayfile"))
+    described_class.publish_to_root(project, publish_root)
+
+    artifact = File.join(
+      publish_root,
+      "v1", "artifacts", "sample", "base", "1.4.3", "sample-base-1.4.3.praypkg"
+    )
+    expect(File).to exist(artifact)
+    expect(File).not_to exist("#{artifact}.praytorrent.json")
+  end
+
+  it "writes a missing torrent descriptor on republish after torrent is listed" do
+    project_dir = File.join(workspace, "project")
+    publish_root = File.join(workspace, "dist")
+    FileUtils.cp_r(simple_project, project_dir)
+    project = Pray::Resolve.resolve_project(File.join(project_dir, "Prayfile"))
+    described_class.publish_to_root(project, publish_root)
+
+    FileUtils.mkdir_p(File.join(publish_root, "v1"))
+    File.write(
+      File.join(publish_root, "v1", "distribution.json"),
+      JSON.generate("spec" => "pray-distribution-config-1", "protocols" => ["torrent"])
+    )
+    described_class.publish_to_root(project, publish_root)
+
+    artifact = File.join(
+      publish_root,
+      "v1", "artifacts", "sample", "base", "1.4.3", "sample-base-1.4.3.praypkg"
+    )
+    expect(File).to exist("#{artifact}.praytorrent.json")
+  end
 end

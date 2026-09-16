@@ -13,7 +13,8 @@ module Pray
     def build_materialization_preview(project, rendered, lockfile, _lockfile_path, previous_lockfile)
       destinations = RenderDest.validate_destinations!(project, previous_lockfile)
       MaterializationPreview.new(
-        package_lines: package_summary_lines(previous_lockfile, lockfile, project),
+        package_lines: ApplyReport.local_summary_lines(previous_lockfile, project) +
+          package_summary_lines(previous_lockfile, lockfile, project),
         lockfile: lockfile_change_status(previous_lockfile, lockfile),
         targets: rendered.map { |target| target_change(project, target) },
         provisioned: destinations.map { |file, status| [file.path, status.to_s] },

@@ -11,6 +11,8 @@ enum Segment {
 ///
 /// When `existing` has no managed spans that overlap `fresh`, return `fresh` wholesale
 /// so corrupted or empty destinations can be repaired by a full rewrite.
+/// When `fresh` introduces managed spans before the first shared id, take that
+/// leading region from `fresh` so local compose sources can gain markers and update.
 pub fn patch_rendered_content(existing: &str, fresh: &str) -> String {
     let existing_segments = split_segments(existing);
     let fresh_segments = split_segments(fresh);
@@ -18,6 +20,13 @@ pub fn patch_rendered_content(existing: &str, fresh: &str) -> String {
         .iter()
         .filter_map(|segment| match segment {
             Segment::Managed { id, body } => Some((id.clone(), body.clone())),
+            Segment::Text(_) => None,
+        })
+        .collect();
+    let existing_ids: std::collections::BTreeSet<&str> = existing_segments
+        .iter()
+        .filter_map(|segment| match segment {
+            Segment::Managed { id, .. } => Some(id.as_str()),
             Segment::Text(_) => None,
         })
         .collect();
@@ -30,18 +39,40 @@ pub fn patch_rendered_content(existing: &str, fresh: &str) -> String {
     }
     let mut used = std::collections::BTreeSet::new();
     let mut output = String::new();
-    for segment in existing_segments {
-        match segment {
-            Segment::Text(text) => output.push_str(&text),
-            Segment::Managed { id, body } => {
-                let replacement = fresh_managed.get(&id).cloned().unwrap_or(body);
-                used.insert(id.clone());
-                output.push_str(&format!("<!-- pray:{id} -->\n"));
-                if !replacement.is_empty() {
-                    output.push_str(replacement.trim_end_matches('\n'));
-                    output.push('\n');
+    let remaining_existing = if fresh_managed
+        .keys()
+        .any(|id| !existing_ids.contains(id.as_str()))
+    {
+        let Some(shared_id) = fresh_segments.iter().find_map(|segment| match segment {
+            Segment::Managed { id, .. } if existing_ids.contains(id.as_str()) => Some(id.as_str()),
+            _ => None,
+        }) else {
+            return fresh.to_string();
+        };
+        for segment in &fresh_segments {
+            match segment {
+                Segment::Managed { id, .. } if id == shared_id => break,
+                Segment::Text(text) => output.push_str(text),
+                Segment::Managed { id, body } => {
+                    used.insert(id.clone());
+                    push_managed_span(&mut output, id, body);
                 }
-                output.push_str(&format!("<!-- pray:{id} -->\n"));
+            }
+        }
+        skip_until_managed(&existing_segments, shared_id)
+    } else {
+        existing_segments.as_slice()
+    };
+    for segment in remaining_existing {
+        match segment {
+            Segment::Text(text) => output.push_str(text),
+            Segment::Managed { id, body } => {
+                let replacement = fresh_managed
+                    .get(id)
+                    .cloned()
+                    .unwrap_or_else(|| body.clone());
+                used.insert(id.clone());
+                push_managed_span(&mut output, id, &replacement);
             }
         }
     }
@@ -50,18 +81,32 @@ pub fn patch_rendered_content(existing: &str, fresh: &str) -> String {
             if used.contains(&id) {
                 continue;
             }
-            output.push_str(&format!("<!-- pray:{id} -->\n"));
-            if !body.is_empty() {
-                output.push_str(body.trim_end_matches('\n'));
-                output.push('\n');
-            }
-            output.push_str(&format!("<!-- pray:{id} -->\n"));
+            push_managed_span(&mut output, &id, &body);
         }
     }
     if !output.ends_with('\n') {
         output.push('\n');
     }
     output
+}
+
+fn skip_until_managed<'a>(segments: &'a [Segment], id: &str) -> &'a [Segment] {
+    match segments.iter().position(|segment| match segment {
+        Segment::Managed { id: found, .. } => found == id,
+        Segment::Text(_) => false,
+    }) {
+        Some(index) => &segments[index..],
+        None => segments,
+    }
+}
+
+fn push_managed_span(output: &mut String, id: &str, body: &str) {
+    output.push_str(&format!("<!-- pray:{id} -->\n"));
+    if !body.is_empty() {
+        output.push_str(body.trim_end_matches('\n'));
+        output.push('\n');
+    }
+    output.push_str(&format!("<!-- pray:{id} -->\n"));
 }
 
 fn split_segments(content: &str) -> Vec<Segment> {
@@ -154,5 +199,34 @@ new body
 <!-- pray:abc123 -->
 ";
         assert_eq!(patch_rendered_content(existing, fresh), fresh);
+    }
+
+    #[test]
+    fn inserts_leading_managed_span_from_fresh_and_drops_stale_unmarked_embed() {
+        let existing = "\
+header
+
+old local body
+
+<!-- pray:abc123 -->
+package body
+<!-- pray:abc123 -->
+";
+        let fresh = "\
+header
+
+<!-- pray:local001 -->
+new local body
+<!-- pray:local001 -->
+
+<!-- pray:abc123 -->
+package body
+<!-- pray:abc123 -->
+";
+        let patched = patch_rendered_content(existing, fresh);
+        assert!(patched.contains("new local body"));
+        assert!(!patched.contains("old local body"));
+        assert!(patched.contains("<!-- pray:local001 -->"));
+        assert!(patched.contains("package body"));
     }
 }

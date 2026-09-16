@@ -40,8 +40,7 @@ export function isLocalPathForm(value: string): boolean {
     value.startsWith("/") ||
     value.endsWith(".md") ||
     value.endsWith(".txt") ||
-    value.endsWith(".markdown") ||
-    !value.includes("/")
+    value.endsWith(".markdown")
   );
 }
 
@@ -165,6 +164,9 @@ export function upsertLocal(manifest: Manifest, local: ManifestLocal): void {
   existing.optional = existing.optional || local.optional;
   if (existing.position === "after" && local.position !== "after") {
     existing.position = local.position;
+  }
+  if (!existing.file && local.file) {
+    existing.file = local.file;
   }
 }
 

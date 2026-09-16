@@ -59,6 +59,7 @@ fn groups_uniform_position_drift_with_local_cause() {
         path: std::path::PathBuf::from(".agents/project.md"),
         manifest_path: ".agents/project.md".to_string(),
         content: "Local alpha\nLocal beta\n".to_string(),
+        source_checksum: "sha256:local".to_string(),
         position: "prepend".to_string(),
         optional: false,
     }];

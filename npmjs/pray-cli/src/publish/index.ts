@@ -1,17 +1,37 @@
-import { existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import { buildPackageArchiveBytes } from "../archive/praypkg.js";
-import { PrayError } from "../errors.js";
+import { allowsTorrent, readDistributionSettings } from "../distribution.js";
 import { sha256Prefixed } from "../hashing.js";
 import { httpPut, joinUrl } from "../http/client.js";
-import { parseMetadata, registryArtifactSignature } from "../registry/index.js";
+import { requireReleaseVersion } from "../package-spec/index.js";
+import { registryArtifactSignature } from "../registry/index.js";
 import type {
-  RegistryIndex,
   RegistryPackageMetadata,
   RegistryPackageVersion,
 } from "../registry/types.js";
 import type { ResolvedPackage, ResolvedProject } from "../resolve/types.js";
 import { storedPackageArtifact, storedPublishMatches } from "./integrity.js";
+import {
+  loadRegistryIndex,
+  loadRegistryPackageMetadata,
+  metadataToHash,
+  registryArtifactPath,
+  registryMetadataPath,
+  writeOutputBytes,
+  writeRegistryIndex,
+  writeRegistryPackageMetadata,
+} from "./registry-store.js";
+import {
+  fetchDistributionSettings,
+  torrentManifestBytes,
+  torrentManifestPath,
+  writeTorrentManifest,
+} from "./torrent-manifest.js";
+
+export {
+  initDistributionRoot,
+  registryArtifactPath,
+} from "./registry-store.js";
 
 export async function publishToRoot(
   project: ResolvedProject,
@@ -21,9 +41,11 @@ export async function publishToRoot(
 ): Promise<void> {
   const distributionRoot = root;
   const index = loadRegistryIndex(distributionRoot);
+  const distribution = readDistributionSettings(distributionRoot);
   const packageNames = new Set(index.packages);
 
   for (const packageEntry of project.packages) {
+    requireReleaseVersion(packageEntry.spec);
     const artifactPath = registryArtifactPath(
       packageEntry.declaration.name,
       packageEntry.spec.version,
@@ -44,6 +66,7 @@ export async function publishToRoot(
       artifactPath,
       packageEntry,
       existing,
+      distribution,
     );
     if (
       existing !== undefined &&
@@ -63,6 +86,14 @@ export async function publishToRoot(
 
     const archiveBytes = buildPackageArchiveBytes(packageEntry);
     writeOutputBytes(join(distributionRoot, artifactPath), archiveBytes);
+    writeTorrentManifest(
+      distributionRoot,
+      packageEntry.declaration.name,
+      packageEntry.spec.version,
+      artifactPath,
+      archiveBytes,
+      distribution,
+    );
     const versionEntry = publishedRegistryPackageVersion(
       packageEntry,
       signer,
@@ -89,6 +120,7 @@ export async function publishToServer(
   signer = "local",
   signerFingerprint?: string,
 ): Promise<void> {
+  const distribution = await fetchDistributionSettings(serverUrl);
   for (const packageEntry of project.packages) {
     const archiveBytes = buildPackageArchiveBytes(packageEntry);
     const artifactPath = registryArtifactPath(
@@ -100,6 +132,19 @@ export async function publishToServer(
       "application/octet-stream",
       archiveBytes,
     );
+    if (allowsTorrent(distribution)) {
+      await httpPut(
+        joinUrl(serverUrl, torrentManifestPath(artifactPath)),
+        "application/json",
+        torrentManifestBytes(
+          packageEntry.declaration.name,
+          packageEntry.spec.version,
+          artifactPath,
+          archiveBytes,
+          distribution.bootstrapTrackers,
+        ),
+      );
+    }
     const metadata: RegistryPackageMetadata = {
       name: packageEntry.declaration.name,
       versions: [
@@ -118,24 +163,6 @@ export async function publishToServer(
       JSON.stringify(metadataToHash(metadata), null, 2),
     );
   }
-}
-
-export function initDistributionRoot(root: string): void {
-  const distributionRoot = root.endsWith("prayers")
-    ? root
-    : join(root, "prayers");
-  const indexPath = join(distributionRoot, "v1", "index.json");
-  if (existsSync(indexPath)) {
-    throw PrayError.manifest(
-      `distribution repo already exists at ${distributionRoot}`,
-    );
-  }
-  mkdirSync(join(distributionRoot, "v1", "packages"), { recursive: true });
-  mkdirSync(join(distributionRoot, "v1", "artifacts"), { recursive: true });
-  writeRegistryIndex(distributionRoot, {
-    spec: "prayfile-distribution-1",
-    packages: [],
-  });
 }
 
 function publishedRegistryPackageVersion(
@@ -178,89 +205,4 @@ function preserveExistingPublishMetadata(
   if (storedArtifact !== undefined) {
     versionEntry.publishedAt = existing.publishedAt;
   }
-}
-
-function loadRegistryIndex(root: string): RegistryIndex {
-  const path = join(root, "v1", "index.json");
-  if (!existsSync(path)) {
-    return { spec: "prayfile-distribution-1", packages: [] };
-  }
-  const data = JSON.parse(readFileSync(path, "utf8")) as RegistryIndex;
-  return { spec: data.spec, packages: data.packages ?? [] };
-}
-
-function writeRegistryIndex(root: string, index: RegistryIndex): void {
-  const path = join(root, "v1", "index.json");
-  mkdirSync(join(path, ".."), { recursive: true });
-  writeFileSync(
-    path,
-    `${JSON.stringify({ spec: index.spec, packages: index.packages }, null, 2)}\n`,
-    "utf8",
-  );
-}
-
-function loadRegistryPackageMetadata(
-  path: string,
-  packageName: string,
-): RegistryPackageMetadata {
-  if (!existsSync(path)) {
-    return { name: packageName, versions: [] };
-  }
-  return parseMetadata(readFileSync(path, "utf8"));
-}
-
-function writeRegistryPackageMetadata(
-  path: string,
-  metadata: RegistryPackageMetadata,
-): void {
-  mkdirSync(join(path, ".."), { recursive: true });
-  writeFileSync(
-    path,
-    `${JSON.stringify(metadataToHash(metadata), null, 2)}\n`,
-    "utf8",
-  );
-}
-
-function metadataToHash(
-  metadata: RegistryPackageMetadata,
-): Record<string, unknown> {
-  return {
-    name: metadata.name,
-    versions: metadata.versions.map((entry) => versionToHash(entry)),
-  };
-}
-
-function versionToHash(entry: RegistryPackageVersion): Record<string, unknown> {
-  const hash: Record<string, unknown> = {
-    version: entry.version,
-    artifact: entry.artifact,
-    yanked: entry.yanked,
-    targets: entry.targets,
-    exports: entry.exports,
-  };
-  if (entry.artifactHash) hash.artifact_hash = entry.artifactHash;
-  if (entry.treeHash) hash.tree_hash = entry.treeHash;
-  if (entry.signer) hash.signer = entry.signer;
-  if (entry.signerFingerprint)
-    hash.signer_fingerprint = entry.signerFingerprint;
-  if (entry.publishedAt !== undefined) hash.published_at = entry.publishedAt;
-  if (entry.signature) hash.signature = entry.signature;
-  return hash;
-}
-
-function registryMetadataPath(root: string, packageName: string): string {
-  return join(root, "v1", "packages", `${packageName}.json`);
-}
-
-export function registryArtifactPath(
-  packageName: string,
-  version: string,
-): string {
-  const artifactName = `${packageName.replaceAll("/", "-")}-${version}.praypkg`;
-  return `v1/artifacts/${packageName}/${version}/${artifactName}`;
-}
-
-function writeOutputBytes(path: string, bytes: Buffer): void {
-  mkdirSync(join(path, ".."), { recursive: true });
-  writeFileSync(path, bytes);
 }

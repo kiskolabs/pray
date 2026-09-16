@@ -14,7 +14,7 @@ Exclusive file: and tree: leaves refuse unmanaged dest bytes, refuse symlink des
 
 ## Next
 
-Stabilize RFC 0033 after polyglot fixtures match and the Windows no-follow equivalent is specified. Marker dialects remain optional and must not claim ids/0032 until scheduled. RFC 0034 and RFC 0108 cover unused-spec strike, file-as-fragment compose, per-destination header, and fail-closed compose dests on this branch.
+Stabilize RFC 0033 after polyglot fixtures match and the Windows no-follow equivalent is specified. Marker dialects remain optional and must not claim ids/0032 until scheduled. RFC 0034 and RFC 0108 cover unused-spec strike, file-as-fragment compose, per-destination header, and fail-closed compose dests.
 
 ## Source
 

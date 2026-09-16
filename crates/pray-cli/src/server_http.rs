@@ -216,9 +216,22 @@ pub(crate) fn write_response(
     content_type: &str,
     body: Vec<u8>,
 ) -> PrayResult<()> {
+    write_response_with_range(stream, status, content_type, None, body)
+}
+
+pub(crate) fn write_response_with_range(
+    stream: &mut TcpStream,
+    status: u16,
+    content_type: &str,
+    content_range: Option<&str>,
+    body: Vec<u8>,
+) -> PrayResult<()> {
     let reason = reason_phrase(status);
+    let range_header = content_range
+        .map(|value| format!("Content-Range: {value}\r\n"))
+        .unwrap_or_default();
     let header = format!(
-        "HTTP/1.1 {status} {reason}\r\nContent-Type: {content_type}\r\nContent-Length: {}\r\nConnection: close\r\n\r\n",
+        "HTTP/1.1 {status} {reason}\r\nContent-Type: {content_type}\r\n{range_header}Content-Length: {}\r\nConnection: close\r\n\r\n",
         body.len()
     );
     stream.write_all(header.as_bytes())?;
@@ -227,16 +240,51 @@ pub(crate) fn write_response(
     Ok(())
 }
 
+pub(crate) fn apply_byte_range(
+    status: u16,
+    body: Vec<u8>,
+    range: Option<&str>,
+) -> PrayResult<(u16, Vec<u8>, Option<String>)> {
+    let Some(range) = range else {
+        return Ok((status, body, None));
+    };
+    if status != 200 || body.is_empty() {
+        return Ok((status, body, None));
+    }
+    let Some((start, end)) = parse_byte_range(range, body.len()) else {
+        return Ok((416, Vec::new(), Some(format!("bytes */{}", body.len()))));
+    };
+    Ok((
+        206,
+        body[start..=end].to_vec(),
+        Some(format!("bytes {start}-{end}/{}", body.len())),
+    ))
+}
+
+fn parse_byte_range(header: &str, total: usize) -> Option<(usize, usize)> {
+    let range = header.strip_prefix("bytes=")?;
+    let (start_text, end_text) = range.split_once('-')?;
+    let start = start_text.parse::<usize>().ok()?;
+    let end = end_text.parse::<usize>().ok()?;
+    if start <= end && end < total {
+        Some((start, end))
+    } else {
+        None
+    }
+}
+
 fn reason_phrase(status: u16) -> &'static str {
     match status {
         200 => "OK",
         201 => "Created",
+        206 => "Partial Content",
         400 => "Bad Request",
         403 => "Forbidden",
         404 => "Not Found",
         405 => "Method Not Allowed",
         408 => "Request Timeout",
         413 => "Payload Too Large",
+        416 => "Range Not Satisfiable",
         431 => "Request Header Fields Too Large",
         503 => "Service Unavailable",
         500 => "Internal Server Error",

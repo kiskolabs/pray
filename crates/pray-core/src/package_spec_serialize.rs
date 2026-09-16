@@ -8,11 +8,16 @@ mod maps;
 pub fn render_package_spec(spec: &PackageSpec) -> String {
     let mut lines = vec!["Package::Specification.new do |spec|".to_string()];
     push_assignment(&mut lines, "name", &spec.name);
-    push_assignment(&mut lines, "version", &spec.version);
+    if !spec.version.is_empty() {
+        push_assignment(&mut lines, "version", &spec.version);
+    }
     push_optional(&mut lines, "summary", spec.summary.as_deref());
     push_optional(&mut lines, "description", spec.description.as_deref());
     if !spec.authors.is_empty() {
         push_array(&mut lines, "authors", &spec.authors);
+    }
+    if !spec.maintainers.is_empty() {
+        push_array(&mut lines, "maintainers", &spec.maintainers);
     }
     push_optional(&mut lines, "license", spec.license.as_deref());
     push_optional(&mut lines, "homepage", spec.homepage.as_deref());

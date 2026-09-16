@@ -59,6 +59,7 @@ RSpec.describe Pray::VerifyPosition do
         path: ".agents/project.md",
         manifest_path: ".agents/project.md",
         content: "Local alpha\nLocal beta\n",
+        source_checksum: "sha256:local",
         position: "before",
         optional: false
       )

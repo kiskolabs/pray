@@ -12,7 +12,7 @@ Derive catalog metadata through the same unpack that consumers use, not a lenien
 
 Do not reject *.prayspec in spec.files at parse time. Path packages that never pack would still work, and pack already fails.
 
-Stay on main. No new RFC. RFC 0011 already requires rejecting duplicate normalized archive paths.
+No new RFC. RFC 0011 already requires rejecting duplicate normalized archive paths.
 
 ## Effects
 
@@ -20,7 +20,7 @@ pray package and pray publish fail with integrity exit 4 when spec.files repeats
 
 In-repo *.prayspec files do not list the spec. pray init already omitted it.
 
-A later pass on this branch changed the listed-spec case. RFC 0114 requires a refreshed fork spec.files to include the fork prayspec path. Pack still auto-includes that file, so a second insert of that name is skipped once. A repeated content path still fails. Skip/overwrite of other members is not allowed.
+A later pass changed the listed-spec case. RFC 0114 requires a refreshed fork spec.files to include the fork prayspec path. Pack still auto-includes that file, so a second insert of that name is skipped once. A repeated content path still fails. Skip/overwrite of other members is not allowed.
 
 A later pass keys pack and unpack on the normalized path. ./README.md and README.md are the same member. Current-directory segments are dropped before the uniqueness set.
 

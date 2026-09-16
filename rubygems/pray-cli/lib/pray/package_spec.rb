@@ -12,12 +12,12 @@ module Pray
   PackageUpstream = Struct.new(:name, :constraint, keyword_init: true)
 
   PackageSpec = Struct.new(
-    :name, :version, :summary, :description, :authors, :license, :homepage,
+    :name, :version, :summary, :description, :authors, :maintainers, :license, :homepage,
     :source_code_uri, :changelog_uri, :prayfile_version, :files, :exports,
     :skills, :templates, :adapters, :targets, :dependencies, :metadata, :upstream
   ) do
     def initialize(
-      name: "", version: "", summary: nil, description: nil, authors: [], license: nil,
+      name: "", version: "", summary: nil, description: nil, authors: [], maintainers: [], license: nil,
       homepage: nil, source_code_uri: nil, changelog_uri: nil, prayfile_version: nil,
       files: [], exports: {}, skills: {}, templates: {}, adapters: {}, targets: [],
       dependencies: [], metadata: {}, upstream: nil
@@ -47,8 +47,9 @@ module Pray
     def canonicalized
       dup.tap do |copy|
         copy.files = files.sort
-        copy.authors = authors.sort
-        copy.targets = targets.sort
+        copy.authors = Array(authors).sort
+        copy.maintainers = Array(maintainers).sort
+        copy.targets = Array(targets).sort
         copy.dependencies = dependencies.sort_by { |dependency| [dependency.name, dependency.constraint, dependency.optional] }
       end
     end
@@ -227,18 +228,29 @@ module Pray
         end
       end
 
+      STRING_ASSIGNMENTS = {
+        "name" => :name=,
+        "version" => :version=,
+        "summary" => :summary=,
+        "description" => :description=,
+        "license" => :license=,
+        "homepage" => :homepage=,
+        "source_code_uri" => :source_code_uri=,
+        "changelog_uri" => :changelog_uri=,
+        "prayfile_version" => :prayfile_version=,
+        "pray_version" => :prayfile_version=
+      }.freeze
+
       def apply_assignment(spec, field, value)
+        setter = STRING_ASSIGNMENTS[field]
+        if setter
+          spec.public_send(setter, string_from_literal(value))
+          return
+        end
+
         case field
-        when "name" then spec.name = string_from_literal(value)
-        when "version" then spec.version = string_from_literal(value)
-        when "summary" then spec.summary = string_from_literal(value)
-        when "description" then spec.description = string_from_literal(value)
         when "authors" then spec.authors = array_of_strings(value)
-        when "license" then spec.license = string_from_literal(value)
-        when "homepage" then spec.homepage = string_from_literal(value)
-        when "source_code_uri" then spec.source_code_uri = string_from_literal(value)
-        when "changelog_uri" then spec.changelog_uri = string_from_literal(value)
-        when "prayfile_version" then spec.prayfile_version = string_from_literal(value)
+        when "maintainers" then spec.maintainers = array_of_strings(value)
         when "files" then spec.files = array_of_strings(value)
         when "targets" then spec.targets = array_of_strings(value)
         when "exports" then spec.exports = parse_exports(value)

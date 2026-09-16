@@ -83,6 +83,27 @@ end
     .expect("write fork prayspec");
 }
 
+fn write_empty_fork_package(catalog: &Path, upstream_constraint: &str) {
+    let root = catalog.join("packages/fork-base");
+    fs::create_dir_all(&root).expect("fork directories");
+    fs::write(
+        root.join("fork-base.prayspec"),
+        format!(
+            r#"
+Package::Specification.new do |spec|
+  spec.name = "fork/base"
+  spec.version = "1.0.0"
+  spec.summary = "forked guidance"
+  spec.files = []
+  spec.upstream "sample/base", "{constraint}"
+end
+"#,
+            constraint = upstream_constraint
+        ),
+    )
+    .expect("write empty fork prayspec");
+}
+
 fn write_fork_prayfile(catalog: &Path, distribution: &Path) {
     fs::write(
         catalog.join("Prayfile"),
@@ -208,8 +229,8 @@ fn update_replaces_clean_fork_from_locked_upstream() {
         "update should lock upstream 1.4.4:\n{updated_lock}"
     );
     assert!(
-        fork_spec.contains("fork-base.prayspec"),
-        "refresh should list the fork spec:\n{fork_spec}"
+        fork_spec.contains("exports/testing-basics.md"),
+        "refresh should list upstream content:\n{fork_spec}"
     );
     let package = run_pray(&catalog_repo, &["package"]);
     assert_success(&package, "package after refresh");
@@ -357,5 +378,123 @@ fn publish_omits_upstream_from_registry_metadata() {
     assert!(
         spec.contains("sample/base"),
         "packaged spec still holds the pin:\n{spec}"
+    );
+}
+
+fn publish_upstream_catalog() -> (PathBuf, PathBuf) {
+    let workspace = temporary_directory("pray-package-upstream-empty");
+    let source_repo = workspace.join("source");
+    let distribution_repo = workspace.join("distribution");
+    let prayers_root = distribution_repo.join("prayers");
+    let catalog_repo = workspace.join("catalog");
+    fs::create_dir_all(&source_repo).expect("source workspace");
+    fs::create_dir_all(&distribution_repo).expect("distribution workspace");
+    fs::create_dir_all(&catalog_repo).expect("catalog workspace");
+
+    create_add_fixture(&source_repo);
+    assert_success(
+        &run_pray(
+            &source_repo,
+            &["add", "sample/base", "--path", "packages/base"],
+        ),
+        "add base",
+    );
+    assert_success(
+        &run_pray(
+            &source_repo,
+            &[
+                "publish",
+                "--root",
+                prayers_root.to_str().expect("distribution path"),
+            ],
+        ),
+        "publish base",
+    );
+    init_distribution(&distribution_repo);
+    write_fork_prayfile(&catalog_repo, &distribution_repo);
+    (catalog_repo, source_repo)
+}
+
+#[test]
+fn install_copies_empty_path_fork_from_upstream() {
+    let (catalog, _) = publish_upstream_catalog();
+    write_empty_fork_package(&catalog, "~> 1.4");
+    assert_success(&run_pray(&catalog, &["install"]), "install empty fork");
+    let testing = fs::read_to_string(catalog.join("packages/fork-base/exports/testing-basics.md"))
+        .expect("fork export");
+    assert_eq!(testing, "Testing guidance\n");
+    let spec =
+        fs::read_to_string(catalog.join("packages/fork-base/fork-base.prayspec")).expect("spec");
+    assert!(spec.contains("fork/base"));
+    assert!(spec.contains("exports/testing-basics.md"));
+}
+
+#[test]
+fn update_keeps_overlay_file_when_upstream_moves() {
+    let (catalog, source) = publish_upstream_catalog();
+    write_empty_fork_package(&catalog, "~> 1.4");
+    assert_success(&run_pray(&catalog, &["install"]), "install empty fork");
+    fs::create_dir_all(catalog.join("packages/fork-base/overlays")).expect("overlay dir");
+    fs::write(
+        catalog.join("packages/fork-base/overlays/note.md"),
+        "local overlay\n",
+    )
+    .expect("overlay file");
+    let spec_path = catalog.join("packages/fork-base/fork-base.prayspec");
+    let spec = fs::read_to_string(&spec_path).expect("spec");
+    let spec = spec.replace("\"README.md\"", "\"README.md\", \"overlays/note.md\"");
+    fs::write(&spec_path, spec).expect("list overlay");
+    assert_success(&run_pray(&catalog, &["install"]), "reinstall overlay");
+
+    bump_upstream_version(&source);
+    let prayers_root = catalog
+        .parent()
+        .expect("workspace")
+        .join("distribution/prayers");
+    assert_success(
+        &run_pray(
+            &source,
+            &[
+                "publish",
+                "--root",
+                prayers_root.to_str().expect("distribution path"),
+            ],
+        ),
+        "publish bump",
+    );
+    let distribution = catalog.parent().expect("workspace").join("distribution");
+    assert_success(&git(&distribution, &["add", "-A"]), "git add bump");
+    assert_success(
+        &git(&distribution, &["commit", "-m", "publish 1.4.4"]),
+        "git commit bump",
+    );
+    assert_success(&run_pray(&catalog, &["update"]), "update fork");
+    assert_eq!(
+        fs::read_to_string(catalog.join("packages/fork-base/overlays/note.md")).expect("overlay"),
+        "local overlay\n"
+    );
+    assert_eq!(
+        fs::read_to_string(catalog.join("packages/fork-base/exports/testing-basics.md"))
+            .expect("export"),
+        "Testing guidance v2\n"
+    );
+}
+
+#[test]
+fn outdated_lists_path_fork_file_drift() {
+    let (catalog, _) = publish_upstream_catalog();
+    write_empty_fork_package(&catalog, "~> 1.4");
+    assert_success(&run_pray(&catalog, &["install"]), "install empty fork");
+    fs::write(
+        catalog.join("packages/fork-base/README.md"),
+        "edited readme\n",
+    )
+    .expect("edit");
+    let outdated = run_pray(&catalog, &["outdated"]);
+    assert_success(&outdated, "outdated");
+    let stdout = String::from_utf8_lossy(&outdated.stdout);
+    assert!(
+        stdout.contains("README.md") && stdout.contains("differs"),
+        "outdated should list fork drift:\n{stdout}"
     );
 }

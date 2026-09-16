@@ -169,8 +169,21 @@ pub(crate) fn fetch_torrent_artifact_to_path(
 
     let mut digest = Sha256::new();
     let mut written = 0usize;
+    let mut cached_artifact: Option<Vec<u8>> = None;
     for piece in manifest.piece_ranges() {
-        let piece_bytes = download_torrent_piece(&sources, &piece)?;
+        let piece_bytes = match cached_artifact.as_ref() {
+            Some(bytes) => bytes[piece.start..=piece.end].to_vec(),
+            None => {
+                let downloaded = download_torrent_piece(&sources, &piece, manifest.length)?;
+                if downloaded.len() == manifest.length {
+                    let slice = downloaded[piece.start..=piece.end].to_vec();
+                    cached_artifact = Some(downloaded);
+                    slice
+                } else {
+                    downloaded
+                }
+            }
+        };
         if sha256_prefixed(&piece_bytes) != piece.hash {
             return Err(PrayError::Integrity(format!(
                 "torrent piece hash mismatch for {artifact_path} {}..{}",
@@ -200,11 +213,19 @@ pub(crate) fn fetch_torrent_artifact_to_path(
     fs::read(destination).map_err(PrayError::from)
 }
 
-fn download_torrent_piece(sources: &[String], piece: &TorrentPieceRange) -> PrayResult<Vec<u8>> {
+fn download_torrent_piece(
+    sources: &[String],
+    piece: &TorrentPieceRange,
+    artifact_length: usize,
+) -> PrayResult<Vec<u8>> {
     let range_header = format!("bytes={}-{}", piece.start, piece.end);
     for source in sources {
         match http_get_with_headers(source, &[("Range", &range_header)]) {
-            Ok((response, _status)) if response.len() == piece.length() => return Ok(response),
+            Ok((response, _))
+                if response.len() == piece.length() || response.len() == artifact_length =>
+            {
+                return Ok(response);
+            }
             Ok(_) => continue,
             Err(_) => continue,
         }

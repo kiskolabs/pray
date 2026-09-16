@@ -9,6 +9,8 @@ require_relative "cli/help"
 require_relative "cli/suggest"
 require_relative "cli/helpers"
 require_relative "cli/commands/init"
+require_relative "cli/commands/init_prayer_manifest"
+require_relative "cli/commands/init_prayer"
 require_relative "cli/commands/workflow"
 require_relative "cli/commands/update_latest"
 require_relative "cli/commands/packages"
@@ -82,7 +84,7 @@ module Pray
       case command
       in [:manifest] then manifest_command
       in [:init, targets] then init_command(targets)
-      in [:prayer_init] then prayer_init_command
+      in [:prayer_init, name, directory] then prayer_init_command(name, directory)
       in [:repo_init] then repo_init_command
       in [:install, flags] then install_command(flags)
       in [:add, add_args] then add_command(**add_args)

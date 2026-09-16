@@ -1,10 +1,9 @@
-use crate::constraint::version_satisfies;
 use crate::lockfile::Lockfile;
 use crate::manifest::{Manifest, ManifestPackage, ManifestSource};
 use crate::package_spec::{parse_package_spec, PackageSpec};
 use crate::resolve_context::ResolveOptions;
 use crate::resolve_exports::{
-    build_skill_file_index, load_export_bodies, load_package_file_bytes, read_text, select_exports,
+    build_skill_file_index, load_export_bodies, load_package_file_bytes, select_exports,
 };
 use crate::resolve_git_sources::{
     prepare_git_sources, prepare_pray_ssh_host_keys, GitSourceCheckout,
@@ -60,6 +59,7 @@ pub struct ResolvedLocalFile {
     pub path: PathBuf,
     pub manifest_path: String,
     pub content: String,
+    pub source_checksum: String,
     pub position: String,
     pub optional: bool,
 }
@@ -134,13 +134,17 @@ pub fn resolve_project_with_options(
 mod project;
 pub use project::{resolve_manifest_in_context, resolve_project_in_context};
 
+#[path = "resolve_implied_source.rs"]
+mod implied_source;
+pub(crate) use implied_source::implied_source_name;
+
 #[path = "resolve_package_root.rs"]
 mod package_root;
-pub(crate) use package_root::{implied_source_name, resolve_package_root, PackageRootResolution};
+pub(crate) use package_root::{resolve_package_root, PackageRootResolution};
 
 #[path = "resolve_upstream.rs"]
 pub mod resolve_upstream;
-pub use resolve_upstream::apply_path_upstream_refreshes;
+pub use resolve_upstream::{apply_path_upstream_refreshes, path_fork_drift_lines};
 
 fn resolve_package(
     project_root: &Path,
@@ -173,12 +177,7 @@ fn resolve_package(
             root, spec.name, declaration.name
         )));
     }
-    if !version_satisfies(&spec.version, &declaration.constraint)? {
-        return Err(PrayError::Resolution(format!(
-            "package {} version {} does not satisfy constraint {}",
-            declaration.name, spec.version, declaration.constraint
-        )));
-    }
+    spec.satisfy_constraint(&declaration.constraint)?;
     let selected_exports = select_exports(declaration, &spec)?;
     let file_bytes = load_package_file_bytes(&root, &spec)?;
     let tree_hash = PackageSpec::tree_hash_from_file_bytes(&file_bytes)?;
@@ -215,41 +214,10 @@ fn resolve_package(
     })
 }
 
-pub fn missing_local_embed_guidance(path: impl AsRef<str>) -> String {
-    let path = path.as_ref();
-    format!(
-        "Prayfile lists `local \"{path}\"` but the file does not exist. \
-         Create the file or remove the entry from Prayfile, then run `pray install`."
-    )
-}
-
-fn resolve_local_file(
-    project_root: &Path,
-    declaration: &crate::manifest::ManifestLocal,
-) -> PrayResult<ResolvedLocalFile> {
-    let path = project_root.join(&declaration.path);
-    if !path.exists() {
-        if declaration.optional {
-            return Ok(ResolvedLocalFile {
-                path,
-                manifest_path: declaration.path.clone(),
-                content: String::new(),
-                position: declaration.position.clone(),
-                optional: true,
-            });
-        }
-        return Err(PrayError::Resolution(missing_local_embed_guidance(
-            &declaration.path,
-        )));
-    }
-    Ok(ResolvedLocalFile {
-        content: read_text(&path)?,
-        path,
-        manifest_path: declaration.path.clone(),
-        position: declaration.position.clone(),
-        optional: declaration.optional,
-    })
-}
+#[path = "resolve_local.rs"]
+mod local;
+pub use local::missing_local_embed_guidance;
+pub(crate) use local::resolve_local_file;
 
 fn source_map(sources: &[ManifestSource]) -> BTreeMap<String, ManifestSource> {
     sources

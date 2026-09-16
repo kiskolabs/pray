@@ -72,11 +72,12 @@ Package::Specification.new do |spec|
   spec.summary = "web applications, testing, data layer, and live UI agent context"
   spec.description = "Shared guidance for web application review workflows, tests, migrations, and common development tasks."
   spec.authors = ["Example Maintainer"]
+  spec.maintainers = ["Example Maintainer"]
   spec.license = "MIT"
   spec.homepage = "https://example.com/sample/webapp"
   spec.source_code_uri = "https://vcs.example.com/sample-org/agent-packages/tree/main/sample-webapp"
   spec.changelog_uri = "https://vcs.example.com/sample-org/agent-packages/blob/main/sample-webapp/CHANGELOG.md"
-  spec.pray_version = ">= 0.1"
+  spec.prayfile_version = ">= 0.1"
   spec.files = [
     "README.md",
     "LICENSE",
@@ -153,6 +154,9 @@ add_dependency add_optional_dependency upstream
 ```
 `upstream` is provenance for a path fork (RFC 0114). It is not `add_dependency`.
 
+`spec.version=` MAY be omitted. Canonical JSON omits an empty version. A path package without a version satisfies only `*` and locks as `local` (RFC 0117). `pray package` and `pray publish` require a version.
+
+`pray_version=` is an alias for `prayfile_version=`. Render and the canonical JSON key are `prayfile_version`. `maintainers=` is a string array, canonicalized in sorted order like `authors=`.
 
 `skills=` is deprecated and will be removed in version 2. Prefer a `folder` export.
 
@@ -168,7 +172,7 @@ eval(...)
 if ... while ... for ...
 ```
 
-All files must be explicitly listed in `spec.files`. This reduces hidden package drift.
+All files must be explicitly listed in `spec.files`. This reduces hidden package drift. The `*.prayspec` on disk is identity. It is not a `spec.files` entry. Pack includes it.
 
 ---
 
@@ -182,6 +186,8 @@ Every `*.prayspec` compiles to a canonical package model:
   "version": "2.1.5",
   "summary": "web applications, testing, data layer, and live UI agent context",
   "license": "MIT",
+  "authors": ["Example Maintainer"],
+  "maintainers": ["Example Maintainer"],
   "prayfile_version": ">= 0.1",
   "files": [
     "README.md",
@@ -340,7 +346,7 @@ Prayfile.lock records this hash.
 
 ## Implementation notes
 
-Parsers and archive code live in `package_spec.rs`, `package_archive.rs`, and unpack tests in changelog 1.6.0.
+Parsers and archive code live in `package_spec.rs`, `package_archive.rs`, and unpack tests in changelog 1.6.0. `spec.maintainers` parses as a string array. `spec.pray_version=` stores `prayfile_version`.
 
 ## Security considerations
 
@@ -348,7 +354,7 @@ Archive members MUST NOT escape the extract root. Implementations MUST NOT execu
 
 ## Registrar
 
-Prayspec fields: name, version, summary, description, authors, exports, adapters, and related declaration keys in the grammar above. `spec.skills` and export `type: "skill"` still parse and warn; they are removed in version 2.
+Prayspec fields: name, version, summary, description, authors, maintainers, exports, adapters, and related declaration keys in the grammar above. `spec.skills` and export `type: "skill"` still parse and warn; they are removed in version 2.
 
 ## Unresolved questions
 

@@ -8,7 +8,7 @@ Andrei Makarov
 
 Keep the destination ownership rules in RFC 0033. Existing bytes may be adopted when they equal the requested export, or replaced when they still match the previous lock's content hash. An empty provisioned array does not establish ownership. Force and destination overwrite prompts remain outside this change.
 
-The implementation pass on 2026-09-07 narrows the earlier proposal: fix candidate resolution, write ordering, previews, and recovery first. Automatic adoption across a legacy version transition remains subject to the evidence rule below. Keep the implementation on the current branch. Maintain this issue and CHANGELOG.md as the documentation for this work.
+The implementation pass on 2026-09-07 narrows the earlier proposal: fix candidate resolution, write ordering, previews, and recovery first. Automatic adoption across a legacy version transition remains subject to the evidence rule below. Maintain this issue and CHANGELOG.md as the documentation for this work.
 
 The follow-up decision on 2026-09-07 extends recovery to interrupted processes in Rust, Ruby, and TypeScript together. Use one project ownership and recovery format across the implementations. Persist recovery before changing destination bytes. This replaces the earlier scope exclusion for rollback.
 

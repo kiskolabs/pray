@@ -41,6 +41,7 @@ class BlockParser {
       name: "",
       version: "",
       authors: [],
+      maintainers: [],
       files: [],
       exports: new Map(),
       skills: new Map(),
@@ -130,6 +131,9 @@ class BlockParser {
       case "authors":
         spec.authors = arrayOfStrings(value);
         return;
+      case "maintainers":
+        spec.maintainers = arrayOfStrings(value);
+        return;
       case "license":
         spec.license = stringFromLiteral(value, PARSE_CONTEXT);
         return;
@@ -143,6 +147,7 @@ class BlockParser {
         spec.changelogUri = stringFromLiteral(value, PARSE_CONTEXT);
         return;
       case "prayfile_version":
+      case "pray_version":
         spec.prayfileVersion = stringFromLiteral(value, PARSE_CONTEXT);
         return;
       case "files":

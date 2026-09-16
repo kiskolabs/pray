@@ -10,6 +10,11 @@ module Pray
       namespace = package_namespace(declaration.name)
       return namespace if namespace && sources.key?(namespace)
 
+      unless declaration.name.include?("/")
+        path_sources = sources.select { |_name, source| source.kind == "path" }
+        return path_sources.keys.first if path_sources.length == 1
+      end
+
       case sources.length
       when 0 then nil
       when 1 then sources.keys.first

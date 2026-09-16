@@ -8,6 +8,7 @@ impl PackageSpec {
         let mut package = self.clone();
         package.files.sort();
         package.authors.sort();
+        package.maintainers.sort();
         package.targets.sort();
         package.dependencies.sort_by(|left, right| {
             left.name

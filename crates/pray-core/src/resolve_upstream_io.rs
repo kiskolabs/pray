@@ -8,6 +8,26 @@ use std::collections::BTreeMap;
 use std::fs;
 use std::path::Path;
 
+pub(super) fn local_content_for_refresh(
+    root: &Path,
+    spec: &crate::package_spec::PackageSpec,
+) -> PrayResult<BTreeMap<String, Vec<u8>>> {
+    let content_paths = content_paths(&spec.files);
+    if content_paths.is_empty() {
+        return Ok(BTreeMap::new());
+    }
+    let mut missing = 0usize;
+    for relative in &content_paths {
+        if !root.join(relative).is_file() {
+            missing += 1;
+        }
+    }
+    if missing == content_paths.len() {
+        return Ok(BTreeMap::new());
+    }
+    content_file_bytes(root, spec)
+}
+
 pub(super) fn content_file_bytes(
     root: &Path,
     spec: &crate::package_spec::PackageSpec,

@@ -53,6 +53,9 @@ pub fn resolve_manifest_in_context(
     let mut local_files = Vec::new();
     let mut local_errors = Vec::new();
     for local in &manifest.local {
+        if !crate::destination::local_is_compose_embed(&manifest, local) {
+            continue;
+        }
         match resolve_local_file(project_root, local) {
             Ok(resolved) => local_files.push(resolved),
             Err(error) => local_errors.push(format!("local {}: {error}", local.path)),

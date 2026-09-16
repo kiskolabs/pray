@@ -6,7 +6,7 @@ Andrei Makarov
 
 ## Decisions
 
-Close D-004 on patch/fix-ruby-praypkg-unpack-cache. Do not restore email-only session issue. Specify the wire contract in RFC 0051.
+Close D-004. Do not restore email-only session issue. Specify the wire contract in RFC 0051.
 
 ## Effects
 

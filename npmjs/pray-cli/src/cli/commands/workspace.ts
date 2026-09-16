@@ -15,6 +15,7 @@ import {
   parseManifest,
   readManifestText,
 } from "../../manifest/index.js";
+import { requireReleaseVersion } from "../../package-spec/index.js";
 import { defaultResolveOptions } from "../../resolve/context.js";
 import { resolveProject } from "../../resolve/project.js";
 import type { ResolvedProject } from "../../resolve/types.js";
@@ -73,6 +74,7 @@ function formatMarkerComments(text: string): string {
 export async function runPackage(): Promise<void> {
   const project = await resolveProject(defaultManifestPath());
   for (const packageEntry of project.packages) {
+    requireReleaseVersion(packageEntry.spec);
     const outputPath = packageArchivePath(
       packageEntry.declaration.name,
       packageEntry.spec.version,

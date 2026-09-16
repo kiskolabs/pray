@@ -3,9 +3,10 @@ import { resolve } from "node:path";
 import { PrayError } from "../errors.js";
 import { normalizeLineEndings } from "../hashing.js";
 import type { Lockfile, ManagedSpanRecord } from "../lockfile/types.js";
+import { recordedPackageVersion } from "../package-spec/index.js";
 import { readRegularBytes } from "../render/destination-io.js";
 import { renderProject } from "../render/project.js";
-import { missingLocalEmbedGuidance } from "../resolve/project.js";
+import { missingLocalEmbedGuidance } from "../resolve/local.js";
 import type { ResolvedProject } from "../resolve/types.js";
 import { markerPositions } from "./markers.js";
 import {
@@ -131,10 +132,10 @@ function collectVerificationReport(
         message: `Package \`${packageEntry.declaration.name}\` no longer matches the locked tree hash. Run \`pray install\` to re-resolve packages.`,
       });
     }
-    if (locked.version !== packageEntry.spec.version) {
+    if (locked.version !== recordedPackageVersion(packageEntry.spec)) {
       report.findings.push({
         kind: "verify_error",
-        message: `Package \`${packageEntry.declaration.name}\` resolved to version ${packageEntry.spec.version} but \`Prayfile.lock\` has ${locked.version}. Run \`pray install\` to refresh the lockfile.`,
+        message: `Package \`${packageEntry.declaration.name}\` resolved to version ${recordedPackageVersion(packageEntry.spec)} but \`Prayfile.lock\` has ${locked.version}. Run \`pray install\` to refresh the lockfile.`,
       });
     }
   }

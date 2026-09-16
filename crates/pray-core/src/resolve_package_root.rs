@@ -1,3 +1,4 @@
+use crate::local_prayer::path_source_package_directory;
 use crate::lockfile::Lockfile;
 use crate::manifest::{ManifestPackage, ManifestSource};
 use crate::registry::{resolve_local_registry_package_root, resolve_registry_package_root};
@@ -48,7 +49,7 @@ pub(crate) fn resolve_package_root(
             registry_latest_version: None,
         });
     }
-    let source_name = implied_source_name(declaration, sources)?;
+    let source_name = super::implied_source_name(declaration, sources)?;
     if let Some(source_name) = source_name {
         let source = sources
             .get(&source_name)
@@ -70,9 +71,9 @@ pub(crate) fn resolve_package_root(
             });
         }
         if source.kind == "path" {
-            let slug = declaration.name.replace('/', "-");
+            let directory = path_source_package_directory(&source_name, &declaration.name);
             return Ok(PackageRootResolution {
-                root: project_root.join(&source.url).join(slug),
+                root: project_root.join(&source.url).join(directory),
                 signer_fingerprint: None,
                 registry_latest_version: None,
             });
@@ -117,26 +118,4 @@ pub(crate) fn resolve_package_root(
         signer_fingerprint: None,
         registry_latest_version: None,
     })
-}
-
-pub(crate) fn implied_source_name(
-    declaration: &ManifestPackage,
-    sources: &BTreeMap<String, ManifestSource>,
-) -> PrayResult<Option<String>> {
-    if let Some(name) = &declaration.source {
-        return Ok(Some(name.clone()));
-    }
-    if let Some(namespace) = declaration.name.split_once('/').map(|(name, _)| name) {
-        if sources.contains_key(namespace) {
-            return Ok(Some(namespace.to_string()));
-        }
-    }
-    match sources.len() {
-        0 => Ok(None),
-        1 => Ok(sources.keys().next().cloned()),
-        _ => Err(PrayError::Resolution(format!(
-            "package {} requires source: when multiple sources are declared and the package namespace does not match a source",
-            declaration.name
-        ))),
-    }
 }

@@ -65,7 +65,7 @@ module Pray
       validate_body_length!(body_length)
       body = body_length.positive? ? socket.read(body_length) : ""
 
-      response = dispatch_request(root, method, path, body)
+      response = dispatch_request(root, method, path, body, headers)
       socket.print(response)
     end
 
@@ -94,7 +94,7 @@ module Pray
       )
     end
 
-    def dispatch_request(root, method, path, body = "")
+    def dispatch_request(root, method, path, body = "", headers = {})
       path = path.split("?", 2).first
 
       case [method, path]
@@ -125,7 +125,8 @@ module Pray
 
       content_type = content_type_for(file_path)
       file_body = File.binread(file_path)
-      ok_response(content_type, file_body)
+      status, ranged_body, content_range = ServeRange.apply(200, file_body, headers["range"])
+      ranged_response(status, content_type, ranged_body, content_range)
     end
 
     def content_type_for(path)
@@ -137,7 +138,17 @@ module Pray
     end
 
     def ok_response(content_type, body)
-      "HTTP/1.1 200 OK\r\nContent-Type: #{content_type}\r\nContent-Length: #{body.bytesize}\r\nConnection: close\r\n\r\n#{body}"
+      ranged_response(200, content_type, body, nil)
+    end
+
+    def ranged_response(status, content_type, body, content_range)
+      reason = {
+        200 => "OK",
+        206 => "Partial Content",
+        416 => "Range Not Satisfiable"
+      }.fetch(status, "OK")
+      range_header = content_range ? "Content-Range: #{content_range}\r\n" : ""
+      "HTTP/1.1 #{status} #{reason}\r\nContent-Type: #{content_type}\r\n#{range_header}Content-Length: #{body.bytesize}\r\nConnection: close\r\n\r\n#{body}"
     end
 
     def html_response(body)

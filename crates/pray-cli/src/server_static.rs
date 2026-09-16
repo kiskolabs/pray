@@ -1,5 +1,5 @@
 use crate::server::ServeAuth;
-use crate::server_http::Response;
+use crate::server_http::{response_with_status, Response};
 use pray_core::push_auth::authorize_distribution_push;
 use pray_core::registry::ConfessionSubmission;
 use pray_core::{PrayError, PrayResult};
@@ -77,13 +77,17 @@ pub(crate) fn static_file_response(root: &Path, request_path: &str) -> PrayResul
             request_path
         )));
     }
-    let body = fs::read(&path).map_err(|error| {
-        if error.kind() == std::io::ErrorKind::NotFound {
-            PrayError::Resolution(format!("not found: {}", request_path))
-        } else {
-            PrayError::from(error)
+    let body = match fs::read(&path) {
+        Ok(body) => body,
+        Err(error) if error.kind() == std::io::ErrorKind::NotFound => {
+            return Ok(response_with_status(
+                404,
+                "text/plain",
+                b"not found".to_vec(),
+            ));
         }
-    })?;
+        Err(error) => return Err(error.into()),
+    };
     let content_type = content_type_for_path(&path);
     Ok(Response {
         status: 200,

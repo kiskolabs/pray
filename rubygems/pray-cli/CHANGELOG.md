@@ -1,5 +1,15 @@
 # CHANGELOG
 
+## 1.17.0 (2026-09-16)
+
+- Locate local prayers through a path source of any directory name (RFC 0117). `pray prayer init` adds `source "local"` when needed and declares `pray "local/project"` once. Version is optional until `pray package` or `pray publish`. `.agents/project.md` remains a compose shortcut for one local file.
+- Copy upstream files into an empty path-fork tree on `pray install` and `pray update` (RFC 0116). Extra listed overlay files stay. `pray outdated` lists fork files that differ from the locked upstream. An identity-only fork uses empty `spec.files`; refresh lists content paths, not the prayspec file.
+- Refuse a local path with `file:` and a local path inside `tree`. Compose still embeds local fragments. Package `file:` and package `tree` stay.
+- Name dest versus lock on `pray verify`, dest versus a fresh render on `pray drift`, and dest write on `pray render`. Dry-run of a write is `pray plan`. Listed local compose files stay on `pray install`.
+- Write `.praytorrent.json` when `v1/distribution.json` lists `protocols: ["torrent"]` (RFC 0062). `pray repo init` writes empty protocols.
+- Parse `spec.maintainers` as a string array, and accept `spec.pray_version` as an alias for `spec.prayfile_version`.
+- Re-embed a changed local compose source on `pray install`, `pray update`, and `pray plan`, and print its `sha256` as `checked` or `was`. List local checksum drift under `pray outdated`.
+
 ## 1.16.0 (2026-09-15)
 
 - Rewrite a two-component pessimistic Prayfile pin on `pray update --latest` (`~> 2.2` to `~> 2.4` when registry latest is 2.4.0), matching the Rust and TypeScript CLIs. Install a newer version that the current constraint already allows.

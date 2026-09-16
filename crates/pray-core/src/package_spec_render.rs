@@ -8,14 +8,11 @@ pub use serialize::render_package_spec;
 pub fn fork_spec_after_refresh(
     local: &PackageSpec,
     new_upstream: &PackageSpec,
-    local_prayspec_file: &str,
     clean_replica: bool,
     merged_content_paths: &[String],
 ) -> PackageSpec {
     let mut spec = local.clone();
-    let mut files = vec![local_prayspec_file.to_string()];
-    files.extend(merged_content_paths.iter().cloned());
-    spec.files = files;
+    spec.files = merged_content_paths.to_vec();
     if clean_replica {
         spec.exports = new_upstream.exports.clone();
         spec.templates = new_upstream.templates.clone();

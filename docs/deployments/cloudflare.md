@@ -23,7 +23,9 @@ graph TD
 
 - Cloudflare Workers alone is usually not a great fit for a mutable distribution point
 - `pray serve` may need durable storage, uploads, append-only audit logs, and package publishing
-- Cloudflare Access is a good fit for protecting admin or publisher routes
+- Cloudflare Access is a good fit for protecting admin or publisher routes in a browser
+- Cloudflare Access does not unlock `pray install` today: the CLI sends unauthenticated GET, not `CF-Access-Client-Id` / `CF-Access-Client-Secret`, and it does not complete an identity-provider login
+- For a private origin that install can use, put `pray serve` on a Tailscale or WireGuard overlay, or use `pray+ssh`, instead of Access in front of the v1 tree
 - CDN caching can help with package downloads if your origin supports cacheable responses
 
 ## When Cloudflare is a good fit

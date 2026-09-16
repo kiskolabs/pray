@@ -279,7 +279,7 @@ Rules:
 
 - Declaration order inside the block is render order.
 - Package inputs use fragment exports (see default export resolution).
-- Local bare paths embed human-owned files (no pray markers).
+- Local bare paths embed human-owned files (no pray markers). A local path starts with `.` or `/`, or ends with `.md`, `.txt`, or `.markdown`. Any other unqualified name is a package (RFC 0117).
 - Markers are HTML comments (`<!-- pray:id -->`) only. Compose fails closed unless the destination accepts HTML comments, as specified by RFC 0108.
 - Alias: `output "AGENTS.md" do … end` at top level.
 
@@ -298,17 +298,20 @@ Alias: `folder`. Deprecated alias: `skills` (block form at top level); removed i
 Rules:
 
 - Copies listed folder leaves into the destination directory.
+- Package inputs only. A local path form MUST fail parse.
 - Leaves undeclared siblings in place.
 - Destinations are project-relative. A leading `~` is a manifest error (RFC 0033).
 
 #### pray
 
-Primary input sugar for packages and (inside `compose`) local files.
+Primary input sugar for packages and local files.
 
 ```manifest
 pray "amkisko/working-rules", "~> 2.0"
 pray "amkisko/community-security", "~> 1.0", file: "SECURITY.md"
-pray ".agents/project.md"
+compose "AGENTS.md" do
+  pray ".agents/project.md"
+end
 ```
 
 Aliases: `use`, `include`. Legacy `agent` / `package` remain valid in prayfile `"1"`. Implementations should warn that `agent` is deprecated and will be removed in version 2; prefer `pray`.
@@ -322,7 +325,8 @@ Forms:
 
 `file:` rules:
 
-- Requires a `file`-typed package export (default export resolution applies).
+- Package form requires a `file`-typed package export (default export resolution applies).
+- Local path form MUST fail parse. RFC 0115 proposed allowing it and is not adopted.
 - Writes UTF-8 text after `((pray:…))` substitution (binary non-UTF-8 copies as bytes); no pray markers; no agent header.
 - Exclusive ownership of the path. Refuse-clobber, symlink dest reject, lock ledger, and hash-gated prune are RFC 0033.
 - Destination strings MUST be project-relative. A leading `~` is a manifest error, not home expansion.
@@ -379,7 +383,7 @@ Default export resolution when `export:` / `exports:` omitted:
 
 Exactly one compatible export is selected; multiple require `export: "name"`; none is a type mismatch. Legacy-only Prayfiles (no `compose` / `tree` / `pray` / `file:`) keep empty exports selecting all package exports.
 
-Package name prefixes are namespaces. When a namespace matches a declared source handle name, `source:` may be omitted. `source:` is also optional when only one source exists.
+Package name prefixes are namespaces. When a namespace matches a declared source handle name, `source:` may be omitted. `pray "local/project"` therefore selects source `local`. `source:` is also optional when only one source exists. An unqualified name (no `/`) uses the unique path source when exactly one path source exists, even if other sources exist (RFC 0117).
 
 #### agent
 

@@ -46,11 +46,7 @@ pub(crate) fn serialize_recommended(manifest: &Manifest) -> String {
                 let path = target.skills.first().map(String::as_str).unwrap_or("");
                 lines.push(format!("tree \"{path}\" do"));
                 for entry in &target.entries {
-                    if let DestinationEntry::Package { name } = entry {
-                        if let Some(package) = find_package(manifest, name) {
-                            lines.push(format!("  {}", format_package_declaration(package)));
-                        }
-                    }
+                    lines.push(format!("  {}", format_destination_entry(entry, manifest)));
                 }
                 lines.push("end".to_string());
             }

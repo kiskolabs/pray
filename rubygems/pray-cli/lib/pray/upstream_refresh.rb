@@ -27,6 +27,11 @@ module Pray
       new_upstream = package.upstream
       return false unless new_upstream && package.declaration.path
 
+      local_content = local_content_for_refresh(package.root, package.spec)
+      if local_content.empty?
+        return materialize_empty_path_fork(project, package, previous, sources, git_sources, user_config, options, new_upstream)
+      end
+
       old_upstream = previous&.package&.find { |entry| entry.name == package.declaration.name }&.upstream
       return false unless old_upstream
       return false if old_upstream.version == new_upstream.version && old_upstream.tree_hash == new_upstream.tree_hash
@@ -38,6 +43,27 @@ module Pray
       write_content_files(package.root, old_content, merged)
       write_refreshed_spec(package, new_package, old_content, local_content, merged)
       true
+    end
+
+    def materialize_empty_path_fork(project, package, previous, sources, git_sources, user_config, options, new_upstream)
+      new_package = resolve_named(
+        project.project_root, sources, git_sources, user_config, previous, options,
+        new_upstream.name, "= #{new_upstream.version}", new_upstream.source
+      )
+      new_content = content_file_bytes(new_package.root, new_package.spec)
+      write_content_files(package.root, {}, new_content)
+      write_refreshed_spec(package, new_package, {}, {}, new_content)
+      true
+    end
+
+    def local_content_for_refresh(root, spec)
+      paths = content_paths(spec.files)
+      return {} if paths.empty?
+
+      missing = paths.count { |relative| !File.file?(File.join(root, relative)) }
+      return {} if missing == paths.length
+
+      content_file_bytes(root, spec)
     end
 
     def resolve_upstream_pair(project, previous, sources, git_sources, user_config, options, old_upstream, new_upstream)
@@ -80,7 +106,6 @@ module Pray
       updated = PackageSpecRender.fork_spec_after_refresh(
         package.spec,
         new_package.spec,
-        File.basename(spec_path),
         clean_replica?(old_content, local_content),
         merged.keys
       )
@@ -138,7 +163,8 @@ module Pray
         Transaction.write_file(File.join(root, relative), bytes)
       end
     end
-    private_class_method :apply_one_path_upstream, :resolve_upstream_pair, :merge_fork_content,
+    private_class_method :apply_one_path_upstream, :materialize_empty_path_fork, :local_content_for_refresh,
+      :resolve_upstream_pair, :merge_fork_content,
       :write_refreshed_spec, :resolve_named
   end
 end

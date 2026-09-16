@@ -39,6 +39,26 @@ RSpec.describe Pray::Serve do
       expect(response).to include("404 Not Found")
     end
 
+    it "returns partial content for a satisfiable Range" do
+      File.write(File.join(root, "v1", "index.json"), "abcdefgh")
+      response = described_class.dispatch_request(
+        root, "GET", "/v1/index.json", "", "range" => "bytes=2-4"
+      )
+      expect(response).to include("206 Partial Content")
+      expect(response).to include("Content-Range: bytes 2-4/8")
+      expect(response).to end_with("cde")
+    end
+
+    it "returns partial content when the Range starts at the first byte" do
+      File.write(File.join(root, "v1", "index.json"), "abcdefgh")
+      response = described_class.dispatch_request(
+        root, "GET", "/v1/index.json", "", "range" => "bytes=0-2"
+      )
+      expect(response).to include("206 Partial Content")
+      expect(response).to include("Content-Range: bytes 0-2/8")
+      expect(response).to end_with("abc")
+    end
+
     it "rejects paths outside the distribution root" do
       outside = File.join(workspace, "outside")
       FileUtils.mkdir_p(outside)

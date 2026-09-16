@@ -54,6 +54,64 @@ fn per_command_help_for_install() {
 }
 
 #[test]
+fn packages_list_describes_update() {
+    let output = run_pray(&["--help"]);
+    let stdout = String::from_utf8_lossy(&output.stdout);
+    assert!(
+        stdout.contains("re-resolve packages and git sources within constraints"),
+        "packages list should describe update:\n{stdout}"
+    );
+}
+
+#[test]
+fn workflow_help_names_what_each_command_compares() {
+    let install = stdout_of(&["help", "install"]);
+    assert!(install.contains("listed local compose"));
+    assert!(install.contains("spec.upstream"));
+    assert!(install.contains("pray update"));
+    assert!(install.contains("pray plan"));
+
+    let verify = stdout_of(&["help", "verify"]);
+    assert!(verify.contains("dest managed spans versus Prayfile.lock"));
+    assert!(verify.contains("pray drift"));
+    assert!(verify.contains("pray plan"));
+
+    let drift = stdout_of(&["help", "drift"]);
+    assert!(drift.contains("fresh render"));
+    assert!(drift.contains("pray plan"));
+
+    let render = stdout_of(&["help", "render"]);
+    assert!(render.contains("write dest and Prayfile.lock"));
+    assert!(!render.contains("without updating the lockfile"));
+    assert!(render.contains("pray plan"));
+    assert!(render.contains("--check"));
+
+    let plan = stdout_of(&["help", "plan"]);
+    assert!(plan.contains("dry-run"));
+    assert!(plan.contains("install"));
+
+    let update = stdout_of(&["help", "update"]);
+    assert!(update.contains("pray install"));
+    assert!(update.contains("local compose"));
+    assert!(update.contains("--latest"));
+
+    let prayer = stdout_of(&["help", "prayer"]);
+    assert!(prayer.contains("prayers/"));
+    assert!(prayer.contains("pray prayer init"));
+}
+
+fn stdout_of(arguments: &[&str]) -> String {
+    let output = run_pray(arguments);
+    assert!(
+        output.status.success(),
+        "pray {:?} failed: {}",
+        arguments,
+        String::from_utf8_lossy(&output.stderr)
+    );
+    String::from_utf8_lossy(&output.stdout).into_owned()
+}
+
+#[test]
 fn listed_commands_have_per_command_help() {
     for command in [
         "remove", "list", "format", "fmt", "render", "version", "login", "sync",
