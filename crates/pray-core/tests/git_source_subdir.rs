@@ -72,11 +72,15 @@ fn same_git_url_with_different_subdirs_resolves_both_distributions() {
         Some("right"),
     );
     assert!(
-        left.join(".git").is_dir(),
+        shared.join(".git").is_dir(),
+        "subdir-only sources should still populate the URL-only cache for trust import-repo"
+    );
+    assert!(
+        left.join(".git").exists(),
         "left subdir should have its own git worktree"
     );
     assert!(
-        right.join(".git").is_dir(),
+        right.join(".git").exists(),
         "right subdir should have its own git worktree"
     );
     assert_ne!(
@@ -86,6 +90,38 @@ fn same_git_url_with_different_subdirs_resolves_both_distributions() {
     assert_ne!(
         left, shared,
         "a subdir worktree must not reuse the URL-only cache key"
+    );
+    let shared_git = git_common_dir(&shared);
+    assert_eq!(
+        git_common_dir(&left),
+        shared_git,
+        "left subdir should share the URL-only object store"
+    );
+    assert_eq!(
+        git_common_dir(&right),
+        shared_git,
+        "right subdir should share the URL-only object store"
+    );
+    assert_eq!(
+        pray_core::resolve::git_source_cached_repository(&root, &clone_url).as_deref(),
+        Some(shared.as_path()),
+        "trust import-repo should find the URL-only cache after a subdir-only clone"
+    );
+    let _ = fs::remove_dir_all(&root);
+}
+
+#[test]
+fn cached_repository_finds_a_subdir_worktree_when_url_only_cache_is_missing() {
+    let root = unique_temp("pray-git-cached-repo-fallback");
+    let clone_url = "file://repo-from-prayfile";
+    let leftover =
+        pray_core::resolve::git_source_cache_directory_with_subdir(&root, clone_url, Some("left"));
+    fs::create_dir_all(&leftover).expect("leftover");
+    git(&leftover, &["init", "-b", "main"]);
+    git(&leftover, &["remote", "add", "origin", clone_url]);
+    assert_eq!(
+        pray_core::resolve::git_source_cached_repository(&root, clone_url).as_deref(),
+        Some(leftover.as_path())
     );
     let _ = fs::remove_dir_all(&root);
 }
@@ -173,6 +209,29 @@ fn commit_git(path: &Path) -> String {
         .expect("canonicalize")
         .to_string_lossy()
         .into_owned()
+}
+
+fn git_common_dir(repository: &Path) -> PathBuf {
+    let output = Command::new("git")
+        .current_dir(repository)
+        .args(["rev-parse", "--git-common-dir"])
+        .output()
+        .expect("git-common-dir");
+    assert!(
+        output.status.success(),
+        "git rev-parse --git-common-dir failed: {}",
+        String::from_utf8_lossy(&output.stderr)
+    );
+    let reported = String::from_utf8_lossy(&output.stdout).trim().to_string();
+    let path = Path::new(&reported);
+    let resolved = if path.is_absolute() {
+        path.to_path_buf()
+    } else {
+        repository.join(path)
+    };
+    resolved
+        .canonicalize()
+        .expect("canonicalize git-common-dir")
 }
 
 fn git(directory: &Path, arguments: &[&str]) {

@@ -1,8 +1,7 @@
 # frozen_string_literal: true
 
-require "open3"
-require "fileutils"
 require "pathname"
+require_relative "git_cache"
 
 module Pray
   GitSourceCheckout = Struct.new(:cache_directory, :revision, :subdir)
@@ -57,7 +56,7 @@ module Pray
       end
 
       pinned_revision = refresh ? nil : pinned_revision_for_source(lockfile, source)
-      cache_directory, revision = ensure_git_repository(
+      cache_directory, revision = GitCache.ensure_git_repository(
         project_root,
         clone_url,
         refresh: refresh,
@@ -109,45 +108,12 @@ module Pray
       discover_distribution_root(path)
     end
 
-    def ensure_git_repository(project_root, clone_url, refresh:, pinned_revision:, sparse_subdir:)
-      cache_directory = git_source_cache_directory(project_root, clone_url, sparse_subdir)
-      if File.directory?(File.join(cache_directory, ".git"))
-        if pinned_revision
-          checkout_git_revision(cache_directory, clone_url, pinned_revision, refresh)
-        elsif refresh
-          refresh_git_worktree(cache_directory, clone_url)
-        end
-        refresh_global_from_project(clone_url, cache_directory) if refresh
-        apply_sparse_checkout(cache_directory, sparse_subdir) if sparse_subdir
-        return [cache_directory, git_head_revision(cache_directory)]
-      end
-
-      FileUtils.rm_rf(cache_directory) if File.exist?(cache_directory)
-      FileUtils.mkdir_p(File.dirname(cache_directory))
-      seeded = seed_git_cache_from_global(clone_url, cache_directory, project_root)
-      if seeded
-        run_git_in_repo(cache_directory, "remote", "set-url", "origin", clone_url)
-      else
-        run_git(project_root, "clone", "--depth", "1", clone_url, cache_directory)
-        mirror_git_cache_to_global(clone_url, cache_directory)
-      end
-      if pinned_revision
-        checkout_git_revision(cache_directory, clone_url, pinned_revision, true)
-      elsif refresh && seeded
-        refresh_git_worktree(cache_directory, clone_url)
-      end
-      refresh_global_from_project(clone_url, cache_directory) if refresh && seeded
-      apply_sparse_checkout(cache_directory, sparse_subdir) if sparse_subdir
-      [cache_directory, git_head_revision(cache_directory)]
-    end
-
     def git_source_cache_directory(project_root, clone_url, subdir = nil)
-      identity = subdir && !subdir.empty? ? "#{clone_url}\n#{subdir}" : clone_url
-      File.join(project_root, ".pray", "cache", "git", cache_key(identity))
+      GitCache.git_source_cache_directory(project_root, clone_url, subdir)
     end
 
-    def cache_key(text)
-      Hashing.sha256_prefixed(text)[7, 16]
+    def git_source_cached_repository(project_root, clone_url)
+      GitCache.git_source_cached_repository(project_root, clone_url)
     end
 
     def pinned_revision_for_source(lockfile, source)
@@ -173,90 +139,6 @@ module Pray
     def clone_url_filesystem_path(project_root, clone_url)
       path = clone_url.delete_prefix("file://")
       Pathname.new(path).absolute? ? path : File.expand_path(path, project_root)
-    end
-
-    def global_cache_root
-      return ENV["PRAY_CACHE"] if ENV["PRAY_CACHE"]
-      return File.join(ENV["PRAY_HOME"], "cache") if ENV["PRAY_HOME"]
-
-      home = ENV["HOME"]
-      home ? File.join(home, ".cache", "pray") : nil
-    end
-
-    def global_git_cache_directory(clone_url)
-      root = global_cache_root
-      root ? File.join(root, "git", cache_key(clone_url)) : nil
-    end
-
-    def global_git_cache_ready?(global_cache)
-      File.directory?(File.join(global_cache, ".git")) || File.file?(File.join(global_cache, "HEAD"))
-    end
-
-    def seed_git_cache_from_global(clone_url, destination, working_directory)
-      global_cache = global_git_cache_directory(clone_url)
-      return false unless global_cache && global_git_cache_ready?(global_cache)
-
-      run_git(working_directory, "clone", "--depth", "1", "--quiet", global_cache, destination)
-      true
-    end
-
-    def mirror_git_cache_to_global(clone_url, project_cache)
-      global_cache = global_git_cache_directory(clone_url)
-      return unless global_cache
-      return if global_git_cache_ready?(global_cache)
-
-      FileUtils.mkdir_p(File.dirname(global_cache))
-      FileUtils.rm_rf(global_cache) if File.exist?(global_cache)
-      run_git(File.dirname(project_cache), "clone", "--bare", "--quiet", File.basename(project_cache), global_cache)
-    end
-
-    def apply_sparse_checkout(repository, subdir)
-      run_git_in_repo(repository, "sparse-checkout", "init", "--cone")
-      run_git_in_repo(repository, "sparse-checkout", "set", subdir)
-    end
-
-    def checkout_git_revision(repository, _clone_url, revision, refresh)
-      run_git_in_repo(repository, "fetch", "--depth", "1", "origin", revision) if refresh
-      run_git_in_repo(repository, "checkout", "--force", revision)
-    end
-
-    def refresh_git_worktree(repository, _clone_url)
-      run_git_in_repo(repository, "fetch", "--depth", "1", "origin")
-      run_git_in_repo(repository, "reset", "--hard", "origin/HEAD")
-    end
-
-    def refresh_global_from_project(clone_url, project_cache)
-      global_cache = global_git_cache_directory(clone_url)
-      return unless global_cache
-
-      FileUtils.rm_rf(global_cache) if global_git_cache_ready?(global_cache) || File.exist?(global_cache)
-      mirror_git_cache_to_global(clone_url, project_cache)
-    end
-
-    def git_head_revision(repository)
-      output, status = Open3.capture2e("git", "-C", repository, "rev-parse", "HEAD")
-      raise Error.resolution(command_error("git rev-parse HEAD", output)) unless status.success?
-
-      revision = output.strip
-      raise Error.resolution("git repository has no HEAD revision") if revision.empty?
-
-      revision
-    end
-
-    def run_git(cwd, *arguments)
-      output, status = Open3.capture2e("git", "-C", cwd, *arguments)
-      return if status.success?
-
-      raise Error.resolution(command_error("git #{arguments.join(" ")}", output))
-    end
-
-    def run_git_in_repo(repository, *arguments)
-      run_git(repository, *arguments)
-    end
-
-    def command_error(program, output)
-      message = output.strip
-      message.empty? ? "#{program} failed" : "#{program} failed: #{message}"
     end
   end
 end

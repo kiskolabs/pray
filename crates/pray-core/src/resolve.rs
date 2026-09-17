@@ -9,6 +9,7 @@ use crate::resolve_git_sources::{prepare_git_sources, prepare_pray_ssh_host_keys
 
 use crate::paths::find_prayspec_file;
 pub use crate::resolve_git::{discover_distribution_root, git_source_cache_directory};
+pub use crate::resolve_git_lookup::git_source_cached_repository;
 pub use crate::resolve_git_paths::git_source_cache_directory_with_subdir;
 pub use crate::resolve_git_refresh::{
     annotate_failed_git_refresh, annotate_missing_git_catalog,
