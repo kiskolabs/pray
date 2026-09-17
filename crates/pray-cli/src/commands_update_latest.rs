@@ -1,7 +1,9 @@
-use super::{constraint_preview_options, update_resolve_options, write_update};
-use crate::project_paths::{manifest_path, resolve_project_with_options};
+use super::{update_resolve_options, write_update};
+use crate::project_paths::{lockfile_path, manifest_path, resolve_project_with_options};
 use pray_core::constraint::{latest_constraint_for_package, version_satisfies};
+use pray_core::lockfile::read_lockfile;
 use pray_core::manifest::{parse_manifest, read_manifest_text, replace_package_declaration};
+use pray_core::resolve::apply_path_upstream_refreshes;
 use pray_core::{PrayError, PrayResult};
 
 #[path = "commands_update_upstream.rs"]
@@ -18,8 +20,8 @@ pub(super) fn update_latest_command(
 ) -> PrayResult<()> {
     let manifest_path = manifest_path();
     let manifest_text = read_manifest_text(&manifest_path)?;
-    let preview_options = constraint_preview_options();
-    let project = resolve_project_with_options(&manifest_path, &preview_options)?;
+    let mut options = update_resolve_options(package.as_deref());
+    let project = resolve_project_with_options(&manifest_path, &options)?;
 
     if let Some(package_name) = &package {
         if !project
@@ -84,8 +86,7 @@ pub(super) fn update_latest_command(
             },
         )
         .collect();
-    let upstream_plans =
-        plan_latest_upstream_constraints(&project, package.as_deref(), &preview_options)?;
+    let upstream_plans = plan_latest_upstream_constraints(&project, package.as_deref(), &options)?;
     let upstream_constraint_updates = latest_upstream_constraint_updates_json(&upstream_plans);
 
     if !json {
@@ -103,17 +104,28 @@ pub(super) fn update_latest_command(
         }
     }
 
-    let mut options = update_resolve_options(package.as_deref());
     options.environment = project.environment.clone();
-    let candidate = resolve_after_latest_upstream(
-        &manifest_path,
-        &project.project_root,
-        parse_manifest(&updated_text)?,
-        &options,
-        package.as_deref(),
-        &upstream_plans,
-        dry_run,
-    )?;
+    let candidate = if !manifest_updates.is_empty() || !upstream_plans.is_empty() {
+        resolve_after_latest_upstream(
+            &manifest_path,
+            &project.project_root,
+            parse_manifest(&updated_text)?,
+            &options,
+            package.as_deref(),
+            &upstream_plans,
+            dry_run,
+        )?
+    } else if dry_run {
+        project
+    } else {
+        let previous = read_lockfile(&lockfile_path()).ok();
+        if apply_path_upstream_refreshes(&project, previous.as_ref(), package.as_deref(), &options)?
+        {
+            resolve_project_with_options(&manifest_path, &options)?
+        } else {
+            project
+        }
+    };
     write_update(
         candidate,
         package,

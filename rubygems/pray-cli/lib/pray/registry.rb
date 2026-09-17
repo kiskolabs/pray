@@ -9,6 +9,7 @@ require "time"
 require_relative "path_safety"
 require_relative "http_body"
 require_relative "registry_paths"
+require_relative "registry_http_cache"
 
 module Pray
   RegistryPackageVersion = Struct.new(
@@ -134,9 +135,7 @@ module Pray
         return parse_metadata(File.read(metadata_path, encoding: "UTF-8"))
       end
 
-      PathSafety.reject_unsafe_package_name!(package_name)
-      response = http_get(join_url(source_url, "v1/packages/#{package_name}.json"))
-      parse_metadata(response)
+      RegistryHttpCache.fetch_package_metadata(source_url, package_name)
     end
 
     def parse_metadata(text)

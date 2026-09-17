@@ -1,3 +1,12 @@
+mod index;
+mod resource;
+
+pub use index::{
+    compact_index, compact_index_json, metadata_with_versions, names_heap_bytes, package_name,
+    write_search_fixture,
+};
+pub use resource::{cpu_time_nanos, peak_rss_bytes};
+
 use pray_core::lockfile::{build_lockfile, write_lockfile, Lockfile, ManagedSpanRecord};
 use pray_core::render::{render_project, write_rendered_targets};
 use pray_core::resolve::resolve_project;

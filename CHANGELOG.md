@@ -1,5 +1,11 @@
 # CHANGELOG
 
+## Unreleased
+
+- Reuse registry package metadata during one command so `pray update --latest` does not download the same package JSON twice.
+- Skip a second resolve when `pray update --latest` does not rewrite constraints or upstream pins, and still refresh path-fork files when needed.
+- Fetch torrent piece lists only when a registry lists torrent.
+
 ## 1.17.0 (2026-09-16)
 
 - Locate local prayers through a path source of any directory name (RFC 0117). `pray prayer init` adds `source "local"` when needed and declares `pray "local/project"` once. Version is optional until `pray package` or `pray publish`. `.agents/project.md` remains a compose shortcut for one local file.

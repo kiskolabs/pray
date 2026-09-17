@@ -6,13 +6,15 @@ module Pray
       path = manifest_path
       original_text = Pray.read_manifest_text(path)
       manifest_text = original_text
-      preview_options = ResolveOptions.new(
+      unlocked = package ? Set[package] : Set.new
+      options = ResolveOptions.new(
         offline: offline,
         refresh: true,
         refresh_source_revisions: true,
-        ignore_locked_versions: true
+        ignore_locked_versions: package.nil?,
+        unlocked_packages: unlocked
       )
-      project = resolve_current_project(preview_options)
+      project = resolve_current_project(options)
       if package && project.manifest.packages.none? { |entry| entry.name == package }
         raise Error.manifest("package #{package} not found")
       end
@@ -46,24 +48,20 @@ module Pray
 
       previous = File.exist?(lockfile_path) ? Pray.read_lockfile(lockfile_path) : nil
       upstream_plans = Upstream.plan_path_upstream_latest_constraints(
-        project, previous, package, preview_options
+        project, previous, package, options
       )
       print_latest_constraint_plans(manifest_updates, upstream_plans)
 
       return if dry_run
 
-      Upstream.apply_path_upstream_latest_constraints(upstream_plans)
-      Transaction.write_file(path, manifest_text) if manifest_text != original_text
-      unlocked = package ? Set[package] : Set.new
-      options = ResolveOptions.new(
-        offline: offline,
-        refresh: true,
-        refresh_source_revisions: true,
-        ignore_locked_versions: package.nil?,
-        unlocked_packages: unlocked
-      )
-      current = resolve_current_project(options)
-      Upstream.apply_path_upstream_refreshes(current, previous, package, options)
+      if !manifest_updates.empty? || !upstream_plans.empty?
+        Upstream.apply_path_upstream_latest_constraints(upstream_plans)
+        Transaction.write_file(path, manifest_text) if manifest_text != original_text
+        current = resolve_current_project(options)
+        Upstream.apply_path_upstream_refreshes(current, previous, package, options)
+      else
+        Upstream.apply_path_upstream_refreshes(project, previous, package, options)
+      end
       install_command(
         {
           locked: false,

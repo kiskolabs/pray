@@ -11,11 +11,19 @@ publish = false
 
 [dependencies]
 pray-core = { workspace = true, features = ["auth"] }
+serde_json = "1"
 tempfile = "3"
+
+[target.'cfg(unix)'.dependencies]
+libc = "0.2"
 
 [dev-dependencies]
 criterion = { version = "0.8", features = ["html_reports"] }
 
 [[bench]]
 name = "operations"
+harness = false
+
+[[bench]]
+name = "index"
 harness = false

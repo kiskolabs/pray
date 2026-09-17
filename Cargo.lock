@@ -1400,7 +1400,9 @@ name = "pray-bench"
 version = "1.17.0"
 dependencies = [
  "criterion",
+ "libc",
  "pray-core",
+ "serde_json",
  "tempfile",
 ]
 

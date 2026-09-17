@@ -38,6 +38,7 @@ pub mod push_auth;
 pub mod registry;
 mod registry_cache;
 mod registry_http;
+mod registry_http_cache;
 mod registry_local;
 pub mod registry_search;
 pub mod registry_select;

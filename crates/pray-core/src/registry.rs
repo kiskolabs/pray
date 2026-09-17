@@ -329,12 +329,7 @@ fn fetch_registry_package_metadata(
     source_url: &str,
     package_name: &str,
 ) -> PrayResult<RegistryPackageMetadata> {
-    let url = join_url(source_url, &format!("v1/packages/{}.json", package_name));
-    let response = http_get(&url)?;
-    serde_json::from_slice(&response).map_err(|error| PrayError::Parse {
-        kind: "registry metadata",
-        message: error.to_string(),
-    })
+    crate::registry_http_cache::fetch_package_metadata(source_url, package_name)
 }
 
 pub fn registry_latest_version_label(metadata: &RegistryPackageMetadata) -> Option<String> {
