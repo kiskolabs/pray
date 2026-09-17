@@ -13,7 +13,7 @@ SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 source "${SCRIPT_DIR}/common.sh"
 
 ROOT="$(release_repo_root)"
-VERSION="$(release_read_workspace_version "${ROOT}")"
+VERSION="$(release_read_gem_version "${ROOT}")"
 MODE="dry-run"
 PACKAGE_DIR="${ROOT}/rubygems/pray-cli"
 
@@ -35,7 +35,12 @@ done
 release_require_command gem
 release_require_command bundle
 release_require_command ruby
-release_assert_version_alignment "${ROOT}" "${VERSION}"
+workspace_version="$(release_read_workspace_version "${ROOT}")"
+if [[ "${VERSION}" == "${workspace_version}" ]]; then
+  release_assert_version_alignment "${ROOT}" "${VERSION}"
+else
+  echo "warn: gem ${VERSION} does not match workspace ${workspace_version}; publishing gem only"
+fi
 
 cd "${PACKAGE_DIR}"
 

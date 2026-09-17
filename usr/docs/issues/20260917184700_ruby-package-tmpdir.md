@@ -18,7 +18,7 @@ PRAY=$HOME/.cargo/bin/pray PRAY_RELEASE_YES=1 make release-distribution printed 
 
 ## Next
 
-Retry distribution publish with PRAY pointing at the Rust CLI, or a rebuilt Ruby gem after this fix. Cut 1.18.1 if the published RubyGems 1.18.0 needs the load.
+Ship RubyGems 1.18.1. Leave crates.io and npm at 1.18.0. See usr/docs/issues/20260917185100_prepare-1-18-1-release.md.
 
 ## Source
 
