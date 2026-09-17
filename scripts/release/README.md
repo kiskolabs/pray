@@ -25,7 +25,7 @@ First crates.io publish must go in order: `pray-core`, then `pray-transport`, th
 - `cargo login` / `CARGO_REGISTRY_TOKEN` for crates.io
 - `npm login` for npmjs
 - `gem push` credentials (MFA) for RubyGems
-- A working `pray` binary for distribution-point publish
+- A working `pray` binary for distribution-point publish (`PRAY` selects it; after `gem push`, PATH `pray` may be the RubyGems CLI)
 - `gh` authenticated for `kiskolabs/pray` when creating or editing GitHub Releases
 - Optional: `PRAY_RELEASE_YES=1` to skip confirmation prompts
 - Optional: `PRAY_SIGNING_KEY` or `--signing-key` for ed25519 package signatures

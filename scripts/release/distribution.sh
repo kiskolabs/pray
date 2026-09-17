@@ -108,7 +108,8 @@ done
 
 cd "${PUBLISHER}"
 
-echo "==> ${PRAY_BIN} package"
+echo "==> ${PRAY_BIN} package ($(command -v "${PRAY_BIN}"))"
+"${PRAY_BIN}" --version 2>/dev/null || true
 "${PRAY_BIN}" package
 
 PUBLISH_ARGS=()

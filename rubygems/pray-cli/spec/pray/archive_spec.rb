@@ -141,6 +141,18 @@ RSpec.describe Pray::Archive do
   end
 
   describe ".build_package_archive_bytes" do
+    it "loads Dir.mktmpdir without the caller requiring tmpdir" do
+      lib = File.expand_path("../../lib", __dir__)
+      script = <<~RUBY
+        $LOAD_PATH.unshift(#{lib.inspect})
+        require "pray"
+        Dir.mktmpdir("pray-archive-tmpdir-") { |_| }
+      RUBY
+
+      _stdout, stderr, status = Open3.capture3(RbConfig.ruby, "-e", script)
+      expect(status.success?).to be(true), stderr
+    end
+
     it "packs when spec.files lists the package spec" do
       spec.files = ["demo.prayspec", "rules.md"]
       package.spec = spec
