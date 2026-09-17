@@ -1,6 +1,6 @@
 import { stringify } from "smol-toml";
 import { PrayError } from "../errors.js";
-import { gitSourceCacheDirectory } from "../git/sources.js";
+import { gitSourceCachedRepository } from "../git/sources.js";
 import { importRegistryTrust } from "./import-registry.js";
 import { importSigningKeysFromRepository } from "./import-repo.js";
 import {
@@ -113,7 +113,7 @@ export async function runTrustCommand(
       );
       const cloneUrl = sourceUrl.replace(/^git\+/, "");
       process.stdout.write(
-        `imported ${added} key(s) from ${gitSourceCacheDirectory(projectRoot, cloneUrl)}\n`,
+        `imported ${added} key(s) from ${gitSourceCachedRepository(projectRoot, cloneUrl)}\n`,
       );
       return;
     }

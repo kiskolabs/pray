@@ -1,21 +1,11 @@
 import { spawnSync } from "node:child_process";
-import { existsSync, mkdirSync, rmSync } from "node:fs";
+import { existsSync, mkdirSync, rmSync, statSync } from "node:fs";
 import { homedir } from "node:os";
-import { join } from "node:path";
+import { isAbsolute, join, resolve } from "node:path";
 import { PrayError } from "../errors.js";
-import { sha256Hex } from "../hashing.js";
+import { cacheKey, gitSourceCacheDirectory } from "./paths.js";
 
-export function gitSourceCacheDirectory(
-  projectRoot: string,
-  cloneUrl: string,
-  subdir?: string,
-): string {
-  const identity =
-    subdir !== undefined && subdir.length > 0
-      ? `${cloneUrl}\n${subdir}`
-      : cloneUrl;
-  return join(projectRoot, ".pray", "cache", "git", cacheKey(identity));
-}
+export { gitSourceCacheDirectory } from "./paths.js";
 
 export function ensureGitRepository(
   projectRoot: string,
@@ -24,56 +14,116 @@ export function ensureGitRepository(
   pinnedRevision?: string,
   sparseSubdir?: string,
 ): { cacheDirectory: string; revision: string } {
+  const shared = gitSourceCacheDirectory(projectRoot, cloneUrl);
+  ensureSharedGitRepository(
+    projectRoot,
+    cloneUrl,
+    shared,
+    refresh,
+    pinnedRevision,
+  );
   const cacheDirectory = gitSourceCacheDirectory(
     projectRoot,
     cloneUrl,
     sparseSubdir,
   );
-  if (existsSync(join(cacheDirectory, ".git"))) {
+  if (cacheDirectory !== shared) {
+    ensureLinkedWorktree(shared, cacheDirectory);
     if (pinnedRevision) {
       checkoutGitRevision(cacheDirectory, pinnedRevision, refresh);
     } else if (refresh) {
-      refreshGitWorktree(cacheDirectory);
-    }
-    if (refresh) {
-      refreshGlobalFromProject(cloneUrl, cacheDirectory);
+      runGit(cacheDirectory, "reset", "--hard", gitHeadRevision(shared));
     }
     if (sparseSubdir) {
       applySparseCheckout(cacheDirectory, sparseSubdir);
     }
     return { cacheDirectory, revision: gitHeadRevision(cacheDirectory) };
   }
+  return { cacheDirectory: shared, revision: gitHeadRevision(shared) };
+}
 
-  if (existsSync(cacheDirectory)) {
-    rmSync(cacheDirectory, { recursive: true, force: true });
+function ensureSharedGitRepository(
+  projectRoot: string,
+  cloneUrl: string,
+  shared: string,
+  refresh: boolean,
+  pinnedRevision?: string,
+): void {
+  if (gitDirectory(shared)) {
+    if (pinnedRevision) {
+      checkoutGitRevision(shared, pinnedRevision, refresh);
+    } else if (refresh) {
+      refreshGitWorktree(shared);
+    }
+    if (refresh) {
+      refreshGlobalFromProject(cloneUrl, shared);
+    }
+    return;
   }
-  mkdirSync(join(cacheDirectory, ".."), { recursive: true });
 
-  const seeded = seedGitCacheFromGlobal(cloneUrl, cacheDirectory, projectRoot);
+  if (existsSync(shared)) {
+    rmSync(shared, { recursive: true, force: true });
+  }
+  mkdirSync(join(shared, ".."), { recursive: true });
+
+  const seeded = seedGitCacheFromGlobal(cloneUrl, shared, projectRoot);
   if (seeded) {
-    runGit(cacheDirectory, "remote", "set-url", "origin", cloneUrl);
+    runGit(shared, "remote", "set-url", "origin", cloneUrl);
   } else {
-    runGit(projectRoot, "clone", "--depth", "1", cloneUrl, cacheDirectory);
-    mirrorGitCacheToGlobal(cloneUrl, cacheDirectory);
+    runGit(projectRoot, "clone", "--depth", "1", cloneUrl, shared);
+    mirrorGitCacheToGlobal(cloneUrl, shared);
   }
 
   if (pinnedRevision) {
-    checkoutGitRevision(cacheDirectory, pinnedRevision, true);
+    checkoutGitRevision(shared, pinnedRevision, true);
   } else if (refresh && seeded) {
-    refreshGitWorktree(cacheDirectory);
+    refreshGitWorktree(shared);
   }
   if (refresh && seeded) {
-    refreshGlobalFromProject(cloneUrl, cacheDirectory);
+    refreshGlobalFromProject(cloneUrl, shared);
   }
-  if (sparseSubdir) {
-    applySparseCheckout(cacheDirectory, sparseSubdir);
-  }
-
-  return { cacheDirectory, revision: gitHeadRevision(cacheDirectory) };
 }
 
-function cacheKey(text: string): string {
-  return sha256Hex(text).slice(0, 16);
+function gitDirectory(repository: string): boolean {
+  try {
+    return statSync(join(repository, ".git")).isDirectory();
+  } catch {
+    return false;
+  }
+}
+
+function ensureLinkedWorktree(shared: string, checkout: string): void {
+  if (sameObjectStore(shared, checkout)) {
+    return;
+  }
+  if (existsSync(checkout)) {
+    rmSync(checkout, { recursive: true, force: true });
+  }
+  mkdirSync(join(checkout, ".."), { recursive: true });
+  runGit(shared, "worktree", "add", "--detach", checkout);
+}
+
+function sameObjectStore(shared: string, checkout: string): boolean {
+  if (!existsSync(join(checkout, ".git"))) {
+    return false;
+  }
+  try {
+    return gitCommonDir(shared) === gitCommonDir(checkout);
+  } catch {
+    return false;
+  }
+}
+
+function gitCommonDir(repository: string): string {
+  const reported = runGitCapture(
+    repository,
+    "rev-parse",
+    "--git-common-dir",
+  ).trim();
+  const resolved = isAbsolute(reported)
+    ? reported
+    : resolve(repository, reported);
+  return resolve(resolved);
 }
 
 function globalCacheRoot(): string | undefined {

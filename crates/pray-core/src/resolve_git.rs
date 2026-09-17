@@ -1,72 +1,12 @@
 use crate::client_trust::{effective_trust_home, gate_git_source};
 use crate::paths::remove_path_if_exists;
 use crate::resolve_git_command::{command_error, run_git_command, run_git_success};
-use crate::resolve_git_paths::{cache_key, git_source_cache_directory_with_subdir};
+use crate::resolve_git_paths::cache_key;
 use crate::{PrayError, PrayResult};
 use std::fs;
 use std::path::{Path, PathBuf};
 
 pub use crate::resolve_git_paths::git_source_cache_directory;
-
-pub(crate) fn ensure_git_repository(
-    project_root: &Path,
-    clone_url: &str,
-    refresh: bool,
-    pinned_revision: Option<&str>,
-    sparse_subdir: Option<&str>,
-) -> PrayResult<(PathBuf, String)> {
-    let git_cache_directory =
-        git_source_cache_directory_with_subdir(project_root, clone_url, sparse_subdir);
-
-    if git_cache_directory.join(".git").is_dir() {
-        if let Some(revision) = pinned_revision {
-            checkout_git_revision(&git_cache_directory, clone_url, revision, refresh)?;
-        } else if refresh {
-            refresh_git_worktree(&git_cache_directory, clone_url)?;
-        }
-        if refresh {
-            let _ = refresh_global_from_project(clone_url, &git_cache_directory);
-        }
-        if let Some(subdir) = sparse_subdir {
-            apply_sparse_checkout(&git_cache_directory, subdir)?;
-        }
-        let revision = git_head_revision(&git_cache_directory)?;
-        return finalize_git_repository(clone_url, &git_cache_directory, revision);
-    }
-
-    if git_cache_directory.exists() {
-        remove_path_if_exists(&git_cache_directory)?;
-    }
-    if let Some(parent) = git_cache_directory.parent() {
-        fs::create_dir_all(parent)?;
-    }
-    let destination = git_cache_directory.to_str().ok_or_else(|| {
-        PrayError::Resolution(format!("invalid git cache path: {:?}", git_cache_directory))
-    })?;
-    let seeded = seed_git_cache_from_global(clone_url, destination, project_root)?;
-    if seeded {
-        ensure_git_remote_origin(&git_cache_directory, clone_url)?;
-    } else {
-        run_git_success(
-            project_root,
-            &["clone", "--depth", "1", clone_url, destination],
-        )?;
-        let _ = mirror_git_cache_to_global(clone_url, &git_cache_directory);
-    }
-    if let Some(revision) = pinned_revision {
-        checkout_git_revision(&git_cache_directory, clone_url, revision, true)?;
-    } else if refresh && seeded {
-        refresh_git_worktree(&git_cache_directory, clone_url)?;
-    }
-    if refresh && seeded {
-        let _ = refresh_global_from_project(clone_url, &git_cache_directory);
-    }
-    if let Some(subdir) = sparse_subdir {
-        apply_sparse_checkout(&git_cache_directory, subdir)?;
-    }
-    let revision = git_head_revision(&git_cache_directory)?;
-    finalize_git_repository(clone_url, &git_cache_directory, revision)
-}
 
 pub(crate) fn global_cache_root() -> Option<PathBuf> {
     if let Ok(path) = std::env::var("PRAY_CACHE") {

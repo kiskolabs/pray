@@ -10,7 +10,7 @@ HTTP registry sources are demand-driven. Git sources now prepare when the first 
 
 Keep path-source matching as it is. Implied source lookup is linear in source count per package and is not the cliff.
 
-Project git cache identity is clone URL plus subdir. Empty subdir stays URL-only. The shared global cache stays URL-only.
+Project git cache identity is clone URL plus subdir. Empty subdir stays URL-only. The shared global cache stays URL-only. A subdir checkout is a linked git worktree of the URL-only clone.
 
 Do not parallelize HTTP origins until serial origin RTT is measured on a real multi-registry Prayfile. Fetch protocol changes stay behind that measurement. Partial clone and blob:none stay behind a later pass. The fetch-byte numbers in this note are the gate.
 
@@ -58,11 +58,13 @@ Path sources are not cloned. Several path sources add parse and implied-source l
 
 ### Shared git URL
 
-Project git cache identity is clone URL plus subdir. Empty subdir stays URL-only. The shared global cache stays URL-only.
+Project git cache identity is clone URL plus subdir. Empty subdir stays URL-only. The shared global cache stays URL-only. A subdir checkout is a linked git worktree of the URL-only clone.
 
 cargo test -p pray-core --test git_source_subdir after that split:
 
-Two sources, same file:// URL, subdir left and right. Packages sample/one and sample/three from left, sample/two from right, declared in that order. All three resolve. Left and right keep distinct .git worktrees. Neither reuses the URL-only cache key.
+Two sources, same file:// URL, subdir left and right. Packages sample/one and sample/three from left, sample/two from right, declared in that order. All three resolve. Left and right keep distinct worktrees. Both share the URL-only object store. git_source_cached_repository returns that URL-only path.
+
+A leftover subdir checkout with origin set is found when the URL-only path is missing.
 
 ### Fetch bytes against stored artifacts
 
@@ -75,7 +77,7 @@ Clone cache stays above half the unused artifact. A later unused blob fetches ab
 
 ### Coverage
 
-Missing before this pass: request accounting for several HTTP origins and an unused origin, clone of a git source with no declared package, scaling of update resolve against git source count, RSS and CPU-seconds on that fixture, same-URL different subdir, clone bytes against a catalog that stores unused artifacts.
+Missing before this pass: request accounting for several HTTP origins and an unused origin, clone of a git source with no declared package, scaling of update resolve against git source count, RSS and CPU-seconds on that fixture, same-URL different subdir, clone bytes against a catalog that stores unused artifacts, trust import-repo after a subdir-only clone, shared object store across subdir worktrees.
 
 Added: crates/pray-core/tests/registry_update_fetch.rs two-origin case, crates/pray-core/tests/git_source_prepare.rs, git_source_subdir.rs, git_source_fetch_bytes.rs, crates/pray-bench/tests/source_scaling.rs.
 
@@ -83,17 +85,19 @@ Futile: none of these assert rendered file order.
 
 ## Next
 
-Partial clone and blob:none stay behind a later pass. Trust import-repo still looks up the URL-only project cache, so a project that only uses subdir worktrees may miss that import path. Two subdir worktrees duplicate project disk for the same URL; the global seed still avoids a second origin clone when it is warm.
+Partial clone and blob:none stay behind a later pass.
 
 Co-location with other processes on the same machine was not measured.
 
 ## Source
 
-crates/pray-core/src/resolve_project.rs, resolve_git_sources.rs, resolve_git_source_set.rs, resolve_git.rs, resolve_git_paths.rs, resolve_package_root.rs, resolve_implied_source.rs
+crates/pray-core/src/resolve_project.rs, resolve_git_sources.rs, resolve_git_source_set.rs, resolve_git.rs, resolve_git_paths.rs, resolve_git_ensure.rs, resolve_git_lookup.rs, resolve_package_root.rs, resolve_implied_source.rs
 
 usr/docs/issues/20260917152100_update-and-index-efficiency.md
 
 usr/docs/changelogs/20260917165500_git-subdir-cache-and-fetch-bytes.md
+
+usr/docs/changelogs/20260917171000_git-worktree-share-and-import-repo.md
 
 Commands run:
 
@@ -101,11 +105,13 @@ Commands run:
 - cargo test -p pray-bench --offline --test source_scaling -- --ignored --nocapture: passed, unused-source numbers above
 - cargo fmt: passed
 - later pass: cargo test -p pray-core --offline; cargo test -p pray-cli --offline --test install_git_global_cache --test install_git_catalog; cargo clippy -p pray-core --offline --tests -- -D warnings; make loc-check; TypeScript git integration tests; Ruby git_distribution, git_sources, conformance_resolve, upstream_refresh. All observed passing.
-- this pass: cargo test -p pray-core --offline --test git_source_subdir --test git_source_fetch_bytes --test git_source_prepare: passed (subdir fixture, 512 KiB unused clone 1080239 bytes, unused skip and single fetch)
+- fetch-byte pass: cargo test -p pray-core --offline --test git_source_subdir --test git_source_fetch_bytes --test git_source_prepare: passed (subdir fixture, 512 KiB unused clone 1080239 bytes, unused skip and single fetch)
 - cargo test -p pray-core --offline --test git_source_fetch_bytes -- --ignored --nocapture: passed, unused 256 KiB clone 555873 bytes, unused 1 MiB clone 2128977 bytes, fetch delta 1050020 bytes
-- cargo clippy -p pray-core --offline --tests -- -D warnings: passed
+- this pass: cargo test -p pray-core --offline --test git_source_subdir --test git_source_prepare --test git_source_fetch_bytes: passed, including cached_repository_finds_a_subdir_worktree_when_url_only_cache_is_missing and shared git-common-dir
+- cargo clippy -p pray-core -p pray-cli --offline --tests -- -D warnings: passed
 - cargo fmt --check: passed
 - make loc-check: 0 failures
 - cargo test -p pray-cli --offline --test install_git_global_cache --test install_git_catalog: passed
-- npmjs/pray-cli npm run lint: passed; node --test dist/git-source-cache.test.js: 1 passed
-- rubygems/pray-cli bundle exec rspec spec/pray/git_sources_spec.rb spec/pray/git_distribution_spec.rb: 8 examples, 0 failures
+- npmjs/pray-cli npm run lint: passed; node --test dist/git-source-cache.test.js: 2 passed
+- rubygems/pray-cli bundle exec rspec spec/pray/git_sources_spec.rb spec/pray/git_distribution_spec.rb: 9 examples, 0 failures
+- bundle exec rubocop on changed Ruby files: no offenses

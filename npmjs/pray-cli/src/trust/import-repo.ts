@@ -1,8 +1,6 @@
 import { spawnSync } from "node:child_process";
-import { existsSync } from "node:fs";
-import { join } from "node:path";
 import { PrayError } from "../errors.js";
-import { gitSourceCacheDirectory } from "../git/sources.js";
+import { gitSourceCachedRepository } from "../git/lookup.js";
 import {
   appendMissingKeys,
   mutableRuleForMatchPrefix,
@@ -16,11 +14,9 @@ export function importSigningKeysFromRepository(
   matchPrefix: string | undefined,
 ): number {
   const cloneUrl = sourceUrl.replace(/^git\+/, "");
-  const repository = gitSourceCacheDirectory(projectRoot, cloneUrl);
-  if (!existsSync(join(repository, ".git"))) {
-    throw PrayError.resolution(
-      `no cached git repository for ${cloneUrl} at ${repository}`,
-    );
+  const repository = gitSourceCachedRepository(projectRoot, cloneUrl);
+  if (!repository) {
+    throw PrayError.resolution(`no cached git repository for ${cloneUrl}`);
   }
   const keys = repositorySigningKeys(repository);
   if (keys.length === 0) {

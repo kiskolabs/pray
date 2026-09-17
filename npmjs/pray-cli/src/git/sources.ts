@@ -7,13 +7,14 @@ import {
   localGitSourceRoot,
 } from "./local-root.js";
 
-export { gitSourceCacheDirectory } from "./cache.js";
 export {
   discoverDistributionRoot,
   localDistributionRoot,
   resolveDistributionRoot,
 } from "./distribution-root.js";
 export { localGitSourceRoot } from "./local-root.js";
+export { gitSourceCachedRepository } from "./lookup.js";
+export { gitSourceCacheDirectory } from "./paths.js";
 
 export interface GitSourceCheckout {
   cacheDirectory: string;

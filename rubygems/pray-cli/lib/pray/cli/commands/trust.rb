@@ -28,10 +28,10 @@ module Pray
 
     def trust_import_repo_command(source_url, match_prefix: nil)
       clone_url = source_url.delete_prefix("git+")
-      repository = GitSources.git_source_cache_directory(Dir.pwd, clone_url)
-      unless File.directory?(File.join(repository, ".git"))
+      repository = GitSources.git_source_cached_repository(Dir.pwd, clone_url)
+      unless repository
         raise Error.resolution(
-          "no cached git repository for #{clone_url} at #{repository}"
+          "no cached git repository for #{clone_url}"
         )
       end
 

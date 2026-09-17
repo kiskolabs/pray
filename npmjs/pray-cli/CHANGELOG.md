@@ -5,6 +5,8 @@
 - Skip cloning a git catalog when no package uses that source.
 - Fetch a used git catalog once on `pray update` instead of fetching it twice.
 - Keep packages from two git sources that share a clone URL when each source names a different `subdir`.
+- Share one git object store for those subdirectory checkouts.
+- Import signing keys with `pray trust import-repo` after a catalog was cloned only through `subdir` sources.
 - Reuse registry package metadata during one command so `pray update --latest` does not download the same package JSON twice.
 - Skip a second resolve when `pray update --latest` does not rewrite constraints or upstream pins, and still refresh path-fork files when needed.
 

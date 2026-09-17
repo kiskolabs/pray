@@ -5,7 +5,7 @@ use pray_core::client_trust::{
     remove_allowed_signing_key, set_allow, set_require_signed_commit, set_require_signed_packages,
     show_policy_toml, TrustListScope, DEFAULT_COMPROMISED_KEYS_SOURCE,
 };
-use pray_core::resolve::git_source_cache_directory;
+use pray_core::resolve::git_source_cached_repository;
 use pray_core::{PrayError, PrayResult};
 use std::env;
 use std::fs;
@@ -219,13 +219,9 @@ fn trust_import_repo_command(mut arguments: std::vec::IntoIter<String>) -> PrayR
         }
     }
     let project_root = env::current_dir()?;
-    let repository = git_source_cache_directory(&project_root, clone_url);
-    if !repository.join(".git").is_dir() {
-        return Err(PrayError::Resolution(format!(
-            "no cached git repository for {clone_url} at {}",
-            repository.display()
-        )));
-    }
+    let repository = git_source_cached_repository(&project_root, clone_url).ok_or_else(|| {
+        PrayError::Resolution(format!("no cached git repository for {clone_url}"))
+    })?;
     let added = import_signing_keys_from_repository(
         &trust_home()?,
         clone_url,

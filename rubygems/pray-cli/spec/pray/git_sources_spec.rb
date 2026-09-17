@@ -50,4 +50,13 @@ RSpec.describe Pray::GitSources do
     expect(left).not_to eq(shared)
     expect(right).not_to eq(shared)
   end
+
+  it "finds a leftover subdir checkout when the URL-only cache is missing" do
+    clone_url = "file://repo-from-prayfile"
+    leftover = described_class.git_source_cache_directory(workspace, clone_url, "left")
+    FileUtils.mkdir_p(leftover)
+    system("git", "init", "-b", "main", leftover, out: File::NULL, err: File::NULL)
+    system("git", "-C", leftover, "remote", "add", "origin", clone_url, out: File::NULL, err: File::NULL)
+    expect(described_class.git_source_cached_repository(workspace, clone_url)).to eq(leftover)
+  end
 end

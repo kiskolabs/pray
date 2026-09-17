@@ -1,7 +1,7 @@
 use crate::lockfile::Lockfile;
 use crate::manifest::ManifestSource;
 use crate::resolve_context::ResolveOptions;
-use crate::resolve_git::ensure_git_repository;
+use crate::resolve_git_ensure::ensure_git_repository;
 use crate::resolve_git_sources::{
     is_local_filesystem_source, local_git_repo_path, local_git_source_root,
     pinned_revision_for_source, GitSourceCheckout,

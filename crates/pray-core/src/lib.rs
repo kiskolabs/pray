@@ -63,6 +63,8 @@ mod resolve_deps;
 mod resolve_exports;
 mod resolve_git;
 mod resolve_git_command;
+mod resolve_git_ensure;
+mod resolve_git_lookup;
 mod resolve_git_paths;
 mod resolve_git_refresh;
 mod resolve_git_source_set;

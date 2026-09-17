@@ -29,7 +29,7 @@ Clone cache stays above half the unused artifact. Fetch of a later unused blob i
 
 ## Next
 
-Partial clone and blob:none stay behind a later pass. Trust import-repo still looks up the URL-only project cache. Co-location with other processes was not measured.
+Partial clone and blob:none stay behind a later pass. Trust import-repo lookup and shared object stores for subdir worktrees moved to usr/docs/changelogs/20260917171000_git-worktree-share-and-import-repo.md.
 
 ## Source
 
