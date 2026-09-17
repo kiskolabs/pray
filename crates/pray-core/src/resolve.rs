@@ -5,12 +5,11 @@ use crate::resolve_context::ResolveOptions;
 use crate::resolve_exports::{
     build_skill_file_index, load_export_bodies, load_package_file_bytes, select_exports,
 };
-use crate::resolve_git_sources::{
-    prepare_git_sources, prepare_pray_ssh_host_keys, GitSourceCheckout,
-};
+use crate::resolve_git_sources::{prepare_git_sources, prepare_pray_ssh_host_keys, GitSourceSet};
 
 use crate::paths::find_prayspec_file;
 pub use crate::resolve_git::{discover_distribution_root, git_source_cache_directory};
+pub use crate::resolve_git_paths::git_source_cache_directory_with_subdir;
 pub use crate::resolve_git_refresh::{
     annotate_failed_git_refresh, annotate_missing_git_catalog,
     resolution_may_benefit_from_git_source_refresh,
@@ -149,7 +148,7 @@ pub use resolve_upstream::{apply_path_upstream_refreshes, path_fork_drift_lines}
 fn resolve_package(
     project_root: &Path,
     sources: &BTreeMap<String, ManifestSource>,
-    git_sources: &BTreeMap<String, GitSourceCheckout>,
+    git_sources: &GitSourceSet,
     user_config: &crate::config::PrayConfig,
     declaration: &ManifestPackage,
     lockfile: Option<&Lockfile>,

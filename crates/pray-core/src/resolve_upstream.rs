@@ -72,7 +72,7 @@ fn apply_one_path_upstream(
     package: &ResolvedPackage,
     previous: Option<&Lockfile>,
     sources: &BTreeMap<String, crate::manifest::ManifestSource>,
-    git_sources: &BTreeMap<String, crate::resolve_git_sources::GitSourceCheckout>,
+    git_sources: &crate::resolve_git_sources::GitSourceSet,
     user_config: &crate::config::PrayConfig,
     options: &ResolveOptions,
 ) -> PrayResult<bool> {

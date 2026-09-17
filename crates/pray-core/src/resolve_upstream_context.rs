@@ -9,7 +9,7 @@ use std::path::Path;
 pub(in crate::resolve) struct UpstreamResolutionContext<'a> {
     project_root: &'a Path,
     pub(super) sources: &'a BTreeMap<String, crate::manifest::ManifestSource>,
-    git_sources: &'a BTreeMap<String, crate::resolve_git_sources::GitSourceCheckout>,
+    git_sources: &'a crate::resolve_git_sources::GitSourceSet,
     user_config: &'a crate::config::PrayConfig,
     pub(super) lockfile: Option<&'a Lockfile>,
     pub(super) options: &'a ResolveOptions,
@@ -19,7 +19,7 @@ impl<'a> UpstreamResolutionContext<'a> {
     pub(in crate::resolve) fn new(
         project_root: &'a Path,
         sources: &'a BTreeMap<String, crate::manifest::ManifestSource>,
-        git_sources: &'a BTreeMap<String, crate::resolve_git_sources::GitSourceCheckout>,
+        git_sources: &'a crate::resolve_git_sources::GitSourceSet,
         user_config: &'a crate::config::PrayConfig,
         lockfile: Option<&'a Lockfile>,
         options: &'a ResolveOptions,

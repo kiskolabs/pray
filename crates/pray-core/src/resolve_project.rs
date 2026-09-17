@@ -72,16 +72,7 @@ pub fn resolve_manifest_in_context(
         manifest_hash,
         packages,
         local_files,
-        source_revisions: git_sources
-            .into_iter()
-            .filter_map(|(name, checkout)| {
-                if checkout.revision.is_empty() {
-                    None
-                } else {
-                    Some((name, checkout.revision))
-                }
-            })
-            .collect(),
+        source_revisions: git_sources.revisions(),
         source_host_keys,
         environment: options.environment.clone(),
     })

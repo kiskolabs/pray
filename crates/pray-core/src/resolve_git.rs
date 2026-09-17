@@ -1,10 +1,12 @@
 use crate::client_trust::{effective_trust_home, gate_git_source};
-use crate::hashing::sha256_prefixed;
 use crate::paths::remove_path_if_exists;
 use crate::resolve_git_command::{command_error, run_git_command, run_git_success};
+use crate::resolve_git_paths::{cache_key, git_source_cache_directory_with_subdir};
 use crate::{PrayError, PrayResult};
 use std::fs;
 use std::path::{Path, PathBuf};
+
+pub use crate::resolve_git_paths::git_source_cache_directory;
 
 pub(crate) fn ensure_git_repository(
     project_root: &Path,
@@ -13,16 +15,17 @@ pub(crate) fn ensure_git_repository(
     pinned_revision: Option<&str>,
     sparse_subdir: Option<&str>,
 ) -> PrayResult<(PathBuf, String)> {
-    let git_cache_directory = git_source_cache_directory(project_root, clone_url);
+    let git_cache_directory =
+        git_source_cache_directory_with_subdir(project_root, clone_url, sparse_subdir);
 
     if git_cache_directory.join(".git").is_dir() {
-        if refresh {
-            refresh_global_git_cache(clone_url)?;
-        }
         if let Some(revision) = pinned_revision {
             checkout_git_revision(&git_cache_directory, clone_url, revision, refresh)?;
         } else if refresh {
             refresh_git_worktree(&git_cache_directory, clone_url)?;
+        }
+        if refresh {
+            let _ = refresh_global_from_project(clone_url, &git_cache_directory);
         }
         if let Some(subdir) = sparse_subdir {
             apply_sparse_checkout(&git_cache_directory, subdir)?;
@@ -40,7 +43,8 @@ pub(crate) fn ensure_git_repository(
     let destination = git_cache_directory.to_str().ok_or_else(|| {
         PrayError::Resolution(format!("invalid git cache path: {:?}", git_cache_directory))
     })?;
-    if seed_git_cache_from_global(clone_url, destination, project_root)? {
+    let seeded = seed_git_cache_from_global(clone_url, destination, project_root)?;
+    if seeded {
         ensure_git_remote_origin(&git_cache_directory, clone_url)?;
     } else {
         run_git_success(
@@ -51,6 +55,11 @@ pub(crate) fn ensure_git_repository(
     }
     if let Some(revision) = pinned_revision {
         checkout_git_revision(&git_cache_directory, clone_url, revision, true)?;
+    } else if refresh && seeded {
+        refresh_git_worktree(&git_cache_directory, clone_url)?;
+    }
+    if refresh && seeded {
+        let _ = refresh_global_from_project(clone_url, &git_cache_directory);
     }
     if let Some(subdir) = sparse_subdir {
         apply_sparse_checkout(&git_cache_directory, subdir)?;
@@ -177,12 +186,6 @@ pub(crate) fn finalize_git_repository(
     Ok((git_cache_directory.to_path_buf(), revision))
 }
 
-pub fn git_source_cache_directory(project_root: &Path, clone_url: &str) -> PathBuf {
-    project_root
-        .join(".pray/cache/git")
-        .join(cache_key(clone_url))
-}
-
 pub(crate) fn ensure_git_remote_origin(repository: &Path, clone_url: &str) -> PrayResult<()> {
     if run_git_success(repository, &["remote", "get-url", "origin"]).is_ok() {
         run_git_success(repository, &["remote", "set-url", "origin", clone_url])?;
@@ -192,16 +195,14 @@ pub(crate) fn ensure_git_remote_origin(repository: &Path, clone_url: &str) -> Pr
     Ok(())
 }
 
-pub(crate) fn refresh_global_git_cache(clone_url: &str) -> PrayResult<()> {
+pub(crate) fn refresh_global_from_project(clone_url: &str, project_cache: &Path) -> PrayResult<()> {
     let Some(global_cache) = global_git_cache_directory(clone_url) else {
         return Ok(());
     };
-    if !global_git_cache_ready(&global_cache) {
-        return Ok(());
+    if global_git_cache_ready(&global_cache) || global_cache.exists() {
+        remove_path_if_exists(&global_cache)?;
     }
-    ensure_git_remote_origin(&global_cache, clone_url)?;
-    run_git_success(&global_cache, &["fetch", "--depth", "1", "origin"])?;
-    Ok(())
+    mirror_git_cache_to_global(clone_url, project_cache)
 }
 
 pub(crate) fn refresh_git_worktree(repository: &Path, clone_url: &str) -> PrayResult<()> {
@@ -282,12 +283,4 @@ pub fn discover_distribution_root(path: &Path) -> Option<PathBuf> {
 
 pub(crate) fn is_local_distribution_root(path: &Path) -> bool {
     path.join("v1/packages").is_dir()
-}
-
-pub(crate) fn cache_key(text: &str) -> String {
-    sha256_prefixed(text.as_bytes())
-        .trim_start_matches("sha256:")
-        .chars()
-        .take(16)
-        .collect()
 }

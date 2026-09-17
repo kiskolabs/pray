@@ -7,42 +7,68 @@ require "pathname"
 module Pray
   GitSourceCheckout = Struct.new(:cache_directory, :revision, :subdir)
 
+  class GitSourceSet
+    def initialize(project_root, sources, lockfile, refresh:)
+      @project_root = project_root
+      @lockfile = lockfile
+      @refresh = refresh
+      @sources = sources.select { |source| source.kind == "git" }.to_h { |source| [source.name, source] }
+      @checkouts = {}
+    end
+
+    def [](name)
+      return @checkouts[name] if @checkouts.key?(name)
+
+      source = @sources[name]
+      return nil unless source
+
+      checkout = GitSources.prepare_one_git_source(@project_root, source, @lockfile, refresh: @refresh)
+      @checkouts[name] = checkout if checkout
+      checkout
+    end
+
+    def revisions
+      @checkouts.each_with_object({}) do |(name, checkout), collected|
+        next if checkout.revision.to_s.empty?
+
+        collected[name] = checkout.revision
+      end
+    end
+  end
+
   module GitSources
     module_function
 
     def prepare_git_sources(project_root, sources, lockfile, refresh: false)
-      checkouts = {}
-      sources.each do |source|
-        next unless source.kind == "git"
+      GitSourceSet.new(project_root, sources, lockfile, refresh: refresh)
+    end
 
-        clone_url = source.url.delete_prefix("git+")
-        if local_filesystem_source?(clone_url) && !local_git_repo_path(project_root, clone_url)
-          source_root = local_git_source_root(project_root, clone_url)
-          if source_root
-            checkouts[source.name] = GitSourceCheckout.new(
-              cache_directory: source_root,
-              revision: "",
-              subdir: source.subdir
-            )
-          end
-          next
-        end
+    def prepare_one_git_source(project_root, source, lockfile, refresh:)
+      clone_url = source.url.delete_prefix("git+")
+      if local_filesystem_source?(clone_url) && !local_git_repo_path(project_root, clone_url)
+        source_root = local_git_source_root(project_root, clone_url)
+        return unless source_root
 
-        pinned_revision = refresh ? nil : pinned_revision_for_source(lockfile, source)
-        cache_directory, revision = ensure_git_repository(
-          project_root,
-          clone_url,
-          refresh: refresh,
-          pinned_revision: pinned_revision,
-          sparse_subdir: source.subdir
-        )
-        checkouts[source.name] = GitSourceCheckout.new(
-          cache_directory: cache_directory,
-          revision: revision,
+        return GitSourceCheckout.new(
+          cache_directory: source_root,
+          revision: "",
           subdir: source.subdir
         )
       end
-      checkouts
+
+      pinned_revision = refresh ? nil : pinned_revision_for_source(lockfile, source)
+      cache_directory, revision = ensure_git_repository(
+        project_root,
+        clone_url,
+        refresh: refresh,
+        pinned_revision: pinned_revision,
+        sparse_subdir: source.subdir
+      )
+      GitSourceCheckout.new(
+        cache_directory: cache_directory,
+        revision: revision,
+        subdir: source.subdir
+      )
     end
 
     def resolve_distribution_root(repo_root, subdir)
@@ -84,34 +110,40 @@ module Pray
     end
 
     def ensure_git_repository(project_root, clone_url, refresh:, pinned_revision:, sparse_subdir:)
-      cache_directory = git_source_cache_directory(project_root, clone_url)
+      cache_directory = git_source_cache_directory(project_root, clone_url, sparse_subdir)
       if File.directory?(File.join(cache_directory, ".git"))
-        refresh_global_git_cache(clone_url) if refresh
         if pinned_revision
           checkout_git_revision(cache_directory, clone_url, pinned_revision, refresh)
         elsif refresh
           refresh_git_worktree(cache_directory, clone_url)
         end
+        refresh_global_from_project(clone_url, cache_directory) if refresh
         apply_sparse_checkout(cache_directory, sparse_subdir) if sparse_subdir
-        revision = git_head_revision(cache_directory)
-        return [cache_directory, revision]
+        return [cache_directory, git_head_revision(cache_directory)]
       end
 
       FileUtils.rm_rf(cache_directory) if File.exist?(cache_directory)
       FileUtils.mkdir_p(File.dirname(cache_directory))
-      if seed_git_cache_from_global(clone_url, cache_directory, project_root)
+      seeded = seed_git_cache_from_global(clone_url, cache_directory, project_root)
+      if seeded
         run_git_in_repo(cache_directory, "remote", "set-url", "origin", clone_url)
       else
         run_git(project_root, "clone", "--depth", "1", clone_url, cache_directory)
         mirror_git_cache_to_global(clone_url, cache_directory)
       end
-      checkout_git_revision(cache_directory, clone_url, pinned_revision, true) if pinned_revision
+      if pinned_revision
+        checkout_git_revision(cache_directory, clone_url, pinned_revision, true)
+      elsif refresh && seeded
+        refresh_git_worktree(cache_directory, clone_url)
+      end
+      refresh_global_from_project(clone_url, cache_directory) if refresh && seeded
       apply_sparse_checkout(cache_directory, sparse_subdir) if sparse_subdir
       [cache_directory, git_head_revision(cache_directory)]
     end
 
-    def git_source_cache_directory(project_root, clone_url)
-      File.join(project_root, ".pray", "cache", "git", cache_key(clone_url))
+    def git_source_cache_directory(project_root, clone_url, subdir = nil)
+      identity = subdir && !subdir.empty? ? "#{clone_url}\n#{subdir}" : clone_url
+      File.join(project_root, ".pray", "cache", "git", cache_key(identity))
     end
 
     def cache_key(text)
@@ -193,11 +225,12 @@ module Pray
       run_git_in_repo(repository, "reset", "--hard", "origin/HEAD")
     end
 
-    def refresh_global_git_cache(clone_url)
+    def refresh_global_from_project(clone_url, project_cache)
       global_cache = global_git_cache_directory(clone_url)
-      return unless global_cache && global_git_cache_ready?(global_cache)
+      return unless global_cache
 
-      run_git_in_repo(global_cache, "fetch", "--depth", "1", "origin")
+      FileUtils.rm_rf(global_cache) if global_git_cache_ready?(global_cache) || File.exist?(global_cache)
+      mirror_git_cache_to_global(clone_url, project_cache)
     end
 
     def git_head_revision(repository)

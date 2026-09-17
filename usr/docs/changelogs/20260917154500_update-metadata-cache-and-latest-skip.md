@@ -16,7 +16,7 @@ Search summaries stay names-only until an RFC 0060 change. Compact index write a
 
 ## Next
 
-Search names-only default or index summaries remains an RFC 0060 amendment. Git catalog refresh still needs a fixture that counts fetch bytes.
+Search names-only default or index summaries remains an RFC 0060 amendment. Git catalog fetch-byte counts are in usr/docs/changelogs/20260917165500_git-subdir-cache-and-fetch-bytes.md.
 
 ## Source
 

@@ -1,11 +1,13 @@
 use crate::lockfile::Lockfile;
 use crate::manifest::{ManifestPackage, ManifestSource};
 use crate::registry::{resolve_local_registry_package_root, RegistryPackageResolution};
-use crate::resolve_context::{PackageResolutionContext, ResolveOptions};
+use crate::resolve_context::PackageResolutionContext;
 use crate::resolve_git::{ensure_git_repository, resolve_distribution_root};
 use crate::{PrayError, PrayResult};
 use std::collections::BTreeMap;
 use std::path::{Path, PathBuf};
+
+pub(crate) use crate::resolve_git_source_set::{prepare_git_sources, GitSourceSet};
 
 #[derive(Debug, Clone)]
 pub(crate) struct GitSourceCheckout {
@@ -33,58 +35,6 @@ pub(crate) fn prepare_pray_ssh_host_keys(
         }
     }
     Ok(host_keys)
-}
-
-pub(crate) fn prepare_git_sources(
-    project_root: &Path,
-    sources: &[ManifestSource],
-    lockfile: Option<&Lockfile>,
-    options: &ResolveOptions,
-) -> PrayResult<BTreeMap<String, GitSourceCheckout>> {
-    let mut git_sources = BTreeMap::new();
-    for source in sources {
-        if source.kind != "git" {
-            continue;
-        }
-        let clone_url = source.url.strip_prefix("git+").unwrap_or(&source.url);
-        let pinned_revision = if options.refresh_source_revisions {
-            None
-        } else {
-            pinned_revision_for_source(lockfile, source)
-        };
-        let refresh = options.refresh_source_revisions;
-        if is_local_filesystem_source(clone_url)
-            && local_git_repo_path(project_root, clone_url).is_none()
-        {
-            if let Some(source_root) = local_git_source_root(project_root, clone_url) {
-                git_sources.insert(
-                    source.name.clone(),
-                    GitSourceCheckout {
-                        cache_directory: source_root,
-                        revision: String::new(),
-                        subdir: source.subdir.clone(),
-                    },
-                );
-            }
-            continue;
-        }
-        let (cache_directory, revision) = ensure_git_repository(
-            project_root,
-            clone_url,
-            refresh,
-            pinned_revision.as_deref(),
-            source.subdir.as_deref(),
-        )?;
-        git_sources.insert(
-            source.name.clone(),
-            GitSourceCheckout {
-                cache_directory,
-                revision,
-                subdir: source.subdir.clone(),
-            },
-        );
-    }
-    Ok(git_sources)
 }
 
 pub(crate) fn is_local_filesystem_source(clone_url: &str) -> bool {
@@ -145,47 +95,50 @@ pub(crate) fn resolve_git_package_root(
     project_root: &Path,
     source_name: &str,
     source_url: &str,
-    git_sources: &BTreeMap<String, GitSourceCheckout>,
+    git_sources: &GitSourceSet,
     declaration: &ManifestPackage,
     context: &PackageResolutionContext,
 ) -> PrayResult<RegistryPackageResolution> {
     let clone_url = source_url.strip_prefix("git+").unwrap_or(source_url);
-    if let Some(checkout) = git_sources.get(source_name) {
-        let distribution_root =
-            resolve_distribution_root(&checkout.cache_directory, checkout.subdir.as_deref())?;
-        let source_key = if checkout.revision.is_empty() {
-            clone_url.to_string()
-        } else {
-            format!("{}@{}", clone_url, checkout.revision)
-        };
-        return resolve_local_registry_package_root(
-            project_root,
-            &source_key,
-            &distribution_root,
-            declaration,
-            context,
-        )
-        .map_err(|error| {
-            crate::resolve_git_refresh::annotate_missing_git_catalog(
-                error,
-                &declaration.name,
-                source_name,
-                &checkout.revision,
+    match git_sources.ensure(source_name) {
+        Ok(checkout) => {
+            let distribution_root =
+                resolve_distribution_root(&checkout.cache_directory, checkout.subdir.as_deref())?;
+            let source_key = if checkout.revision.is_empty() {
+                clone_url.to_string()
+            } else {
+                format!("{}@{}", clone_url, checkout.revision)
+            };
+            resolve_local_registry_package_root(
+                project_root,
+                &source_key,
+                &distribution_root,
+                declaration,
+                context,
             )
-        });
+            .map_err(|error| {
+                crate::resolve_git_refresh::annotate_missing_git_catalog(
+                    error,
+                    &declaration.name,
+                    source_name,
+                    &checkout.revision,
+                )
+            })
+        }
+        Err(error) => {
+            if let Some(source_root) = local_git_source_root(project_root, clone_url) {
+                resolve_local_registry_package_root(
+                    project_root,
+                    clone_url,
+                    &source_root,
+                    declaration,
+                    context,
+                )
+            } else {
+                Err(error)
+            }
+        }
     }
-    if let Some(source_root) = local_git_source_root(project_root, clone_url) {
-        return resolve_local_registry_package_root(
-            project_root,
-            clone_url,
-            &source_root,
-            declaration,
-            context,
-        );
-    }
-    Err(PrayError::Resolution(format!(
-        "git source {source_name} was not prepared"
-    )))
 }
 
 pub fn refresh_git_sources(manifest_path: &Path) -> PrayResult<()> {

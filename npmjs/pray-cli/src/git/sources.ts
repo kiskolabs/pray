@@ -1,17 +1,13 @@
-import { spawnSync } from "node:child_process";
-import { existsSync, mkdirSync, rmSync } from "node:fs";
-import { homedir } from "node:os";
-import { join } from "node:path";
-import { PrayError } from "../errors.js";
-import { sha256Hex } from "../hashing.js";
 import type { Lockfile } from "../lockfile/types.js";
 import type { ManifestSource } from "../manifest/types.js";
+import { ensureGitRepository } from "./cache.js";
 import {
   isLocalFilesystemSource,
   localGitRepoPath,
   localGitSourceRoot,
 } from "./local-root.js";
 
+export { gitSourceCacheDirectory } from "./cache.js";
 export {
   discoverDistributionRoot,
   localDistributionRoot,
@@ -25,101 +21,95 @@ export interface GitSourceCheckout {
   subdir?: string;
 }
 
+export class GitSourceSet {
+  private readonly checkouts = new Map<string, GitSourceCheckout>();
+  private readonly sourcesByName: Map<string, ManifestSource>;
+
+  constructor(
+    private readonly projectRoot: string,
+    sources: ManifestSource[],
+    private readonly lockfile: Lockfile | undefined,
+    private readonly refresh: boolean,
+  ) {
+    this.sourcesByName = new Map(
+      sources
+        .filter((source) => source.kind === "git")
+        .map((source) => [source.name, source]),
+    );
+  }
+
+  get(name: string): GitSourceCheckout | undefined {
+    const cached = this.checkouts.get(name);
+    if (cached) {
+      return cached;
+    }
+    const source = this.sourcesByName.get(name);
+    if (!source) {
+      return undefined;
+    }
+    const checkout = prepareOneGitSource(
+      this.projectRoot,
+      source,
+      this.lockfile,
+      this.refresh,
+    );
+    if (!checkout) {
+      return undefined;
+    }
+    this.checkouts.set(name, checkout);
+    return checkout;
+  }
+
+  entries(): IterableIterator<[string, GitSourceCheckout]> {
+    return this.checkouts.entries();
+  }
+}
+
 export function prepareGitSources(
   projectRoot: string,
   sources: ManifestSource[],
   lockfile: Lockfile | undefined,
   refresh = false,
-): Map<string, GitSourceCheckout> {
-  const checkouts = new Map<string, GitSourceCheckout>();
-  for (const source of sources) {
-    if (source.kind !== "git") {
-      continue;
-    }
-    const cloneUrl = source.url.replace(/^git\+/, "");
-    if (
-      isLocalFilesystemSource(cloneUrl) &&
-      !localGitRepoPath(projectRoot, cloneUrl)
-    ) {
-      const sourceRoot = localGitSourceRoot(projectRoot, cloneUrl);
-      if (sourceRoot) {
-        checkouts.set(source.name, {
-          cacheDirectory: sourceRoot,
-          revision: "",
-          subdir: source.subdir,
-        });
-      }
-      continue;
-    }
-    const pinnedRevision = refresh
-      ? undefined
-      : pinnedRevisionForSource(lockfile, source);
-    const { cacheDirectory, revision } = ensureGitRepository(
-      projectRoot,
-      cloneUrl,
-      refresh,
-      pinnedRevision,
-      source.subdir,
-    );
-    checkouts.set(source.name, {
-      cacheDirectory,
-      revision,
-      subdir: source.subdir,
-    });
-  }
-  return checkouts;
+): GitSourceSet {
+  return new GitSourceSet(projectRoot, sources, lockfile, refresh);
 }
 
-export function gitSourceCacheDirectory(
+function prepareOneGitSource(
   projectRoot: string,
-  cloneUrl: string,
-): string {
-  return join(projectRoot, ".pray", "cache", "git", cacheKey(cloneUrl));
-}
-
-function ensureGitRepository(
-  projectRoot: string,
-  cloneUrl: string,
+  source: ManifestSource,
+  lockfile: Lockfile | undefined,
   refresh: boolean,
-  pinnedRevision?: string,
-  sparseSubdir?: string,
-): { cacheDirectory: string; revision: string } {
-  const cacheDirectory = gitSourceCacheDirectory(projectRoot, cloneUrl);
-  if (existsSync(join(cacheDirectory, ".git"))) {
-    if (refresh) {
-      refreshGlobalGitCache(cloneUrl);
+): GitSourceCheckout | undefined {
+  const cloneUrl = source.url.replace(/^git\+/, "");
+  if (
+    isLocalFilesystemSource(cloneUrl) &&
+    !localGitRepoPath(projectRoot, cloneUrl)
+  ) {
+    const sourceRoot = localGitSourceRoot(projectRoot, cloneUrl);
+    if (!sourceRoot) {
+      return undefined;
     }
-    if (pinnedRevision) {
-      checkoutGitRevision(cacheDirectory, pinnedRevision, refresh);
-    } else if (refresh) {
-      refreshGitWorktree(cacheDirectory);
-    }
-    if (sparseSubdir) {
-      applySparseCheckout(cacheDirectory, sparseSubdir);
-    }
-    return { cacheDirectory, revision: gitHeadRevision(cacheDirectory) };
+    return {
+      cacheDirectory: sourceRoot,
+      revision: "",
+      subdir: source.subdir,
+    };
   }
-
-  if (existsSync(cacheDirectory)) {
-    rmSync(cacheDirectory, { recursive: true, force: true });
-  }
-  mkdirSync(join(cacheDirectory, ".."), { recursive: true });
-
-  if (!seedGitCacheFromGlobal(cloneUrl, cacheDirectory, projectRoot)) {
-    runGit(projectRoot, "clone", "--depth", "1", cloneUrl, cacheDirectory);
-    mirrorGitCacheToGlobal(cloneUrl, cacheDirectory);
-  } else {
-    runGit(cacheDirectory, "remote", "set-url", "origin", cloneUrl);
-  }
-
-  if (pinnedRevision) {
-    checkoutGitRevision(cacheDirectory, pinnedRevision, true);
-  }
-  if (sparseSubdir) {
-    applySparseCheckout(cacheDirectory, sparseSubdir);
-  }
-
-  return { cacheDirectory, revision: gitHeadRevision(cacheDirectory) };
+  const pinnedRevision = refresh
+    ? undefined
+    : pinnedRevisionForSource(lockfile, source);
+  const { cacheDirectory, revision } = ensureGitRepository(
+    projectRoot,
+    cloneUrl,
+    refresh,
+    pinnedRevision,
+    source.subdir,
+  );
+  return {
+    cacheDirectory,
+    revision,
+    subdir: source.subdir,
+  };
 }
 
 function pinnedRevisionForSource(
@@ -136,146 +126,4 @@ function pinnedRevisionForSource(
     return source.rev ?? source.tag;
   }
   return undefined;
-}
-
-function cacheKey(text: string): string {
-  return sha256Hex(text).slice(0, 16);
-}
-
-function globalCacheRoot(): string | undefined {
-  if (process.env.PRAY_CACHE) {
-    return process.env.PRAY_CACHE;
-  }
-  if (process.env.PRAY_HOME) {
-    return join(process.env.PRAY_HOME, "cache");
-  }
-  return join(homedir(), ".cache", "pray");
-}
-
-function globalGitCacheDirectory(cloneUrl: string): string | undefined {
-  const root = globalCacheRoot();
-  return root ? join(root, "git", cacheKey(cloneUrl)) : undefined;
-}
-
-function globalGitCacheReady(globalCache: string): boolean {
-  return (
-    existsSync(join(globalCache, ".git")) ||
-    existsSync(join(globalCache, "HEAD"))
-  );
-}
-
-function seedGitCacheFromGlobal(
-  cloneUrl: string,
-  destination: string,
-  workingDirectory: string,
-): boolean {
-  const globalCache = globalGitCacheDirectory(cloneUrl);
-  if (!globalCache || !globalGitCacheReady(globalCache)) {
-    return false;
-  }
-  runGit(
-    workingDirectory,
-    "clone",
-    "--depth",
-    "1",
-    "--quiet",
-    globalCache,
-    destination,
-  );
-  return true;
-}
-
-function mirrorGitCacheToGlobal(cloneUrl: string, projectCache: string): void {
-  const globalCache = globalGitCacheDirectory(cloneUrl);
-  if (!globalCache || globalGitCacheReady(globalCache)) {
-    return;
-  }
-  mkdirSync(join(globalCache, ".."), { recursive: true });
-  if (existsSync(globalCache)) {
-    rmSync(globalCache, { recursive: true, force: true });
-  }
-  runGit(
-    join(projectCache, ".."),
-    "clone",
-    "--bare",
-    "--quiet",
-    projectCache,
-    globalCache,
-  );
-}
-
-function applySparseCheckout(repository: string, subdir: string): void {
-  runGit(repository, "sparse-checkout", "init", "--cone");
-  runGit(repository, "sparse-checkout", "set", subdir);
-}
-
-function checkoutGitRevision(
-  repository: string,
-  revision: string,
-  refresh: boolean,
-): void {
-  if (refresh) {
-    runGit(repository, "fetch", "--depth", "1", "origin", revision);
-  }
-  runGit(repository, "checkout", "--force", revision);
-}
-
-function refreshGitWorktree(repository: string): void {
-  runGit(repository, "fetch", "--depth", "1", "origin");
-  runGit(repository, "reset", "--hard", "origin/HEAD");
-}
-
-function refreshGlobalGitCache(cloneUrl: string): void {
-  const globalCache = globalGitCacheDirectory(cloneUrl);
-  if (!globalCache || !globalGitCacheReady(globalCache)) {
-    return;
-  }
-  runGit(globalCache, "fetch", "--depth", "1", "origin");
-}
-
-function gitHeadRevision(repository: string): string {
-  const output = runGitCapture(repository, "rev-parse", "HEAD").trim();
-  if (output.length === 0) {
-    throw PrayError.resolution("git repository has no HEAD revision");
-  }
-  return output;
-}
-
-function runGit(repository: string, ...argumentsList: string[]): void {
-  const result = spawnSync("git", ["-C", repository, ...argumentsList], {
-    encoding: "utf8",
-  });
-  if ((result.error as NodeJS.ErrnoException | undefined)?.code === "ENOENT") {
-    throw PrayError.unsupported("git is required for git sources");
-  }
-  if (result.status !== 0) {
-    throw PrayError.resolution(
-      commandError(
-        `git ${argumentsList.join(" ")}`,
-        result.stderr ?? result.stdout ?? "",
-      ),
-    );
-  }
-}
-
-function runGitCapture(repository: string, ...argumentsList: string[]): string {
-  const result = spawnSync("git", ["-C", repository, ...argumentsList], {
-    encoding: "utf8",
-  });
-  if (result.status !== 0) {
-    throw PrayError.resolution(
-      commandError(
-        `git ${argumentsList.join(" ")}`,
-        result.stderr ?? result.stdout ?? "",
-      ),
-    );
-  }
-  return result.stdout ?? "";
-}
-
-function commandError(program: string, output: string): string {
-  const message = output.trim();
-  return message.length === 0
-    ? `${program} failed`
-    : `${program} failed: ${message}`;
 }
