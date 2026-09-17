@@ -1,9 +1,10 @@
 use crate::paths::remove_path_if_exists;
 use crate::resolve_git::{
-    apply_sparse_checkout, checkout_git_revision, ensure_git_remote_origin,
-    finalize_git_repository, git_head_revision, mirror_git_cache_to_global, refresh_git_worktree,
-    refresh_global_from_project, seed_git_cache_from_global,
+    checkout_git_revision, ensure_git_remote_origin, finalize_git_repository, git_head_revision,
+    mirror_git_cache_to_global, refresh_git_worktree, refresh_global_from_project,
+    seed_git_cache_from_global,
 };
+use crate::resolve_git_clone::{apply_sparse_checkout, clone_git_cache};
 use crate::resolve_git_command::{run_git_command, run_git_success};
 use crate::resolve_git_lookup::is_git_checkout;
 use crate::resolve_git_paths::{
@@ -25,18 +26,17 @@ pub(crate) fn ensure_git_repository(
     let checkout = git_source_cache_directory_with_subdir(project_root, clone_url, sparse_subdir);
     if checkout != shared {
         ensure_linked_worktree(&shared, &checkout)?;
+        apply_sparse_checkout(&checkout, sparse_subdir)?;
         if let Some(revision) = pinned_revision {
             checkout_git_revision(&checkout, clone_url, revision, refresh)?;
         } else if refresh {
             let shared_head = git_head_revision(&shared)?;
             run_git_success(&checkout, &["reset", "--hard", &shared_head])?;
         }
-        if let Some(subdir) = sparse_subdir {
-            apply_sparse_checkout(&checkout, subdir)?;
-        }
         let revision = git_head_revision(&checkout)?;
         return finalize_git_repository(clone_url, &checkout, revision);
     }
+    apply_sparse_checkout(&shared, None)?;
     let revision = git_head_revision(&shared)?;
     finalize_git_repository(clone_url, &shared, revision)
 }
@@ -72,12 +72,10 @@ fn ensure_shared_git_repository(
     if seeded {
         ensure_git_remote_origin(shared, clone_url)?;
     } else {
-        run_git_success(
-            project_root,
-            &["clone", "--depth", "1", clone_url, destination],
-        )?;
+        clone_git_cache(project_root, clone_url, destination, false)?;
         let _ = mirror_git_cache_to_global(clone_url, shared);
     }
+    apply_sparse_checkout(shared, None)?;
     if let Some(revision) = pinned_revision {
         checkout_git_revision(shared, clone_url, revision, true)?;
     } else if refresh && seeded {
@@ -102,7 +100,14 @@ fn ensure_linked_worktree(shared: &Path, checkout: &Path) -> PrayResult<()> {
     let destination = checkout.to_str().ok_or_else(|| {
         PrayError::Resolution(format!("invalid git worktree path: {:?}", checkout))
     })?;
-    run_git_success(shared, &["worktree", "add", "--detach", destination])?;
+    if run_git_success(
+        shared,
+        &["worktree", "add", "--detach", "--no-checkout", destination],
+    )
+    .is_err()
+    {
+        run_git_success(shared, &["worktree", "add", "--detach", destination])?;
+    }
     Ok(())
 }
 

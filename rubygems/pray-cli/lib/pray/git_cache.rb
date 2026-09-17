@@ -1,10 +1,11 @@
 # frozen_string_literal: true
 
-require "open3"
 require "fileutils"
 require "pathname"
 require_relative "error"
 require_relative "hashing"
+require_relative "git_run"
+require_relative "git_clone"
 
 module Pray
   module GitCache
@@ -16,15 +17,16 @@ module Pray
       checkout = git_source_cache_directory(project_root, clone_url, sparse_subdir)
       if checkout != shared
         ensure_linked_worktree(shared, checkout)
+        GitClone.apply_sparse_checkout(checkout, sparse_subdir)
         if pinned_revision
           checkout_git_revision(checkout, clone_url, pinned_revision, refresh)
         elsif refresh
-          run_git(checkout, "reset", "--hard", git_head_revision(shared))
+          GitRun.run_git(checkout, "reset", "--hard", git_head_revision(shared))
         end
-        apply_sparse_checkout(checkout, sparse_subdir) if sparse_subdir
         return [checkout, git_head_revision(checkout)]
       end
 
+      GitClone.apply_sparse_checkout(shared)
       [shared, git_head_revision(shared)]
     end
 
@@ -70,11 +72,12 @@ module Pray
       FileUtils.mkdir_p(File.dirname(shared))
       seeded = seed_git_cache_from_global(clone_url, shared, project_root)
       if seeded
-        run_git(shared, "remote", "set-url", "origin", clone_url)
+        GitRun.run_git(shared, "remote", "set-url", "origin", clone_url)
       else
-        run_git(project_root, "clone", "--depth", "1", clone_url, shared)
+        GitClone.clone_git_cache(project_root, clone_url, shared, quiet: false)
         mirror_git_cache_to_global(clone_url, shared)
       end
+      GitClone.apply_sparse_checkout(shared)
       if pinned_revision
         checkout_git_revision(shared, clone_url, pinned_revision, true)
       elsif refresh && seeded
@@ -88,7 +91,9 @@ module Pray
 
       FileUtils.rm_rf(checkout) if File.exist?(checkout)
       FileUtils.mkdir_p(File.dirname(checkout))
-      run_git(shared, "worktree", "add", "--detach", checkout)
+      return if GitRun.try_run_git(shared, "worktree", "add", "--detach", "--no-checkout", checkout)
+
+      GitRun.run_git(shared, "worktree", "add", "--detach", checkout)
     end
 
     def same_object_store?(shared, checkout)
@@ -98,8 +103,8 @@ module Pray
     end
 
     def git_common_dir(repository)
-      output, status = Open3.capture2e("git", "-C", repository, "rev-parse", "--git-common-dir")
-      raise Error.resolution(command_error("git rev-parse --git-common-dir", output)) unless status.success?
+      output, status = GitRun.capture_git(repository, "rev-parse", "--git-common-dir")
+      raise Error.resolution(GitRun.command_error("git rev-parse --git-common-dir", output)) unless status.success?
 
       reported = output.strip
       path = Pathname.new(reported).absolute? ? reported : File.expand_path(reported, repository)
@@ -107,7 +112,7 @@ module Pray
     end
 
     def origin_matches?(repository, clone_url)
-      output, status = Open3.capture2e("git", "-C", repository, "remote", "get-url", "origin")
+      output, status = GitRun.capture_git(repository, "remote", "get-url", "origin")
       return false unless status.success?
 
       origin = output.strip.delete_prefix("git+")
@@ -135,7 +140,7 @@ module Pray
       global_cache = global_git_cache_directory(clone_url)
       return false unless global_cache && global_git_cache_ready?(global_cache)
 
-      run_git(working_directory, "clone", "--depth", "1", "--quiet", global_cache, destination)
+      GitClone.clone_git_cache(working_directory, global_cache, destination, quiet: true)
       true
     end
 
@@ -146,22 +151,24 @@ module Pray
 
       FileUtils.mkdir_p(File.dirname(global_cache))
       FileUtils.rm_rf(global_cache) if File.exist?(global_cache)
-      run_git(File.dirname(project_cache), "clone", "--bare", "--quiet", File.basename(project_cache), global_cache)
+      GitRun.run_git(File.dirname(project_cache), "clone", "--bare", "--quiet", File.basename(project_cache), global_cache)
     end
 
-    def apply_sparse_checkout(repository, subdir)
-      run_git(repository, "sparse-checkout", "init", "--cone")
-      run_git(repository, "sparse-checkout", "set", subdir)
+    def fetch_origin(repository, revision = nil)
+      extra = revision ? [revision] : []
+      return if GitRun.try_run_git(repository, "fetch", "--depth", "1", "--filter=blob:none", "origin", *extra)
+
+      GitRun.run_git(repository, "fetch", "--depth", "1", "origin", *extra)
     end
 
     def checkout_git_revision(repository, _clone_url, revision, refresh)
-      run_git(repository, "fetch", "--depth", "1", "origin", revision) if refresh
-      run_git(repository, "checkout", "--force", revision)
+      fetch_origin(repository, revision) if refresh
+      GitRun.run_git(repository, "checkout", "--force", revision)
     end
 
     def refresh_git_worktree(repository, _clone_url)
-      run_git(repository, "fetch", "--depth", "1", "origin")
-      run_git(repository, "reset", "--hard", "origin/HEAD")
+      fetch_origin(repository)
+      GitRun.run_git(repository, "reset", "--hard", "origin/HEAD")
     end
 
     def refresh_global_from_project(clone_url, project_cache)
@@ -173,25 +180,13 @@ module Pray
     end
 
     def git_head_revision(repository)
-      output, status = Open3.capture2e("git", "-C", repository, "rev-parse", "HEAD")
-      raise Error.resolution(command_error("git rev-parse HEAD", output)) unless status.success?
+      output, status = GitRun.capture_git(repository, "rev-parse", "HEAD")
+      raise Error.resolution(GitRun.command_error("git rev-parse HEAD", output)) unless status.success?
 
       revision = output.strip
       raise Error.resolution("git repository has no HEAD revision") if revision.empty?
 
       revision
-    end
-
-    def run_git(cwd, *arguments)
-      output, status = Open3.capture2e("git", "-C", cwd, *arguments)
-      return if status.success?
-
-      raise Error.resolution(command_error("git #{arguments.join(" ")}", output))
-    end
-
-    def command_error(program, output)
-      message = output.strip
-      message.empty? ? "#{program} failed" : "#{program} failed: #{message}"
     end
   end
 end

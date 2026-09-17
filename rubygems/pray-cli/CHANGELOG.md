@@ -2,6 +2,7 @@
 
 ## Unreleased
 
+- Clone a git catalog without unused package blobs, and fetch a used package file when install needs it.
 - Skip cloning a git catalog when no package uses that source.
 - Fetch a used git catalog once on `pray update` instead of fetching it twice.
 - Keep packages from two git sources that share a clone URL when each source names a different `subdir`.

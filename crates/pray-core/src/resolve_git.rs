@@ -1,5 +1,6 @@
 use crate::client_trust::{effective_trust_home, gate_git_source};
 use crate::paths::remove_path_if_exists;
+use crate::resolve_git_clone::clone_git_cache;
 use crate::resolve_git_command::{command_error, run_git_command, run_git_success};
 use crate::resolve_git_paths::cache_key;
 use crate::{PrayError, PrayResult};
@@ -40,10 +41,7 @@ pub(crate) fn seed_git_cache_from_global(
     let global_path = global_cache.to_str().ok_or_else(|| {
         PrayError::Resolution(format!("invalid global git cache path: {:?}", global_cache))
     })?;
-    run_git_success(
-        working_directory,
-        &["clone", "--depth", "1", "--quiet", global_path, destination],
-    )?;
+    clone_git_cache(working_directory, global_path, destination, true)?;
     Ok(true)
 }
 
@@ -82,12 +80,6 @@ pub(crate) fn mirror_git_cache_to_global(clone_url: &str, project_cache: &Path) 
         cache_parent,
         &["clone", "--bare", "--quiet", cache_name, destination],
     )?;
-    Ok(())
-}
-
-pub(crate) fn apply_sparse_checkout(repository: &Path, subdir: &str) -> PrayResult<()> {
-    run_git_success(repository, &["sparse-checkout", "init", "--cone"])?;
-    run_git_success(repository, &["sparse-checkout", "set", subdir])?;
     Ok(())
 }
 
@@ -147,7 +139,14 @@ pub(crate) fn refresh_global_from_project(clone_url: &str, project_cache: &Path)
 
 pub(crate) fn refresh_git_worktree(repository: &Path, clone_url: &str) -> PrayResult<()> {
     ensure_git_remote_origin(repository, clone_url)?;
-    run_git_success(repository, &["fetch", "--depth", "1", "origin"])?;
+    if run_git_success(
+        repository,
+        &["fetch", "--depth", "1", "--filter=blob:none", "origin"],
+    )
+    .is_err()
+    {
+        run_git_success(repository, &["fetch", "--depth", "1", "origin"])?;
+    }
     run_git_success(repository, &["reset", "--hard", "FETCH_HEAD"])?;
     Ok(())
 }
@@ -169,7 +168,21 @@ pub(crate) fn checkout_git_revision(
         )));
     }
     ensure_git_remote_origin(repository, clone_url)?;
-    run_git_success(repository, &["fetch", "--depth", "1", "origin", revision])?;
+    if run_git_success(
+        repository,
+        &[
+            "fetch",
+            "--depth",
+            "1",
+            "--filter=blob:none",
+            "origin",
+            revision,
+        ],
+    )
+    .is_err()
+    {
+        run_git_success(repository, &["fetch", "--depth", "1", "origin", revision])?;
+    }
     if git_object_exists(repository, revision) {
         run_git_success(repository, &["reset", "--hard", revision])?;
         return Ok(());
