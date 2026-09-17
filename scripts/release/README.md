@@ -13,6 +13,7 @@ Publishing is intentional and operator-driven. Scripts default to dry-run / buil
 | `rubygems.sh` | RubyGems (`pray-cli`) | build gem | `--publish` |
 | `distribution.sh` | pray distribution point | requires `--root` / `--server` | omit `--dry-run` |
 | `all.sh` | all of the above | dry-run registries | `--publish` plus DP args |
+| `github.sh` | GitHub Release for `vX.Y.Z` | print title and one CHANGELOG section | `--publish` (create or edit); `--all` rewrites existing releases |
 
 The CLI executable remains `pray`. The crates.io package name is `pray-cli` because `pray` is already taken by an unrelated crate.
 
@@ -25,6 +26,7 @@ First crates.io publish must go in order: `pray-core`, then `pray-transport`, th
 - `npm login` for npmjs
 - `gem push` credentials (MFA) for RubyGems
 - A working `pray` binary for distribution-point publish
+- `gh` authenticated for `kiskolabs/pray` when creating or editing GitHub Releases
 - Optional: `PRAY_RELEASE_YES=1` to skip confirmation prompts
 - Optional: `PRAY_SIGNING_KEY` or `--signing-key` for ed25519 package signatures
 
@@ -67,6 +69,18 @@ Full release including distribution point:
 scripts/release/all.sh --publish --root ./prayers --server https://pray.example/registry
 ```
 
+Create or edit the GitHub Release for the workspace version:
+
+```sh
+scripts/release/github.sh --publish
+```
+
+Rewrite notes on every GitHub Release that already exists:
+
+```sh
+scripts/release/github.sh --publish --all
+```
+
 ## Makefile targets
 
 From the repository root:
@@ -77,4 +91,8 @@ make release-crates
 make release-npm
 make release-rubygems
 make release-distribution ROOT=./prayers
+make release-github
+make release-github-sync
 ```
+
+`github.sh` reads `CHANGELOG.md`. Title is `vX.Y.Z` so the GitHub name is never empty. Notes stop at the next `##` version heading. `--all` edits releases that already exist; it does not create tags or notify for missing versions.
