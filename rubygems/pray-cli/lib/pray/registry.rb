@@ -10,6 +10,7 @@ require_relative "path_safety"
 require_relative "http_body"
 require_relative "registry_paths"
 require_relative "registry_http_cache"
+require_relative "git_materialize"
 
 module Pray
   RegistryPackageVersion = Struct.new(
@@ -206,18 +207,7 @@ module Pray
     end
 
     def read_local_artifact_bytes(source_root, artifact)
-      if artifact.start_with?("file://")
-        path = PathSafety.join_under_root(source_root, artifact.delete_prefix("file://"))
-        raise Error.resolution("package artifact path escapes distribution root") unless path
-        return File.binread(path)
-      end
-      reject_absolute_artifact!(artifact)
-
-      path = PathSafety.join_under_root(source_root, artifact)
-      raise Error.resolution("package artifact path escapes distribution root") unless path
-      raise Error.resolution("package artifact missing at #{path}") unless File.exist?(path)
-
-      File.binread(path)
+      GitMaterialize.read_local_artifact_bytes(source_root, artifact)
     end
 
     def read_artifact_bytes(source_url, artifact)

@@ -236,6 +236,9 @@ pub(crate) fn read_local_registry_artifact_bytes(
     let artifact_path = Path::new(artifact);
     validate_package_relative_path(artifact_path)?;
     let full_path = source_root.join(artifact_path);
+    if !full_path.is_file() {
+        crate::resolve_git_materialize::materialize_git_catalog_file(source_root, artifact_path)?;
+    }
     fs::read(&full_path).map_err(|error| {
         if error.kind() == std::io::ErrorKind::NotFound {
             PrayError::Resolution(format!(

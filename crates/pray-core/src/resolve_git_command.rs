@@ -14,6 +14,9 @@ pub(crate) fn run_git_success(root: &Path, arguments: &[&str]) -> PrayResult<()>
 pub(crate) fn run_git_command(root: &Path, arguments: &[&str]) -> PrayResult<std::process::Output> {
     Command::new(git_program())
         .current_dir(root)
+        .env("GIT_TERMINAL_PROMPT", "0")
+        .stdin(std::process::Stdio::null())
+        .args(["-c", "protocol.file.allow=always"])
         .args(arguments)
         .output()
         .map_err(|error| PrayError::Unsupported(format!("failed to run `git`: {error}")))

@@ -3,6 +3,7 @@ import { join } from "node:path";
 import semver from "semver";
 import { versionSatisfies } from "../constraint.js";
 import { PrayError } from "../errors.js";
+import { materializeGitCatalogFile } from "../git/materialize.js";
 import {
   httpGet,
   httpGetText,
@@ -320,6 +321,7 @@ function readLocalArtifactBytes(sourceRoot: string, artifact: string): Buffer {
   }
   rejectAbsoluteArtifactPath(artifact);
   const path = resolveDistributionPath(sourceRoot, artifact);
+  materializeGitCatalogFile(sourceRoot, artifact);
   if (!existsSync(path)) {
     throw PrayError.resolution(`package artifact missing at ${path}`);
   }

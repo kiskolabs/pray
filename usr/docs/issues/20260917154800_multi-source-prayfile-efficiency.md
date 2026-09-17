@@ -12,7 +12,7 @@ Keep path-source matching as it is. Implied source lookup is linear in source co
 
 Project git cache identity is clone URL plus subdir. Empty subdir stays URL-only. The shared global cache stays URL-only. A subdir checkout is a linked git worktree of the URL-only clone.
 
-Do not parallelize HTTP origins until serial origin RTT is measured on a real multi-registry Prayfile. Fetch protocol changes stay behind that measurement. Partial clone and blob:none stay behind a later pass. The fetch-byte numbers in this note are the gate.
+Do not parallelize HTTP origins until serial origin RTT is measured on a real multi-registry Prayfile. Fetch protocol changes stay behind that measurement. A used git catalog clones with blob:none and sparse package metadata, then materializes a used artifact. The fetch-byte numbers in this note are the gate.
 
 ## Effects
 
@@ -75,6 +75,19 @@ cargo test -p pray-core --test git_source_fetch_bytes, Darwin arm64, debug, inco
 
 Clone cache stays above half the unused artifact. A later unused blob fetches about one-to-one. git clone --depth 1 still transfers unused blobs in the commit. Sparse-checkout does not cut those first-clone bytes.
 
+Later pass on 2026-09-17: clone with blob:none and sparse package metadata, then materialize a used artifact.
+
+cargo test -p pray-core --offline --test git_source_fetch_bytes -- --nocapture after that pass:
+
+- unused 512 KiB: clone cache 34234 bytes, used package still resolves
+
+cargo test -p pray-core --offline --test git_source_fetch_bytes -- --ignored --nocapture:
+
+- unused 256 KiB then 1 MiB: clone cache 34235 then 34237 bytes
+- extra 1 MiB blob on refresh: fetch delta 2812 bytes
+
+Clone cache no longer grows with unused artifact size.
+
 ### Coverage
 
 Missing before this pass: request accounting for several HTTP origins and an unused origin, clone of a git source with no declared package, scaling of update resolve against git source count, RSS and CPU-seconds on that fixture, same-URL different subdir, clone bytes against a catalog that stores unused artifacts, trust import-repo after a subdir-only clone, shared object store across subdir worktrees.
@@ -84,8 +97,6 @@ Added: crates/pray-core/tests/registry_update_fetch.rs two-origin case, crates/p
 Futile: none of these assert rendered file order.
 
 ## Next
-
-Partial clone and blob:none stay behind a later pass.
 
 Co-location with other processes on the same machine was not measured.
 
@@ -98,6 +109,8 @@ usr/docs/issues/20260917152100_update-and-index-efficiency.md
 usr/docs/changelogs/20260917165500_git-subdir-cache-and-fetch-bytes.md
 
 usr/docs/changelogs/20260917171000_git-worktree-share-and-import-repo.md
+
+usr/docs/changelogs/20260917174500_git-blobless-clone.md
 
 Commands run:
 
@@ -112,6 +125,14 @@ Commands run:
 - cargo fmt --check: passed
 - make loc-check: 0 failures
 - cargo test -p pray-cli --offline --test install_git_global_cache --test install_git_catalog: passed
-- npmjs/pray-cli npm run lint: passed; node --test dist/git-source-cache.test.js: 2 passed
-- rubygems/pray-cli bundle exec rspec spec/pray/git_sources_spec.rb spec/pray/git_distribution_spec.rb: 9 examples, 0 failures
+- npmjs/pray-cli npm run lint: passed; node --test dist/git-source-cache.test.js dist/git-clone.test.js dist/git-catalog.integration.test.js dist/git-distribution.integration.test.js dist/install-git-global-cache.integration.test.js: 8 passed
+- rubygems/pray-cli bundle exec rspec spec/pray/git_clone_spec.rb spec/pray/git_sources_spec.rb spec/pray/git_distribution_spec.rb spec/pray/install_git_global_cache_spec.rb spec/pray/registry_spec.rb: 26 examples, 0 failures
 - bundle exec rubocop on changed Ruby files: no offenses
+- blobless pass: cargo test -p pray-core --offline --test git_source_fetch_bytes -- --nocapture: unused 512 KiB clone 34234 bytes
+- cargo test -p pray-core --offline --test git_source_fetch_bytes -- --ignored --nocapture: unused 256 KiB then 1 MiB clone 34235 then 34237 bytes, fetch delta 2812 bytes
+- cargo test -p pray-core --offline --test git_source_subdir --test git_source_prepare --test git_source_fetch_bytes: passed
+- cargo test -p pray-core --offline: passed
+- cargo test -p pray-cli --offline --test install_git_global_cache --test install_git_catalog: passed
+- cargo clippy -p pray-core -p pray-cli --offline --tests -- -D warnings: passed
+- cargo fmt --check: passed
+- make loc-check: 0 failures

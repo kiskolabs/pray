@@ -32,15 +32,15 @@ fn git_catalog_with_unused_artifact_still_resolves_the_used_package() {
     );
     assert_eq!(measured.package_name, "sample/base");
     assert!(
-        measured.cache_bytes >= UNUSED_ARTIFACT_BYTES as u64 / 2,
-        "clone of a git catalog that stores artifacts should keep unused artifact blobs, got {} bytes",
+        measured.cache_bytes < UNUSED_ARTIFACT_BYTES as u64,
+        "a blobless clone should not keep an unused {UNUSED_ARTIFACT_BYTES}-byte artifact, got {} bytes",
         measured.cache_bytes
     );
 }
 
 #[test]
 #[ignore = "scaling guard; run with: cargo test -p pray-core --test git_source_fetch_bytes -- --ignored --nocapture"]
-fn git_clone_bytes_grow_with_unused_artifact_size() {
+fn git_clone_bytes_stay_small_when_unused_artifact_grows() {
     const SMALL: usize = 256 * 1024;
     const LARGE: usize = 1024 * 1024;
     let small = clone_catalog_with_unused_artifact(SMALL);
@@ -55,15 +55,15 @@ fn git_clone_bytes_grow_with_unused_artifact_size() {
         grown.saturating_sub(large.cache_bytes)
     );
     assert!(
-        large.cache_bytes > small.cache_bytes,
-        "a larger unused artifact should enlarge the git clone cache"
-    );
-    assert!(
-        large.cache_bytes >= LARGE as u64 / 2,
-        "clone cache should keep most of a {LARGE} unused artifact, got {}",
+        large.cache_bytes < LARGE as u64 / 2,
+        "a blobless clone should not grow with unused artifact size, got {} bytes for {LARGE}",
         large.cache_bytes
     );
-    assert!(grown >= large.cache_bytes);
+    let fetch_delta = grown.saturating_sub(large.cache_bytes);
+    assert!(
+        fetch_delta < LARGE as u64 / 2,
+        "refresh should not fetch an unused {LARGE}-byte blob, got fetch_delta={fetch_delta}"
+    );
 }
 
 struct CatalogClone {
@@ -223,6 +223,7 @@ fn pack_praypkg(path: &str, contents: &[u8]) -> Vec<u8> {
 
 fn commit_git(path: &Path) -> String {
     git(path, &["init", "-b", "main"]);
+    git(path, &["config", "uploadpack.allowFilter", "true"]);
     git(path, &["add", "-A"]);
     git(
         path,

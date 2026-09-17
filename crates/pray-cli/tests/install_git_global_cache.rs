@@ -10,6 +10,12 @@ use support::{create_add_fixture, run_pray, temporary_directory};
 fn git(directory: &Path, arguments: &[&str]) -> Output {
     Command::new("git")
         .current_dir(directory)
+        .args([
+            "-c",
+            "commit.gpgsign=false",
+            "-c",
+            "core.hooksPath=/dev/null",
+        ])
         .args(arguments)
         .output()
         .expect("run git")

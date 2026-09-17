@@ -22,7 +22,7 @@ The URL-only clone still has a full working tree. Linked worktrees do not copy g
 
 ## Next
 
-Partial clone and blob:none stay behind a later pass. Co-location with other processes was not measured.
+Co-location with other processes was not measured.
 
 ## Source
 
