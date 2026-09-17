@@ -17,14 +17,14 @@ The crates.io name `pray` is already taken by an unrelated project, so the Rust 
 
 ## Version sync
 
-Keep these equal before any publish:
+Keep these equal before a full language-registry publish (`make release-all`, crates.io, npm):
 
 - workspace `Cargo.toml` (`[workspace.package].version`)
 - `npmjs/pray-cli/package.json`
 - `npmjs/pray-cli/src/lockfile/types.ts` (`PACKAGE_VERSION`)
 - `rubygems/pray-cli/lib/pray/version.rb`
 
-Release scripts refuse to proceed when these drift.
+`make release-crates`, `make release-npm`, and `make release-all` refuse to proceed when these drift. A gem-only patch may bump only `Pray::VERSION`; `make release-rubygems` then publishes that gem version and leaves crates.io and npm on the workspace version.
 
 ## Commands
 

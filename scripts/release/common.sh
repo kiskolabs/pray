@@ -13,6 +13,11 @@ release_read_workspace_version() {
   sed -n 's/^version = "\(.*\)"/\1/p' "${root}/Cargo.toml" | head -1
 }
 
+release_read_gem_version() {
+  local root="$1"
+  ruby -e 'load ARGV[0]; puts Pray::VERSION' "${root}/rubygems/pray-cli/lib/pray/version.rb"
+}
+
 release_require_command() {
   local name="$1"
   if ! command -v "${name}" >/dev/null 2>&1; then

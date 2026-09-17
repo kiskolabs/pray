@@ -21,7 +21,7 @@ First crates.io publish must go in order: `pray-core`, then `pray-transport`, th
 
 ## Prerequisites
 
-- Version alignment across `Cargo.toml`, `npmjs/pray-cli/package.json`, `npmjs/pray-cli/src/lockfile/types.ts`, and `rubygems/pray-cli/lib/pray/version.rb`
+- Version alignment across `Cargo.toml`, `npmjs/pray-cli/package.json`, `npmjs/pray-cli/src/lockfile/types.ts`, and `rubygems/pray-cli/lib/pray/version.rb` for crates, npm, and `all.sh`. `rubygems.sh` may publish a gem-only patch when `Pray::VERSION` is ahead of the workspace.
 - `cargo login` / `CARGO_REGISTRY_TOKEN` for crates.io
 - `npm login` for npmjs
 - `gem push` credentials (MFA) for RubyGems

@@ -1,8 +1,8 @@
 # CHANGELOG
 
-## Unreleased
+## 1.18.1 (2026-09-17)
 
-- Fix `pray package` and `pray publish` when `tmpdir` is not already loaded.
+- Fix `pray package` and `pray publish` when the CLI cannot create a staging directory.
 
 ## 1.18.0 (2026-09-17)
 

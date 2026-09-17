@@ -18,7 +18,7 @@ PRAY=$HOME/.cargo/bin/pray PRAY_RELEASE_YES=1 make release-distribution finished
 
 ## Next
 
-Publish distribution with the Rust CLI for this 1.18.0 cut. Ship the Ruby load on 1.18.1 if operators need the gem CLI.
+Ship the Ruby load on 1.18.1. Leave crates.io and npm at 1.18.0.
 
 ## Source
 
