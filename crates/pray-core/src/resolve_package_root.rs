@@ -3,7 +3,7 @@ use crate::lockfile::Lockfile;
 use crate::manifest::{ManifestPackage, ManifestSource};
 use crate::registry::{resolve_local_registry_package_root, resolve_registry_package_root};
 use crate::resolve_context::{PackageResolutionContext, ResolveOptions};
-use crate::resolve_git_sources::{resolve_git_package_root, GitSourceCheckout};
+use crate::resolve_git_sources::{resolve_git_package_root, GitSourceSet};
 use crate::{PrayError, PrayResult};
 use std::collections::BTreeMap;
 use std::path::{Path, PathBuf};
@@ -18,7 +18,7 @@ pub(crate) struct PackageRootResolution {
 pub(crate) fn resolve_package_root(
     project_root: &Path,
     sources: &BTreeMap<String, ManifestSource>,
-    git_sources: &BTreeMap<String, GitSourceCheckout>,
+    git_sources: &GitSourceSet,
     user_config: &crate::config::PrayConfig,
     declaration: &ManifestPackage,
     lockfile: Option<&Lockfile>,

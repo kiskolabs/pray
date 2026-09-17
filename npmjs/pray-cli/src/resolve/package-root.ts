@@ -3,7 +3,7 @@ import { join, resolve } from "node:path";
 import { PrayError } from "../errors.js";
 import {
   discoverDistributionRoot,
-  type GitSourceCheckout,
+  type GitSourceSet,
   localGitSourceRoot,
   resolveDistributionRoot,
 } from "../git/sources.js";
@@ -29,7 +29,7 @@ export interface PackageRootResolution {
 export async function resolvePackageRoot(
   projectRoot: string,
   sources: Map<string, ManifestSource>,
-  gitSources: Map<string, GitSourceCheckout>,
+  gitSources: GitSourceSet,
   declaration: ManifestPackage,
   lockfile: Lockfile | undefined,
   options: ResolveOptions,

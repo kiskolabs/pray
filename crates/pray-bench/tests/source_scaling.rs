@@ -48,7 +48,15 @@ fn update_resolve_scales_near_linearly_with_git_source_count() {
     let ratio = scaling_ratio(BASELINE_SOURCES, baseline_warm, STRESS_SOURCES, stress_warm);
     assert!(
         ratio <= MAX_SUPERLINEAR_RATIO,
-        "git source scaling ratio {ratio:.2} exceeded {MAX_SUPERLINEAR_RATIO}"
+        "unused git source scaling ratio {ratio:.2} exceeded {MAX_SUPERLINEAR_RATIO}"
+    );
+    assert!(
+        !baseline.root.join(".pray/cache/git").exists(),
+        "unused git sources should not be cloned"
+    );
+    assert!(
+        !stress.root.join(".pray/cache/git").exists(),
+        "unused git sources should not be cloned"
     );
 }
 

@@ -6,11 +6,13 @@ Andrei Makarov
 
 ## Decisions
 
-HTTP registry sources are demand-driven. Git sources are not. prepare_git_sources clones or fetches every git source in the Prayfile before any package is resolved, including sources no package names. An unused HTTP origin is not contacted.
+HTTP registry sources are demand-driven. Git sources now prepare when the first package needs that source, including transitives discovered during resolve. Unused git catalogs are not cloned. An unused HTTP origin is not contacted.
 
 Keep path-source matching as it is. Implied source lookup is linear in source count per package and is not the cliff.
 
-Do not parallelize HTTP origins until serial origin RTT is measured on a real multi-registry Prayfile. Skip unused git sources, or prepare a git source when the first package needs it, before changing fetch protocol.
+Project git cache identity is clone URL plus subdir. Empty subdir stays URL-only. The shared global cache stays URL-only.
+
+Do not parallelize HTTP origins until serial origin RTT is measured on a real multi-registry Prayfile. Fetch protocol changes stay behind that measurement. Partial clone and blob:none stay behind a later pass. The fetch-byte numbers in this note are the gate.
 
 ## Effects
 
@@ -31,55 +33,79 @@ Person wait on a slow network is serial GETs times used origins. At 50 ms RTT, t
 
 ### Git sources
 
-prepare_git_sources walks every source with kind git. update sets refresh_source_revisions, so each of those sources is cloned on first use of the cache and then fetched with depth 1 on later updates. refresh_global_git_cache runs a second fetch into the global git cache when that cache exists. Warm update can do two fetches per git source.
+Later pass on 2026-09-17: prepare on first package need, and one origin fetch per used source on refresh. Unused git catalogs are not cloned. Warm update copies the shared cache from the project worktree after that fetch.
 
-cargo test -p pray-core --test git_source_prepare:
+cargo test -p pray-core --test git_source_prepare after that pass:
 
-Prayfile with a path package plus two git sources, only the path package declared. Both git catalogs were cloned into .pray/cache/git. The unused catalog held a 64 KiB blob. After clone the unused cache was at least 32 KiB.
+Path package plus two git sources, no git package: neither catalog is cloned.
 
-cargo test -p pray-bench --test source_scaling -- --ignored --nocapture, tiny file:// catalogs, no declared git packages, debug:
+One used git package plus one unused git source: only the used catalog is cloned.
 
-- 2 sources: cold 162 ms, warm 246 ms
-- 8 sources: cold 614 ms, warm 976 ms
-- cold ratio 0.95, warm ratio 0.99 versus a 4x source count
-- peak RSS 7.0 MiB, CPU-seconds 0.078
+Warm update of a used git source fetches origin once.
 
-Wall time is about 80 ms cold and 120 ms warm per tiny git source. CPU is a small fraction of wall. The wait is git subprocess IO. A real catalog of tens of megabytes times source count is the first dramatic cliff, including catalogs that no package uses.
+cargo test -p pray-bench --test source_scaling -- --ignored --nocapture after unused skip, tiny file:// catalogs, no declared git packages, debug:
+
+- 2 sources: cold 1.3 ms, warm 0.20 ms
+- 8 sources: cold 0.67 ms, warm 0.51 ms
+- warm ratio 0.62 versus a 4x unused source count
+- peak RSS 7.4 MiB
+
+Unused git source count no longer drives wall time. A used catalog of tens of megabytes remains the size cliff for that one source.
+
+Before the change the same unused fixture paid about 80 ms cold and 120 ms warm per tiny catalog, and warm update could fetch origin twice per source.
 
 Path sources are not cloned. Several path sources add parse and implied-source lookup only.
 
 ### Shared git URL
 
-git_source_cache_directory keys only on clone URL. Two source names with the same URL share one cache. A later sparse-checkout for source.subdir would change that worktree for both names. That is a correctness risk, not a size cliff. It was not exercised in this pass.
+Project git cache identity is clone URL plus subdir. Empty subdir stays URL-only. The shared global cache stays URL-only.
+
+cargo test -p pray-core --test git_source_subdir after that split:
+
+Two sources, same file:// URL, subdir left and right. Packages sample/one and sample/three from left, sample/two from right, declared in that order. All three resolve. Left and right keep distinct .git worktrees. Neither reuses the URL-only cache key.
+
+### Fetch bytes against stored artifacts
+
+cargo test -p pray-core --test git_source_fetch_bytes, Darwin arm64, debug, incompressible unused blobs next to a tiny used package:
+
+- unused 512 KiB: clone cache 1080239 bytes, used package still resolves
+- ignored scaling: unused 256 KiB clone 555873 bytes, unused 1 MiB clone 2128977 bytes, then an extra 1 MiB blob and refresh fetch delta 1050020 bytes
+
+Clone cache stays above half the unused artifact. A later unused blob fetches about one-to-one. git clone --depth 1 still transfers unused blobs in the commit. Sparse-checkout does not cut those first-clone bytes.
 
 ### Coverage
 
-Missing before this pass: request accounting for several HTTP origins and an unused origin, clone of a git source with no declared package, scaling of update resolve against git source count, RSS and CPU-seconds on that fixture.
+Missing before this pass: request accounting for several HTTP origins and an unused origin, clone of a git source with no declared package, scaling of update resolve against git source count, RSS and CPU-seconds on that fixture, same-URL different subdir, clone bytes against a catalog that stores unused artifacts.
 
-Added: crates/pray-core/tests/registry_update_fetch.rs two-origin case, crates/pray-core/tests/git_source_prepare.rs, crates/pray-bench/tests/source_scaling.rs.
+Added: crates/pray-core/tests/registry_update_fetch.rs two-origin case, crates/pray-core/tests/git_source_prepare.rs, git_source_subdir.rs, git_source_fetch_bytes.rs, crates/pray-bench/tests/source_scaling.rs.
 
 Futile: none of these assert rendered file order.
 
 ## Next
 
-Prepare a git source when the first package needs it, so unused git catalogs are not cloned or fetched on update.
-
-Avoid a second fetch into the global git cache when the project cache was just refreshed.
-
-Measure git fetch bytes against a catalog that stores artifacts. Tiny file:// blobs do not show that cliff.
-
-Same-URL sources with different subdir still need a fixture.
+Partial clone and blob:none stay behind a later pass. Trust import-repo still looks up the URL-only project cache, so a project that only uses subdir worktrees may miss that import path. Two subdir worktrees duplicate project disk for the same URL; the global seed still avoids a second origin clone when it is warm.
 
 Co-location with other processes on the same machine was not measured.
 
 ## Source
 
-crates/pray-core/src/resolve_project.rs, resolve_git_sources.rs, resolve_git.rs, resolve_package_root.rs, resolve_implied_source.rs
+crates/pray-core/src/resolve_project.rs, resolve_git_sources.rs, resolve_git_source_set.rs, resolve_git.rs, resolve_git_paths.rs, resolve_package_root.rs, resolve_implied_source.rs
 
 usr/docs/issues/20260917152100_update-and-index-efficiency.md
 
+usr/docs/changelogs/20260917165500_git-subdir-cache-and-fetch-bytes.md
+
 Commands run:
 
-- cargo test -p pray-core --test registry_update_fetch --test git_source_prepare: passed, including two_registry_origins_fetch_per_origin_not_a_shared_index and update_clones_git_sources_that_have_no_declared_package
-- cargo test -p pray-bench --offline --test source_scaling -- --ignored --nocapture: passed, numbers above
+- cargo test -p pray-core --test registry_update_fetch --test git_source_prepare: passed, including two_registry_origins_fetch_per_origin_not_a_shared_index, update_does_not_clone_git_sources_that_have_no_declared_package, update_clones_only_the_git_source_a_package_uses, and update_fetches_origin_once_per_used_git_source
+- cargo test -p pray-bench --offline --test source_scaling -- --ignored --nocapture: passed, unused-source numbers above
 - cargo fmt: passed
+- later pass: cargo test -p pray-core --offline; cargo test -p pray-cli --offline --test install_git_global_cache --test install_git_catalog; cargo clippy -p pray-core --offline --tests -- -D warnings; make loc-check; TypeScript git integration tests; Ruby git_distribution, git_sources, conformance_resolve, upstream_refresh. All observed passing.
+- this pass: cargo test -p pray-core --offline --test git_source_subdir --test git_source_fetch_bytes --test git_source_prepare: passed (subdir fixture, 512 KiB unused clone 1080239 bytes, unused skip and single fetch)
+- cargo test -p pray-core --offline --test git_source_fetch_bytes -- --ignored --nocapture: passed, unused 256 KiB clone 555873 bytes, unused 1 MiB clone 2128977 bytes, fetch delta 1050020 bytes
+- cargo clippy -p pray-core --offline --tests -- -D warnings: passed
+- cargo fmt --check: passed
+- make loc-check: 0 failures
+- cargo test -p pray-cli --offline --test install_git_global_cache --test install_git_catalog: passed
+- npmjs/pray-cli npm run lint: passed; node --test dist/git-source-cache.test.js: 1 passed
+- rubygems/pray-cli bundle exec rspec spec/pray/git_sources_spec.rb spec/pray/git_distribution_spec.rb: 8 examples, 0 failures

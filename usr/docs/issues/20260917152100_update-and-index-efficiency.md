@@ -77,9 +77,9 @@ Search: names-only by default, or copy latest non-yanked summary onto the index 
 
 Pretty versus compact index.json is a small storage tax, not the cliff. Compact write is optional.
 
-Git catalog refresh size still needs a fixture that counts fetch bytes against a tree that stores artifacts.
+Git catalog fetch bytes against a tree that stores artifacts are in usr/docs/issues/20260917154800_multi-source-prayfile-efficiency.md.
 
-Multi-source git catalogs are cloned even when no package uses them. See usr/docs/issues/20260917154800_multi-source-prayfile-efficiency.md.
+Unused multi-source git catalogs are no longer cloned. See that same issue.
 
 Co-location with other processes on the same machine was not measured.
 

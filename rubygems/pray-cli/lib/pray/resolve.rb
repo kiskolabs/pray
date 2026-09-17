@@ -61,7 +61,6 @@ module Pray
         lockfile_hints,
         refresh: options.refresh || options.refresh_source_revisions
       )
-      source_revisions = git_sources.transform_values(&:revision)
       source_host_keys = Trust.prepare_source_host_keys(manifest.sources)
 
       packages = []
@@ -100,6 +99,7 @@ module Pray
       raise Error.resolution(local_errors.join("\n")) unless local_errors.empty?
 
       ResolveDeps.reject_dependency_cycles(packages)
+      source_revisions = git_sources.revisions
 
       ResolvedProject.new(
         manifest_path: manifest_path,

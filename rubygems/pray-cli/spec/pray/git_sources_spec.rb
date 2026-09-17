@@ -41,4 +41,13 @@ RSpec.describe Pray::GitSources do
     )
     expect(described_class.pinned_revision_for_source(lockfile, source)).to eq("abc123")
   end
+
+  it "gives different cache directories to the same URL with different subdirs" do
+    left = described_class.git_source_cache_directory(workspace, "file://repo", "left")
+    right = described_class.git_source_cache_directory(workspace, "file://repo", "right")
+    shared = described_class.git_source_cache_directory(workspace, "file://repo")
+    expect(left).not_to eq(right)
+    expect(left).not_to eq(shared)
+    expect(right).not_to eq(shared)
+  end
 end

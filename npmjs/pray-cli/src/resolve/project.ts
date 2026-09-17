@@ -64,12 +64,6 @@ export async function resolveProject(
     lockfile,
     options.refreshSourceRevisions,
   );
-  const sourceRevisions = new Map<string, string>();
-  for (const [name, checkout] of gitSources.entries()) {
-    if (checkout.revision) {
-      sourceRevisions.set(name, checkout.revision);
-    }
-  }
 
   const packages: ResolvedPackage[] = [];
   const seen = new Set<string>();
@@ -119,6 +113,12 @@ export async function resolveProject(
     throw PrayError.resolution(localErrors.join("\n"));
   }
   rejectDependencyCycles(packages);
+  const sourceRevisions = new Map<string, string>();
+  for (const [name, checkout] of gitSources.entries()) {
+    if (checkout.revision) {
+      sourceRevisions.set(name, checkout.revision);
+    }
+  }
   return {
     manifestPath: resolve(manifestPath),
     projectRoot,
