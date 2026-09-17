@@ -1,6 +1,7 @@
 .PHONY: build clean install bench bench-scaling ruby-test loc-check rfc-ids audit audit-rust audit-ruby audit-npm \
 	libyears libyears-rust libyears-ruby libyears-npm bump-homebrew \
 	release-dry-run release-crates release-npm release-rubygems release-distribution release-all \
+	release-github release-github-sync \
 	coverage coverage-rust mutants fuzz-build
 
 HOMEBREW_TAP ?= $(abspath ../../amkisko/homebrew-tap)
@@ -105,3 +106,10 @@ release-all:
 	if [ -n "$(SERVER)" ]; then args="$$args --server $(SERVER)"; fi; \
 	if [ -n "$(SIGNING_KEY)" ]; then args="$$args --signing-key $(SIGNING_KEY)"; fi; \
 	./scripts/release/all.sh $$args
+
+# GitHub Release title is vX.Y.Z. Notes are that version's CHANGELOG.md section.
+release-github:
+	./scripts/release/github.sh --publish
+
+release-github-sync:
+	./scripts/release/github.sh --publish --all

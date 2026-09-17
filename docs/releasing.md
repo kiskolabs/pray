@@ -75,7 +75,7 @@ Exit codes for operators: `docs/cli-exit-codes.md` (normative table in RFC 0040)
 
 ## After language registry publish
 
-1. Create a GitHub Release for `vX.Y.Z` so `pray` upgrade notices can resolve the latest tag. When the annotated tag already exists, run `gh release create vX.Y.Z --verify-tag` and omit `--target`. `--target` accepts a branch or full commit SHA; a short SHA returns HTTP 422. Use `--latest=false` when backfilling an older version.
+1. Create a GitHub Release for `vX.Y.Z` so `pray` upgrade notices can resolve the latest tag. Run `make release-github` (or `./scripts/release/github.sh --publish`). The title is `vX.Y.Z`. Notes are that version's `CHANGELOG.md` heading and bullets only. When the annotated tag already exists, the script uses `gh release create --verify-tag` or `gh release edit` and omits `--target`. `--target` accepts a branch or full commit SHA; a short SHA returns HTTP 422. Creating a version other than the workspace version passes `--latest=false`. Preview notes with `./scripts/release/github.sh --notes-only`. Rewrite every existing GitHub Release from `CHANGELOG.md` with `make release-github-sync`.
 2. Optionally bump Homebrew with `make bump-homebrew` once the tag exists.
 3. Confirm install paths:
 
