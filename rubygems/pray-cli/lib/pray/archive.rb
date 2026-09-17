@@ -3,6 +3,7 @@
 require "json"
 require "open3"
 require "fileutils"
+require "tmpdir"
 require_relative "archive_unpack"
 require_relative "path_safety"
 

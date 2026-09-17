@@ -1,5 +1,9 @@
 # CHANGELOG
 
+## Unreleased
+
+- Fix `pray package` and `pray publish` when `tmpdir` is not already loaded.
+
 ## 1.18.0 (2026-09-17)
 
 - Clone a git catalog without unused package blobs, and fetch a used package file when install needs it.

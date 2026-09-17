@@ -3,6 +3,7 @@
 require "json"
 require "fileutils"
 require "time"
+require "tmpdir"
 
 module Pray
   RegistryIndex = Struct.new(:spec, :packages) do
