@@ -36,7 +36,7 @@ for argument in "$@"; do
 done
 
 release_require_command cargo
-release_assert_version_alignment "${ROOT}" "${VERSION}"
+release_begin_surface_publish "${ROOT}" "crates"
 
 cd "${ROOT}"
 

@@ -17,14 +17,16 @@ The crates.io name `pray` is already taken by an unrelated project, so the Rust 
 
 ## Version sync
 
-Keep these equal before a full language-registry publish (`make release-all`, crates.io, npm):
+Keep these equal before a full language-registry publish (`make release-all`):
 
 - workspace `Cargo.toml` (`[workspace.package].version`)
 - `npmjs/pray-cli/package.json`
 - `npmjs/pray-cli/src/lockfile/types.ts` (`PACKAGE_VERSION`)
 - `rubygems/pray-cli/lib/pray/version.rb`
 
-`make release-crates`, `make release-npm`, and `make release-all` refuse to proceed when these drift. A gem-only patch may bump only `Pray::VERSION`; `make release-rubygems` then publishes that gem version and leaves crates.io and npm on the workspace version.
+The next version crates.io, npm, and RubyGems may share is the max of those numbers. A max held by one surface only cannot be aligned, whether that cut was a patch or a minor. The other surfaces skip that number and jump to the next patch. 1.18.1 is a Ruby-only example; an npm-only 1.19.0 or a crates-only 1.19.0 would likewise be skipped, with the next shared cut at 1.19.1 or later.
+
+`make release-all` still requires all surfaces equal. `make release-crates`, `make release-npm`, and `make release-rubygems` may publish a one-surface version when that surface is uniquely ahead, print the next coordinated version, and leave the other registries where they are. A shared publish refuses a version that is missing from the root, npm, or Ruby changelog.
 
 ## Commands
 

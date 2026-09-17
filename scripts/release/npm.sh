@@ -13,7 +13,7 @@ SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 source "${SCRIPT_DIR}/common.sh"
 
 ROOT="$(release_repo_root)"
-VERSION="$(release_read_workspace_version "${ROOT}")"
+VERSION="$(release_read_npm_version "${ROOT}")"
 MODE="dry-run"
 PACKAGE_DIR="${ROOT}/npmjs/pray-cli"
 
@@ -34,7 +34,8 @@ done
 
 release_require_command npm
 release_require_command node
-release_assert_version_alignment "${ROOT}" "${VERSION}"
+release_assert_npm_typescript_match "${ROOT}"
+release_begin_surface_publish "${ROOT}" "npm"
 
 cd "${PACKAGE_DIR}"
 
