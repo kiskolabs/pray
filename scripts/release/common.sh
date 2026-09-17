@@ -70,3 +70,8 @@ release_confirm() {
   read -r answer
   [[ "${answer}" == "y" || "${answer}" == "Y" ]]
 }
+
+# shellcheck source=changelog.sh
+source "$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)/changelog.sh"
+# shellcheck source=versions.sh
+source "$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)/versions.sh"

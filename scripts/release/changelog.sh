@@ -32,3 +32,9 @@ release_github_release_title() {
   local version="$1"
   printf 'v%s\n' "${version}"
 }
+
+release_changelog_has_version() {
+  local file="$1"
+  local version="$2"
+  release_changelog_versions "${file}" | grep -Fxq "${version}"
+}

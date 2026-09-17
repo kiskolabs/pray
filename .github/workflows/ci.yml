@@ -21,6 +21,8 @@ jobs:
         run: make loc-check
       - name: Check GitHub release changelog notes
         run: ./scripts/release/changelog_test.sh
+      - name: Check coordinated release versions
+        run: ./scripts/release/versions_test.sh
       - name: Run Clippy
         run: cargo clippy --workspace --all-targets -- -D warnings
       - name: Check RFC id reservations

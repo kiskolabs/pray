@@ -35,12 +35,7 @@ done
 release_require_command gem
 release_require_command bundle
 release_require_command ruby
-workspace_version="$(release_read_workspace_version "${ROOT}")"
-if [[ "${VERSION}" == "${workspace_version}" ]]; then
-  release_assert_version_alignment "${ROOT}" "${VERSION}"
-else
-  echo "warn: gem ${VERSION} does not match workspace ${workspace_version}; publishing gem only"
-fi
+release_begin_surface_publish "${ROOT}" "gem"
 
 cd "${PACKAGE_DIR}"
 
