@@ -1,6 +1,6 @@
 # CHANGELOG
 
-## Unreleased
+## 1.18.0 (2026-09-17)
 
 - Clone a git catalog without unused package blobs, and fetch a used package file when install needs it.
 - Skip cloning a git catalog when no package uses that source.
