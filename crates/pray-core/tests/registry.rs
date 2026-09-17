@@ -25,7 +25,8 @@ fn prefers_torrent_sidecar_when_available() {
     let artifact_bytes = build_artifact_bytes();
     let piece_size = 4;
     let artifact_path = "v1/artifacts/sample/base/1.0.0/package.praypkg";
-    let source_url = start_registry_fixture(&artifact_bytes, artifact_path, true, piece_size, true);
+    let source_url =
+        start_registry_fixture(&artifact_bytes, artifact_path, true, piece_size, true, true);
     let project_root = unique_temp_dir("pray-core-torrent-sidecar");
     let declaration = ManifestPackage {
         name: "sample/base".to_string(),
@@ -45,6 +46,7 @@ fn prefers_torrent_sidecar_when_available() {
     assert!(resolved_root.join("package.prayspec").exists());
     let counts = read_request_counts(&source_url);
     assert_eq!(counts.metadata.load(Ordering::SeqCst), 1);
+    assert_eq!(counts.distribution.load(Ordering::SeqCst), 1);
     assert_eq!(counts.sidecar.load(Ordering::SeqCst), 1);
     assert_eq!(counts.direct_artifact.load(Ordering::SeqCst), 0);
     assert_eq!(
@@ -137,8 +139,14 @@ fn falls_back_to_direct_artifact_when_sidecar_is_missing() {
     let artifact_bytes = build_artifact_bytes();
     let piece_size = 4;
     let artifact_path = "v1/artifacts/sample/base/1.0.0/package.praypkg";
-    let source_url =
-        start_registry_fixture(&artifact_bytes, artifact_path, false, piece_size, true);
+    let source_url = start_registry_fixture(
+        &artifact_bytes,
+        artifact_path,
+        false,
+        piece_size,
+        true,
+        false,
+    );
     let project_root = unique_temp_dir("pray-core-torrent-fallback");
     let declaration = ManifestPackage {
         name: "sample/base".to_string(),
@@ -158,9 +166,46 @@ fn falls_back_to_direct_artifact_when_sidecar_is_missing() {
     assert!(resolved_root.join("package.prayspec").exists());
     let counts = read_request_counts(&source_url);
     assert_eq!(counts.metadata.load(Ordering::SeqCst), 1);
-    assert_eq!(counts.sidecar.load(Ordering::SeqCst), 1);
+    assert_eq!(counts.distribution.load(Ordering::SeqCst), 1);
+    assert_eq!(counts.sidecar.load(Ordering::SeqCst), 0);
     assert_eq!(counts.direct_artifact.load(Ordering::SeqCst), 1);
     assert_eq!(counts.range_artifact.load(Ordering::SeqCst), 0);
+}
+
+#[test]
+fn torrent_policy_still_probes_missing_sidecar() {
+    let artifact_bytes = build_artifact_bytes();
+    let piece_size = 4;
+    let artifact_path = "v1/artifacts/sample/base/1.0.0/package.praypkg";
+    let source_url = start_registry_fixture(
+        &artifact_bytes,
+        artifact_path,
+        false,
+        piece_size,
+        true,
+        true,
+    );
+    let project_root = unique_temp_dir("pray-core-torrent-policy-missing-sidecar");
+    let declaration = ManifestPackage {
+        name: "sample/base".to_string(),
+        source: Some("default".to_string()),
+        ..ManifestPackage::default()
+    };
+
+    let resolved_root = resolve_registry_package_root(
+        &project_root,
+        &source_url,
+        &declaration,
+        &PackageResolutionContext::default(),
+    )
+    .expect("missing torrent sidecar should fall back")
+    .root;
+
+    assert!(resolved_root.join("package.prayspec").exists());
+    let counts = read_request_counts(&source_url);
+    assert_eq!(counts.distribution.load(Ordering::SeqCst), 1);
+    assert_eq!(counts.sidecar.load(Ordering::SeqCst), 1);
+    assert_eq!(counts.direct_artifact.load(Ordering::SeqCst), 1);
 }
 
 #[test]
@@ -168,8 +213,14 @@ fn torrent_sidecar_accepts_full_body_when_range_is_ignored() {
     let artifact_bytes = build_artifact_bytes();
     let piece_size = 4;
     let artifact_path = "v1/artifacts/sample/base/1.0.0/package.praypkg";
-    let source_url =
-        start_registry_fixture(&artifact_bytes, artifact_path, true, piece_size, false);
+    let source_url = start_registry_fixture(
+        &artifact_bytes,
+        artifact_path,
+        true,
+        piece_size,
+        false,
+        true,
+    );
     let project_root = unique_temp_dir("pray-core-torrent-full-body");
     let declaration = ManifestPackage {
         name: "sample/base".to_string(),
@@ -188,6 +239,7 @@ fn torrent_sidecar_accepts_full_body_when_range_is_ignored() {
 
     assert!(resolved_root.join("package.prayspec").exists());
     let counts = read_request_counts(&source_url);
+    assert_eq!(counts.distribution.load(Ordering::SeqCst), 1);
     assert_eq!(counts.sidecar.load(Ordering::SeqCst), 1);
     assert_eq!(counts.direct_artifact.load(Ordering::SeqCst), 1);
     assert_eq!(counts.range_artifact.load(Ordering::SeqCst), 0);
@@ -195,6 +247,7 @@ fn torrent_sidecar_accepts_full_body_when_range_is_ignored() {
 
 struct RequestCounts {
     metadata: Arc<AtomicUsize>,
+    distribution: Arc<AtomicUsize>,
     sidecar: Arc<AtomicUsize>,
     direct_artifact: Arc<AtomicUsize>,
     range_artifact: Arc<AtomicUsize>,
@@ -209,6 +262,7 @@ fn read_request_counts(source_url: &str) -> RequestCounts {
         .expect("request counts should exist for fixture");
     RequestCounts {
         metadata: counts.metadata.clone(),
+        distribution: counts.distribution.clone(),
         sidecar: counts.sidecar.clone(),
         direct_artifact: counts.direct_artifact.clone(),
         range_artifact: counts.range_artifact.clone(),
@@ -221,16 +275,19 @@ fn start_registry_fixture(
     include_sidecar: bool,
     piece_size: usize,
     honor_range: bool,
+    allow_torrent: bool,
 ) -> String {
     let listener = TcpListener::bind("127.0.0.1:0").expect("bind registry fixture");
     let address = listener.local_addr().expect("fixture address");
     let source_url = format!("http://{}", address);
     let counts = Arc::new(FixtureCounts {
         metadata: Arc::new(AtomicUsize::new(0)),
+        distribution: Arc::new(AtomicUsize::new(0)),
         sidecar: Arc::new(AtomicUsize::new(0)),
         direct_artifact: Arc::new(AtomicUsize::new(0)),
         range_artifact: Arc::new(AtomicUsize::new(0)),
         honor_range,
+        allow_torrent,
     });
     request_counts()
         .lock()
@@ -244,8 +301,10 @@ fn start_registry_fixture(
     let artifact_path = artifact_path.to_string();
     let counts_for_thread = counts;
 
-    let expected_requests = if include_sidecar && honor_range {
-        2 + expected_piece_count(&artifact_bytes, piece_size)
+    let expected_requests = if allow_torrent && include_sidecar && honor_range {
+        3 + expected_piece_count(&artifact_bytes, piece_size)
+    } else if allow_torrent {
+        4
     } else {
         3
     };
@@ -295,6 +354,19 @@ fn handle_registry_request(
             stream,
             &serde_json::to_vec(metadata).expect("metadata json"),
         );
+        return;
+    }
+
+    if path == "/v1/distribution.json" {
+        counts.distribution.fetch_add(1, Ordering::SeqCst);
+        if counts.allow_torrent {
+            respond_json(
+                stream,
+                br#"{"spec":"pray-distribution-config-1","protocols":["torrent"]}"#,
+            );
+        } else {
+            respond_not_found(stream);
+        }
         return;
     }
 
@@ -522,10 +594,12 @@ fn unique_temp_dir(prefix: &str) -> PathBuf {
 #[derive(Clone)]
 struct FixtureCounts {
     metadata: Arc<AtomicUsize>,
+    distribution: Arc<AtomicUsize>,
     sidecar: Arc<AtomicUsize>,
     direct_artifact: Arc<AtomicUsize>,
     range_artifact: Arc<AtomicUsize>,
     honor_range: bool,
+    allow_torrent: bool,
 }
 
 #[derive(Serialize)]

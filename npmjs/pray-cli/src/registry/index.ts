@@ -32,6 +32,8 @@ import type {
   RegistryPackageVersion,
 } from "./types.js";
 
+const packageMetadataCache = new Map<string, RegistryPackageMetadata>();
+
 export async function resolveRegistryPackageRoot(
   projectRoot: string,
   sourceUrl: string,
@@ -156,9 +158,16 @@ export async function fetchPackageMetadata(
     );
     return parseMetadata(readFileSync(metadataPath, "utf8"));
   }
-  return parseMetadata(
+  const cacheKey = `${sourceUrl}\0${packageName}`;
+  const cached = packageMetadataCache.get(cacheKey);
+  if (cached) {
+    return cached;
+  }
+  const metadata = parseMetadata(
     await httpGetText(joinUrl(sourceUrl, `v1/packages/${packageName}.json`)),
   );
+  packageMetadataCache.set(cacheKey, metadata);
+  return metadata;
 }
 
 export function parseMetadata(text: string): RegistryPackageMetadata {

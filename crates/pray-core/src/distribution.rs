@@ -114,17 +114,20 @@ pub fn write_registry_distribution_settings(
 pub fn fetch_registry_distribution_settings(
     source_url: &str,
 ) -> PrayResult<RegistryDistributionSettings> {
-    let url = join_url(source_url, "v1/distribution.json");
-    match http_get(&url) {
-        Ok(bytes) => {
-            let text = String::from_utf8(bytes).map_err(|error| parse_error(error.to_string()))?;
-            parse_registry_distribution_settings(&text)
+    crate::registry_http_cache::registry_distribution_settings(source_url, || {
+        let url = join_url(source_url, "v1/distribution.json");
+        match http_get(&url) {
+            Ok(bytes) => {
+                let text =
+                    String::from_utf8(bytes).map_err(|error| parse_error(error.to_string()))?;
+                parse_registry_distribution_settings(&text)
+            }
+            Err(PrayError::Resolution(message) | PrayError::Network(message))
+                if message.contains("HTTP 404") =>
+            {
+                Ok(RegistryDistributionSettings::default())
+            }
+            Err(error) => Err(error),
         }
-        Err(PrayError::Resolution(message) | PrayError::Network(message))
-            if message.contains("HTTP 404") =>
-        {
-            Ok(RegistryDistributionSettings::default())
-        }
-        Err(error) => Err(error),
-    }
+    })
 }

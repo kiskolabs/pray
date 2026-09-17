@@ -64,6 +64,33 @@ fn local_search_includes_summary_from_metadata() {
     let _ = fs::remove_dir_all(&root);
 }
 
+#[test]
+fn empty_query_returns_every_index_name() {
+    let index = RegistryIndex {
+        spec: "prayfile-distribution-1".to_string(),
+        packages: vec!["sample/base".to_string(), "sample/webapp".to_string()],
+    };
+    assert_eq!(
+        search_registry_index_names(&index, "  "),
+        vec!["sample/base".to_string(), "sample/webapp".to_string()]
+    );
+}
+
+#[test]
+fn names_only_search_does_not_require_package_metadata() {
+    let root = temporary_root("registry-search-names");
+    fs::create_dir_all(root.join("v1/packages")).expect("dirs");
+    fs::write(
+        root.join("v1/index.json"),
+        r#"{"spec":"prayfile-distribution-1","packages":["sample/alpha","sample/beta"]}"#,
+    )
+    .expect("index");
+    let hits = search_local_registry(&root, "sample", false).expect("search");
+    assert_eq!(hits.len(), 2);
+    assert!(hits.iter().all(|hit| hit.summary.is_none()));
+    let _ = fs::remove_dir_all(&root);
+}
+
 fn temporary_root(prefix: &str) -> PathBuf {
     let path = std::env::temp_dir().join(format!(
         "pray-{prefix}-{}-{}",

@@ -7,7 +7,6 @@ import { PrayError } from "../../errors.js";
 import { readLockfile } from "../../lockfile/index.js";
 import { parseManifest } from "../../manifest/index.js";
 import { replacePackageDeclaration } from "../../manifest/package-declaration.js";
-import { defaultResolveOptions } from "../../resolve/context.js";
 import { resolveProject } from "../../resolve/project.js";
 import {
   applyPathUpstreamLatestConstraints,
@@ -20,7 +19,7 @@ import {
   manifestPath,
   resolveCurrentProject,
 } from "../invocation.js";
-import { writeUpdate } from "./update-core.js";
+import { updateResolveOptions, writeUpdate } from "./update-core.js";
 
 export async function updateLatestCommand(
   packageName: string | undefined,
@@ -30,12 +29,8 @@ export async function updateLatestCommand(
   const path = manifestPath();
   const originalText = readFileSync(path, "utf8");
   let manifestText = originalText;
-  const previewOptions = {
-    ...defaultResolveOptions(),
-    refreshSourceRevisions: true,
-    ignoreLockedVersions: true,
-  };
-  const project = await resolveCurrentProject(previewOptions);
+  const options = updateResolveOptions(packageName);
+  const project = await resolveCurrentProject(options);
   if (
     packageName &&
     !project.manifest.packages.some((entry) => entry.name === packageName)
@@ -89,7 +84,7 @@ export async function updateLatestCommand(
     project,
     previous,
     packageName,
-    previewOptions,
+    options,
   );
   const upstreamConstraintUpdates = upstreamPlans.map((plan) => ({
     name: plan.packageName,
@@ -113,28 +108,34 @@ export async function updateLatestCommand(
     }
   }
 
-  const options = {
-    ...defaultResolveOptions(),
-    refreshSourceRevisions: true,
-    ignoreLockedVersions: packageName === undefined,
-    unlockedPackages: packageName ? new Set([packageName]) : new Set<string>(),
-  };
-  if (!dryRun) {
-    applyPathUpstreamLatestConstraints(upstreamPlans);
-  }
-  let candidate = await resolveProject(
-    path,
-    options,
-    parseManifest(manifestText),
-  );
-  if (
-    !dryRun &&
-    (await applyPathUpstreamRefreshes(
-      candidate,
-      previous,
-      packageName,
+  let candidate = project;
+  if (manifestUpdates.length > 0 || upstreamPlans.length > 0) {
+    if (!dryRun) {
+      applyPathUpstreamLatestConstraints(upstreamPlans);
+    }
+    candidate = await resolveProject(
+      path,
       options,
-    ))
+      parseManifest(manifestText),
+    );
+    if (
+      !dryRun &&
+      (await applyPathUpstreamRefreshes(
+        candidate,
+        previous,
+        packageName,
+        options,
+      ))
+    ) {
+      candidate = await resolveProject(
+        path,
+        options,
+        parseManifest(manifestText),
+      );
+    }
+  } else if (
+    !dryRun &&
+    (await applyPathUpstreamRefreshes(project, previous, packageName, options))
   ) {
     candidate = await resolveProject(
       path,

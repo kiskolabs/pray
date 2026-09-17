@@ -83,6 +83,23 @@ RSpec.describe Pray::Registry do
       expect(metadata.name).to eq("sample/base")
     end
 
+    it "reuses remote package metadata within the process" do
+      hits = 0
+      fixture = HttpFixtureServer.start(
+        "GET /v1/packages/sample/base.json" => lambda { |_body, _headers|
+          hits += 1
+          ["200 OK", "application/json", JSON.generate("name" => "sample/base", "versions" => [])]
+        }
+      )
+      first = described_class.fetch_package_metadata(fixture[:url], "sample/base")
+      second = described_class.fetch_package_metadata(fixture[:url], "sample/base")
+      expect(first.name).to eq("sample/base")
+      expect(second.name).to eq(first.name)
+      expect(hits).to eq(1)
+    ensure
+      HttpFixtureServer.stop(fixture) if fixture
+    end
+
     it "rejects package names that escape the metadata directory" do
       expect do
         described_class.fetch_package_metadata(distribution_root, "../../outside")

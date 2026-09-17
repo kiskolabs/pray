@@ -17,29 +17,33 @@ pub fn download_registry_artifact(
     artifact_relative_path: &str,
 ) -> PrayResult<Vec<u8>> {
     let artifact_url = join_url(source_url, artifact_relative_path);
-    if let Some(manifest) = fetch_torrent_manifest(source_url, artifact_relative_path)? {
-        let stamp = SystemTime::now()
-            .duration_since(UNIX_EPOCH)
-            .map(|duration| duration.as_nanos())
-            .unwrap_or(0);
-        let staging = std::env::temp_dir().join(format!("pray-torrent-{stamp}"));
-        fs::create_dir_all(&staging)?;
-        let destination = staging.join("package.praypkg");
-        let result = fetch_torrent_artifact_to_path(
-            source_url,
-            artifact_relative_path,
-            &manifest,
-            &destination,
-        );
-        let bytes = match result {
-            Ok(bytes) => bytes,
-            Err(error) => {
-                let _ = remove_path_if_exists(&staging);
-                return Err(error);
-            }
-        };
-        let _ = remove_path_if_exists(&staging);
-        return Ok(bytes);
+    let allow_torrent =
+        crate::distribution::fetch_registry_distribution_settings(source_url)?.allows_torrent();
+    if allow_torrent {
+        if let Some(manifest) = fetch_torrent_manifest(source_url, artifact_relative_path)? {
+            let stamp = SystemTime::now()
+                .duration_since(UNIX_EPOCH)
+                .map(|duration| duration.as_nanos())
+                .unwrap_or(0);
+            let staging = std::env::temp_dir().join(format!("pray-torrent-{stamp}"));
+            fs::create_dir_all(&staging)?;
+            let destination = staging.join("package.praypkg");
+            let result = fetch_torrent_artifact_to_path(
+                source_url,
+                artifact_relative_path,
+                &manifest,
+                &destination,
+            );
+            let bytes = match result {
+                Ok(bytes) => bytes,
+                Err(error) => {
+                    let _ = remove_path_if_exists(&staging);
+                    return Err(error);
+                }
+            };
+            let _ = remove_path_if_exists(&staging);
+            return Ok(bytes);
+        }
     }
     http_get(&artifact_url)
 }

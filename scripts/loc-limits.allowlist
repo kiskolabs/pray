@@ -11,7 +11,7 @@ crates/pray-core/src/format_manifest.rs	337
 crates/pray-core/src/literal.rs	502
 crates/pray-core/src/registry.rs	371
 crates/pray-core/src/statement_surface.rs	367
-crates/pray-transport/src/torrent.rs	545
+crates/pray-transport/src/torrent.rs	385
 npmjs/pray-cli/src/literal/statement-surface.ts	352
 npmjs/pray-cli/src/manifest/format-manifest.ts	392
 npmjs/pray-cli/src/manifest/parser.ts	547

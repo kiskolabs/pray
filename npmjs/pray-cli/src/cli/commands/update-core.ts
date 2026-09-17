@@ -13,7 +13,10 @@ import {
   renderProject,
   writeRenderedTargets,
 } from "../../render/project.js";
-import { defaultResolveOptions } from "../../resolve/context.js";
+import {
+  defaultResolveOptions,
+  type ResolveOptions,
+} from "../../resolve/context.js";
 import type { ResolvedProject } from "../../resolve/types.js";
 import { applyPathUpstreamRefreshes } from "../../resolve/upstream-refresh.js";
 import { writeProjectFile } from "../../transaction/index.js";
@@ -72,6 +75,17 @@ export async function previewRemoteUpdates(
   process.stdout.write("All packages up to date\n");
 }
 
+export function updateResolveOptions(
+  packageName: string | undefined,
+): ResolveOptions {
+  return {
+    ...defaultResolveOptions(),
+    refreshSourceRevisions: true,
+    ignoreLockedVersions: packageName === undefined,
+    unlockedPackages: packageName ? new Set([packageName]) : new Set<string>(),
+  };
+}
+
 export async function updateWithManifestConstraints(
   packageName: string | undefined,
   json: boolean,
@@ -88,12 +102,7 @@ export async function updateWithManifestConstraints(
     latest_version: string;
   }> = [],
 ): Promise<void> {
-  const options = {
-    ...defaultResolveOptions(),
-    refreshSourceRevisions: true,
-    ignoreLockedVersions: packageName === undefined,
-    unlockedPackages: packageName ? new Set([packageName]) : new Set<string>(),
-  };
+  const options = updateResolveOptions(packageName);
   let project = await resolveCurrentProject(options);
   const previous = existsSync(lockfilePath())
     ? readLockfile(lockfilePath())
