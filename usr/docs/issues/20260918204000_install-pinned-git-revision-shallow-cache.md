@@ -61,7 +61,9 @@ New residual after iteration 2: Finding 4 and Finding 5. Closed in the 20260918 
 
 Git-free project catalog and unshallow pin fetch shipped in usr/docs/changelogs/20260918213000_git-free-catalog-and-unshallow.md.
 
-Later pass 20260918211600: annotated tag v1.20.0 points at fb8777d. GitHub Release https://github.com/kiskolabs/pray/releases/tag/v1.20.0 is published. Close GitHub issue 31 after registry publish.
+Later pass 20260918211600: annotated tag v1.20.0 points at fb8777d. GitHub Release https://github.com/kiskolabs/pray/releases/tag/v1.20.0 is published.
+
+Later pass 20260918212000: crates.io, npm, and RubyGems all list pray-cli 1.20.0. Comment https://github.com/kiskolabs/pray/issues/31#issuecomment-5734357732 is on the ticket. Ticket still open.
 
 ## Source
 
