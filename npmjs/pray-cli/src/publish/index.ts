@@ -71,13 +71,7 @@ export async function publishToRoot(
     if (
       existing !== undefined &&
       storedArtifact !== undefined &&
-      storedPublishMatches(
-        storedArtifact,
-        packageEntry,
-        signer,
-        signerFingerprint,
-        existing,
-      )
+      storedPublishMatches(storedArtifact, packageEntry, existing)
     ) {
       packageNames.add(packageEntry.declaration.name);
       writeRegistryPackageMetadata(metadataPath, metadata);

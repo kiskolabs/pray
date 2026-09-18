@@ -54,6 +54,7 @@ pub(crate) enum Command {
         servers: Vec<String>,
         to: Vec<String>,
         signing_key: Option<PathBuf>,
+        resign: bool,
         dry_run: bool,
     },
     Yank {

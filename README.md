@@ -355,7 +355,7 @@ Signatures may be produced with supported signing methods such as passkeys, SSH 
 
 `pray install`, `pray update`, and `pray verify` should verify package hashes and signatures according to policy.
 
-`Prayfile.lock` should record enough information to verify that the resolved package still matches the expected archive, source fragments, publisher identity, and signature policy.
+`Prayfile.lock` should record enough information to verify that the resolved package still matches the expected archive, source fragments, recorded publisher claim, and signature policy.
 
 The package archive is the object being distributed. The lockfile is the local record of what was accepted.
 
@@ -554,7 +554,7 @@ In short:
 * ideal checksums detect custom edits to managed content
 * line positions detect marker movement and missing spans
 * the cache preserves what was resolved
-* signatures verify who published or approved the package
+* Ed25519 signatures verify that a key signed the package hashes; identifying a publisher also requires a trusted binding to that key
 * confessions record signed acceptance or rejection feedback
 * rendered outputs contain what was selected to speak
 * silenced fragments remain out of inference-facing files
@@ -927,7 +927,7 @@ The current focus is building a production-ready implementation with stable cont
 | `*.prayspec`           | Package definition                                                                     |
 | `*.praypkg`            | Package archive                                                                        |
 | distribution point     | Registry-like source for packages, metadata, checksums, signatures, feedback, and docs |
-| package signature      | Verifiable publisher approval for a package archive                                    |
+| package signature      | Proof that a signing key approved package hashes; publisher identity needs a separate trust binding |
 | confession             | Signed acceptance or rejection feedback for a resolved prayer                          |
 | network fingerprint    | Additional verification signal attached to a signed confession                         |
 | local cache            | Compressed storage for original resolved source fragments                              |

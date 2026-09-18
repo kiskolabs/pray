@@ -4,6 +4,7 @@ use crate::publish_dest::publish_destinations;
 use crate::publish_integrity::{stored_package_artifact, stored_publish_matches};
 use crate::publish_plan::{print_publish_plan, selected_packages};
 use crate::publish_ssh::publish_to_ssh_server;
+use crate::publish_version::published_registry_package_version;
 use crate::registry_ops::{
     current_signer, current_signer_fingerprint, current_timestamp, load_registry_index,
     load_registry_package_metadata, registry_artifact_path, registry_metadata_path,
@@ -13,19 +14,16 @@ use crate::registry_ops::{
 use crate::revision::{record_root_revision, RevisionAction};
 use crate::sync_peers::map_transport_error;
 use crate::transport_metadata::transport_package_metadata;
-use pray_core::derived_metadata::derive_registry_derived_metadata_from_archive_bytes;
 use pray_core::distribution::{
     fetch_registry_distribution_settings, read_registry_distribution_settings,
 };
-use pray_core::hashing::sha256_prefixed;
-use pray_core::package_integrity::{package_signature_for_publish, resolve_publish_signing_key};
+use pray_core::package_integrity::resolve_publish_signing_key;
 use pray_core::publish_remote::PublishCliDest;
 use pray_core::registry::{
     publish_authorization_header, upload_registry_artifact_with_authorization,
-    RegistryPackageMetadata, RegistryPackageVersion,
+    RegistryPackageMetadata,
 };
 use pray_core::resolve::{resolve_project, ResolvedPackage};
-use pray_core::ssh_identity::signing_identity;
 use pray_core::{PrayError, PrayResult};
 use pray_transport::{PeerConfig, SyncDirection, TransportRegistry, TrustLevel};
 use std::path::{Path, PathBuf};
@@ -35,6 +33,7 @@ pub(crate) fn publish_command(
     servers: Vec<String>,
     to: Vec<String>,
     signing_key_path: Option<PathBuf>,
+    resign: bool,
     dry_run: bool,
 ) -> PrayResult<()> {
     let project = resolve_project(&manifest_path())?;
@@ -43,6 +42,21 @@ pub(crate) fn publish_command(
     let signer_fingerprint = current_signer_fingerprint();
     let published_at = current_timestamp()?;
     let signing_key = resolve_publish_signing_key(signing_key_path.as_deref())?;
+    if resign && signing_key.is_none() {
+        return Err(PrayError::Usage(
+            "publish --resign requires a signing key".to_string(),
+        ));
+    }
+    if resign && dests.iter().any(|dest| dest.server.is_some()) {
+        return Err(PrayError::Usage(
+            "publish --resign requires a local root destination".to_string(),
+        ));
+    }
+    if resign && dry_run {
+        return Err(PrayError::Usage(
+            "publish --resign cannot be combined with --dry-run".to_string(),
+        ));
+    }
     if dry_run {
         print_publish_plan(&project, &dests)?;
         return Ok(());
@@ -69,6 +83,7 @@ pub(crate) fn publish_command(
                 signer_fingerprint.as_deref(),
                 published_at,
                 signing_key.as_ref(),
+                resign,
                 root,
             )?;
             record_root_revision(root, RevisionAction::Publish)?;
@@ -94,6 +109,7 @@ pub(crate) fn publish_to_root(
     signer_fingerprint: Option<&str>,
     published_at: u64,
     signing_key: Option<&ed25519_dalek::SigningKey>,
+    resign: bool,
     root: &Path,
 ) -> PrayResult<()> {
     let mut registry_index = load_registry_index(root)?;
@@ -117,18 +133,12 @@ pub(crate) fn publish_to_root(
         let stored_artifact = existing.and_then(|entry| {
             stored_package_artifact(root, &artifact_path, package, entry, &distribution)
         });
-        if existing
-            .zip(stored_artifact.as_deref())
-            .is_some_and(|(entry, artifact_bytes)| {
-                stored_publish_matches(
-                    artifact_bytes,
-                    package,
-                    signer,
-                    signer_fingerprint,
-                    signing_key,
-                    entry,
-                )
-            })
+        if !resign
+            && existing
+                .zip(stored_artifact.as_deref())
+                .is_some_and(|(entry, artifact_bytes)| {
+                    stored_publish_matches(artifact_bytes, package, entry)
+                })
         {
             package_names.insert(package.declaration.name.clone());
             write_registry_package_metadata(&metadata_path, &metadata)?;
@@ -168,43 +178,6 @@ pub(crate) fn publish_to_root(
     registry_index.packages = package_names.into_iter().collect();
     write_registry_index(root, &registry_index)?;
     Ok(())
-}
-
-pub(crate) fn published_registry_package_version(
-    package: &pray_core::resolve::ResolvedPackage,
-    signer: &str,
-    signer_fingerprint: Option<&str>,
-    published_at: u64,
-    signing_key: Option<&ed25519_dalek::SigningKey>,
-    artifact_path: &str,
-    archive_bytes: &[u8],
-) -> PrayResult<RegistryPackageVersion> {
-    let signing_identity = signing_identity(signer, signer_fingerprint);
-    let artifact_hash = sha256_prefixed(archive_bytes);
-    let signature_material = package_signature_for_publish(
-        signing_key,
-        archive_bytes,
-        &artifact_hash,
-        &package.tree_hash,
-        &signing_identity,
-    );
-    Ok(RegistryPackageVersion {
-        version: package.spec.version.clone(),
-        artifact: artifact_path.to_string(),
-        artifact_hash: Some(artifact_hash),
-        tree_hash: Some(package.tree_hash.clone()),
-        yanked: false,
-        targets: package.spec.targets.clone(),
-        exports: package.spec.exports.keys().cloned().collect(),
-        signer: Some(signer.to_string()),
-        signer_fingerprint: signer_fingerprint.map(str::to_string),
-        signer_public_key: signature_material.signer_public_key,
-        published_at: Some(published_at),
-        signature: Some(signature_material.signature),
-        derived_metadata: Some(derive_registry_derived_metadata_from_archive_bytes(
-            archive_bytes,
-        )?),
-    })
 }
 
 pub(crate) fn publish_to_server(

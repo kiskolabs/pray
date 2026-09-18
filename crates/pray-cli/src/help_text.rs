@@ -19,7 +19,7 @@ pub(crate) const PACKAGE_COMMANDS: &[&str] = &[
 
 #[cfg(feature = "auth")]
 pub(crate) const DISTRIBUTION_COMMANDS: &[&str] = &[
-    "publish [--root PATH|--server URL|--to NAME] [--dry-run] [--signing-key PATH]",
+    "publish [--root PATH|--server URL|--to NAME] [--dry-run] [--signing-key PATH] [--resign]",
     "yank <package> <version> [--root PATH | --to NAME] [--undo]",
     "token create|revoke [--root PATH | --to NAME] ...",
     "login --server URL --email EMAIL",
@@ -30,7 +30,7 @@ pub(crate) const DISTRIBUTION_COMMANDS: &[&str] = &[
 
 #[cfg(not(feature = "auth"))]
 pub(crate) const DISTRIBUTION_COMMANDS: &[&str] = &[
-    "publish [--root PATH|--server URL|--to NAME] [--dry-run] [--signing-key PATH]",
+    "publish [--root PATH|--server URL|--to NAME] [--dry-run] [--signing-key PATH] [--resign]",
     "yank <package> <version> [--root PATH | --to NAME] [--undo]",
     "login --server URL --email EMAIL",
     "sync [--root PATH] [--peer URL ...]",
@@ -144,10 +144,11 @@ pub(crate) fn command_help_text(command: &str) -> Option<&'static str> {
         ),
         "publish" => Some(
             "upload path packages to a registry or local root\n\n\
-             Usage: pray publish [--root PATH] [--server URL ...] [--to NAME] [--dry-run] [--signing-key PATH]\n\n\
+             Usage: pray publish [--root PATH] [--server URL ...] [--to NAME] [--dry-run] [--signing-key PATH] [--resign]\n\n\
              Prayfile publish remotes supply dests when flags are omitted.\n\
              Prefer --signing-key PATH or PRAY_SIGNING_KEY (32-byte ed25519 seed).\n\
-             Without a signing key, publish records a legacy content digest.",
+             Without a signing key, publish records a legacy content digest.\n\
+             --resign uses that key for unchanged versions in a local root.",
         ),
         "yank" => Some(
             "mark or unmark a published version as yanked in a distribution root\n\n\

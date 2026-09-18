@@ -34,18 +34,26 @@ export function storedPackageArtifact(
     : undefined;
 }
 
+// A stored row is current when its own recorded signature still authenticates the
+// stored artifact. The check deliberately ignores who is publishing now: a row signed
+// by another publisher is still a valid attestation of identical bytes, and rewriting it
+// would restate authorship without republishing anything. A row carrying no signature is
+// not current, so publish repairs it.
 export function storedPublishMatches(
   artifactBytes: Buffer,
   packageEntry: ResolvedPackage,
-  signer: string,
-  signerFingerprint: string | undefined,
   existing: RegistryPackageVersion,
 ): boolean {
+  if (existing.signer === undefined || existing.signature === undefined) {
+    return false;
+  }
   return (
-    existing.signer === signer &&
-    existing.signerFingerprint === signerFingerprint &&
     existing.signature ===
-      registryArtifactSignature(artifactBytes, packageEntry.treeHash, signer)
+    registryArtifactSignature(
+      artifactBytes,
+      packageEntry.treeHash,
+      existing.signer,
+    )
   );
 }
 
