@@ -64,7 +64,7 @@ fn login_upgrades_legacy_single_session_document_and_publish_uses_latest_session
     );
     let initial_metadata = published_metadata(&registry_root);
     assert_eq!(initial_metadata["versions"][0]["signer"], legacy_email);
-    let initial_published_at = initial_metadata["versions"][0]["published_at"].clone();
+    let initial_artifact_hash = initial_metadata["versions"][0]["artifact_hash"].clone();
 
     let port = find_free_port();
     let server_url = format!("http://127.0.0.1:{port}");
@@ -104,6 +104,14 @@ fn login_upgrades_legacy_single_session_document_and_publish_uses_latest_session
     assert!(session_emails(&session_json).contains(&legacy_email.to_string()));
     assert!(session_emails(&session_json).contains(&upgraded_email.to_string()));
 
+    // Publish records the session that ran it only when it actually writes a row, and an
+    // unchanged package is preserved rather than restamped. Change the export so the
+    // upgraded session has something to publish.
+    fs::write(
+        source_repo.join("packages/base/exports/testing-basics.md"),
+        "Testing guidance after the session upgrade\n",
+    )
+    .expect("change package content");
     let upgraded_publish = run_pray(
         &source_repo,
         &[
@@ -119,9 +127,9 @@ fn login_upgrades_legacy_single_session_document_and_publish_uses_latest_session
     );
     let upgraded_metadata = published_metadata(&registry_root);
     assert_eq!(upgraded_metadata["versions"][0]["signer"], upgraded_email);
-    assert_eq!(
-        upgraded_metadata["versions"][0]["published_at"],
-        initial_published_at
+    assert_ne!(
+        upgraded_metadata["versions"][0]["artifact_hash"],
+        initial_artifact_hash
     );
 
     let _ = server.kill();
