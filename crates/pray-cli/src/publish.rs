@@ -1,6 +1,8 @@
 use crate::materialize::build_package_archive_bytes;
 use crate::project_paths::manifest_path;
+use crate::publish_dest::publish_destinations;
 use crate::publish_integrity::{stored_package_artifact, stored_publish_matches};
+use crate::publish_plan::{print_publish_plan, selected_packages};
 use crate::publish_ssh::publish_to_ssh_server;
 use crate::registry_ops::{
     current_signer, current_signer_fingerprint, current_timestamp, load_registry_index,
@@ -17,11 +19,12 @@ use pray_core::distribution::{
 };
 use pray_core::hashing::sha256_prefixed;
 use pray_core::package_integrity::{package_signature_for_publish, resolve_publish_signing_key};
+use pray_core::publish_remote::PublishCliDest;
 use pray_core::registry::{
     publish_authorization_header, upload_registry_artifact_with_authorization,
     RegistryPackageMetadata, RegistryPackageVersion,
 };
-use pray_core::resolve::{resolve_project, ResolvedProject};
+use pray_core::resolve::{resolve_project, ResolvedPackage};
 use pray_core::ssh_identity::signing_identity;
 use pray_core::{PrayError, PrayResult};
 use pray_transport::{PeerConfig, SyncDirection, TransportRegistry, TrustLevel};
@@ -30,19 +33,21 @@ use std::path::{Path, PathBuf};
 pub(crate) fn publish_command(
     roots: Vec<PathBuf>,
     servers: Vec<String>,
+    to: Vec<String>,
     signing_key_path: Option<PathBuf>,
+    dry_run: bool,
 ) -> PrayResult<()> {
     let project = resolve_project(&manifest_path())?;
-    for package in &project.packages {
-        package.spec.require_release_version()?;
-    }
+    let (_project_root, dests) = publish_destinations(PublishCliDest { to, roots, servers })?;
     let signer = current_signer()?;
     let signer_fingerprint = current_signer_fingerprint();
     let published_at = current_timestamp()?;
     let signing_key = resolve_publish_signing_key(signing_key_path.as_deref())?;
-    let runtime = if servers.is_empty() {
-        None
-    } else {
+    if dry_run {
+        print_publish_plan(&project, &dests)?;
+        return Ok(());
+    }
+    let runtime = if dests.iter().any(|dest| dest.server.is_some()) {
         Some(
             tokio::runtime::Builder::new_current_thread()
                 .enable_all()
@@ -51,28 +56,31 @@ pub(crate) fn publish_command(
                     PrayError::Unsupported(format!("failed to start publish runtime: {error}"))
                 })?,
         )
+    } else {
+        None
     };
 
-    for root in roots {
-        publish_to_root(
-            &project,
-            &signer,
-            signer_fingerprint.as_deref(),
-            published_at,
-            signing_key.as_ref(),
-            &root,
-        )?;
-        record_root_revision(&root, RevisionAction::Publish)?;
-    }
-    if let Some(runtime) = &runtime {
-        for server_url in servers {
-            publish_to_server(
-                &project,
+    for dest in dests {
+        let packages = selected_packages(&project, &dest.packages)?;
+        if let Some(root) = &dest.root {
+            publish_to_root(
+                &packages,
                 &signer,
                 signer_fingerprint.as_deref(),
                 published_at,
                 signing_key.as_ref(),
-                &server_url,
+                root,
+            )?;
+            record_root_revision(root, RevisionAction::Publish)?;
+        }
+        if let (Some(server_url), Some(runtime)) = (&dest.server, &runtime) {
+            publish_to_server(
+                &packages,
+                &signer,
+                signer_fingerprint.as_deref(),
+                published_at,
+                signing_key.as_ref(),
+                server_url,
                 runtime,
             )?;
         }
@@ -81,7 +89,7 @@ pub(crate) fn publish_command(
 }
 
 pub(crate) fn publish_to_root(
-    project: &ResolvedProject,
+    packages: &[&ResolvedPackage],
     signer: &str,
     signer_fingerprint: Option<&str>,
     published_at: u64,
@@ -96,7 +104,7 @@ pub(crate) fn publish_to_root(
         .cloned()
         .collect::<std::collections::BTreeSet<_>>();
 
-    for package in &project.packages {
+    for package in packages {
         let artifact_path =
             registry_artifact_path(&package.declaration.name, &package.spec.version);
         let metadata_path = registry_metadata_path(root, &package.declaration.name);
@@ -200,7 +208,7 @@ pub(crate) fn published_registry_package_version(
 }
 
 pub(crate) fn publish_to_server(
-    project: &ResolvedProject,
+    packages: &[&ResolvedPackage],
     signer: &str,
     signer_fingerprint: Option<&str>,
     published_at: u64,
@@ -210,7 +218,7 @@ pub(crate) fn publish_to_server(
 ) -> PrayResult<()> {
     if pray_core::ssh_client::is_pray_ssh_url(server_url) {
         return publish_to_ssh_server(
-            project,
+            packages,
             signer,
             signer_fingerprint,
             published_at,
@@ -239,7 +247,7 @@ pub(crate) fn publish_to_server(
     let transport = registry.create(&peer).map_err(map_transport_error)?;
     let distribution = fetch_registry_distribution_settings(server_url)?;
 
-    for package in &project.packages {
+    for package in packages {
         let archive_bytes = build_package_archive_bytes(package)?;
         let artifact_path =
             registry_artifact_path(&package.declaration.name, &package.spec.version);

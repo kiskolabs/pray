@@ -16,6 +16,8 @@ pub struct Manifest {
     pub targets: Vec<ManifestTarget>,
     pub packages: Vec<ManifestPackage>,
     pub local: Vec<ManifestLocal>,
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub publish_remotes: Vec<crate::publish_remote::ManifestPublishRemote>,
     #[serde(default, skip_serializing_if = "BTreeMap::is_empty")]
     pub symbols: BTreeMap<String, String>,
     pub render: RenderPolicy,
@@ -191,6 +193,9 @@ impl Manifest {
         manifest
             .local
             .sort_by(|left, right| left.path.cmp(&right.path));
+        manifest
+            .publish_remotes
+            .sort_by(|left, right| left.name.cmp(&right.name));
         manifest
     }
 

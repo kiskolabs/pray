@@ -4,8 +4,11 @@ require_relative "manifest_json"
 require_relative "manifest_formatter"
 require_relative "manifest_parser_helpers"
 require_relative "manifest_parser_blocks"
+require_relative "manifest_parser_publish"
 require_relative "manifest_parser"
 require_relative "path_safety"
+require_relative "publish_remote"
+require_relative "publish_select"
 
 module Pray
   RenderPolicy = Struct.new(
@@ -53,7 +56,7 @@ module Pray
   end
 
   Manifest = Struct.new(
-    :prayfile_version, :sources, :targets, :packages, :local, :symbols, :render,
+    :prayfile_version, :sources, :targets, :packages, :local, :publish_remotes, :symbols, :render,
     :deprecated_keywords,
     keyword_init: true
   ) do
@@ -63,6 +66,7 @@ module Pray
       targets: [],
       packages: [],
       local: [],
+      publish_remotes: [],
       symbols: {},
       render: RenderPolicy.default,
       deprecated_keywords: []
@@ -99,6 +103,7 @@ module Pray
         copy.targets = targets.sort_by(&:name)
         copy.packages = packages.sort_by { |package| [package.name, package.source.to_s, package.constraint] }
         copy.local = local.sort_by(&:path)
+        copy.publish_remotes = (publish_remotes || []).sort_by(&:name)
         copy.deprecated_keywords = []
       end
     end
@@ -139,6 +144,7 @@ module Pray
         PathSafety.validate_project_relative_path!(local.path)
         PathSafety.validate_destination_path!(local.file) if local.file
       end
+      PublishRemote.validate_publish_remotes!(manifest)
     end
   end
 

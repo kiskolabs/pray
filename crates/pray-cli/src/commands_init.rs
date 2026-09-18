@@ -58,6 +58,47 @@ pub(crate) fn repo_init_command() -> PrayResult<()> {
         &distribution_root,
         &RegistryDistributionSettings::default(),
     )?;
+    maybe_declare_publish_remote(&root, &distribution_root)?;
+    Ok(())
+}
+
+fn maybe_declare_publish_remote(project_root: &Path, distribution_root: &Path) -> PrayResult<()> {
+    let manifest_path = project_root.join("Prayfile");
+    if !manifest_path.exists() {
+        return Ok(());
+    }
+    let text = fs::read_to_string(&manifest_path)?;
+    let manifest = pray_core::manifest::parse_manifest(&text)?;
+    if !manifest.publish_remotes.is_empty() {
+        return Ok(());
+    }
+    let relative = if distribution_root == project_root {
+        ".".to_string()
+    } else {
+        distribution_root
+            .strip_prefix(project_root)
+            .map(|path| path.to_string_lossy().replace('\\', "/"))
+            .unwrap_or_else(|_| "prayers".to_string())
+    };
+    let statement = format!("publish \"prayers\", path: \"{relative}\"");
+    let mut lines: Vec<String> = text.lines().map(str::to_string).collect();
+    let insertion = lines
+        .iter()
+        .rposition(|line| line.trim_start().starts_with("source "))
+        .map(|index| index + 1)
+        .or_else(|| {
+            lines
+                .iter()
+                .position(|line| line.trim_start().starts_with("prayfile "))
+                .map(|index| index + 1)
+        })
+        .unwrap_or(1);
+    lines.insert(insertion, statement);
+    let mut updated = lines.join("\n");
+    if !updated.ends_with('\n') {
+        updated.push('\n');
+    }
+    fs::write(manifest_path, updated)?;
     Ok(())
 }
 

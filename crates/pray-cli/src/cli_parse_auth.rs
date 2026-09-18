@@ -103,6 +103,7 @@ pub(crate) fn parse_serve_command(
     mut arguments: std::vec::IntoIter<String>,
 ) -> PrayResult<Command> {
     let mut root = PathBuf::from(".");
+    let mut to = None;
     let mut host = "127.0.0.1".to_string();
     let mut port = 7429u16;
     let mut stdio = false;
@@ -116,6 +117,14 @@ pub(crate) fn parse_serve_command(
                     ));
                 };
                 root = PathBuf::from(value);
+            }
+            "--to" => {
+                let Some(value) = arguments.next() else {
+                    return Err(PrayError::Unsupported(
+                        "serve requires a name after --to".to_string(),
+                    ));
+                };
+                to = Some(value);
             }
             "--host" => {
                 let Some(value) = arguments.next() else {
@@ -151,6 +160,7 @@ pub(crate) fn parse_serve_command(
     }
     Ok(Command::Serve {
         root,
+        to,
         host,
         port,
         stdio,

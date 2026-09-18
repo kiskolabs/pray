@@ -52,12 +52,15 @@ pub(crate) enum Command {
     Publish {
         roots: Vec<PathBuf>,
         servers: Vec<String>,
+        to: Vec<String>,
         signing_key: Option<PathBuf>,
+        dry_run: bool,
     },
     Yank {
         package: String,
         version: String,
-        root: PathBuf,
+        root: Option<PathBuf>,
+        to: Option<String>,
         undo: bool,
     },
     #[cfg(feature = "auth")]
@@ -81,6 +84,7 @@ pub(crate) enum Command {
     #[cfg(feature = "auth")]
     Serve {
         root: PathBuf,
+        to: Option<String>,
         host: String,
         port: u16,
         stdio: bool,

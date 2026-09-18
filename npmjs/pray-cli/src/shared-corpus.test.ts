@@ -35,6 +35,12 @@ type ExpectedCorpus = {
     path?: string;
   }>;
   local: Array<{ path: string; bound: boolean }>;
+  publish_remotes?: Array<{
+    name: string;
+    path?: string;
+    url?: string;
+    packages?: string[];
+  }>;
 };
 
 describe("shared fixture corpus", () => {
@@ -78,6 +84,17 @@ describe("shared fixture corpus", () => {
         const local = manifest.local[index]!;
         assert.equal(local.path, want.path);
         assert.equal(local.bound, want.bound);
+      }
+
+      const remotes = expected.publish_remotes ?? [];
+      assert.equal((manifest.publishRemotes ?? []).length, remotes.length);
+      for (const [index, want] of remotes.entries()) {
+        const remote = manifest.publishRemotes?.[index];
+        assert.ok(remote);
+        assert.equal(remote.name, want.name);
+        assert.equal(remote.path, want.path);
+        assert.equal(remote.url, want.url);
+        assert.deepEqual(remote.packages ?? [], want.packages ?? []);
       }
     });
   }

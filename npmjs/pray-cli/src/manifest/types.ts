@@ -80,12 +80,20 @@ export interface RenderPolicy {
   header: boolean;
 }
 
+export interface ManifestPublishRemote {
+  name: string;
+  path?: string;
+  url?: string;
+  packages: string[];
+}
+
 export interface Manifest {
   prayfileVersion: string;
   sources: ManifestSource[];
   targets: ManifestTarget[];
   packages: ManifestPackage[];
   local: ManifestLocal[];
+  publishRemotes?: ManifestPublishRemote[];
   symbols: Record<string, string>;
   render: RenderPolicy;
   /** Deprecated Prayfile keywords encountered while parsing (`target`, `output`, `agent`). */
@@ -116,6 +124,9 @@ export function canonicalManifest(manifest: Manifest): Manifest {
     ),
     local: [...manifest.local].sort((left, right) =>
       left.path.localeCompare(right.path),
+    ),
+    publishRemotes: [...(manifest.publishRemotes ?? [])].sort((left, right) =>
+      left.name.localeCompare(right.name),
     ),
     symbols: Object.fromEntries(
       Object.entries(manifest.symbols ?? {}).sort(([left], [right]) =>
@@ -181,6 +192,16 @@ export function manifestToJson(manifest: Manifest): Record<string, unknown> {
     })),
     ...(Object.keys(canonical.symbols ?? {}).length > 0
       ? { symbols: canonical.symbols }
+      : {}),
+    ...((canonical.publishRemotes ?? []).length > 0
+      ? {
+          publish_remotes: canonical.publishRemotes?.map((remote) => ({
+            name: remote.name,
+            ...(remote.path ? { path: remote.path } : {}),
+            ...(remote.url ? { url: remote.url } : {}),
+            packages: remote.packages,
+          })),
+        }
       : {}),
     render: {
       mode: canonical.render.mode,

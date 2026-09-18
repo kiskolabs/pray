@@ -22,6 +22,8 @@ struct ExpectedCorpus {
     targets: Vec<ExpectedTarget>,
     packages: Vec<ExpectedPackage>,
     local: Vec<ExpectedLocal>,
+    #[serde(default)]
+    publish_remotes: Vec<ExpectedPublishRemote>,
 }
 
 #[derive(Debug, Deserialize)]
@@ -58,6 +60,17 @@ struct ExpectedPackage {
 struct ExpectedLocal {
     path: String,
     bound: bool,
+}
+
+#[derive(Debug, Deserialize)]
+struct ExpectedPublishRemote {
+    name: String,
+    #[serde(default)]
+    path: Option<String>,
+    #[serde(default)]
+    url: Option<String>,
+    #[serde(default)]
+    packages: Vec<String>,
 }
 
 fn assert_matches_expected(manifest: &Manifest, expected: &ExpectedCorpus) {
@@ -110,6 +123,21 @@ fn assert_matches_expected(manifest: &Manifest, expected: &ExpectedCorpus) {
     for (local, want) in manifest.local.iter().zip(expected.local.iter()) {
         assert_eq!(local.path, want.path);
         assert_eq!(local.bound, want.bound);
+    }
+
+    assert_eq!(
+        manifest.publish_remotes.len(),
+        expected.publish_remotes.len()
+    );
+    for (remote, want) in manifest
+        .publish_remotes
+        .iter()
+        .zip(expected.publish_remotes.iter())
+    {
+        assert_eq!(remote.name, want.name);
+        assert_eq!(remote.path, want.path);
+        assert_eq!(remote.url, want.url);
+        assert_eq!(remote.packages, want.packages);
     }
 }
 

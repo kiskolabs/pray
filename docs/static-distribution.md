@@ -30,7 +30,11 @@ pray package
 pray publish --root ./distribution --signing-key "$PRAY_SIGNING_KEY"
 ```
 
-This writes index, metadata, and bytes under `./distribution`. Host that tree with any static file server, object storage, or `pray serve --root ./distribution`. Git is not required. A consumer Prayfile points `source` at the HTTP origin:
+This writes index, metadata, and bytes under `./distribution`. Host that tree with any static file server, object storage, or `pray serve --root ./distribution`. Git is not required.
+
+Prayfile may name the dest with `publish "prayers", path: "distribution"`. Then `pray publish` uses that remote when `--root` and `--server` are omitted. Those flags, when present, must match a declared remote.
+
+A consumer Prayfile points `source` at the HTTP origin:
 
 ```
 source "public", "https://prayers.example.com"

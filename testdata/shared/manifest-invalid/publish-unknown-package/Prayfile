@@ -1,0 +1,4 @@
+prayfile "1"
+publish "prayers", path: "prayers" do
+  pray "missing/package"
+end

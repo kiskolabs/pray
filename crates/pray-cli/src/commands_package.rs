@@ -50,7 +50,18 @@ pub(crate) fn format_command() -> PrayResult<()> {
 
 pub(crate) fn package_command() -> PrayResult<()> {
     let project = resolve_project(&manifest_path())?;
-    for package in &project.packages {
+    let allowed = pray_core::publish_remote::path_owned_package_names(&project.manifest);
+    let packages: Vec<_> = project
+        .packages
+        .iter()
+        .filter(|package| allowed.iter().any(|name| name == &package.declaration.name))
+        .collect();
+    if packages.is_empty() {
+        return Err(PrayError::Usage(
+            "no path packages to package; remote dependencies are not packed".to_string(),
+        ));
+    }
+    for package in packages {
         package.spec.require_release_version()?;
         let output_path = package_archive_path(&package.declaration.name, &package.spec.version);
         write_package_archive(package, &output_path)?;

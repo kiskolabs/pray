@@ -1,6 +1,7 @@
 import { readFileSync } from "node:fs";
 import { PrayError } from "../errors.js";
 import { sha256Prefixed } from "../hashing.js";
+import { validatePublishRemotes } from "../publish/remote.js";
 import { parseManifestText } from "./parser.js";
 import {
   canonicalManifest,
@@ -8,6 +9,7 @@ import {
   type Manifest,
   type ManifestLocal,
   type ManifestPackage,
+  type ManifestPublishRemote,
   type ManifestSource,
   type ManifestTarget,
   manifestToJson,
@@ -37,6 +39,7 @@ export function readManifestText(manifestPath: string): string {
 export function parseManifest(text: string): Manifest {
   const manifest = parseManifestText(text);
   validateManifestPaths(manifest);
+  validatePublishRemotes(manifest);
   return manifest;
 }
 
@@ -83,6 +86,7 @@ export {
   type Manifest,
   type ManifestLocal,
   type ManifestPackage,
+  type ManifestPublishRemote,
   type ManifestSource,
   type ManifestTarget,
   type RenderPolicy,

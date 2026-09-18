@@ -28,7 +28,9 @@ mod lockfile_ops;
 mod materialize;
 mod project_paths;
 mod publish;
+mod publish_dest;
 mod publish_integrity;
+mod publish_plan;
 mod publish_ssh;
 mod registry_ops;
 mod revision;
@@ -193,14 +195,17 @@ fn run(arguments: Vec<String>) -> PrayResult<()> {
         Command::Publish {
             roots,
             servers,
+            to,
             signing_key,
-        } => publish_command(roots, servers, signing_key),
+            dry_run,
+        } => publish_command(roots, servers, to, signing_key, dry_run),
         Command::Yank {
             package,
             version,
             root,
+            to,
             undo,
-        } => yank_command(package, version, root, undo),
+        } => yank_command(package, version, root, to, undo),
         #[cfg(feature = "auth")]
         Command::Token { arguments } => run_token_command(arguments),
         Command::Search {
@@ -227,11 +232,15 @@ fn run(arguments: Vec<String>) -> PrayResult<()> {
         #[cfg(feature = "auth")]
         Command::Serve {
             root,
+            to,
             host,
             port,
             stdio,
             allow_open_push,
-        } => serve_command(root, host, port, stdio, allow_open_push),
+        } => {
+            let root = crate::publish_dest::optional_path_remote_root(to.as_deref(), &root)?;
+            serve_command(root, host, port, stdio, allow_open_push)
+        }
         Command::Confess {
             package,
             from_lock,
