@@ -45,3 +45,113 @@ pub use crate::render_provisioned::{
 };
 
 pub use crate::render_file::read_destination_text;
+
+#[cfg(test)]
+mod patch_tests {
+    use crate::render_patch::patch_rendered_content;
+
+    #[test]
+    fn preserves_unmarked_text_and_updates_managed_body() {
+        let existing = "\
+## Shared instructions
+
+User note: keep this line.
+
+<!-- pray:abc123 -->
+old body
+<!-- pray:abc123 -->
+";
+        let fresh = "\
+## Shared instructions
+
+<!-- pray:abc123 -->
+new body
+<!-- pray:abc123 -->
+";
+        let patched = patch_rendered_content(existing, fresh);
+        assert!(patched.contains("User note: keep this line."));
+        assert!(patched.contains("new body"));
+        assert!(!patched.contains("old body"));
+    }
+
+    #[test]
+    fn rewrites_wholesale_when_existing_has_no_managed_overlap() {
+        let existing = "broken rendered output\n";
+        let fresh = "\
+<!-- pray:abc123 -->
+new body
+<!-- pray:abc123 -->
+";
+        assert_eq!(patch_rendered_content(existing, fresh), fresh);
+    }
+
+    #[test]
+    fn inserts_leading_managed_span_from_fresh_and_drops_stale_unmarked_embed() {
+        let existing = "\
+header
+
+old local body
+
+<!-- pray:abc123 -->
+package body
+<!-- pray:abc123 -->
+";
+        let fresh = "\
+header
+
+<!-- pray:local001 -->
+new local body
+<!-- pray:local001 -->
+
+<!-- pray:abc123 -->
+package body
+<!-- pray:abc123 -->
+";
+        let patched = patch_rendered_content(existing, fresh);
+        assert!(patched.contains("new local body"));
+        assert!(!patched.contains("old local body"));
+        assert!(patched.contains("<!-- pray:local001 -->"));
+        assert!(patched.contains("package body"));
+    }
+
+    #[test]
+    fn appends_trailing_managed_span_with_intervening_blank_line_from_fresh() {
+        let existing = "\
+<!-- pray:abc123 -->
+package body
+<!-- pray:abc123 -->
+";
+        let fresh = "\
+<!-- pray:abc123 -->
+package body
+<!-- pray:abc123 -->
+
+<!-- pray:local001 -->
+new local body
+<!-- pray:local001 -->
+";
+        assert_eq!(patch_rendered_content(existing, fresh), fresh);
+    }
+
+    #[test]
+    fn restores_missing_blank_line_between_adjacent_managed_spans() {
+        let existing = "\
+<!-- pray:abc123 -->
+package body
+<!-- pray:abc123 -->
+<!-- pray:local001 -->
+new local body
+<!-- pray:local001 -->
+";
+        let fresh = "\
+<!-- pray:abc123 -->
+package body
+<!-- pray:abc123 -->
+
+<!-- pray:local001 -->
+new local body
+<!-- pray:local001 -->
+";
+        assert_eq!(patch_rendered_content(existing, fresh), fresh);
+    }
+}

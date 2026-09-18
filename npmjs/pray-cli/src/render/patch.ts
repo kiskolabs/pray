@@ -41,7 +41,9 @@ export function patchRenderedContent(existing: string, fresh: string): string {
     }
     remaining = skipUntilManaged(existingSegments, shared.id);
   }
-  for (const segment of remaining) {
+  for (let index = 0; index < remaining.length; index += 1) {
+    const segment = remaining[index];
+    if (!segment) continue;
     if (segment.kind === "text") {
       output += segment.text;
       continue;
@@ -49,13 +51,55 @@ export function patchRenderedContent(existing: string, fresh: string): string {
     const body = freshManaged.get(segment.id) ?? segment.body;
     used.add(segment.id);
     output += managedSegment(segment.id, body);
-  }
-  for (const segment of freshSegments) {
-    if (segment.kind === "managed" && !used.has(segment.id)) {
-      output += managedSegment(segment.id, segment.body);
+    const next = remaining[index + 1];
+    if (next?.kind === "managed") {
+      output += textBetween(freshSegments, segment.id, next.id);
     }
   }
+  output += unusedFreshSuffix(freshSegments, used);
   return output.endsWith("\n") ? output : `${output}\n`;
+}
+
+function textBetween(segments: Segment[], left: string, right: string): string {
+  let copying = false;
+  let text = "";
+  for (const segment of segments) {
+    if (segment.kind === "managed") {
+      if (segment.id === left) {
+        copying = true;
+        text = "";
+      } else if (copying) {
+        return segment.id === right ? text : "";
+      }
+    } else if (copying) {
+      text += segment.text;
+    }
+  }
+  return "";
+}
+
+function unusedFreshSuffix(
+  freshSegments: Segment[],
+  used: Set<string>,
+): string {
+  let pending = "";
+  let seenUsed = false;
+  let suffix = "";
+  for (const segment of freshSegments) {
+    if (segment.kind === "managed") {
+      if (used.has(segment.id)) {
+        seenUsed = true;
+        pending = "";
+        continue;
+      }
+      suffix += pending;
+      pending = "";
+      suffix += managedSegment(segment.id, segment.body);
+      continue;
+    }
+    if (seenUsed) pending += segment.text;
+  }
+  return suffix;
 }
 
 function skipUntilManaged(segments: Segment[], id: string): Segment[] {

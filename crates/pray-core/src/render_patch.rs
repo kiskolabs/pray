@@ -63,7 +63,7 @@ pub fn patch_rendered_content(existing: &str, fresh: &str) -> String {
     } else {
         existing_segments.as_slice()
     };
-    for segment in remaining_existing {
+    for (index, segment) in remaining_existing.iter().enumerate() {
         match segment {
             Segment::Text(text) => output.push_str(text),
             Segment::Managed { id, body } => {
@@ -73,21 +73,66 @@ pub fn patch_rendered_content(existing: &str, fresh: &str) -> String {
                     .unwrap_or_else(|| body.clone());
                 used.insert(id.clone());
                 push_managed_span(&mut output, id, &replacement);
+                if let Some(Segment::Managed { id: next_id, .. }) =
+                    remaining_existing.get(index + 1)
+                {
+                    output.push_str(&text_between(&fresh_segments, id, next_id));
+                }
             }
         }
     }
-    for segment in fresh_segments {
-        if let Segment::Managed { id, body } = segment {
-            if used.contains(&id) {
-                continue;
-            }
-            push_managed_span(&mut output, &id, &body);
-        }
-    }
+    append_unused_fresh_spans(&fresh_segments, &used, &mut output);
     if !output.ends_with('\n') {
         output.push('\n');
     }
     output
+}
+
+fn text_between(segments: &[Segment], left: &str, right: &str) -> String {
+    let mut copying = false;
+    let mut text = String::new();
+    for segment in segments {
+        match segment {
+            Segment::Managed { id, .. } if id == left => {
+                copying = true;
+                text.clear();
+            }
+            Segment::Managed { id, .. } if copying => {
+                return if id == right { text } else { String::new() };
+            }
+            Segment::Text(body) if copying => text.push_str(body),
+            _ => {}
+        }
+    }
+    String::new()
+}
+
+fn append_unused_fresh_spans(
+    fresh_segments: &[Segment],
+    used: &std::collections::BTreeSet<String>,
+    output: &mut String,
+) {
+    let mut pending_text = String::new();
+    let mut seen_used = false;
+    for segment in fresh_segments {
+        match segment {
+            Segment::Managed { id, body } => {
+                if used.contains(id) {
+                    seen_used = true;
+                    pending_text.clear();
+                    continue;
+                }
+                output.push_str(&pending_text);
+                pending_text.clear();
+                push_managed_span(output, id, body);
+            }
+            Segment::Text(text) => {
+                if seen_used {
+                    pending_text.push_str(text);
+                }
+            }
+        }
+    }
 }
 
 fn skip_until_managed<'a>(segments: &'a [Segment], id: &str) -> &'a [Segment] {
@@ -160,73 +205,4 @@ fn marker_id(line: &str) -> Option<String> {
         return None;
     }
     Some(id.to_string())
-}
-
-#[cfg(test)]
-mod tests {
-    use super::*;
-
-    #[test]
-    fn preserves_unmarked_text_and_updates_managed_body() {
-        let existing = "\
-## Shared instructions
-
-User note: keep this line.
-
-<!-- pray:abc123 -->
-old body
-<!-- pray:abc123 -->
-";
-        let fresh = "\
-## Shared instructions
-
-<!-- pray:abc123 -->
-new body
-<!-- pray:abc123 -->
-";
-        let patched = patch_rendered_content(existing, fresh);
-        assert!(patched.contains("User note: keep this line."));
-        assert!(patched.contains("new body"));
-        assert!(!patched.contains("old body"));
-    }
-
-    #[test]
-    fn rewrites_wholesale_when_existing_has_no_managed_overlap() {
-        let existing = "broken rendered output\n";
-        let fresh = "\
-<!-- pray:abc123 -->
-new body
-<!-- pray:abc123 -->
-";
-        assert_eq!(patch_rendered_content(existing, fresh), fresh);
-    }
-
-    #[test]
-    fn inserts_leading_managed_span_from_fresh_and_drops_stale_unmarked_embed() {
-        let existing = "\
-header
-
-old local body
-
-<!-- pray:abc123 -->
-package body
-<!-- pray:abc123 -->
-";
-        let fresh = "\
-header
-
-<!-- pray:local001 -->
-new local body
-<!-- pray:local001 -->
-
-<!-- pray:abc123 -->
-package body
-<!-- pray:abc123 -->
-";
-        let patched = patch_rendered_content(existing, fresh);
-        assert!(patched.contains("new local body"));
-        assert!(!patched.contains("old local body"));
-        assert!(patched.contains("<!-- pray:local001 -->"));
-        assert!(patched.contains("package body"));
-    }
 }

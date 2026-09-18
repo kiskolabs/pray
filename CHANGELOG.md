@@ -3,6 +3,7 @@
 ## Unreleased
 
 - Skip a crate on `make release-all` when that version already exists on crates.io.
+- Keep `pray drift` clean after `pray install` when a compose block adds a local file after a package dest already had.
 
 ## 1.19.0 (2026-09-18)
 

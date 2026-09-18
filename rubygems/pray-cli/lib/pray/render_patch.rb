@@ -19,7 +19,7 @@ module Pray
         used,
         output
       )
-      splice_existing_managed(remaining, fresh_managed, used, output)
+      splice_existing_managed(remaining, fresh_segments, fresh_managed, used, output)
       append_unused_fresh_managed(fresh_segments, used, output)
       output.end_with?("\n") ? output : "#{output}\n"
     end
@@ -36,8 +36,8 @@ module Pray
       segments.filter_map { |segment| segment[:id] if segment[:kind] == :managed }.to_h { |id| [id, true] }
     end
 
-    def splice_existing_managed(remaining, fresh_managed, used, output)
-      remaining.each do |segment|
+    def splice_existing_managed(remaining, fresh_segments, fresh_managed, used, output)
+      remaining.each_with_index do |segment, index|
         if segment[:kind] == :text
           output << segment[:text]
           next
@@ -45,15 +45,47 @@ module Pray
 
         used[segment[:id]] = true
         output << managed_segment(segment[:id], fresh_managed.fetch(segment[:id], segment[:body]))
+        next_segment = remaining[index + 1]
+        next unless next_segment && next_segment[:kind] == :managed
+
+        output << text_between(fresh_segments, segment[:id], next_segment[:id])
       end
     end
 
-    def append_unused_fresh_managed(fresh_segments, used, output)
-      fresh_segments.each do |segment|
-        next unless segment[:kind] == :managed
-        next if used[segment[:id]]
+    def text_between(segments, left, right)
+      copying = false
+      text = +""
+      segments.each do |segment|
+        if segment[:kind] == :managed
+          if segment[:id] == left
+            copying = true
+            text = +""
+          elsif copying
+            return (segment[:id] == right) ? text : ""
+          end
+        elsif copying
+          text << segment[:text]
+        end
+      end
+      ""
+    end
 
-        output << managed_segment(segment[:id], segment[:body])
+    def append_unused_fresh_managed(fresh_segments, used, output)
+      pending = +""
+      seen_used = false
+      fresh_segments.each do |segment|
+        if segment[:kind] == :managed
+          if used[segment[:id]]
+            seen_used = true
+            pending = +""
+            next
+          end
+          output << pending
+          pending = +""
+          output << managed_segment(segment[:id], segment[:body])
+        elsif seen_used
+          pending << segment[:text]
+        end
       end
     end
 

@@ -183,6 +183,56 @@ fn plan_and_outdated_report_a_changed_local_source() {
 }
 
 #[test]
+fn drift_is_clean_after_adding_a_trailing_local_compose_fragment() {
+    let repo = temporary_directory("pray-drift-trailing-local");
+    create_scoped_local_fixture(&repo);
+    fs::write(
+        repo.join("Prayfile"),
+        r#"
+prayfile "1"
+compose "AGENTS.md" do
+  pray "sample/base", "~> 1.4", path: "packages/base"
+end
+render mode: :managed, conflict: :fail, churn: :minimal
+"#,
+    )
+    .expect("write package-only Prayfile");
+    assert!(
+        run_pray(&repo, &["install"]).status.success(),
+        "package-only install failed"
+    );
+    let first_drift = run_pray(&repo, &["drift"]);
+    assert!(
+        first_drift.status.success(),
+        "drift after package-only install failed:\n{}",
+        stderr(&first_drift)
+    );
+
+    fs::write(
+        repo.join("Prayfile"),
+        r#"
+prayfile "1"
+compose "AGENTS.md" do
+  pray "sample/base", "~> 1.4", path: "packages/base"
+  pray ".agents/project.md"
+end
+render mode: :managed, conflict: :fail, churn: :minimal
+"#,
+    )
+    .expect("write Prayfile with trailing local");
+    assert!(
+        run_pray(&repo, &["install"]).status.success(),
+        "install after adding local failed"
+    );
+    let drift = run_pray(&repo, &["drift"]);
+    assert!(
+        drift.status.success(),
+        "expected clean drift after adding a trailing local fragment:\n{}",
+        stderr(&drift)
+    );
+}
+
+#[test]
 fn update_rewrites_compose_when_a_local_source_changes() {
     let repo = temporary_directory("pray-update-local-change");
     create_scoped_local_fixture(&repo);
