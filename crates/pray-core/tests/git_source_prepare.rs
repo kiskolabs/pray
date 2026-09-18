@@ -8,13 +8,19 @@ use std::fs;
 use std::io::Write;
 use std::path::{Path, PathBuf};
 use std::process::Command;
+use std::sync::{Mutex, MutexGuard};
 use std::time::{SystemTime, UNIX_EPOCH};
 
-struct CacheEnv(Option<String>);
+static PRAY_CACHE_LOCK: Mutex<()> = Mutex::new(());
+
+struct CacheEnv {
+    _lock: MutexGuard<'static, ()>,
+    previous: Option<String>,
+}
 
 impl Drop for CacheEnv {
     fn drop(&mut self) {
-        match self.0.take() {
+        match self.previous.take() {
             Some(value) => std::env::set_var("PRAY_CACHE", value),
             None => std::env::remove_var("PRAY_CACHE"),
         }
@@ -81,9 +87,15 @@ fn update_clones_only_the_git_source_a_package_uses() {
 
     assert!(
         git_source_cache_directory(&root, &format!("file://{used}"))
+            .join(".pray-revision")
+            .is_file(),
+        "used git source should materialize a catalog tree"
+    );
+    assert!(
+        !git_source_cache_directory(&root, &format!("file://{used}"))
             .join(".git")
-            .is_dir(),
-        "used git source should be cloned"
+            .exists(),
+        "used git source catalog must not keep a git object store"
     );
     assert!(
         !git_source_cache_directory(&root, &format!("file://{unused}"))
@@ -123,11 +135,17 @@ fn update_fetches_origin_once_per_used_git_source() {
 }
 
 fn pin_cache(root: &Path) -> CacheEnv {
+    let lock = PRAY_CACHE_LOCK
+        .lock()
+        .unwrap_or_else(|poison| poison.into_inner());
     let previous = std::env::var("PRAY_CACHE").ok();
     let cache = root.join("cache");
     fs::create_dir_all(&cache).expect("cache");
     std::env::set_var("PRAY_CACHE", &cache);
-    CacheEnv(previous)
+    CacheEnv {
+        _lock: lock,
+        previous,
+    }
 }
 
 fn write_prayfile(root: &Path, body: &str) {

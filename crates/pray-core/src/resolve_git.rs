@@ -1,10 +1,7 @@
 use crate::client_trust::{effective_trust_home, gate_git_source};
-use crate::paths::remove_path_if_exists;
-use crate::resolve_git_clone::clone_git_cache;
 use crate::resolve_git_command::{command_error, run_git_command, run_git_success};
 use crate::resolve_git_paths::cache_key;
 use crate::{PrayError, PrayResult};
-use std::fs;
 use std::path::{Path, PathBuf};
 
 pub use crate::resolve_git_paths::git_source_cache_directory;
@@ -27,70 +24,10 @@ pub(crate) fn global_git_cache_ready(global_cache: &Path) -> bool {
     global_cache.join(".git").is_dir() || global_cache.join("HEAD").is_file()
 }
 
-pub(crate) fn git_global_seed_available(clone_url: &str) -> bool {
-    global_git_cache_directory(clone_url).is_some_and(|path| global_git_cache_ready(&path))
-}
-
 pub(crate) fn offline_git_source_uncached(clone_url: &str) -> PrayError {
     PrayError::Resolution(format!(
         "git source {clone_url} is not cached locally and offline mode is enabled"
     ))
-}
-
-pub(crate) fn seed_git_cache_from_global(
-    clone_url: &str,
-    destination: &str,
-    working_directory: &Path,
-) -> PrayResult<bool> {
-    let Some(global_cache) = global_git_cache_directory(clone_url) else {
-        return Ok(false);
-    };
-    if !global_git_cache_ready(&global_cache) {
-        return Ok(false);
-    }
-    let global_path = global_cache.to_str().ok_or_else(|| {
-        PrayError::Resolution(format!("invalid global git cache path: {:?}", global_cache))
-    })?;
-    clone_git_cache(working_directory, global_path, destination, true)?;
-    Ok(true)
-}
-
-pub(crate) fn mirror_git_cache_to_global(clone_url: &str, project_cache: &Path) -> PrayResult<()> {
-    let Some(global_cache) = global_git_cache_directory(clone_url) else {
-        return Ok(());
-    };
-    if global_git_cache_ready(&global_cache) {
-        return Ok(());
-    }
-    let cache_parent = project_cache.parent().ok_or_else(|| {
-        PrayError::Resolution(format!(
-            "invalid project git cache path: {:?}",
-            project_cache
-        ))
-    })?;
-    let cache_name = project_cache
-        .file_name()
-        .and_then(|name| name.to_str())
-        .ok_or_else(|| {
-            PrayError::Resolution(format!(
-                "invalid project git cache path: {:?}",
-                project_cache
-            ))
-        })?;
-    if let Some(parent) = global_cache.parent() {
-        fs::create_dir_all(parent)?;
-    }
-    let destination = global_cache.to_str().ok_or_else(|| {
-        PrayError::Resolution(format!("invalid global git cache path: {:?}", global_cache))
-    })?;
-    if global_cache.exists() {
-        remove_path_if_exists(&global_cache)?;
-    }
-    run_git_success(
-        cache_parent,
-        &["clone", "--bare", "--quiet", cache_name, destination],
-    )?;
-    Ok(())
 }
 
 pub(crate) fn resolve_distribution_root(
@@ -112,20 +49,21 @@ pub(crate) fn resolve_distribution_root(
 
 pub(crate) fn finalize_git_repository(
     clone_url: &str,
-    git_cache_directory: &Path,
+    trust_repository: &Path,
+    catalog: PathBuf,
     revision: String,
 ) -> PrayResult<(PathBuf, String)> {
-    gate_git_source(&effective_trust_home()?, clone_url, git_cache_directory)?;
+    gate_git_source(&effective_trust_home()?, clone_url, trust_repository)?;
     if crate::client_trust::env_truthy("PRAY_TRUST_IMPORT") {
         let global_scope = crate::client_trust::env_truthy("PRAY_TRUST_GLOBAL");
         crate::client_trust::prompt_import_signing_keys_for_source(
             &effective_trust_home()?,
             clone_url,
-            git_cache_directory,
+            trust_repository,
             global_scope,
         )?;
     }
-    Ok((git_cache_directory.to_path_buf(), revision))
+    Ok((catalog, revision))
 }
 
 pub(crate) fn ensure_git_remote_origin(repository: &Path, clone_url: &str) -> PrayResult<()> {
@@ -134,71 +72,6 @@ pub(crate) fn ensure_git_remote_origin(repository: &Path, clone_url: &str) -> Pr
     } else {
         run_git_success(repository, &["remote", "add", "origin", clone_url])?;
     }
-    Ok(())
-}
-
-pub(crate) fn refresh_global_from_project(clone_url: &str, project_cache: &Path) -> PrayResult<()> {
-    let Some(global_cache) = global_git_cache_directory(clone_url) else {
-        return Ok(());
-    };
-    if global_git_cache_ready(&global_cache) || global_cache.exists() {
-        remove_path_if_exists(&global_cache)?;
-    }
-    mirror_git_cache_to_global(clone_url, project_cache)
-}
-
-pub(crate) fn refresh_git_worktree(repository: &Path, clone_url: &str) -> PrayResult<()> {
-    ensure_git_remote_origin(repository, clone_url)?;
-    if run_git_success(
-        repository,
-        &["fetch", "--depth", "1", "--filter=blob:none", "origin"],
-    )
-    .is_err()
-    {
-        run_git_success(repository, &["fetch", "--depth", "1", "origin"])?;
-    }
-    run_git_success(repository, &["reset", "--hard", "FETCH_HEAD"])?;
-    Ok(())
-}
-
-pub(crate) fn checkout_git_revision(
-    repository: &Path,
-    clone_url: &str,
-    revision: &str,
-    allow_fetch: bool,
-) -> PrayResult<()> {
-    if git_object_exists(repository, revision) {
-        run_git_success(repository, &["reset", "--hard", revision])?;
-        return Ok(());
-    }
-    if !allow_fetch {
-        return Err(PrayError::Resolution(format!(
-            "git source {:?} is locked to revision {revision}, but that commit is not available locally and offline mode is enabled",
-            repository
-        )));
-    }
-    ensure_git_remote_origin(repository, clone_url)?;
-    if run_git_success(
-        repository,
-        &[
-            "fetch",
-            "--depth",
-            "1",
-            "--filter=blob:none",
-            "origin",
-            revision,
-        ],
-    )
-    .is_err()
-    {
-        run_git_success(repository, &["fetch", "--depth", "1", "origin", revision])?;
-    }
-    if git_object_exists(repository, revision) {
-        run_git_success(repository, &["reset", "--hard", revision])?;
-        return Ok(());
-    }
-    run_git_success(repository, &["fetch", "origin", revision])?;
-    run_git_success(repository, &["reset", "--hard", revision])?;
     Ok(())
 }
 

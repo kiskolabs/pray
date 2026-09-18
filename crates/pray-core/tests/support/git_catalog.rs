@@ -2,19 +2,24 @@ use pray_core::embed::{write_lockfile, LockSource, Lockfile};
 use pray_core::hashing::sha256_prefixed;
 use pray_core::package_spec::PackageSpec;
 use pray_core::registry::{RegistryPackageMetadata, RegistryPackageVersion};
-use pray_core::resolve::git_source_cache_directory;
 use std::collections::BTreeMap;
 use std::fs;
 use std::io::Write;
 use std::path::{Path, PathBuf};
 use std::process::Command;
+use std::sync::{Mutex, MutexGuard};
 use std::time::{SystemTime, UNIX_EPOCH};
 
-pub struct CacheEnv(Option<String>);
+static PRAY_CACHE_LOCK: Mutex<()> = Mutex::new(());
+
+pub struct CacheEnv {
+    _lock: MutexGuard<'static, ()>,
+    previous: Option<String>,
+}
 
 impl Drop for CacheEnv {
     fn drop(&mut self) {
-        match self.0.take() {
+        match self.previous.take() {
             Some(value) => std::env::set_var("PRAY_CACHE", value),
             None => std::env::remove_var("PRAY_CACHE"),
         }
@@ -36,11 +41,27 @@ impl Drop for PinnedShallowCache {
 }
 
 pub fn pin_cache(root: &Path) -> CacheEnv {
+    let lock = PRAY_CACHE_LOCK
+        .lock()
+        .unwrap_or_else(|poison| poison.into_inner());
     let previous = std::env::var("PRAY_CACHE").ok();
     let cache = root.join("cache");
     fs::create_dir_all(&cache).expect("cache");
     std::env::set_var("PRAY_CACHE", &cache);
-    CacheEnv(previous)
+    CacheEnv {
+        _lock: lock,
+        previous,
+    }
+}
+
+pub fn global_git_directory(cache_root: &Path, clone_url: &str) -> PathBuf {
+    let digest = sha256_prefixed(clone_url.as_bytes());
+    let key: String = digest
+        .trim_start_matches("sha256:")
+        .chars()
+        .take(16)
+        .collect();
+    cache_root.join("git").join(key)
 }
 
 pub fn unique_temp(prefix: &str) -> PathBuf {
@@ -156,23 +177,24 @@ pub fn pinned_shallow_cache_fixture(strip_origin: bool) -> PinnedShallowCache {
         ],
     );
     let clone_url = format!("file://{}", origin.display());
-    let cache = git_source_cache_directory(&root, &clone_url);
-    fs::create_dir_all(cache.parent().expect("cache parent")).expect("cache parent");
+    let db = global_git_directory(&root.join("cache"), &clone_url);
+    fs::create_dir_all(db.parent().expect("db parent")).expect("db parent");
     git(
         &root,
         &[
             "clone",
+            "--bare",
             "--depth",
             "1",
             "--no-local",
             &clone_url,
-            cache.to_str().expect("cache path"),
+            db.to_str().expect("db path"),
         ],
     );
     assert!(
-        !git_succeeds(&cache, &["cat-file", "-e", &pinned]),
-        "fixture cache must lack the pinned commit {pinned}; cache HEAD is {}",
-        git_head(&cache)
+        !git_succeeds(&db, &["cat-file", "-e", &pinned]),
+        "fixture db must lack the pinned commit {pinned}; db HEAD is {}",
+        git_head(&db)
     );
     if strip_origin {
         for name in ["v1", "later.txt"] {

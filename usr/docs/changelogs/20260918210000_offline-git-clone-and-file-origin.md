@@ -30,9 +30,7 @@ Confirming checks: cargo test -p pray-core --offline (full crate, including git_
 
 ## Next
 
-Project git cache is still a working tree with .git. Cargo-style split (objects only in the global bare db, git-free catalog tree in the project cache) remains design work. See usr/docs/issues/20260917190500_git-cache-without-dot-git.md.
-
-Shallow catalogs still fetch a missing pin with depth 1 rather than unshallow.
+Closed by usr/docs/changelogs/20260918213000_git-free-catalog-and-unshallow.md.
 
 ## Source
 

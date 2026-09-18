@@ -8,13 +8,21 @@ RSpec.describe "git blobless catalog clone" do
   let(:workspace) { Dir.mktmpdir("pray-git-blobless-") }
   let(:unused_bytes) { 128 * 1024 }
 
-  after do
+  around do |example|
+    previous_cache = ENV["PRAY_CACHE"]
+    ENV["PRAY_CACHE"] = File.join(workspace, "global-cache")
+    example.run
+  ensure
+    if previous_cache.nil?
+      ENV.delete("PRAY_CACHE")
+    else
+      ENV["PRAY_CACHE"] = previous_cache
+    end
     FileUtils.rm_rf(workspace)
   end
 
   it "keeps unused artifacts out of the clone and materializes a used file" do
     origin = File.join(workspace, "origin")
-    clone = File.join(workspace, "clone")
     FileUtils.mkdir_p(File.join(origin, "v1/packages/sample"))
     FileUtils.mkdir_p(File.join(origin, "v1/artifacts/sample/base/1.0.0"))
     FileUtils.mkdir_p(File.join(origin, "v1/artifacts/sample/heavy/1.0.0"))
@@ -23,19 +31,25 @@ RSpec.describe "git blobless catalog clone" do
     unused = "v1/artifacts/sample/heavy/1.0.0/sample-heavy-1.0.0.praypkg"
     File.write(File.join(origin, used), "used-package\n")
     File.binwrite(File.join(origin, unused), "\x07" * unused_bytes)
-    git(origin, "init", "-b", "main")
+    git(origin, "init", "--template=", "-b", "main")
     git(origin, "config", "user.name", "pray")
     git(origin, "config", "user.email", "pray@example.com")
     git(origin, "config", "uploadpack.allowFilter", "true")
     git(origin, "add", "-A")
     git(origin, "-c", "commit.gpgsign=false", "-c", "core.hooksPath=/dev/null", "commit", "-m", "catalog")
 
-    Pray::GitClone.clone_git_cache(workspace, "file://#{origin}", clone, quiet: true)
-    Pray::GitClone.apply_sparse_checkout(clone)
-    expect(File).not_to exist(File.join(clone, unused))
-    Pray::GitMaterialize.materialize_catalog_file(clone, used)
-    expect(File).to exist(File.join(clone, used))
-    expect(directory_bytes(clone)).to be < unused_bytes
+    cache, = Pray::GitCache.ensure_git_repository(
+      workspace,
+      "file://#{origin}",
+      refresh: false,
+      pinned_revision: nil,
+      sparse_subdir: nil
+    )
+    expect(File).not_to exist(File.join(cache, ".git"))
+    expect(File).not_to exist(File.join(cache, unused))
+    Pray::GitMaterialize.materialize_catalog_file(cache, used)
+    expect(File).to exist(File.join(cache, used))
+    expect(directory_bytes(cache)).to be < unused_bytes
   end
 
   def git(directory, *arguments)

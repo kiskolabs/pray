@@ -8,13 +8,19 @@ use std::fs;
 use std::io::Write;
 use std::path::{Path, PathBuf};
 use std::process::Command;
+use std::sync::{Mutex, MutexGuard};
 use std::time::{SystemTime, UNIX_EPOCH};
 
-struct CacheEnv(Option<String>);
+static PRAY_CACHE_LOCK: Mutex<()> = Mutex::new(());
+
+struct CacheEnv {
+    _lock: MutexGuard<'static, ()>,
+    previous: Option<String>,
+}
 
 impl Drop for CacheEnv {
     fn drop(&mut self) {
-        match self.0.take() {
+        match self.previous.take() {
             Some(value) => std::env::set_var("PRAY_CACHE", value),
             None => std::env::remove_var("PRAY_CACHE"),
         }
@@ -24,11 +30,17 @@ impl Drop for CacheEnv {
 #[test]
 fn same_git_url_with_different_subdirs_resolves_both_distributions() {
     let root = unique_temp("pray-git-shared-url-subdir");
+    let lock = PRAY_CACHE_LOCK
+        .lock()
+        .unwrap_or_else(|poison| poison.into_inner());
     let previous = std::env::var("PRAY_CACHE").ok();
     let cache = root.join("cache");
     fs::create_dir_all(&cache).expect("cache");
     std::env::set_var("PRAY_CACHE", &cache);
-    let _cache_env = CacheEnv(previous);
+    let _cache_env = CacheEnv {
+        _lock: lock,
+        previous,
+    };
 
     let repo = write_two_subdir_catalog(&root.join("catalog"));
     fs::write(
@@ -72,40 +84,30 @@ fn same_git_url_with_different_subdirs_resolves_both_distributions() {
         Some("right"),
     );
     assert!(
-        shared.join(".git").is_dir(),
-        "subdir-only sources should still populate the URL-only cache for trust import-repo"
+        left.join("left/v1/packages").is_dir(),
+        "left subdir should materialize its distribution prefix"
     );
     assert!(
-        left.join(".git").exists(),
-        "left subdir should have its own git worktree"
+        right.join("right/v1/packages").is_dir(),
+        "right subdir should materialize its distribution prefix"
     );
     assert!(
-        right.join(".git").exists(),
-        "right subdir should have its own git worktree"
+        !left.join(".git").exists() && !right.join(".git").exists(),
+        "subdir catalogs must not keep a git object store"
     );
     assert_ne!(
         left, right,
-        "different subdirs of the same URL must not share a worktree"
+        "different subdirs of the same URL must not share a catalog tree"
     );
     assert_ne!(
         left, shared,
-        "a subdir worktree must not reuse the URL-only cache key"
+        "a subdir catalog must not reuse the URL-only cache key"
     );
-    let shared_git = git_common_dir(&shared);
-    assert_eq!(
-        git_common_dir(&left),
-        shared_git,
-        "left subdir should share the URL-only object store"
-    );
-    assert_eq!(
-        git_common_dir(&right),
-        shared_git,
-        "right subdir should share the URL-only object store"
-    );
-    assert_eq!(
-        pray_core::resolve::git_source_cached_repository(&root, &clone_url).as_deref(),
-        Some(shared.as_path()),
-        "trust import-repo should find the URL-only cache after a subdir-only clone"
+    let cached = pray_core::resolve::git_source_cached_repository(&root, &clone_url)
+        .expect("trust import-repo should find the global object db");
+    assert!(
+        cached.join("HEAD").is_file(),
+        "import-repo should use the global bare db"
     );
     let _ = fs::remove_dir_all(&root);
 }
@@ -209,29 +211,6 @@ fn commit_git(path: &Path) -> String {
         .expect("canonicalize")
         .to_string_lossy()
         .into_owned()
-}
-
-fn git_common_dir(repository: &Path) -> PathBuf {
-    let output = Command::new("git")
-        .current_dir(repository)
-        .args(["rev-parse", "--git-common-dir"])
-        .output()
-        .expect("git-common-dir");
-    assert!(
-        output.status.success(),
-        "git rev-parse --git-common-dir failed: {}",
-        String::from_utf8_lossy(&output.stderr)
-    );
-    let reported = String::from_utf8_lossy(&output.stdout).trim().to_string();
-    let path = Path::new(&reported);
-    let resolved = if path.is_absolute() {
-        path.to_path_buf()
-    } else {
-        repository.join(path)
-    };
-    resolved
-        .canonicalize()
-        .expect("canonicalize git-common-dir")
 }
 
 fn git(directory: &Path, arguments: &[&str]) {

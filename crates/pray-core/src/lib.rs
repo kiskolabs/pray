@@ -73,6 +73,7 @@ mod resolve_git_paths;
 mod resolve_git_refresh;
 mod resolve_git_source_set;
 mod resolve_git_sources;
+mod resolve_git_store;
 mod resolve_queue;
 mod resolve_tarball;
 pub mod resource_limits;

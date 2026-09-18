@@ -30,6 +30,17 @@ RSpec.describe "pinned git revision fetch" do
       sparse_subdir: nil
     )
     expect(revision).to eq(fixture.fetch(:pinned))
+    parent_status = system(
+      "git",
+      "-C",
+      fixture.fetch(:db),
+      "cat-file",
+      "-e",
+      "#{fixture.fetch(:pinned)}^",
+      out: File::NULL,
+      err: File::NULL
+    )
+    expect(parent_status).to be(true)
   end
 
   it "refuses that fetch when offline" do
@@ -78,8 +89,8 @@ RSpec.describe "pinned git revision fetch" do
 
   it "seeds from the global cache when offline and the origin is gone" do
     origin = File.join(workspace, "origin")
-    FileUtils.mkdir_p(origin)
-    File.write(File.join(origin, "catalog.txt"), "one\n")
+    FileUtils.mkdir_p(File.join(origin, "v1/packages"))
+    File.write(File.join(origin, "v1/packages/sample.json"), "{}\n")
     run_git(origin, "init", "--template=", "-b", "main")
     run_git(origin, "config", "user.name", "pray")
     run_git(origin, "config", "user.email", "pray@example.com")
@@ -108,25 +119,28 @@ RSpec.describe "pinned git revision fetch" do
 
   def pinned_shallow_cache
     origin = File.join(workspace, "origin")
-    FileUtils.mkdir_p(origin)
-    File.write(File.join(origin, "catalog.txt"), "one\n")
+    FileUtils.mkdir_p(File.join(origin, "v1/packages"))
+    File.write(File.join(origin, "v1/packages/sample.json"), "{}\n")
     run_git(origin, "init", "--template=", "-b", "main")
     run_git(origin, "config", "user.name", "pray")
     run_git(origin, "config", "user.email", "pray@example.com")
     run_git(origin, "config", "uploadpack.allowReachableSHA1InWant", "true")
     run_git(origin, "add", "-A")
     run_git(origin, "-c", "commit.gpgsign=false", "-c", "core.hooksPath=/dev/null", "commit", "-m", "one")
+    File.write(File.join(origin, "middle.txt"), "pin\n")
+    run_git(origin, "add", "-A")
+    run_git(origin, "-c", "commit.gpgsign=false", "-c", "core.hooksPath=/dev/null", "commit", "-m", "middle")
     pinned = run_git(origin, "rev-parse", "HEAD").strip
     File.write(File.join(origin, "later.txt"), "two\n")
     run_git(origin, "add", "-A")
     run_git(origin, "-c", "commit.gpgsign=false", "-c", "core.hooksPath=/dev/null", "commit", "-m", "two")
     clone_url = "file://#{origin}"
-    cache = Pray::GitCache.git_source_cache_directory(workspace, clone_url)
-    FileUtils.mkdir_p(File.dirname(cache))
-    run_git(workspace, "clone", "--depth", "1", "--no-local", clone_url, cache)
-    status = system("git", "-C", cache, "cat-file", "-e", pinned, out: File::NULL, err: File::NULL)
+    db = Pray::GitStore.global_git_cache_directory(clone_url)
+    FileUtils.mkdir_p(File.dirname(db))
+    run_git(workspace, "clone", "--bare", "--depth", "1", "--no-local", clone_url, db)
+    status = system("git", "-C", db, "cat-file", "-e", pinned, out: File::NULL, err: File::NULL)
     expect(status).to be_falsey
-    {root: workspace, clone_url: clone_url, pinned: pinned}
+    {root: workspace, clone_url: clone_url, pinned: pinned, db: db}
   end
 
   def run_git(directory, *arguments)

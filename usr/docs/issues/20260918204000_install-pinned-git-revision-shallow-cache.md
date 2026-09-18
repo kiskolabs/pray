@@ -59,9 +59,7 @@ New residual after iteration 2: Finding 4 and Finding 5. Closed in the 20260918 
 
 ## Next
 
-Project git cache is still a working tree with .git. Cargo-style object db versus git-free catalog tree remains open.
-
-Shallow catalogs still fetch a missing pin with depth 1 rather than unshallow.
+Git-free project catalog and unshallow pin fetch shipped in usr/docs/changelogs/20260918213000_git-free-catalog-and-unshallow.md.
 
 Ship in 1.20.0. Close GitHub issue 31 after release.
 

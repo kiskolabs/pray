@@ -1,33 +1,26 @@
 # frozen_string_literal: true
 
-require "fileutils"
-require "pathname"
 require_relative "error"
 require_relative "hashing"
 require_relative "git_run"
-require_relative "git_clone"
+require_relative "git_store"
+require_relative "git_materialize"
 
 module Pray
   module GitCache
     module_function
 
     def ensure_git_repository(project_root, clone_url, refresh:, pinned_revision:, sparse_subdir:, offline: false)
-      shared = git_source_cache_directory(project_root, clone_url)
-      ensure_shared_git_repository(project_root, clone_url, shared, refresh: refresh, pinned_revision: pinned_revision, offline: offline)
-      checkout = git_source_cache_directory(project_root, clone_url, sparse_subdir)
-      if checkout != shared
-        ensure_linked_worktree(shared, checkout)
-        GitClone.apply_sparse_checkout(checkout, sparse_subdir)
-        if pinned_revision
-          checkout_git_revision(checkout, clone_url, pinned_revision, !offline)
-        elsif refresh
-          GitRun.run_git(checkout, "reset", "--hard", git_head_revision(shared))
-        end
-        return [checkout, git_head_revision(checkout)]
-      end
-
-      GitClone.apply_sparse_checkout(shared)
-      [shared, git_head_revision(shared)]
+      db, revision = GitStore.ensure_global_git_db(
+        clone_url,
+        pinned_revision: pinned_revision,
+        refresh: refresh,
+        offline: offline,
+        working_directory: project_root
+      )
+      catalog = git_source_cache_directory(project_root, clone_url, sparse_subdir)
+      GitMaterialize.materialize_catalog_tree(db, catalog, revision, sparse_subdir, refresh)
+      [catalog, revision]
     end
 
     def git_source_cache_directory(project_root, clone_url, subdir = nil)
@@ -36,6 +29,9 @@ module Pray
     end
 
     def git_source_cached_repository(project_root, clone_url)
+      global_cache = GitStore.global_git_cache_directory(clone_url)
+      return global_cache if global_cache && GitStore.global_git_cache_ready?(global_cache)
+
       shared = git_source_cache_directory(project_root, clone_url)
       return shared if git_checkout?(shared)
 
@@ -57,162 +53,12 @@ module Pray
       Hashing.sha256_prefixed(text)[7, 16]
     end
 
-    def ensure_shared_git_repository(project_root, clone_url, shared, refresh:, pinned_revision:, offline: false)
-      if File.directory?(File.join(shared, ".git"))
-        if pinned_revision
-          checkout_git_revision(shared, clone_url, pinned_revision, !offline)
-        elsif refresh
-          refresh_git_worktree(shared, clone_url)
-        end
-        refresh_global_from_project(clone_url, shared) if refresh
-        return
-      end
-
-      if offline && !git_global_seed_available?(clone_url)
-        raise Error.resolution(offline_git_source_uncached(clone_url))
-      end
-
-      FileUtils.rm_rf(shared) if File.exist?(shared)
-      FileUtils.mkdir_p(File.dirname(shared))
-      seeded = seed_git_cache_from_global(clone_url, shared, project_root)
-      if seeded
-        GitRun.run_git(shared, "remote", "set-url", "origin", clone_url)
-      elsif offline
-        raise Error.resolution(offline_git_source_uncached(clone_url))
-      else
-        GitClone.clone_git_cache(project_root, clone_url, shared, quiet: false)
-        mirror_git_cache_to_global(clone_url, shared)
-      end
-      GitClone.apply_sparse_checkout(shared)
-      if pinned_revision
-        checkout_git_revision(shared, clone_url, pinned_revision, !offline)
-      elsif refresh && seeded
-        refresh_git_worktree(shared, clone_url)
-      end
-      refresh_global_from_project(clone_url, shared) if refresh && seeded
-    end
-
-    def ensure_linked_worktree(shared, checkout)
-      return if same_object_store?(shared, checkout)
-
-      FileUtils.rm_rf(checkout) if File.exist?(checkout)
-      FileUtils.mkdir_p(File.dirname(checkout))
-      return if GitRun.try_run_git(shared, "worktree", "add", "--detach", "--no-checkout", checkout)
-
-      GitRun.run_git(shared, "worktree", "add", "--detach", checkout)
-    end
-
-    def same_object_store?(shared, checkout)
-      return false unless git_checkout?(checkout)
-
-      git_common_dir(shared) == git_common_dir(checkout)
-    end
-
-    def git_common_dir(repository)
-      output, status = GitRun.capture_git(repository, "rev-parse", "--git-common-dir")
-      raise Error.resolution(GitRun.command_error("git rev-parse --git-common-dir", output)) unless status.success?
-
-      reported = output.strip
-      path = Pathname.new(reported).absolute? ? reported : File.expand_path(reported, repository)
-      File.realpath(path)
-    end
-
     def origin_matches?(repository, clone_url)
       output, status = GitRun.capture_git(repository, "remote", "get-url", "origin")
       return false unless status.success?
 
       origin = output.strip.delete_prefix("git+")
       origin == clone_url
-    end
-
-    def global_cache_root
-      return ENV["PRAY_CACHE"] if ENV["PRAY_CACHE"]
-      return File.join(ENV["PRAY_HOME"], "cache") if ENV["PRAY_HOME"]
-
-      home = ENV["HOME"]
-      home ? File.join(home, ".cache", "pray") : nil
-    end
-
-    def global_git_cache_directory(clone_url)
-      root = global_cache_root
-      root ? File.join(root, "git", cache_key(clone_url)) : nil
-    end
-
-    def global_git_cache_ready?(global_cache)
-      File.directory?(File.join(global_cache, ".git")) || File.file?(File.join(global_cache, "HEAD"))
-    end
-
-    def git_global_seed_available?(clone_url)
-      global_cache = global_git_cache_directory(clone_url)
-      global_cache && global_git_cache_ready?(global_cache)
-    end
-
-    def offline_git_source_uncached(clone_url)
-      "git source #{clone_url} is not cached locally and offline mode is enabled"
-    end
-
-    def seed_git_cache_from_global(clone_url, destination, working_directory)
-      global_cache = global_git_cache_directory(clone_url)
-      return false unless global_cache && global_git_cache_ready?(global_cache)
-
-      GitClone.clone_git_cache(working_directory, global_cache, destination, quiet: true)
-      true
-    end
-
-    def mirror_git_cache_to_global(clone_url, project_cache)
-      global_cache = global_git_cache_directory(clone_url)
-      return unless global_cache
-      return if global_git_cache_ready?(global_cache)
-
-      FileUtils.mkdir_p(File.dirname(global_cache))
-      FileUtils.rm_rf(global_cache) if File.exist?(global_cache)
-      GitRun.run_git(File.dirname(project_cache), "clone", "--bare", "--quiet", File.basename(project_cache), global_cache)
-    end
-
-    def fetch_origin(repository, revision = nil)
-      extra = revision ? [revision] : []
-      return if GitRun.try_run_git(repository, "fetch", "--depth", "1", "--filter=blob:none", "origin", *extra)
-
-      GitRun.run_git(repository, "fetch", "--depth", "1", "origin", *extra)
-    end
-
-    def checkout_git_revision(repository, _clone_url, revision, allow_fetch)
-      if GitRun.try_run_git(repository, "cat-file", "-e", revision)
-        GitRun.run_git(repository, "checkout", "--force", revision)
-        return
-      end
-      unless allow_fetch
-        raise Error.resolution(
-          "git source #{repository.inspect} is locked to revision #{revision}, but that commit is not available locally and offline mode is enabled"
-        )
-      end
-
-      fetch_origin(repository, revision)
-      GitRun.run_git(repository, "fetch", "origin", revision) unless GitRun.try_run_git(repository, "cat-file", "-e", revision)
-      GitRun.run_git(repository, "checkout", "--force", revision)
-    end
-
-    def refresh_git_worktree(repository, _clone_url)
-      fetch_origin(repository)
-      GitRun.run_git(repository, "reset", "--hard", "origin/HEAD")
-    end
-
-    def refresh_global_from_project(clone_url, project_cache)
-      global_cache = global_git_cache_directory(clone_url)
-      return unless global_cache
-
-      FileUtils.rm_rf(global_cache) if global_git_cache_ready?(global_cache) || File.exist?(global_cache)
-      mirror_git_cache_to_global(clone_url, project_cache)
-    end
-
-    def git_head_revision(repository)
-      output, status = GitRun.capture_git(repository, "rev-parse", "HEAD")
-      raise Error.resolution(GitRun.command_error("git rev-parse HEAD", output)) unless status.success?
-
-      revision = output.strip
-      raise Error.resolution("git repository has no HEAD revision") if revision.empty?
-
-      revision
     end
   end
 end
