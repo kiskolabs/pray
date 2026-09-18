@@ -1,5 +1,10 @@
 # CHANGELOG
 
+## 1.20.0 (2026-09-18)
+
+- Keep an unchanged published version when a later `pray publish` uses a different publisher label.
+- Keep `pray drift` clean after `pray install` when a compose block adds a local file after a package dest already had.
+
 ## 1.19.0 (2026-09-18)
 
 - Declare named `publish` remotes in Prayfile (RFC 0118). `pray publish` uses them when dest flags are omitted, and publishes only path-owned packages.

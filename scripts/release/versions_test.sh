@@ -35,10 +35,11 @@ fail() {
 ROOT="$(cd "${SCRIPT_DIR}/../.." && pwd)"
 release_assert_coordinated_changelog "${ROOT}" "1.18.0" || fail "1.18.0 is coordinated"
 release_assert_coordinated_changelog "${ROOT}" "1.19.0" || fail "1.19.0 is coordinated"
+release_assert_coordinated_changelog "${ROOT}" "1.20.0" || fail "1.20.0 is coordinated"
 if release_assert_coordinated_changelog "${ROOT}" "1.18.1" >/dev/null 2>&1; then
   fail "1.18.1 must not be coordinated"
 fi
-[[ "$(release_next_coordinated_version "${ROOT}")" == "1.19.0" ]] ||
-  fail "live next coordinated version is 1.19.0"
+[[ "$(release_next_coordinated_version "${ROOT}")" == "1.20.0" ]] ||
+  fail "live next coordinated version is 1.20.0"
 
 echo "coordinated version tests passed"

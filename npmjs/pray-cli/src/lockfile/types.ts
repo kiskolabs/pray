@@ -96,5 +96,5 @@ export function canonicalLockfile(lockfile: Lockfile): Lockfile {
   };
 }
 
-export const PACKAGE_VERSION = "1.19.0";
+export const PACKAGE_VERSION = "1.20.0";
 export const GENERATED_BY = `pray ${PACKAGE_VERSION} (typescript)`;
