@@ -1,0 +1,5 @@
+prayfile "1"
+publish "prayers", path: "prayers" do
+  pray "amkisko/rules"
+end
+pray "amkisko/rules", git: "https://example.com/rules.git"

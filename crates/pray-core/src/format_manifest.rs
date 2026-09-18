@@ -166,16 +166,9 @@ fn migrate_legacy_manifest(
     manifest: &Manifest,
     hints: &BTreeMap<String, PackageFormatHint>,
 ) -> Manifest {
-    let mut next = Manifest {
-        prayfile_version: manifest.prayfile_version.clone(),
-        sources: manifest.sources.clone(),
-        targets: Vec::new(),
-        packages: manifest.packages.clone(),
-        local: manifest.local.clone(),
-        symbols: manifest.symbols.clone(),
-        render: manifest.render.clone(),
-        deprecated_keywords: Vec::new(),
-    };
+    let mut next = manifest.clone();
+    next.targets = Vec::new();
+    next.deprecated_keywords.clear();
 
     apply_format_hints(&mut next.packages, hints);
 

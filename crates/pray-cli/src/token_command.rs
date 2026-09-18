@@ -1,3 +1,4 @@
+use crate::publish_dest::required_path_remote_root;
 use pray_core::auth::{RegistryAuthStore, PUBLISH_SCOPE};
 use pray_core::{PrayError, PrayResult};
 use std::path::PathBuf;
@@ -18,6 +19,7 @@ pub(crate) fn run_token_command(arguments: Vec<String>) -> PrayResult<()> {
 
 fn token_create_command(mut arguments: std::vec::IntoIter<String>) -> PrayResult<()> {
     let mut root = None;
+    let mut to = None;
     let mut email = None;
     let mut scopes = Vec::new();
     while let Some(argument) = arguments.next() {
@@ -26,6 +28,11 @@ fn token_create_command(mut arguments: std::vec::IntoIter<String>) -> PrayResult
                 root = Some(PathBuf::from(arguments.next().ok_or_else(|| {
                     PrayError::Unsupported("token create requires a path after --root".into())
                 })?));
+            }
+            "--to" => {
+                to = Some(arguments.next().ok_or_else(|| {
+                    PrayError::Unsupported("token create requires a name after --to".into())
+                })?);
             }
             "--email" => {
                 email = Some(arguments.next().ok_or_else(|| {
@@ -44,8 +51,7 @@ fn token_create_command(mut arguments: std::vec::IntoIter<String>) -> PrayResult
             }
         }
     }
-    let root = root
-        .ok_or_else(|| PrayError::Unsupported("token create requires --root PATH".to_string()))?;
+    let root = required_path_remote_root(to.as_deref(), root.as_deref())?;
     let email = email
         .ok_or_else(|| PrayError::Unsupported("token create requires --email EMAIL".to_string()))?;
     if scopes.is_empty() {
@@ -65,6 +71,7 @@ fn token_create_command(mut arguments: std::vec::IntoIter<String>) -> PrayResult
 
 fn token_revoke_command(mut arguments: std::vec::IntoIter<String>) -> PrayResult<()> {
     let mut root = None;
+    let mut to = None;
     let mut token = None;
     while let Some(argument) = arguments.next() {
         match argument.as_str() {
@@ -72,6 +79,11 @@ fn token_revoke_command(mut arguments: std::vec::IntoIter<String>) -> PrayResult
                 root = Some(PathBuf::from(arguments.next().ok_or_else(|| {
                     PrayError::Unsupported("token revoke requires a path after --root".into())
                 })?));
+            }
+            "--to" => {
+                to = Some(arguments.next().ok_or_else(|| {
+                    PrayError::Unsupported("token revoke requires a name after --to".into())
+                })?);
             }
             other if !other.starts_with('-') => token = Some(other.to_string()),
             other => {
@@ -81,8 +93,7 @@ fn token_revoke_command(mut arguments: std::vec::IntoIter<String>) -> PrayResult
             }
         }
     }
-    let root = root
-        .ok_or_else(|| PrayError::Unsupported("token revoke requires --root PATH".to_string()))?;
+    let root = required_path_remote_root(to.as_deref(), root.as_deref())?;
     let token =
         token.ok_or_else(|| PrayError::Unsupported("token revoke requires TOKEN".to_string()))?;
     let store = RegistryAuthStore::open(&root)?;

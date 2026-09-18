@@ -3,6 +3,7 @@ import type {
   DestinationEntry,
   Manifest,
   ManifestPackage,
+  ManifestPublishRemote,
   ManifestSource,
   ManifestTarget,
 } from "./types.js";
@@ -23,6 +24,14 @@ export function serializeRecommended(manifest: Manifest): string {
     lines.push("");
     for (const source of manifest.sources) {
       lines.push(formatSource(source));
+    }
+  }
+
+  const remotes = manifest.publishRemotes ?? [];
+  if (remotes.length > 0) {
+    lines.push("");
+    for (const remote of remotes) {
+      lines.push(formatPublishRemote(remote));
     }
   }
 
@@ -153,6 +162,25 @@ function formatSource(source: ManifestSource): string {
     parts.push(`rev: "${source.rev}"`);
   }
   return parts.join(", ");
+}
+
+function formatPublishRemote(remote: ManifestPublishRemote): string {
+  const parts = [`publish "${remote.name}"`];
+  if (remote.path) {
+    parts.push(`path: "${remote.path}"`);
+  }
+  if (remote.url) {
+    parts.push(`"${remote.url}"`);
+  }
+  if (remote.packages.length === 0) {
+    return parts.join(", ");
+  }
+  const lines = [`${parts.join(", ")} do`];
+  for (const name of remote.packages) {
+    lines.push(`  pray "${name}"`);
+  }
+  lines.push("end");
+  return lines.join("\n");
 }
 
 function formatDestinationEntry(

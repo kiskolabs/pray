@@ -23,9 +23,9 @@ module Pray
       ].freeze
 
       DISTRIBUTION_COMMANDS = [
-        "publish --root PATH [--server URL ...]",
+        "publish [--root PATH|--server URL|--to NAME] [--dry-run]",
         "login --server URL --email EMAIL",
-        "serve [--root PATH] [--host HOST] [--port PORT] [--stdio]",
+        "serve [--root PATH | --to NAME] [--host HOST] [--port PORT] [--stdio]",
         "sync [--root PATH] [--peer URL ...]",
         "confess <package> | --from-lock SPAN_ID [--accepted|--rejected]"
       ].freeze
@@ -146,9 +146,11 @@ module Pray
         "vendor" => "copy resolved packages locally\n\nUsage: pray vendor",
         "clean" => "remove local cache and vendor trees, or only unused registry entries\n\nUsage: pray clean [--unused]",
         "publish" => <<~TEXT.strip,
-          upload packages to a registry or local root
+          upload path packages to a registry or local root
 
-          Usage: pray publish --root PATH [--server URL ...]
+          Usage: pray publish [--root PATH] [--server URL ...] [--to NAME] [--dry-run]
+
+          Prayfile publish remotes supply dests when flags are omitted.
         TEXT
         "login" => <<~TEXT.strip,
           authenticate to a registry server
@@ -158,7 +160,7 @@ module Pray
         "serve" => <<~TEXT.strip,
           run a local registry server
 
-          Usage: pray serve [--root PATH] [--host HOST] [--port PORT] [--stdio]
+          Usage: pray serve [--root PATH | --to NAME] [--host HOST] [--port PORT] [--stdio]
         TEXT
         "sync" => <<~TEXT.strip,
           sync packages with peer registries

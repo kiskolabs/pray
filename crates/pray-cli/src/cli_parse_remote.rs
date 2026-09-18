@@ -56,6 +56,7 @@ pub(crate) fn parse_yank_command(mut arguments: std::vec::IntoIter<String>) -> P
     let mut package = None;
     let mut version = None;
     let mut root = None;
+    let mut to = None;
     let mut undo = false;
     while let Some(argument) = arguments.next() {
         match argument.as_str() {
@@ -66,6 +67,14 @@ pub(crate) fn parse_yank_command(mut arguments: std::vec::IntoIter<String>) -> P
                     ));
                 };
                 root = Some(PathBuf::from(value));
+            }
+            "--to" => {
+                let Some(value) = arguments.next() else {
+                    return Err(PrayError::Unsupported(
+                        "yank requires a name after --to".to_string(),
+                    ));
+                };
+                to = Some(value);
             }
             "--undo" => undo = true,
             other if other.starts_with("--") => {
@@ -90,12 +99,11 @@ pub(crate) fn parse_yank_command(mut arguments: std::vec::IntoIter<String>) -> P
         .ok_or_else(|| PrayError::Unsupported("yank requires a package name".to_string()))?;
     let version =
         version.ok_or_else(|| PrayError::Unsupported("yank requires a version".to_string()))?;
-    let root =
-        root.ok_or_else(|| PrayError::Unsupported("yank requires --root PATH".to_string()))?;
     Ok(Command::Yank {
         package,
         version,
         root,
+        to,
         undo,
     })
 }
@@ -105,7 +113,9 @@ pub(crate) fn parse_publish_command(
 ) -> PrayResult<Command> {
     let mut roots = Vec::new();
     let mut servers = Vec::new();
+    let mut to = Vec::new();
     let mut signing_key = None;
+    let mut dry_run = false;
     while let Some(argument) = arguments.next() {
         match argument.as_str() {
             "--root" => {
@@ -124,6 +134,14 @@ pub(crate) fn parse_publish_command(
                 };
                 servers.push(value);
             }
+            "--to" => {
+                let Some(value) = arguments.next() else {
+                    return Err(PrayError::Unsupported(
+                        "publish requires a name after --to".to_string(),
+                    ));
+                };
+                to.push(value);
+            }
             "--signing-key" => {
                 let Some(value) = arguments.next() else {
                     return Err(PrayError::Unsupported(
@@ -132,6 +150,7 @@ pub(crate) fn parse_publish_command(
                 };
                 signing_key = Some(PathBuf::from(value));
             }
+            "--dry-run" => dry_run = true,
             other if other.starts_with("--") => {
                 return Err(PrayError::Unsupported(format!(
                     "unknown publish flag: {other}"
@@ -144,15 +163,12 @@ pub(crate) fn parse_publish_command(
             }
         }
     }
-    if roots.is_empty() && servers.is_empty() {
-        return Err(PrayError::Unsupported(
-            "publish requires at least one --root PATH or --server URL".to_string(),
-        ));
-    }
     Ok(Command::Publish {
         roots,
         servers,
+        to,
         signing_key,
+        dry_run,
     })
 }
 

@@ -49,6 +49,16 @@ RSpec.describe "shared fixture corpus" do
           expect(local.path).to eq(want["path"])
           expect(local.bound).to eq(want["bound"])
         end
+
+        remotes = expected["publish_remotes"] || []
+        expect(manifest.publish_remotes.length).to eq(remotes.length)
+        remotes.each_with_index do |want, index|
+          remote = manifest.publish_remotes[index]
+          expect(remote.name).to eq(want["name"])
+          expect(remote.path).to eq(want["path"])
+          expect(remote.url).to eq(want["url"])
+          expect(remote.packages).to eq(want["packages"] || [])
+        end
       end
     end
 

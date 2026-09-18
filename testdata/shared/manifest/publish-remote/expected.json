@@ -1,0 +1,26 @@
+{
+  "targets": [
+    {
+      "name": "compose:AGENTS.md",
+      "mode": "compose",
+      "scoped": true,
+      "outputs": ["AGENTS.md"],
+      "entries": [
+        { "kind": "package", "name": "local/project" }
+      ]
+    }
+  ],
+  "packages": [
+    {
+      "name": "local/project",
+      "bound": true,
+      "roles": ["fragment"],
+      "path": "guidance/project"
+    }
+  ],
+  "local": [],
+  "publish_remotes": [
+    { "name": "prayers", "path": "prayers", "packages": [] },
+    { "name": "public", "url": "https://prayers.example", "packages": [] }
+  ]
+}
