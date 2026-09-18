@@ -17,7 +17,7 @@ Publishing is intentional and operator-driven. Scripts default to dry-run / buil
 
 The CLI executable remains `pray`. The crates.io package name is `pray-cli` because `pray` is already taken by an unrelated crate.
 
-First crates.io publish must go in order: `pray-core`, then `pray-transport`, then `pray-cli`. Until `pray-core` exists on crates.io, `cargo publish --dry-run` for the later crates falls back to `cargo check`.
+First crates.io publish must go in order: `pray-core`, then `pray-transport`, then `pray-cli`. Until `pray-core` exists on crates.io, `cargo publish --dry-run` for the later crates falls back to `cargo check`. A later `--publish` skips a crate whose version is already on crates.io.
 
 ## Prerequisites
 

@@ -38,7 +38,7 @@ make release-dry-run
 ./scripts/release/all.sh
 ```
 
-Publish crates.io (order is handled by the script):
+Publish crates.io (order is handled by the script). A crate whose version is already on crates.io is skipped so `make release-all` can resume:
 
 ```sh
 ./scripts/release/crates.sh --publish
