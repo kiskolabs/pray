@@ -4,9 +4,8 @@ mod support;
 use serde_json::Value;
 use std::fs;
 use std::path::Path;
-use std::process::Command;
 
-use support::{create_add_fixture, temporary_directory};
+use support::{create_add_fixture, run_pray_as, temporary_directory};
 
 /// A second publisher re-running publish over unchanged packages must leave the catalog
 /// alone. Rewriting `signer` and `signature` there restates authorship of bytes nobody
@@ -17,7 +16,7 @@ fn republish_by_another_signer_leaves_unchanged_versions_alone() {
     let registry_root = temporary_directory("pray-publish-cross-signer-root");
     create_add_fixture(&repo);
 
-    let add = publish_as(
+    let add = run_pray_as(
         &repo,
         &["add", "sample/base", "--path", "packages/base"],
         "amkisko",
@@ -57,7 +56,7 @@ fn republish_by_another_signer_leaves_unchanged_versions_alone() {
 }
 
 fn publish(repo: &Path, registry_root: &Path, signer: &str) {
-    let result = publish_as(
+    let result = run_pray_as(
         repo,
         &[
             "publish",
@@ -71,20 +70,6 @@ fn publish(repo: &Path, registry_root: &Path, signer: &str) {
         "publish as {signer} failed: {}",
         String::from_utf8_lossy(&result.stderr)
     );
-}
-
-fn publish_as(repo: &Path, arguments: &[&str], signer: &str) -> std::process::Output {
-    Command::new(env!("CARGO_BIN_EXE_pray"))
-        .args(arguments)
-        .current_dir(repo)
-        .env("PRAY_HOME", repo.join(".pray-user"))
-        .env("PRAY_SIGNER", signer)
-        .env_remove("PRAY_SSH_USER_FINGERPRINT")
-        .env_remove("SSH_USER_FINGERPRINT")
-        .env_remove("PRAY_SSH_PUBLISHER")
-        .env_remove("PRAY_SESSION_TOKEN")
-        .output()
-        .expect("run pray command")
 }
 
 fn read_metadata(path: &Path) -> Value {

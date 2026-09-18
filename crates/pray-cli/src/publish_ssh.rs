@@ -1,5 +1,5 @@
 use crate::materialize::build_package_archive_bytes;
-use crate::publish::published_registry_package_version;
+use crate::publish_version::published_registry_package_version;
 use crate::transport_metadata::transport_package_metadata;
 use crate::{registry_artifact_path, torrent_manifest_bytes, torrent_manifest_path};
 use base64::{engine::general_purpose::STANDARD, Engine as _};

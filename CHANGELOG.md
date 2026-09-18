@@ -3,6 +3,8 @@
 ## Unreleased
 
 - Skip a crate on `make release-all` when that version already exists on crates.io.
+- Add `pray publish --resign` for local distribution roots to sign existing package versions with a new key while keeping their yank state and first-publish time.
+- Label publisher names as claims and distinguish package signatures from content digests on distribution package pages.
 
 ## 1.19.0 (2026-09-18)
 

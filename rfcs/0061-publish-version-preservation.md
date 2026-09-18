@@ -33,6 +33,8 @@ git diff --exit-code -- ./prayers
 
 The final command exits successfully. Each version keeps its first `published_at` value. A prior `pray yank` remains in force until `pray yank --undo` clears it.
 
+The Rust reference CLI can sign an unchanged version with a new key in a local distribution root: `pray publish --root ./prayers --signing-key PATH --resign`. It republishes from the local package source while keeping the version's first-publish time and yank state.
+
 Registry JSON represents the time as whole UTC seconds since the Unix epoch:
 
 ```json
@@ -57,7 +59,9 @@ An implementation with required protocol descriptors MAY require those descripto
 
 When the row is absent or not current, the publisher builds and writes the artifact and version row. If a row for that version already exists, publish MUST preserve its `yanked` value. Publish MUST preserve `published_at` when the prior artifact passes its hash check and its package tree and prayspec match the current package. A changed tree or prayspec receives the current publish time. Artifact encoding changes do not change the first-publish time when package content is unchanged.
 
-A row MUST NOT be rebuilt because the current publisher differs from the one recorded in it. A verified row already attests the stored bytes under the identity that wrote it, and a second publisher re-running publish over unchanged packages restates authorship without republishing anything. In a distribution tracked in version control, that rewrites every current row and buries a real release in identity churn. A row carrying no `signature` is not current, so publish repairs it.
+An ordinary publish MUST NOT rebuild a row because the current publisher differs from the one recorded in it. A verified row already attests the stored bytes under its recorded key or legacy signing identity, and a second publisher re-running publish over unchanged packages restates authorship without republishing anything. In a distribution tracked in version control, that rewrites every current row and buries a real release in identity churn. A row carrying no `signature` is not current, so publish repairs it.
+
+An implementation that offers `--resign` for a local root MUST require an ed25519 signing key supplied by `--signing-key` or `PRAY_SIGNING_KEY`. It MUST rebuild each selected version from the current local package source, write its artifact, and replace the version row with the new signing fields. The same preservation rules for `yanked` and `published_at` apply. A publisher MUST NOT sign stored artifact bytes solely because their catalog hash and legacy digest match: those values can be rewritten together without proving that the artifact matches the current package tree. The Rust reference CLI rejects `--resign` for server destinations and with `--dry-run`.
 
 Registry merge identity MUST exclude `published_at`. A merge of rows that differ only in `published_at` keeps the receiving registry's value.
 
@@ -69,17 +73,17 @@ The package signature contract in RFC 0050 remains unchanged. `published_at` is 
 
 ## Implementation notes
 
-The reference implementation covers local preservation and legacy timestamp normalization in the Rust, Ruby, and TypeScript publish tests. Rust accepts legacy numeric strings. Ruby and TypeScript also accept prior RFC 3339 output. The registry schema test rejects strings, numbers with non-zero fractional parts, negatives, out-of-range integers, and null. The Rust registry identity test covers timestamp-only merge input.
+The reference implementation covers local preservation and legacy timestamp normalization in the Rust, Ruby, and TypeScript publish tests. Rust accepts legacy numeric strings. Ruby and TypeScript also accept prior RFC 3339 output. The registry schema test rejects strings, numbers with non-zero fractional parts, negatives, out-of-range integers, and null. The Rust registry identity test covers timestamp-only merge input. Only Rust exposes ed25519 publish signing and `--resign` today. Its publish tests cover explicit key upgrade, rotation, and replacement of a self-consistent but false stored artifact from local package source.
 
 ## Security considerations
 
-A preserved row keeps its `signer` and `signature` together, so the pair stays internally consistent and install verification is unaffected. Preservation is not an authorization decision: whoever may publish a package may publish it, and declining to restate the signer neither grants nor withholds that. A publisher verifies stored artifact bytes against `artifact_hash` before skipping an unchanged version. It compares the stored artifact path with the expected relative path before reading, so catalog metadata cannot select another filesystem path for this check.
+An ed25519 package signature authenticates `artifact_hash` and `tree_hash`. It does not authenticate the human `signer` label or optional `signer_fingerprint`; those are catalog claims unless a client independently binds them to the signing key. A legacy `sha256:` digest is not a public-key signature. Preservation is not an authorization decision: whoever may publish a package may publish it, and declining to restate the signer neither grants nor withholds that. A publisher verifies stored artifact bytes against `artifact_hash` before skipping an unchanged version. It compares the stored artifact path with the expected relative path before reading, so catalog metadata cannot select another filesystem path for this check.
 
 Yank remains an explicit metadata operation. Publish does not clear a yank.
 
 ## Drawbacks
 
-An unchanged publish does not refresh derived annotations or replace a valid artifact with a newly encoded copy. Those operations need an explicit contract if distribution operators require them. Existing catalogs receive a one-time representation change when a reference client migrates a legacy timestamp.
+An unchanged publish does not refresh derived annotations or replace a valid artifact with a newly encoded copy. Those operations need an explicit contract if distribution operators require them. Existing catalogs receive a one-time representation change when a reference client migrates a legacy timestamp. `--resign` replaces the version's previous signer and signature fields; it does not retain a signature history.
 
 ## Rationale and alternatives
 
