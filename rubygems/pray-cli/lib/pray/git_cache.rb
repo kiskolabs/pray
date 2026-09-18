@@ -11,15 +11,15 @@ module Pray
   module GitCache
     module_function
 
-    def ensure_git_repository(project_root, clone_url, refresh:, pinned_revision:, sparse_subdir:)
+    def ensure_git_repository(project_root, clone_url, refresh:, pinned_revision:, sparse_subdir:, offline: false)
       shared = git_source_cache_directory(project_root, clone_url)
-      ensure_shared_git_repository(project_root, clone_url, shared, refresh: refresh, pinned_revision: pinned_revision)
+      ensure_shared_git_repository(project_root, clone_url, shared, refresh: refresh, pinned_revision: pinned_revision, offline: offline)
       checkout = git_source_cache_directory(project_root, clone_url, sparse_subdir)
       if checkout != shared
         ensure_linked_worktree(shared, checkout)
         GitClone.apply_sparse_checkout(checkout, sparse_subdir)
         if pinned_revision
-          checkout_git_revision(checkout, clone_url, pinned_revision, refresh)
+          checkout_git_revision(checkout, clone_url, pinned_revision, !offline)
         elsif refresh
           GitRun.run_git(checkout, "reset", "--hard", git_head_revision(shared))
         end
@@ -57,10 +57,10 @@ module Pray
       Hashing.sha256_prefixed(text)[7, 16]
     end
 
-    def ensure_shared_git_repository(project_root, clone_url, shared, refresh:, pinned_revision:)
+    def ensure_shared_git_repository(project_root, clone_url, shared, refresh:, pinned_revision:, offline: false)
       if File.directory?(File.join(shared, ".git"))
         if pinned_revision
-          checkout_git_revision(shared, clone_url, pinned_revision, refresh)
+          checkout_git_revision(shared, clone_url, pinned_revision, !offline)
         elsif refresh
           refresh_git_worktree(shared, clone_url)
         end
@@ -68,18 +68,24 @@ module Pray
         return
       end
 
+      if offline && !git_global_seed_available?(clone_url)
+        raise Error.resolution(offline_git_source_uncached(clone_url))
+      end
+
       FileUtils.rm_rf(shared) if File.exist?(shared)
       FileUtils.mkdir_p(File.dirname(shared))
       seeded = seed_git_cache_from_global(clone_url, shared, project_root)
       if seeded
         GitRun.run_git(shared, "remote", "set-url", "origin", clone_url)
+      elsif offline
+        raise Error.resolution(offline_git_source_uncached(clone_url))
       else
         GitClone.clone_git_cache(project_root, clone_url, shared, quiet: false)
         mirror_git_cache_to_global(clone_url, shared)
       end
       GitClone.apply_sparse_checkout(shared)
       if pinned_revision
-        checkout_git_revision(shared, clone_url, pinned_revision, true)
+        checkout_git_revision(shared, clone_url, pinned_revision, !offline)
       elsif refresh && seeded
         refresh_git_worktree(shared, clone_url)
       end
@@ -136,6 +142,15 @@ module Pray
       File.directory?(File.join(global_cache, ".git")) || File.file?(File.join(global_cache, "HEAD"))
     end
 
+    def git_global_seed_available?(clone_url)
+      global_cache = global_git_cache_directory(clone_url)
+      global_cache && global_git_cache_ready?(global_cache)
+    end
+
+    def offline_git_source_uncached(clone_url)
+      "git source #{clone_url} is not cached locally and offline mode is enabled"
+    end
+
     def seed_git_cache_from_global(clone_url, destination, working_directory)
       global_cache = global_git_cache_directory(clone_url)
       return false unless global_cache && global_git_cache_ready?(global_cache)
@@ -161,8 +176,19 @@ module Pray
       GitRun.run_git(repository, "fetch", "--depth", "1", "origin", *extra)
     end
 
-    def checkout_git_revision(repository, _clone_url, revision, refresh)
-      fetch_origin(repository, revision) if refresh
+    def checkout_git_revision(repository, _clone_url, revision, allow_fetch)
+      if GitRun.try_run_git(repository, "cat-file", "-e", revision)
+        GitRun.run_git(repository, "checkout", "--force", revision)
+        return
+      end
+      unless allow_fetch
+        raise Error.resolution(
+          "git source #{repository.inspect} is locked to revision #{revision}, but that commit is not available locally and offline mode is enabled"
+        )
+      end
+
+      fetch_origin(repository, revision)
+      GitRun.run_git(repository, "fetch", "origin", revision) unless GitRun.try_run_git(repository, "cat-file", "-e", revision)
       GitRun.run_git(repository, "checkout", "--force", revision)
     end
 

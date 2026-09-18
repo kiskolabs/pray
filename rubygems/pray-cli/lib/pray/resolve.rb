@@ -59,7 +59,8 @@ module Pray
         project_root,
         manifest.sources,
         lockfile_hints,
-        refresh: options.refresh || options.refresh_source_revisions
+        refresh: options.refresh || options.refresh_source_revisions,
+        offline: options.offline
       )
       source_host_keys = Trust.prepare_source_host_keys(manifest.sources)
 

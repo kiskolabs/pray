@@ -1,7 +1,8 @@
 use crate::paths::remove_path_if_exists;
 use crate::resolve_git::{
-    checkout_git_revision, ensure_git_remote_origin, finalize_git_repository, git_head_revision,
-    mirror_git_cache_to_global, refresh_git_worktree, refresh_global_from_project,
+    checkout_git_revision, ensure_git_remote_origin, finalize_git_repository,
+    git_global_seed_available, git_head_revision, mirror_git_cache_to_global,
+    offline_git_source_uncached, refresh_git_worktree, refresh_global_from_project,
     seed_git_cache_from_global,
 };
 use crate::resolve_git_clone::{apply_sparse_checkout, clone_git_cache};
@@ -20,15 +21,23 @@ pub(crate) fn ensure_git_repository(
     refresh: bool,
     pinned_revision: Option<&str>,
     sparse_subdir: Option<&str>,
+    offline: bool,
 ) -> PrayResult<(PathBuf, String)> {
     let shared = git_source_cache_directory(project_root, clone_url);
-    ensure_shared_git_repository(project_root, clone_url, &shared, refresh, pinned_revision)?;
+    ensure_shared_git_repository(
+        project_root,
+        clone_url,
+        &shared,
+        refresh,
+        pinned_revision,
+        offline,
+    )?;
     let checkout = git_source_cache_directory_with_subdir(project_root, clone_url, sparse_subdir);
     if checkout != shared {
         ensure_linked_worktree(&shared, &checkout)?;
         apply_sparse_checkout(&checkout, sparse_subdir)?;
         if let Some(revision) = pinned_revision {
-            checkout_git_revision(&checkout, clone_url, revision, refresh)?;
+            checkout_git_revision(&checkout, clone_url, revision, !offline)?;
         } else if refresh {
             let shared_head = git_head_revision(&shared)?;
             run_git_success(&checkout, &["reset", "--hard", &shared_head])?;
@@ -47,10 +56,11 @@ fn ensure_shared_git_repository(
     shared: &Path,
     refresh: bool,
     pinned_revision: Option<&str>,
+    offline: bool,
 ) -> PrayResult<()> {
     if shared.join(".git").is_dir() {
         if let Some(revision) = pinned_revision {
-            checkout_git_revision(shared, clone_url, revision, refresh)?;
+            checkout_git_revision(shared, clone_url, revision, !offline)?;
         } else if refresh {
             refresh_git_worktree(shared, clone_url)?;
         }
@@ -58,6 +68,9 @@ fn ensure_shared_git_repository(
             let _ = refresh_global_from_project(clone_url, shared);
         }
         return Ok(());
+    }
+    if offline && !git_global_seed_available(clone_url) {
+        return Err(offline_git_source_uncached(clone_url));
     }
     if shared.exists() {
         remove_path_if_exists(shared)?;
@@ -71,13 +84,15 @@ fn ensure_shared_git_repository(
     let seeded = seed_git_cache_from_global(clone_url, destination, project_root)?;
     if seeded {
         ensure_git_remote_origin(shared, clone_url)?;
+    } else if offline {
+        return Err(offline_git_source_uncached(clone_url));
     } else {
         clone_git_cache(project_root, clone_url, destination, false)?;
         let _ = mirror_git_cache_to_global(clone_url, shared);
     }
     apply_sparse_checkout(shared, None)?;
     if let Some(revision) = pinned_revision {
-        checkout_git_revision(shared, clone_url, revision, true)?;
+        checkout_git_revision(shared, clone_url, revision, !offline)?;
     } else if refresh && seeded {
         refresh_git_worktree(shared, clone_url)?;
     }

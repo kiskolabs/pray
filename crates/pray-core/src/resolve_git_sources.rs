@@ -101,45 +101,29 @@ pub(crate) fn resolve_git_package_root(
     context: &PackageResolutionContext,
 ) -> PrayResult<RegistryPackageResolution> {
     let clone_url = source_url.strip_prefix("git+").unwrap_or(source_url);
-    match git_sources.ensure(source_name) {
-        Ok(checkout) => {
-            let distribution_root =
-                resolve_distribution_root(&checkout.cache_directory, checkout.subdir.as_deref())?;
-            let source_key = if checkout.revision.is_empty() {
-                clone_url.to_string()
-            } else {
-                format!("{}@{}", clone_url, checkout.revision)
-            };
-            resolve_local_registry_package_root(
-                project_root,
-                &source_key,
-                &distribution_root,
-                declaration,
-                context,
-            )
-            .map_err(|error| {
-                crate::resolve_git_refresh::annotate_missing_git_catalog(
-                    error,
-                    &declaration.name,
-                    source_name,
-                    &checkout.revision,
-                )
-            })
-        }
-        Err(error) => {
-            if let Some(source_root) = local_git_source_root(project_root, clone_url) {
-                resolve_local_registry_package_root(
-                    project_root,
-                    clone_url,
-                    &source_root,
-                    declaration,
-                    context,
-                )
-            } else {
-                Err(error)
-            }
-        }
-    }
+    let checkout = git_sources.ensure(source_name)?;
+    let distribution_root =
+        resolve_distribution_root(&checkout.cache_directory, checkout.subdir.as_deref())?;
+    let source_key = if checkout.revision.is_empty() {
+        clone_url.to_string()
+    } else {
+        format!("{}@{}", clone_url, checkout.revision)
+    };
+    resolve_local_registry_package_root(
+        project_root,
+        &source_key,
+        &distribution_root,
+        declaration,
+        context,
+    )
+    .map_err(|error| {
+        crate::resolve_git_refresh::annotate_missing_git_catalog(
+            error,
+            &declaration.name,
+            source_name,
+            &checkout.revision,
+        )
+    })
 }
 
 pub fn refresh_git_sources(manifest_path: &Path) -> PrayResult<()> {
@@ -162,6 +146,7 @@ pub fn refresh_git_sources(manifest_path: &Path) -> PrayResult<()> {
             true,
             None,
             source.subdir.as_deref(),
+            false,
         )?;
     }
     Ok(())

@@ -27,6 +27,16 @@ pub(crate) fn global_git_cache_ready(global_cache: &Path) -> bool {
     global_cache.join(".git").is_dir() || global_cache.join("HEAD").is_file()
 }
 
+pub(crate) fn git_global_seed_available(clone_url: &str) -> bool {
+    global_git_cache_directory(clone_url).is_some_and(|path| global_git_cache_ready(&path))
+}
+
+pub(crate) fn offline_git_source_uncached(clone_url: &str) -> PrayError {
+    PrayError::Resolution(format!(
+        "git source {clone_url} is not cached locally and offline mode is enabled"
+    ))
+}
+
 pub(crate) fn seed_git_cache_from_global(
     clone_url: &str,
     destination: &str,
@@ -163,7 +173,7 @@ pub(crate) fn checkout_git_revision(
     }
     if !allow_fetch {
         return Err(PrayError::Resolution(format!(
-            "git source {:?} is locked to revision {revision}, but that commit is not available locally; rerun pray install without --locked to refresh the cache",
+            "git source {:?} is locked to revision {revision}, but that commit is not available locally and offline mode is enabled",
             repository
         )));
     }

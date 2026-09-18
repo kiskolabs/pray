@@ -63,6 +63,7 @@ export async function resolveProject(
     manifest.sources,
     lockfile,
     options.refreshSourceRevisions,
+    options.offline,
   );
 
   const packages: ResolvedPackage[] = [];

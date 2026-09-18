@@ -16,6 +16,7 @@ pub(crate) struct GitSourceSet {
     sources: BTreeMap<String, ManifestSource>,
     pins: BTreeMap<String, String>,
     refresh: bool,
+    offline: bool,
     checkouts: RefCell<BTreeMap<String, GitSourceCheckout>>,
 }
 
@@ -27,6 +28,7 @@ impl GitSourceSet {
         options: &ResolveOptions,
     ) -> Self {
         let refresh = options.refresh_source_revisions;
+        let offline = options.offline;
         let mut pins = BTreeMap::new();
         let mut git_sources = BTreeMap::new();
         for source in sources {
@@ -45,6 +47,7 @@ impl GitSourceSet {
             sources: git_sources,
             pins,
             refresh,
+            offline,
             checkouts: RefCell::new(BTreeMap::new()),
         }
     }
@@ -63,6 +66,7 @@ impl GitSourceSet {
             source,
             self.pins.get(name).map(String::as_str),
             self.refresh,
+            self.offline,
         )?
         else {
             return Err(PrayError::Resolution(format!(
@@ -104,18 +108,19 @@ fn prepare_one_git_source(
     source: &ManifestSource,
     pinned_revision: Option<&str>,
     refresh: bool,
+    offline: bool,
 ) -> PrayResult<Option<GitSourceCheckout>> {
     let clone_url = source.url.strip_prefix("git+").unwrap_or(&source.url);
     if is_local_filesystem_source(clone_url)
         && local_git_repo_path(project_root, clone_url).is_none()
     {
-        return Ok(
-            local_git_source_root(project_root, clone_url).map(|source_root| GitSourceCheckout {
+        if let Some(source_root) = local_git_source_root(project_root, clone_url) {
+            return Ok(Some(GitSourceCheckout {
                 cache_directory: source_root,
                 revision: String::new(),
                 subdir: source.subdir.clone(),
-            }),
-        );
+            }));
+        }
     }
     let (cache_directory, revision) = ensure_git_repository(
         project_root,
@@ -123,6 +128,7 @@ fn prepare_one_git_source(
         refresh,
         pinned_revision,
         source.subdir.as_deref(),
+        offline,
     )?;
     Ok(Some(GitSourceCheckout {
         cache_directory,

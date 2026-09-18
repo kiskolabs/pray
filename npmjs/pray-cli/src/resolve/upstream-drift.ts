@@ -17,6 +17,7 @@ export async function pathForkDriftLines(
     project.manifest.sources,
     previous,
     options.refreshSourceRevisions,
+    options.offline,
   );
   const sources = sourceMap(project.manifest.sources);
   const lines: string[] = [];
