@@ -1,5 +1,9 @@
 # CHANGELOG
 
+## Unreleased
+
+- Skip a crate on `make release-all` when that version already exists on crates.io.
+
 ## 1.19.0 (2026-09-18)
 
 - Declare named `publish` remotes in Prayfile (RFC 0118). `pray publish` uses them when dest flags are omitted, and publishes only path-owned packages.

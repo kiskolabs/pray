@@ -10,11 +10,14 @@
 # First-time note: cargo publish --dry-run for pray-transport / pray-cli
 # only succeeds after pray-core (and then pray-transport) exist on crates.io.
 # Until then, dry-run validates pray-core packaging and cargo check for dependents.
+# Publish skips a crate whose version is already on crates.io so release-all can resume.
 set -euo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 # shellcheck source=common.sh
 source "${SCRIPT_DIR}/common.sh"
+# shellcheck source=crates_status.sh
+source "${SCRIPT_DIR}/crates_status.sh"
 
 ROOT="$(release_repo_root)"
 VERSION="$(release_read_workspace_version "${ROOT}")"
@@ -61,12 +64,29 @@ for crate in "${CRATES[@]}"; do
   if [[ "${MODE}" == "dry-run" ]]; then
     dry_run_crate "${crate}"
   else
+    if release_crates_io_has_version "${crate}" "${VERSION}"; then
+      echo "skip ${crate}@${VERSION} (already on crates.io)"
+      continue
+    fi
     if ! release_confirm "Publish ${crate} ${VERSION} to crates.io?"; then
       echo "skipped ${crate}"
       continue
     fi
     echo "==> cargo publish -p ${crate} --locked"
-    cargo publish -p "${crate}" --locked
+    publish_log="$(mktemp)"
+    set +e
+    cargo publish -p "${crate}" --locked 2>&1 | tee "${publish_log}"
+    publish_status="${PIPESTATUS[0]}"
+    set -e
+    outcome="$(release_crate_publish_outcome no "${publish_status}" "$(cat "${publish_log}")" || true)"
+    rm -f "${publish_log}"
+    if [[ "${outcome}" == "skip" ]]; then
+      echo "skip ${crate}@${VERSION} (already on crates.io)"
+      continue
+    fi
+    if [[ "${publish_status}" -ne 0 ]]; then
+      exit "${publish_status}"
+    fi
     if [[ "${crate}" != "pray-cli" ]]; then
       echo "waiting briefly for crates.io index to observe ${crate}@${VERSION}"
       sleep 5
