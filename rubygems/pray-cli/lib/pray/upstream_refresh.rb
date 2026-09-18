@@ -10,7 +10,8 @@ module Pray
         project.project_root,
         project.manifest.sources,
         previous,
-        refresh: options.refresh || options.refresh_source_revisions
+        refresh: options.refresh || options.refresh_source_revisions,
+        offline: options.offline
       )
       sources = Resolve.source_map(project.manifest.sources)
       changed = false

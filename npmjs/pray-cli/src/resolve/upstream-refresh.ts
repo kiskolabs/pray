@@ -34,6 +34,7 @@ export async function applyPathUpstreamRefreshes(
     project.manifest.sources,
     previous,
     options.refreshSourceRevisions,
+    options.offline,
   );
   const sources = sourceMap(project.manifest.sources);
   let changed = false;

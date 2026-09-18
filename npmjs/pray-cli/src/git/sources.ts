@@ -31,6 +31,7 @@ export class GitSourceSet {
     sources: ManifestSource[],
     private readonly lockfile: Lockfile | undefined,
     private readonly refresh: boolean,
+    private readonly offline = false,
   ) {
     this.sourcesByName = new Map(
       sources
@@ -53,6 +54,7 @@ export class GitSourceSet {
       source,
       this.lockfile,
       this.refresh,
+      this.offline,
     );
     if (!checkout) {
       return undefined;
@@ -71,8 +73,9 @@ export function prepareGitSources(
   sources: ManifestSource[],
   lockfile: Lockfile | undefined,
   refresh = false,
+  offline = false,
 ): GitSourceSet {
-  return new GitSourceSet(projectRoot, sources, lockfile, refresh);
+  return new GitSourceSet(projectRoot, sources, lockfile, refresh, offline);
 }
 
 function prepareOneGitSource(
@@ -80,6 +83,7 @@ function prepareOneGitSource(
   source: ManifestSource,
   lockfile: Lockfile | undefined,
   refresh: boolean,
+  offline: boolean,
 ): GitSourceCheckout | undefined {
   const cloneUrl = source.url.replace(/^git\+/, "");
   if (
@@ -87,14 +91,13 @@ function prepareOneGitSource(
     !localGitRepoPath(projectRoot, cloneUrl)
   ) {
     const sourceRoot = localGitSourceRoot(projectRoot, cloneUrl);
-    if (!sourceRoot) {
-      return undefined;
+    if (sourceRoot) {
+      return {
+        cacheDirectory: sourceRoot,
+        revision: "",
+        subdir: source.subdir,
+      };
     }
-    return {
-      cacheDirectory: sourceRoot,
-      revision: "",
-      subdir: source.subdir,
-    };
   }
   const pinnedRevision = refresh
     ? undefined
@@ -105,6 +108,7 @@ function prepareOneGitSource(
     refresh,
     pinnedRevision,
     source.subdir,
+    offline,
   );
   return {
     cacheDirectory,

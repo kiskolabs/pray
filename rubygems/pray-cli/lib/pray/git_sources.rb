@@ -7,10 +7,11 @@ module Pray
   GitSourceCheckout = Struct.new(:cache_directory, :revision, :subdir)
 
   class GitSourceSet
-    def initialize(project_root, sources, lockfile, refresh:)
+    def initialize(project_root, sources, lockfile, refresh:, offline: false)
       @project_root = project_root
       @lockfile = lockfile
       @refresh = refresh
+      @offline = offline
       @sources = sources.select { |source| source.kind == "git" }.to_h { |source| [source.name, source] }
       @checkouts = {}
     end
@@ -21,7 +22,7 @@ module Pray
       source = @sources[name]
       return nil unless source
 
-      checkout = GitSources.prepare_one_git_source(@project_root, source, @lockfile, refresh: @refresh)
+      checkout = GitSources.prepare_one_git_source(@project_root, source, @lockfile, refresh: @refresh, offline: @offline)
       @checkouts[name] = checkout if checkout
       checkout
     end
@@ -38,21 +39,21 @@ module Pray
   module GitSources
     module_function
 
-    def prepare_git_sources(project_root, sources, lockfile, refresh: false)
-      GitSourceSet.new(project_root, sources, lockfile, refresh: refresh)
+    def prepare_git_sources(project_root, sources, lockfile, refresh: false, offline: false)
+      GitSourceSet.new(project_root, sources, lockfile, refresh: refresh, offline: offline)
     end
 
-    def prepare_one_git_source(project_root, source, lockfile, refresh:)
+    def prepare_one_git_source(project_root, source, lockfile, refresh:, offline: false)
       clone_url = source.url.delete_prefix("git+")
       if local_filesystem_source?(clone_url) && !local_git_repo_path(project_root, clone_url)
         source_root = local_git_source_root(project_root, clone_url)
-        return unless source_root
-
-        return GitSourceCheckout.new(
-          cache_directory: source_root,
-          revision: "",
-          subdir: source.subdir
-        )
+        if source_root
+          return GitSourceCheckout.new(
+            cache_directory: source_root,
+            revision: "",
+            subdir: source.subdir
+          )
+        end
       end
 
       pinned_revision = refresh ? nil : pinned_revision_for_source(lockfile, source)
@@ -61,7 +62,8 @@ module Pray
         clone_url,
         refresh: refresh,
         pinned_revision: pinned_revision,
-        sparse_subdir: source.subdir
+        sparse_subdir: source.subdir,
+        offline: offline
       )
       GitSourceCheckout.new(
         cache_directory: cache_directory,

@@ -14,6 +14,7 @@ export function ensureGitRepository(
   refresh: boolean,
   pinnedRevision?: string,
   sparseSubdir?: string,
+  offline = false,
 ): { cacheDirectory: string; revision: string } {
   const shared = gitSourceCacheDirectory(projectRoot, cloneUrl);
   ensureSharedGitRepository(
@@ -22,6 +23,7 @@ export function ensureGitRepository(
     shared,
     refresh,
     pinnedRevision,
+    offline,
   );
   const cacheDirectory = gitSourceCacheDirectory(
     projectRoot,
@@ -32,7 +34,7 @@ export function ensureGitRepository(
     ensureLinkedWorktree(shared, cacheDirectory);
     applySparseCheckout(cacheDirectory, sparseSubdir);
     if (pinnedRevision) {
-      checkoutGitRevision(cacheDirectory, pinnedRevision, refresh);
+      checkoutGitRevision(cacheDirectory, pinnedRevision, !offline);
     } else if (refresh) {
       runGit(cacheDirectory, "reset", "--hard", gitHeadRevision(shared));
     }
@@ -47,11 +49,12 @@ function ensureSharedGitRepository(
   cloneUrl: string,
   shared: string,
   refresh: boolean,
-  pinnedRevision?: string,
+  pinnedRevision: string | undefined,
+  offline: boolean,
 ): void {
   if (gitDirectory(shared)) {
     if (pinnedRevision) {
-      checkoutGitRevision(shared, pinnedRevision, refresh);
+      checkoutGitRevision(shared, pinnedRevision, !offline);
     } else if (refresh) {
       refreshGitWorktree(shared);
     }
@@ -59,6 +62,10 @@ function ensureSharedGitRepository(
       refreshGlobalFromProject(cloneUrl, shared);
     }
     return;
+  }
+
+  if (offline && !gitGlobalSeedAvailable(cloneUrl)) {
+    offlineGitSourceUncached(cloneUrl);
   }
 
   if (existsSync(shared)) {
@@ -69,6 +76,8 @@ function ensureSharedGitRepository(
   const seeded = seedGitCacheFromGlobal(cloneUrl, shared, projectRoot);
   if (seeded) {
     runGit(shared, "remote", "set-url", "origin", cloneUrl);
+  } else if (offline) {
+    offlineGitSourceUncached(cloneUrl);
   } else {
     cloneGitCache(projectRoot, cloneUrl, shared, false);
     mirrorGitCacheToGlobal(cloneUrl, shared);
@@ -76,7 +85,7 @@ function ensureSharedGitRepository(
   applySparseCheckout(shared);
 
   if (pinnedRevision) {
-    checkoutGitRevision(shared, pinnedRevision, true);
+    checkoutGitRevision(shared, pinnedRevision, !offline);
   } else if (refresh && seeded) {
     refreshGitWorktree(shared);
   }
@@ -153,6 +162,17 @@ function globalGitCacheReady(globalCache: string): boolean {
   );
 }
 
+function gitGlobalSeedAvailable(cloneUrl: string): boolean {
+  const globalCache = globalGitCacheDirectory(cloneUrl);
+  return globalCache !== undefined && globalGitCacheReady(globalCache);
+}
+
+function offlineGitSourceUncached(cloneUrl: string): never {
+  throw PrayError.resolution(
+    `git source ${cloneUrl} is not cached locally and offline mode is enabled`,
+  );
+}
+
 function seedGitCacheFromGlobal(
   cloneUrl: string,
   destination: string,
@@ -219,10 +239,20 @@ function fetchOrigin(repository: string, revision?: string): void {
 function checkoutGitRevision(
   repository: string,
   revision: string,
-  refresh: boolean,
+  allowFetch: boolean,
 ): void {
-  if (refresh) {
-    fetchOrigin(repository, revision);
+  if (tryRunGit(repository, "cat-file", "-e", revision)) {
+    runGit(repository, "checkout", "--force", revision);
+    return;
+  }
+  if (!allowFetch) {
+    throw PrayError.resolution(
+      `git source ${JSON.stringify(repository)} is locked to revision ${revision}, but that commit is not available locally and offline mode is enabled`,
+    );
+  }
+  fetchOrigin(repository, revision);
+  if (!tryRunGit(repository, "cat-file", "-e", revision)) {
+    runGit(repository, "fetch", "origin", revision);
   }
   runGit(repository, "checkout", "--force", revision);
 }
