@@ -51,11 +51,13 @@ For a local distribution root, a publisher MUST look for a row with the package 
 - its `tree_hash` equals the resolved package tree hash;
 - its stored artifact exists and hashes to `artifact_hash`;
 - its archived prayspec filename and bytes equal the current package prayspec;
-- its signer, signer fingerprint, public key, and signature equal the publish input.
+- its recorded `signature` verifies against its own recorded signing identity.
 
 An implementation with required protocol descriptors MAY require those descriptors to exist before treating the row as current. When the row is current, the publisher MUST preserve the artifact and complete version row.
 
-When the row is absent or not current, the publisher builds and writes the artifact and version row. If a row for that version already exists, publish MUST preserve its `yanked` value. Publish MUST preserve `published_at` when the prior artifact passes its hash check and its package tree and prayspec match the current package. A changed tree or prayspec receives the current publish time. Artifact encoding, signer, or signature changes do not change the first-publish time when package content is unchanged.
+When the row is absent or not current, the publisher builds and writes the artifact and version row. If a row for that version already exists, publish MUST preserve its `yanked` value. Publish MUST preserve `published_at` when the prior artifact passes its hash check and its package tree and prayspec match the current package. A changed tree or prayspec receives the current publish time. Artifact encoding changes do not change the first-publish time when package content is unchanged.
+
+A row MUST NOT be rebuilt because the current publisher differs from the one recorded in it. A verified row already attests the stored bytes under the identity that wrote it, and a second publisher re-running publish over unchanged packages restates authorship without republishing anything. In a distribution tracked in version control, that rewrites every current row and buries a real release in identity churn. A row carrying no `signature` is not current, so publish repairs it.
 
 Registry merge identity MUST exclude `published_at`. A merge of rows that differ only in `published_at` keeps the receiving registry's value.
 
@@ -71,7 +73,7 @@ The reference implementation covers local preservation and legacy timestamp norm
 
 ## Security considerations
 
-A publisher verifies stored artifact bytes against `artifact_hash` before skipping an unchanged version. It compares the stored artifact path with the expected relative path before reading, so catalog metadata cannot select another filesystem path for this check.
+A preserved row keeps its `signer` and `signature` together, so the pair stays internally consistent and install verification is unaffected. Preservation is not an authorization decision: whoever may publish a package may publish it, and declining to restate the signer neither grants nor withholds that. A publisher verifies stored artifact bytes against `artifact_hash` before skipping an unchanged version. It compares the stored artifact path with the expected relative path before reading, so catalog metadata cannot select another filesystem path for this check.
 
 Yank remains an explicit metadata operation. Publish does not clear a yank.
 
@@ -84,6 +86,8 @@ An unchanged publish does not refresh derived annotations or replace a valid art
 Rebuilding every package and copying only `published_at` still performs unnecessary archive and catalog writes. It also leaves no-op behavior dependent on whether an archive encoder emits deterministic bytes.
 
 Comparing only `tree_hash` could retain a missing or corrupted artifact. Verifying the expected stored artifact preserves repair behavior.
+
+Comparing the row's signing fields against the publish input, rather than verifying the row against itself, was the earlier draft of this check. It makes a no-op publish depend on who runs it: the reference client derives `signer` from `PRAY_SIGNER`, `USER`, or `USERNAME`, so two maintainers of one distribution rewrite each other's rows on every release.
 
 RFC 0050 already treats artifact bytes as immutable and yank as metadata-only. Preserving a verified row follows those existing rules.
 

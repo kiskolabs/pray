@@ -120,14 +120,7 @@ pub(crate) fn publish_to_root(
         if existing
             .zip(stored_artifact.as_deref())
             .is_some_and(|(entry, artifact_bytes)| {
-                stored_publish_matches(
-                    artifact_bytes,
-                    package,
-                    signer,
-                    signer_fingerprint,
-                    signing_key,
-                    entry,
-                )
+                stored_publish_matches(artifact_bytes, package, entry)
             })
         {
             package_names.insert(package.declaration.name.clone());
