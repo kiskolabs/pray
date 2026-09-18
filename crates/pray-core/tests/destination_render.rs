@@ -236,7 +236,9 @@ agent "sample/unbound", "~> 1.0", path: "packages/unbound"
     assert!(!content.contains("## Shared instructions"));
 
     let planned = planned_provisioned_files(&project).expect("planned");
-    assert!(planned.iter().any(|file| file.path == *"SECURITY.md"));
+    assert!(planned
+        .iter()
+        .any(|file| file.path == Path::new("SECURITY.md")));
     assert!(planned
         .iter()
         .any(|file| file.path.ends_with(".agents/skills/audit/SKILL.md")));
