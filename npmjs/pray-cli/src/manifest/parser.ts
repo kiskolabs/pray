@@ -27,6 +27,7 @@ import {
   upsertPackage,
 } from "./destination.js";
 import { tryApplyFileBlockPray, tryApplyLocalPray } from "./local-pray.js";
+import { applyPublishOrUnrecognized } from "./parse-publish.js";
 import {
   applyTargetStatement,
   parseGroupHeader,
@@ -65,6 +66,7 @@ class BlockParser {
       targets: [],
       packages: [],
       local: [],
+      publishRemotes: [],
       symbols: {},
       render: defaultRenderPolicy(),
     };
@@ -231,10 +233,7 @@ class BlockParser {
       manifest.render = parseRenderPolicy(statement.slice("render ".length));
       return;
     }
-    throw PrayError.parse(
-      PARSE_CONTEXT,
-      `unrecognized statement: ${statement}`,
-    );
+    applyPublishOrUnrecognized(this.reader, manifest, statement);
   }
 
   private parseDestinationBlock(

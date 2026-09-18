@@ -17,7 +17,17 @@ module Pray
         "local" => manifest.local.map { |entry| local_fields(entry) }
       }
       fields["symbols"] = manifest.symbols.sort.to_h unless manifest.symbols.empty?
+      unless (manifest.publish_remotes || []).empty?
+        fields["publish_remotes"] = manifest.publish_remotes.map { |remote| publish_remote_fields(remote) }
+      end
       fields["render"] = render_fields(manifest.render)
+      fields
+    end
+
+    def publish_remote_fields(remote)
+      fields = {"name" => remote.name, "packages" => remote.packages}
+      fields["path"] = remote.path if remote.path
+      fields["url"] = remote.url if remote.url
       fields
     end
 

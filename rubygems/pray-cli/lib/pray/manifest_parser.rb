@@ -5,6 +5,7 @@ module Pray
     class BlockParser
       include ParserHelpers
       include ParserBlocks
+      include ParserPublish
 
       def initialize(lines)
         @lines = lines
@@ -41,6 +42,8 @@ module Pray
           manifest.prayfile_version = string_from_literal(Regexp.last_match(1))
         when /\Asource (.+)\z/
           manifest.sources << parse_source(Regexp.last_match(1))
+        when /\Apublish (.+)\z/
+          apply_publish(manifest, Regexp.last_match(1))
         when /\Atarget (.+)\z/
           apply_legacy_target(manifest, statement, Regexp.last_match(1), allow_target)
         when /\Agroup (.+)\z/

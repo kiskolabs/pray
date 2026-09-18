@@ -34,6 +34,8 @@ mod package_spec_render;
 pub mod package_upstream;
 pub mod paths;
 pub mod project_context;
+pub mod publish_remote;
+mod publish_select;
 pub mod push_auth;
 pub mod registry;
 mod registry_cache;

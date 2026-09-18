@@ -12,6 +12,11 @@ module Pray
         manifest.sources.each { |source| lines << format_source(source) }
       end
 
+      unless (manifest.publish_remotes || []).empty?
+        lines << ""
+        manifest.publish_remotes.each { |remote| lines << format_publish_remote(remote) }
+      end
+
       unless manifest.symbols.empty?
         lines << ""
         lines << "pray do"
@@ -107,6 +112,18 @@ module Pray
       parts << %(tag: "#{source.tag}") if source.tag
       parts << %(rev: "#{source.rev}") if source.rev
       parts.join(", ")
+    end
+
+    def format_publish_remote(remote)
+      parts = [%(publish "#{remote.name}")]
+      parts << %(path: "#{remote.path}") if remote.path
+      parts << %("#{remote.url}") if remote.url
+      return parts.join(", ") if remote.packages.empty?
+
+      lines = ["#{parts.join(", ")} do"]
+      remote.packages.each { |name| lines << %(  pray "#{name}") }
+      lines << "end"
+      lines.join("\n")
     end
 
     def format_destination_entry(entry, manifest)

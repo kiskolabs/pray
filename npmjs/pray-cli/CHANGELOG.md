@@ -1,5 +1,9 @@
 # CHANGELOG
 
+## Unreleased
+
+- Declare named `publish` remotes in Prayfile (RFC 0118). `pray publish` uses them when dest flags are omitted, and publishes only path-owned packages.
+
 ## 1.18.0 (2026-09-17)
 
 - Clone a git catalog without unused package blobs, and fetch a used package file when install needs it.

@@ -62,7 +62,7 @@ Also useful: `remove`, `unlock`, `tree`, `list`, `outdated`, `explain`, `manifes
 - format / fmt: rewrite Prayfile to `compose` / `tree` / `pray …, file:`; normalize markers in lock targets
 - verify: read-only managed-span, integrity, cache, signature checks
 - drift: custom implementation, removed prayers, position/renderer drift, orphan markers
-- package / publish: build `.praypkg`; sign and upload
+- package / publish: build `.praypkg`; sign and upload. `publish` uses Prayfile remotes when dest flags are omitted (RFC 0118). `--to NAME` selects a remote. `--dry-run` prints dests and writes nothing. Path-owned packages only.
 - confess: signed acceptance/rejection feedback
 - serve: local or self-hosted distribution point
 - yank: mark a version yanked in a distribution root; `--undo` clears the flag

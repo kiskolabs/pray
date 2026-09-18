@@ -1,0 +1,8 @@
+prayfile "1"
+
+publish "prayers", path: "prayers"
+publish "public", "https://prayers.example"
+
+compose "AGENTS.md" do
+  pray "local/project", path: "guidance/project"
+end

@@ -2,6 +2,7 @@ use crate::manifest::{
     format_package_declaration, DestinationEntry, DestinationMode, Manifest, ManifestPackage,
     ManifestSource, ManifestTarget, RenderPolicy,
 };
+use crate::publish_remote::ManifestPublishRemote;
 
 pub(crate) fn serialize_recommended(manifest: &Manifest) -> String {
     let mut lines = Vec::new();
@@ -11,6 +12,13 @@ pub(crate) fn serialize_recommended(manifest: &Manifest) -> String {
         lines.push(String::new());
         for source in &manifest.sources {
             lines.push(format_source(source));
+        }
+    }
+
+    if !manifest.publish_remotes.is_empty() {
+        lines.push(String::new());
+        for remote in &manifest.publish_remotes {
+            lines.push(format_publish_remote(remote));
         }
     }
 
@@ -148,6 +156,25 @@ fn format_source(source: &ManifestSource) -> String {
         parts.push(format!("rev: \"{rev}\""));
     }
     parts.join(", ")
+}
+
+fn format_publish_remote(remote: &ManifestPublishRemote) -> String {
+    let mut parts = vec![format!("publish \"{}\"", remote.name)];
+    if let Some(path) = &remote.path {
+        parts.push(format!("path: \"{path}\""));
+    }
+    if let Some(url) = &remote.url {
+        parts.push(format!("\"{url}\""));
+    }
+    if remote.packages.is_empty() {
+        return parts.join(", ");
+    }
+    let mut lines = vec![format!("{} do", parts.join(", "))];
+    for name in &remote.packages {
+        lines.push(format!("  pray \"{name}\""));
+    }
+    lines.push("end".to_string());
+    lines.join("\n")
 }
 
 fn format_destination_entry(entry: &DestinationEntry, manifest: &Manifest) -> String {

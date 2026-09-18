@@ -8,6 +8,7 @@ mod blocks;
 mod call;
 mod decls;
 mod policy;
+mod publish;
 
 use call::string_from_literal;
 use decls::{
@@ -69,6 +70,10 @@ impl<'a> BlockParser<'a> {
         }
         if let Some(rest) = statement.strip_prefix("source ") {
             manifest.sources.push(parse_source(rest)?);
+            return Ok(());
+        }
+        if let Some(rest) = statement.strip_prefix("publish ") {
+            self.apply_publish_statement(&mut manifest.publish_remotes, rest)?;
             return Ok(());
         }
         if let Some(rest) = statement.strip_prefix("target ") {

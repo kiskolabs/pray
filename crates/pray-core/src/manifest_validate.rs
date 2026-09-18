@@ -5,6 +5,7 @@ use std::collections::BTreeSet;
 
 pub(crate) fn validate_manifest_semantics(manifest: &Manifest) -> PrayResult<()> {
     reject_duplicate_source_names(manifest)?;
+    crate::publish_remote::validate_publish_remotes(manifest)?;
     validate_render_policy(&manifest.render)?;
     for target in &manifest.targets {
         for output in &target.outputs {

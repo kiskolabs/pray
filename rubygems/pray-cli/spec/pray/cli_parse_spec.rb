@@ -23,7 +23,7 @@ RSpec.describe Pray::CLI do
 
     it "parses publish destinations" do
       expect(described_class.parse_command(["publish", "--root", "dist", "--server", "https://registry.example"])).to eq(
-        [:publish, {roots: ["dist"], servers: ["https://registry.example"]}]
+        [:publish, {roots: ["dist"], servers: ["https://registry.example"], to: [], dry_run: false}]
       )
     end
 

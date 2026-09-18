@@ -18,9 +18,9 @@ const PACKAGE_COMMANDS = [
 ];
 
 const DISTRIBUTION_COMMANDS = [
-  "publish --root PATH [--server URL ...]",
+  "publish [--root PATH|--server URL|--to NAME] [--dry-run]",
   "login --server URL --email EMAIL",
-  "serve [--root PATH] [--host HOST] [--port PORT] [--stdio]",
+  "serve [--root PATH | --to NAME] [--host HOST] [--port PORT] [--stdio]",
   "sync [--root PATH] [--peer URL ...]",
   "confess <package> | --from-lock SPAN_ID [--accepted|--rejected]",
 ];
@@ -132,11 +132,12 @@ const COMMAND_HELP: Record<string, string> = {
     "Subcommands: list, show, add-key, remove-key, set-signed, set-allow, import-repo, import-registry, check",
   init: "create a starter Prayfile\n\nUsage: pray init [--targets tool_a,tool_b]",
   publish:
-    "upload packages to a registry or local root\n\n" +
-    "Usage: pray publish --root PATH [--server URL ...]",
+    "upload path packages to a registry or local root\n\n" +
+    "Usage: pray publish [--root PATH] [--server URL ...] [--to NAME] [--dry-run]\n\n" +
+    "Prayfile publish remotes supply dests when flags are omitted.",
   serve:
     "run a local registry server\n\n" +
-    "Usage: pray serve [--root PATH] [--host HOST] [--port PORT] [--stdio]",
+    "Usage: pray serve [--root PATH | --to NAME] [--host HOST] [--port PORT] [--stdio]",
   sync:
     "sync packages with peer registries\n\n" +
     "Usage: pray sync [--root PATH] [--peer URL ...]",

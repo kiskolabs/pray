@@ -1,0 +1,3 @@
+prayfile "1"
+publish "prayers", path: "prayers"
+publish "prayers", "https://prayers.example"

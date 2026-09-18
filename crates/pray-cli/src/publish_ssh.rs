@@ -5,13 +5,13 @@ use crate::{registry_artifact_path, torrent_manifest_bytes, torrent_manifest_pat
 use base64::{engine::general_purpose::STANDARD, Engine as _};
 use pray_core::distribution::{parse_registry_distribution_settings, RegistryDistributionSettings};
 use pray_core::registry::RegistryPackageMetadata;
-use pray_core::resolve::ResolvedProject;
+use pray_core::resolve::ResolvedPackage;
 use pray_core::ssh_client::{with_pray_ssh_session, SshRpcSession};
 use pray_core::{PrayError, PrayResult};
 use serde_json::json;
 
 pub(crate) fn publish_to_ssh_server(
-    project: &ResolvedProject,
+    packages: &[&ResolvedPackage],
     signer: &str,
     signer_fingerprint: Option<&str>,
     published_at: u64,
@@ -20,7 +20,7 @@ pub(crate) fn publish_to_ssh_server(
 ) -> PrayResult<()> {
     with_pray_ssh_session(server_url, |session| {
         let distribution = ssh_distribution_settings(session)?;
-        for package in &project.packages {
+        for package in packages {
             let archive_bytes = build_package_archive_bytes(package)?;
             let artifact_path =
                 registry_artifact_path(&package.declaration.name, &package.spec.version);

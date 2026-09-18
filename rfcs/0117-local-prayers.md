@@ -103,4 +103,4 @@ Whether a later rename of `spec.name` to a registry namespace should rewrite the
 
 ## Future possibilities
 
-A publish flow that copies a local prayer from the path source tree into a distribution `v1/packages` tree after a version is added.
+A publish flow that copies a local prayer from the path source tree into a distribution `v1/packages` tree after a version is added (RFC 0118).

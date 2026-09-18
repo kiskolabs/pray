@@ -44,6 +44,8 @@ Open `rfcs/README.md` for types, statuses, numbering, and the current set. Open 
 - RFC 0108: file-as-fragment
 - RFC 0114: package upstream (path fork pin)
 - RFC 0116: path-fork first material and overlay files
+- RFC 0117: local prayers
+- RFC 0118: Prayfile publish remotes
 
 Implementation PRs cite `RFC-NNNN`. JSON Schema and fixtures win for field presence. RFC reference-level text wins for algorithms until RFC 0100 is Stable.
 

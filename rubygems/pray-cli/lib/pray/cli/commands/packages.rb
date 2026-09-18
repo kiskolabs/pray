@@ -53,7 +53,12 @@ module Pray
 
     def package_command
       project = resolve_current_project
-      project.packages.each do |package|
+      allowed = PublishRemote.path_owned_package_names(project.manifest)
+      packages = project.packages.select { |package| allowed.include?(package.declaration.name) }
+      if packages.empty?
+        raise Error.usage("no path packages to package; remote dependencies are not packed")
+      end
+      packages.each do |package|
         package.spec.require_release_version!
         output_path = Archive.package_archive_path(package.declaration.name, package.spec.version)
         Archive.write_package_archive(package, output_path)

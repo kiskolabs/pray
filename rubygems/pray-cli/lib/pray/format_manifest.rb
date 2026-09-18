@@ -79,6 +79,7 @@ module Pray
         targets: [],
         packages: manifest.packages.map { |package| clone_package(package) },
         local: manifest.local.map { |local| local.dup },
+        publish_remotes: (manifest.publish_remotes || []).map(&:dup),
         symbols: manifest.symbols.dup,
         render: manifest.render.dup
       )

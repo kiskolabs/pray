@@ -1,0 +1,2 @@
+prayfile "1"
+publish "out", path: "../outside"

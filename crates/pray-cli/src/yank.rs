@@ -1,3 +1,4 @@
+use crate::publish_dest::required_path_remote_root;
 use crate::registry_ops::{
     load_registry_package_metadata, registry_metadata_path, write_registry_package_metadata,
 };
@@ -9,9 +10,11 @@ use std::path::PathBuf;
 pub(crate) fn yank_command(
     package: String,
     version: String,
-    root: PathBuf,
+    root: Option<PathBuf>,
+    to: Option<String>,
     undo: bool,
 ) -> PrayResult<()> {
+    let root = required_path_remote_root(to.as_deref(), root.as_deref())?;
     let metadata_path = registry_metadata_path(&root, &package);
     if !metadata_path.exists() {
         return Err(PrayError::Resolution(format!(

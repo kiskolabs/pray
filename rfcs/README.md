@@ -60,7 +60,7 @@ Informational, Describes 1.8.1, Stable: RFC 0002, 0070, 0101.
 
 Standards Track, shipped design, Stable: RFC 0010, 0011, 0020, 0030, 0031, 0040, 0050, 0060, 0071, 0108.
 
-Standards Track follow-ons (not yet the product contract): RFC 0033, 0034, 0100, 0102, 0104, 0106, 0109, 0114, 0116, 0117.
+Standards Track follow-ons (not yet the product contract): RFC 0033, 0034, 0100, 0102, 0104, 0106, 0109, 0114, 0116, 0117, 0118.
 
 Standards Track Rejected: RFC 0115 (local exclusive copy of project files).
 

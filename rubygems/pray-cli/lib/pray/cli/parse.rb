@@ -141,26 +141,33 @@ module Pray
     def parse_publish_arguments(arguments)
       roots = []
       servers = []
+      to = []
+      dry_run = false
       while (argument = arguments.shift)
         case argument
         when "--root"
           roots << arguments.shift
         when "--server"
           servers << arguments.shift
+        when "--to"
+          to << arguments.shift
+        when "--dry-run"
+          dry_run = true
+        when "--signing-key"
+          arguments.shift
         else
           raise Error.unsupported("unexpected publish argument: #{argument}")
         end
       end
-      raise Error.unsupported("publish requires at least one --root PATH or --server URL") if roots.empty? && servers.empty?
-
-      {roots: roots, servers: servers}
+      {roots: roots, servers: servers, to: to, dry_run: dry_run}
     end
 
     def parse_serve_arguments(arguments)
-      options = {root: ".", host: "127.0.0.1", port: 7429, stdio: false}
+      options = {root: ".", to: nil, host: "127.0.0.1", port: 7429, stdio: false}
       while (argument = arguments.shift)
         case argument
         when "--root" then options[:root] = arguments.shift
+        when "--to" then options[:to] = arguments.shift
         when "--host" then options[:host] = arguments.shift
         when "--port" then options[:port] = Integer(arguments.shift)
         when "--stdio" then options[:stdio] = true

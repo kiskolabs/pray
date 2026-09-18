@@ -3,6 +3,7 @@ import {
   packageArchivePath,
   writePackageArchive,
 } from "../../archive/praypkg.js";
+import { PrayError } from "../../errors.js";
 import { normalizeLineEndings } from "../../hashing.js";
 import { readLockfile } from "../../lockfile/index.js";
 import {
@@ -16,6 +17,7 @@ import {
   readManifestText,
 } from "../../manifest/index.js";
 import { requireReleaseVersion } from "../../package-spec/index.js";
+import { pathOwnedPackageNames } from "../../publish/remote.js";
 import { defaultResolveOptions } from "../../resolve/context.js";
 import { resolveProject } from "../../resolve/project.js";
 import type { ResolvedProject } from "../../resolve/types.js";
@@ -73,7 +75,16 @@ function formatMarkerComments(text: string): string {
 
 export async function runPackage(): Promise<void> {
   const project = await resolveProject(defaultManifestPath());
-  for (const packageEntry of project.packages) {
+  const allowed = pathOwnedPackageNames(project.manifest);
+  const packages = project.packages.filter((entry) =>
+    allowed.includes(entry.declaration.name),
+  );
+  if (packages.length === 0) {
+    throw PrayError.usage(
+      "no path packages to package; remote dependencies are not packed",
+    );
+  }
+  for (const packageEntry of packages) {
     requireReleaseVersion(packageEntry.spec);
     const outputPath = packageArchivePath(
       packageEntry.declaration.name,

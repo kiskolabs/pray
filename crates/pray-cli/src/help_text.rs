@@ -19,19 +19,19 @@ pub(crate) const PACKAGE_COMMANDS: &[&str] = &[
 
 #[cfg(feature = "auth")]
 pub(crate) const DISTRIBUTION_COMMANDS: &[&str] = &[
-    "publish --root PATH [--server URL ...] [--signing-key PATH]",
-    "yank <package> <version> --root PATH [--undo]",
-    "token create|revoke --root PATH ...",
+    "publish [--root PATH|--server URL|--to NAME] [--dry-run] [--signing-key PATH]",
+    "yank <package> <version> [--root PATH | --to NAME] [--undo]",
+    "token create|revoke [--root PATH | --to NAME] ...",
     "login --server URL --email EMAIL",
-    "serve [--root PATH] [--host HOST] [--port PORT] [--stdio] [--allow-open-push]",
+    "serve [--root PATH | --to NAME] [--host HOST] [--port PORT] [--stdio] [--allow-open-push]",
     "sync [--root PATH] [--peer URL ...]",
     "confess <package> | --from-lock SPAN_ID [--accepted|--rejected]",
 ];
 
 #[cfg(not(feature = "auth"))]
 pub(crate) const DISTRIBUTION_COMMANDS: &[&str] = &[
-    "publish --root PATH [--server URL ...] [--signing-key PATH]",
-    "yank <package> <version> --root PATH [--undo]",
+    "publish [--root PATH|--server URL|--to NAME] [--dry-run] [--signing-key PATH]",
+    "yank <package> <version> [--root PATH | --to NAME] [--undo]",
     "login --server URL --email EMAIL",
     "sync [--root PATH] [--peer URL ...]",
     "confess <package> | --from-lock SPAN_ID [--accepted|--rejected]",
@@ -143,14 +143,15 @@ pub(crate) fn command_help_text(command: &str) -> Option<&'static str> {
              Usage: pray clean [--unused]",
         ),
         "publish" => Some(
-            "upload packages to a registry or local root\n\n\
-             Usage: pray publish --root PATH [--server URL ...] [--signing-key PATH]\n\n\
+            "upload path packages to a registry or local root\n\n\
+             Usage: pray publish [--root PATH] [--server URL ...] [--to NAME] [--dry-run] [--signing-key PATH]\n\n\
+             Prayfile publish remotes supply dests when flags are omitted.\n\
              Prefer --signing-key PATH or PRAY_SIGNING_KEY (32-byte ed25519 seed).\n\
              Without a signing key, publish records a legacy content digest.",
         ),
         "yank" => Some(
             "mark or unmark a published version as yanked in a distribution root\n\n\
-             Usage: pray yank <package> <version> --root PATH [--undo]\n\n\
+             Usage: pray yank <package> <version> [--root PATH | --to NAME] [--undo]\n\n\
              Yank flips metadata only; artifact bytes stay immutable.\n\
              New resolves skip yanked versions. Locked installs may continue with a warning;\n\
              use pray install --strict to refuse them.",
@@ -158,8 +159,8 @@ pub(crate) fn command_help_text(command: &str) -> Option<&'static str> {
         #[cfg(feature = "auth")]
         "token" => Some(
             "mint or revoke scoped publish tokens for a distribution root\n\n\
-             Usage: pray token create --root PATH --email EMAIL [--scope publish]\n\
-                    pray token revoke --root PATH TOKEN\n\n\
+             Usage: pray token create [--root PATH | --to NAME] --email EMAIL [--scope publish]\n\
+                    pray token revoke [--root PATH | --to NAME] TOKEN\n\n\
              Use the printed token as PRAY_PUBLISH_TOKEN for pray publish --server.",
         ),
         "search" => Some(
@@ -176,7 +177,7 @@ pub(crate) fn command_help_text(command: &str) -> Option<&'static str> {
         #[cfg(feature = "auth")]
         "serve" => Some(
             "run a local registry server\n\n\
-             Usage: pray serve [--root PATH] [--host HOST] [--port PORT] [--stdio] [--allow-open-push]",
+             Usage: pray serve [--root PATH | --to NAME] [--host HOST] [--port PORT] [--stdio] [--allow-open-push]",
         ),
         "sync" => Some(
             "sync packages with peer registries\n\n\

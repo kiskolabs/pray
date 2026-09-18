@@ -7,6 +7,7 @@ import {
   setActiveInvocationContext,
 } from "../project-context/runtime.js";
 import { initDistributionRoot } from "../publish/index.js";
+import { maybeDeclarePublishRemote } from "../publish/remote-init.js";
 import { renderProject } from "../render/project.js";
 import { runTransaction } from "../transaction/index.js";
 import { renderDependencyTree } from "../tree/index.js";
@@ -107,6 +108,12 @@ export async function runCli(argumentsList: string[]): Promise<number> {
             throw PrayError.unsupported("repo requires init");
           }
           initDistributionRoot(process.cwd());
+          maybeDeclarePublishRemote(
+            process.cwd(),
+            process.cwd().endsWith("prayers")
+              ? process.cwd()
+              : `${process.cwd()}/prayers`,
+          );
           process.stdout.write("created distribution root\n");
           return 0;
         case "add":

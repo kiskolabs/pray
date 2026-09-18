@@ -541,7 +541,7 @@ Ruby and TypeScript CLIs consume `testdata/shared/manifest/` for destination-foc
 
 ## Registrar
 
-Prayfile keywords in use: `prayfile`, `source`, `compose`, `tree`, `pray`, `local`, `render`, `group`, plus deprecated `target`, `output`, `agent`, `skills`. Marker comment grammar is RFC 0030. Lockfile keys are RFC 0020.
+Prayfile keywords in use: `prayfile`, `source`, `compose`, `tree`, `pray`, `local`, `render`, `group`, `publish` (RFC 0118), plus deprecated `target`, `output`, `agent`, `skills`. Marker comment grammar is RFC 0030. Lockfile keys are RFC 0020.
 
 ## Unresolved questions
 

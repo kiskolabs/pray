@@ -191,8 +191,7 @@ function migrateLegacyManifest(
   hints: Map<string, PackageFormatHint>,
 ): Manifest {
   const next: Manifest = {
-    prayfileVersion: manifest.prayfileVersion,
-    sources: manifest.sources,
+    ...manifest,
     targets: [],
     packages: manifest.packages.map((entry) => ({
       ...entry,
@@ -204,7 +203,6 @@ function migrateLegacyManifest(
     })),
     local: manifest.local.map((entry) => ({ ...entry })),
     symbols: { ...(manifest.symbols ?? {}) },
-    render: manifest.render,
   };
 
   applyFormatHints(next.packages, hints);
