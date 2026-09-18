@@ -61,7 +61,7 @@ New residual after iteration 2: Finding 4 and Finding 5. Closed in the 20260918 
 
 Git-free project catalog and unshallow pin fetch shipped in usr/docs/changelogs/20260918213000_git-free-catalog-and-unshallow.md.
 
-Ship in 1.20.0. Close GitHub issue 31 after release.
+Later pass 20260918211600: annotated tag v1.20.0 points at fb8777d. GitHub Release https://github.com/kiskolabs/pray/releases/tag/v1.20.0 is published. Close GitHub issue 31 after registry publish.
 
 ## Source
 
@@ -84,3 +84,5 @@ usr/docs/issues/20260908120000_install-git-catalog-refresh.md
 usr/docs/changelogs/20260918204500_install-fetch-pinned-git-revision.md
 
 usr/docs/changelogs/20260918210000_offline-git-clone-and-file-origin.md
+
+usr/docs/changelogs/20260918211600_tag-1-20-0.md
