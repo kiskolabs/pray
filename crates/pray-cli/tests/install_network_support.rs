@@ -25,6 +25,21 @@ pub fn run_pray(repo: &Path, arguments: &[&str]) -> std::process::Output {
         .expect("run pray command")
 }
 
+pub fn run_pray_as(repo: &Path, arguments: &[&str], signer: &str) -> std::process::Output {
+    Command::new(env!("CARGO_BIN_EXE_pray"))
+        .args(arguments)
+        .current_dir(repo)
+        .env("PRAY_HOME", repo.join(".pray-user"))
+        .env("PRAY_SIGNER", signer)
+        .env_remove("PRAY_SIGNING_KEY")
+        .env_remove("PRAY_SSH_USER_FINGERPRINT")
+        .env_remove("SSH_USER_FINGERPRINT")
+        .env_remove("PRAY_SSH_PUBLISHER")
+        .env_remove("PRAY_SESSION_TOKEN")
+        .output()
+        .expect("run pray command")
+}
+
 pub fn run_pray_login_passkey(
     repo: &Path,
     server_url: &str,

@@ -115,6 +115,7 @@ pub(crate) fn parse_publish_command(
     let mut servers = Vec::new();
     let mut to = Vec::new();
     let mut signing_key = None;
+    let mut resign = false;
     let mut dry_run = false;
     while let Some(argument) = arguments.next() {
         match argument.as_str() {
@@ -150,6 +151,7 @@ pub(crate) fn parse_publish_command(
                 };
                 signing_key = Some(PathBuf::from(value));
             }
+            "--resign" => resign = true,
             "--dry-run" => dry_run = true,
             other if other.starts_with("--") => {
                 return Err(PrayError::Unsupported(format!(
@@ -168,6 +170,7 @@ pub(crate) fn parse_publish_command(
         servers,
         to,
         signing_key,
+        resign,
         dry_run,
     })
 }

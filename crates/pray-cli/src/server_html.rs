@@ -68,10 +68,20 @@ fn render_package_page(
     for version in &metadata.versions {
         let mut details = String::new();
         if let Some(signer) = version.signer.as_ref() {
-            details.push_str(&format!("<div>Signer: {}</div>", html_escape(signer)));
+            details.push_str(&format!(
+                "<div>Publisher label: {}</div>",
+                html_escape(signer)
+            ));
         }
         if let Some(signature) = version.signature.as_ref() {
-            details.push_str(&format!("<div>Signature: {}</div>", html_escape(signature)));
+            let label = if signature.starts_with("ed25519:") {
+                "Package signature"
+            } else if signature.starts_with("sha256:") {
+                "Content digest"
+            } else {
+                "Signature field"
+            };
+            details.push_str(&format!("<div>{label}: {}</div>", html_escape(signature)));
         }
         if let Some(published_at) = version.published_at.as_ref() {
             details.push_str(&format!("<div>Published at: {}</div>", published_at));

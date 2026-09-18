@@ -45,6 +45,11 @@ pub fn maybe_print_upgrade_notice(arguments: &[String]) {
     let _ = writeln!(std::io::stderr(), "{}", format_upgrade_notice(&notice));
 }
 
+pub fn version_command() -> PrayResult<()> {
+    println!("pray {}", env!("CARGO_PKG_VERSION"));
+    Ok(())
+}
+
 pub fn upgrade_command() -> PrayResult<()> {
     let status = Command::new("cargo")
         .args(["install", "pray-cli", "--locked", "--force"])

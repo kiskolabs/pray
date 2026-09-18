@@ -28,9 +28,7 @@ module Pray
         metadata = load_registry_package_metadata(metadata_path, package.declaration.name)
         existing = metadata.versions.find { |entry| entry.version == package.spec.version }
         stored_artifact = stored_package_artifact(root, artifact_path, package, existing, distribution)
-        if stored_artifact && stored_publish_matches?(
-          stored_artifact, package, signer, signer_fingerprint, existing
-        )
+        if stored_artifact && stored_publish_matches?(stored_artifact, package, existing)
           package_names << package.declaration.name
           write_registry_package_metadata(metadata_path, metadata)
           next
@@ -134,10 +132,17 @@ module Pray
       artifact_bytes
     end
 
-    def stored_publish_matches?(artifact_bytes, package, signer, signer_fingerprint, existing)
-      existing.signer == signer &&
-        existing.signer_fingerprint == signer_fingerprint &&
-        existing.signature == Registry.registry_artifact_signature(artifact_bytes, package.tree_hash, signer)
+    # A stored row is current when its own recorded signature still authenticates the
+    # stored artifact. The check deliberately ignores who is publishing now: a row signed
+    # by another publisher is still a valid attestation of identical bytes, and rewriting
+    # it would restate authorship without republishing anything. A row carrying no
+    # signature is not current, so publish repairs it.
+    def stored_publish_matches?(artifact_bytes, package, existing)
+      return false if existing.signer.nil? || existing.signature.nil?
+
+      existing.signature == Registry.registry_artifact_signature(
+        artifact_bytes, package.tree_hash, existing.signer
+      )
     end
 
     def stored_prayspec_matches?(artifact_bytes, package_root)

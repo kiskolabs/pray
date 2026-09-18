@@ -44,12 +44,12 @@ describe("publish", () => {
     await publishToRoot(project, distributionRoot);
     assert.deepEqual(readMetadata(metadataPath), unchangedMetadata);
 
+    // A second publisher over unchanged packages must not restate authorship of bytes
+    // nobody rebuilt, or one maintainer's release buries itself in the other's identity.
     await publishToRoot(project, distributionRoot, "replacement");
-    const resigned = readMetadata(metadataPath).versions[0];
-    assert.ok(resigned);
-    assert.equal(resigned.signer, "replacement");
-    assert.equal(resigned.published_at, 1_577_836_800);
-    assert.equal(resigned.yanked, true);
+    assert.deepEqual(readMetadata(metadataPath), unchangedMetadata);
+    const preserved = unchangedMetadata.versions[0];
+    assert.ok(preserved);
 
     const prayspecPath = join(
       projectRoot,
@@ -62,10 +62,18 @@ describe("publish", () => {
         "revised guidance bundle",
       ),
     );
-    await publishToRoot(await resolveProject(manifestPath), distributionRoot);
+    await publishToRoot(
+      await resolveProject(manifestPath),
+      distributionRoot,
+      "replacement",
+    );
     const specificationChanged = readMetadata(metadataPath).versions[0];
     assert.ok(specificationChanged);
-    assert.notEqual(specificationChanged.artifact_hash, resigned.artifact_hash);
+    assert.equal(specificationChanged.signer, "replacement");
+    assert.notEqual(
+      specificationChanged.artifact_hash,
+      preserved.artifact_hash,
+    );
     assert.notEqual(specificationChanged.published_at, 1_577_836_800);
     assert.equal(specificationChanged.yanked, true);
 

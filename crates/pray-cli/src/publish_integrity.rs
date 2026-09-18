@@ -2,14 +2,13 @@ use crate::materialize::find_prayspec_file;
 use crate::torrent_manifest_path;
 use pray_core::distribution::RegistryDistributionSettings;
 use pray_core::hashing::sha256_prefixed;
-use pray_core::package_integrity::package_signature_for_publish;
+use pray_core::package_integrity::verify_package_signature;
 use pray_core::paths::normalize_package_relative_path;
 use pray_core::registry::RegistryPackageVersion;
 use pray_core::resolve::ResolvedPackage;
 use pray_core::resource_limits::{
     MAX_ARCHIVE_ENTRIES, MAX_ARCHIVE_ENTRY_BYTES, MAX_ARCHIVE_TOTAL_BYTES,
 };
-use pray_core::ssh_identity::signing_identity;
 use std::collections::BTreeSet;
 use std::fs;
 use std::io::Read;
@@ -39,26 +38,25 @@ pub(crate) fn stored_package_artifact(
         .then_some(artifact_bytes)
 }
 
+/// A stored row is current when its own recorded signature still authenticates the
+/// stored artifact. The check deliberately ignores who is publishing now: a row signed
+/// by another publisher is still a valid attestation of identical bytes, and rewriting it
+/// would restate authorship without republishing anything. An unsigned row is treated as
+/// not current so that publish repairs it.
 pub(crate) fn stored_publish_matches(
     artifact_bytes: &[u8],
     package: &ResolvedPackage,
-    signer: &str,
-    signer_fingerprint: Option<&str>,
-    signing_key: Option<&ed25519_dalek::SigningKey>,
     existing: &RegistryPackageVersion,
 ) -> bool {
-    let artifact_hash = sha256_prefixed(artifact_bytes);
-    let signature = package_signature_for_publish(
-        signing_key,
-        artifact_bytes,
-        &artifact_hash,
-        &package.tree_hash,
-        &signing_identity(signer, signer_fingerprint),
-    );
-    existing.signer.as_deref() == Some(signer)
-        && existing.signer_fingerprint.as_deref() == signer_fingerprint
-        && existing.signer_public_key == signature.signer_public_key
-        && existing.signature.as_deref() == Some(signature.signature.as_str())
+    existing.signature.is_some()
+        && verify_package_signature(
+            &package.declaration.name,
+            &existing.version,
+            existing,
+            artifact_bytes,
+            &package.tree_hash,
+        )
+        .is_ok()
 }
 
 fn stored_prayspec_matches(artifact_bytes: &[u8], package_root: &Path) -> bool {

@@ -32,6 +32,7 @@ mod publish_dest;
 mod publish_integrity;
 mod publish_plan;
 mod publish_ssh;
+mod publish_version;
 mod registry_ops;
 mod revision;
 mod revision_backend;
@@ -197,8 +198,9 @@ fn run(arguments: Vec<String>) -> PrayResult<()> {
             servers,
             to,
             signing_key,
+            resign,
             dry_run,
-        } => publish_command(roots, servers, to, signing_key, dry_run),
+        } => publish_command(roots, servers, to, signing_key, resign, dry_run),
         Command::Yank {
             package,
             version,
@@ -259,7 +261,7 @@ fn run(arguments: Vec<String>) -> PrayResult<()> {
         Command::Sync { root, peers } => sync_command(root, peers),
         Command::Trust { arguments } => trust_command::run_trust_command(arguments),
         Command::Upgrade => cli_release::upgrade_command(),
-        Command::Version => version_command(),
+        Command::Version => cli_release::version_command(),
         Command::Completion { shell } => completion_command(&shell),
     };
 
@@ -273,11 +275,6 @@ fn run(arguments: Vec<String>) -> PrayResult<()> {
         let _ = fs::remove_dir_all(home);
     }
     result
-}
-
-fn version_command() -> PrayResult<()> {
-    println!("pray {}", env!("CARGO_PKG_VERSION"));
-    Ok(())
 }
 
 #[cfg(feature = "auth")]
