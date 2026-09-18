@@ -5,6 +5,8 @@
 - Fetch a locked git catalog revision during `pray install` when the local cache does not have that commit yet. `pray install --offline` still refuses a missing commit.
 - Refuse `pray install --offline` when a git catalog is not already in the local cache, instead of cloning it. A global cache seed still works.
 - Honour a locked git revision for a local file catalog. Install does not read the origin worktree after that checkout fails.
+- Keep git catalog objects in the shared cache. The project catalog is a file tree without a git directory.
+- When a locked git revision is missing from a shallow cache, fetch the missing history instead of only that one commit.
 - Keep an unchanged published version when a later `pray publish` uses a different publisher label.
 - Keep `pray drift` clean after `pray install` when a compose block adds a local file after a package dest already had.
 

@@ -14,6 +14,7 @@ import { describe, it } from "node:test";
 import { PrayError } from "./errors.js";
 import { ensureGitRepository } from "./git/cache.js";
 import { gitSourceCacheDirectory } from "./git/paths.js";
+import { globalGitCacheDirectory } from "./git/store.js";
 
 describe("pinned git revision fetch", () => {
   it("fetches a locked revision missing from a shallow cache", () => {
@@ -26,6 +27,14 @@ describe("pinned git revision fetch", () => {
         fixture.pinned,
       );
       assert.equal(result.revision, fixture.pinned);
+      const parent = spawnSync("git", [
+        "-C",
+        fixture.db,
+        "cat-file",
+        "-e",
+        `${fixture.pinned}^`,
+      ]);
+      assert.equal(parent.status, 0);
     } finally {
       fixture.cleanup();
     }
@@ -111,8 +120,8 @@ describe("pinned git revision fetch", () => {
     process.env.PRAY_CACHE = join(root, "global-cache");
     try {
       const origin = join(root, "origin");
-      mkdirSync(origin, { recursive: true });
-      writeFileSync(join(origin, "catalog.txt"), "one\n");
+      mkdirSync(join(origin, "v1/packages"), { recursive: true });
+      writeFileSync(join(origin, "v1/packages/sample.json"), "{}\n");
       runGit(origin, "init", "--template=", "-b", "main");
       runGit(origin, "config", "user.name", "pray");
       runGit(origin, "config", "user.email", "pray@example.com");
@@ -156,14 +165,15 @@ function pinnedShallowCache(): {
   root: string;
   cloneUrl: string;
   pinned: string;
+  db: string;
   cleanup: () => void;
 } {
   const root = mkdtempSync(join(tmpdir(), "pray-pinned-git-"));
   const previousCache = process.env.PRAY_CACHE;
   process.env.PRAY_CACHE = join(root, "global-cache");
   const origin = join(root, "origin");
-  mkdirSync(origin, { recursive: true });
-  writeFileSync(join(origin, "catalog.txt"), "one\n");
+  mkdirSync(join(origin, "v1/packages"), { recursive: true });
+  writeFileSync(join(origin, "v1/packages/sample.json"), "{}\n");
   runGit(origin, "init", "--template=", "-b", "main");
   runGit(origin, "config", "user.name", "pray");
   runGit(origin, "config", "user.email", "pray@example.com");
@@ -179,6 +189,18 @@ function pinnedShallowCache(): {
     "-m",
     "one",
   );
+  writeFileSync(join(origin, "middle.txt"), "pin\n");
+  runGit(origin, "add", "-A");
+  runGit(
+    origin,
+    "-c",
+    "commit.gpgsign=false",
+    "-c",
+    "core.hooksPath=/dev/null",
+    "commit",
+    "-m",
+    "middle",
+  );
   const pinned = runGit(origin, "rev-parse", "HEAD").trim();
   writeFileSync(join(origin, "later.txt"), "two\n");
   runGit(origin, "add", "-A");
@@ -193,15 +215,17 @@ function pinnedShallowCache(): {
     "two",
   );
   const cloneUrl = `file://${origin}`;
-  const cache = gitSourceCacheDirectory(root, cloneUrl);
-  mkdirSync(join(cache, ".."), { recursive: true });
-  runGit(root, "clone", "--depth", "1", "--no-local", cloneUrl, cache);
-  const missing = spawnSync("git", ["-C", cache, "cat-file", "-e", pinned]);
+  const db = globalGitCacheDirectory(cloneUrl);
+  assert.ok(db);
+  mkdirSync(join(db, ".."), { recursive: true });
+  runGit(root, "clone", "--bare", "--depth", "1", "--no-local", cloneUrl, db);
+  const missing = spawnSync("git", ["-C", db, "cat-file", "-e", pinned]);
   assert.notEqual(missing.status, 0, "fixture cache must lack the pin");
   return {
     root,
     cloneUrl,
     pinned,
+    db,
     cleanup: () => {
       if (previousCache === undefined) delete process.env.PRAY_CACHE;
       else process.env.PRAY_CACHE = previousCache;

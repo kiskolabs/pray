@@ -2,11 +2,16 @@ import { spawnSync } from "node:child_process";
 import { existsSync, readdirSync } from "node:fs";
 import { join } from "node:path";
 import { gitSourceCacheDirectory } from "./paths.js";
+import { globalGitCacheDirectory, globalGitCacheReady } from "./store.js";
 
 export function gitSourceCachedRepository(
   projectRoot: string,
   cloneUrl: string,
 ): string | undefined {
+  const globalCache = globalGitCacheDirectory(cloneUrl);
+  if (globalCache !== undefined && globalGitCacheReady(globalCache)) {
+    return globalCache;
+  }
   const shared = gitSourceCacheDirectory(projectRoot, cloneUrl);
   if (isGitCheckout(shared)) {
     return shared;

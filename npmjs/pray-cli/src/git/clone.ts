@@ -1,17 +1,22 @@
 import { runGit, tryRunGit } from "./run.js";
 
-export function cloneGitCache(
+export function cloneBareGitDb(
   workingDirectory: string,
   source: string,
   destination: string,
   quiet: boolean,
 ): void {
+  const local =
+    source.startsWith("file://") || source.startsWith("/")
+      ? ["--no-local"]
+      : [];
   const filtered = [
     "clone",
+    "--bare",
     "--depth",
     "1",
     "--filter=blob:none",
-    "--sparse",
+    ...local,
     source,
     destination,
   ];
@@ -21,19 +26,22 @@ export function cloneGitCache(
   if (tryRunGit(workingDirectory, ...filtered)) {
     return;
   }
-  const full = ["clone", "--depth", "1", source, destination];
+  const full = [
+    "clone",
+    "--bare",
+    "--depth",
+    "1",
+    ...local,
+    source,
+    destination,
+  ];
   if (quiet) {
     full.splice(1, 0, "--quiet");
   }
   runGit(workingDirectory, ...full);
 }
 
-export function applySparseCheckout(repository: string, subdir?: string): void {
-  runGit(repository, "sparse-checkout", "init", "--cone");
-  runGit(repository, "sparse-checkout", "set", ...catalogSparseCones(subdir));
-}
-
-function catalogSparseCones(subdir?: string): string[] {
+export function catalogSparseCones(subdir?: string): string[] {
   if (subdir && subdir.length > 0) {
     return [`${subdir}/v1/packages`];
   }

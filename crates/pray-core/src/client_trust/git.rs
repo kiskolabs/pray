@@ -167,3 +167,7 @@ pub fn is_remote_git_url(clone_url: &str) -> bool {
         || lower.starts_with("http://")
         || lower.starts_with("git://")
 }
+
+pub fn is_git_repository(path: &Path) -> bool {
+    path.join("HEAD").is_file() || path.join(".git").exists()
+}

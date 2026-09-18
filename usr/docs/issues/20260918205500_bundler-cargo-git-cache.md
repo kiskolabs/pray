@@ -70,9 +70,7 @@ file:// fallback in pray (resolve_git_package_root reads the origin worktree whe
 
 ## Next
 
-Project git cache is still a working tree with .git. Cargo-style split remains design work. See usr/docs/issues/20260917190500_git-cache-without-dot-git.md.
-
-Shallow catalogs still fetch a missing pin with depth 1 rather than unshallow.
+Git-free project catalog and unshallow pin fetch shipped in usr/docs/changelogs/20260918213000_git-free-catalog-and-unshallow.md.
 
 Clone of a missing cache is gated on --offline. file:// origin worktree is no longer read after a pin checkout fails. See usr/docs/changelogs/20260918210000_offline-git-clone-and-file-origin.md.
 

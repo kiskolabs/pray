@@ -3,7 +3,8 @@ use std::path::Path;
 use crate::{PrayError, PrayResult};
 
 use super::git::{
-    commit_signing_fingerprint, commit_signing_key, is_remote_git_url, trust_git_run,
+    commit_signing_fingerprint, commit_signing_key, is_git_repository, is_remote_git_url,
+    trust_git_run,
 };
 use super::policy::{best_rule, load_policy, normalize_key, ClientTrustRule};
 
@@ -11,7 +12,7 @@ pub fn gate_git_source(home: &Path, source_url: &str, repository: &Path) -> Pray
     if !is_remote_git_url(source_url) {
         return Ok(());
     }
-    if !repository.join(".git").is_dir() {
+    if !is_git_repository(repository) {
         return Ok(());
     }
     enforce_source_trust(home, source_url, repository)?;

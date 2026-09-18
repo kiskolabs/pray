@@ -1,9 +1,15 @@
+use crate::resolve_git::{global_git_cache_directory, global_git_cache_ready};
 use crate::resolve_git_command::run_git_command;
 use crate::resolve_git_paths::git_source_cache_directory;
 use std::fs;
 use std::path::{Path, PathBuf};
 
 pub fn git_source_cached_repository(project_root: &Path, clone_url: &str) -> Option<PathBuf> {
+    if let Some(global) = global_git_cache_directory(clone_url) {
+        if global_git_cache_ready(&global) {
+            return Some(global);
+        }
+    }
     let shared = git_source_cache_directory(project_root, clone_url);
     if is_git_checkout(&shared) {
         return Some(shared);

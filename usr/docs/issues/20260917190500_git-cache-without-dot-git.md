@@ -6,7 +6,7 @@ Andrei Makarov
 
 ## Decisions
 
-No product change in this pass. Research only.
+No product change in this pass. Research only. A later pass on 2026-09-18 implemented the design in this note. See usr/docs/changelogs/20260918213000_git-free-catalog-and-unshallow.md.
 
 Prayer files used for resolve and render do not need a .git directory. After a git source is cloned, install reads v1/packages metadata and a .praypkg, unpacks that archive into .pray/cache/registry, and renders from the unpacked tree. That registry cache is already git-free.
 
@@ -71,6 +71,8 @@ If .git is removed from a project catalog without a design change:
 - verify-commit cannot run on that path
 - global seed cannot git clone --bare from it
 
+A later pass on 2026-09-18 implemented the design below. See usr/docs/changelogs/20260918213000_git-free-catalog-and-unshallow.md.
+
 A design that matches the claim without losing those jobs:
 
 - keep git objects only in the global bare db
@@ -83,15 +85,9 @@ That is a behavior change and needs tests first. Cone-mode root files are a smal
 
 ## Next
 
-Decide whether project git cache should become a git-free distribution tree while the global cache stays the bare object store.
+Shipped. Objects live in the global bare store. The project catalog is a git-free tree. Unshallow replaces a depth-1 pin fetch. Trust and import-repo use the bare store. See usr/docs/changelogs/20260918213000_git-free-catalog-and-unshallow.md.
 
-If yes: tests that a locked install reuses a catalog directory with no .git, that update fetches in the bare db, that blobless artifact materialize still works, and that require_signed_commit runs on the bare db including subdir sources.
-
-Fix gate_git_source to treat a .git file as a checkout so worktrees do not skip trust. Independent of stripping .git.
-
-Optional: non-cone sparse patterns so root files are not checked out. Independent of stripping .git.
-
-Do not delete .git from existing caches until the reuse path exists.
+Optional leftover: leftover project worktrees with .git remain a fallback when the global store is missing.
 
 ## Source
 

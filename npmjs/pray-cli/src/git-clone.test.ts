@@ -12,7 +12,7 @@ import {
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { describe, it } from "node:test";
-import { applySparseCheckout, cloneGitCache } from "./git/clone.js";
+import { ensureGitRepository } from "./git/cache.js";
 import { materializeGitCatalogFile } from "./git/materialize.js";
 
 const UNUSED_BYTES = 128 * 1024;
@@ -20,9 +20,10 @@ const UNUSED_BYTES = 128 * 1024;
 describe("git blobless catalog clone", () => {
   it("keeps unused artifacts out of the clone and materializes a used file", () => {
     const root = mkdtempSync(join(tmpdir(), "pray-git-blobless-"));
+    const previousCache = process.env.PRAY_CACHE;
+    process.env.PRAY_CACHE = join(root, "global-cache");
     try {
       const origin = join(root, "origin");
-      const clone = join(root, "clone");
       mkdirSync(join(origin, "v1/packages/sample"), { recursive: true });
       mkdirSync(join(origin, "v1/artifacts/sample/base/1.0.0"), {
         recursive: true,
@@ -36,7 +37,7 @@ describe("git blobless catalog clone", () => {
         "v1/artifacts/sample/heavy/1.0.0/sample-heavy-1.0.0.praypkg";
       writeFileSync(join(origin, used), "used-package\n");
       writeFileSync(join(origin, unused), Buffer.alloc(UNUSED_BYTES, 7));
-      runGit(origin, "init", "-b", "main");
+      runGit(origin, "init", "--template=", "-b", "main");
       runGit(origin, "config", "user.name", "pray");
       runGit(origin, "config", "user.email", "pray@example.com");
       runGit(origin, "config", "uploadpack.allowFilter", "true");
@@ -51,16 +52,18 @@ describe("git blobless catalog clone", () => {
         "-m",
         "catalog",
       );
-      cloneGitCache(root, `file://${origin}`, clone, true);
-      applySparseCheckout(clone);
-      assert.equal(existsSync(join(clone, unused)), false);
-      materializeGitCatalogFile(clone, used);
-      assert.equal(existsSync(join(clone, used)), true);
+      const result = ensureGitRepository(root, `file://${origin}`, false);
+      assert.equal(existsSync(join(result.cacheDirectory, ".git")), false);
+      assert.equal(existsSync(join(result.cacheDirectory, unused)), false);
+      materializeGitCatalogFile(result.cacheDirectory, used);
+      assert.equal(existsSync(join(result.cacheDirectory, used)), true);
       assert.ok(
-        directoryBytes(clone) < UNUSED_BYTES,
-        "blobless clone should stay smaller than the unused artifact",
+        directoryBytes(result.cacheDirectory) < UNUSED_BYTES,
+        "blobless catalog should stay smaller than the unused artifact",
       );
     } finally {
+      if (previousCache === undefined) delete process.env.PRAY_CACHE;
+      else process.env.PRAY_CACHE = previousCache;
       rmSync(root, { recursive: true, force: true });
     }
   });
