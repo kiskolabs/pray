@@ -1,9 +1,10 @@
 # CHANGELOG
 
-## Unreleased
+## 1.20.0 (2026-09-18)
 
 - Skip a crate on `make release-all` when that version already exists on crates.io.
 - Add `pray publish --resign` for local distribution roots to sign existing package versions with a new key while keeping their yank state and first-publish time.
+- Keep an unchanged published version when a later `pray publish` uses a different publisher label.
 - Label publisher names as claims and distinguish package signatures from content digests on distribution package pages.
 - Keep `pray drift` clean after `pray install` when a compose block adds a local file after a package dest already had.
 
