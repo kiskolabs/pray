@@ -55,18 +55,18 @@ RSpec.describe Pray::Publish do
     described_class.publish_to_root(project, publish_root)
     expect(JSON.parse(File.read(metadata_path))).to eq(unchanged_metadata)
 
+    # A second publisher over unchanged packages must not restate authorship of bytes
+    # nobody rebuilt, or one maintainer's release buries itself in the other's identity.
     described_class.publish_to_root(project, publish_root, signer: "replacement")
-    resigned = JSON.parse(File.read(metadata_path))["versions"].first
-    expect(resigned["signer"]).to eq("replacement")
-    expect(resigned["published_at"]).to eq(1_577_836_800)
-    expect(resigned["yanked"]).to be(true)
+    expect(JSON.parse(File.read(metadata_path))).to eq(unchanged_metadata)
 
     prayspec_path = File.join(project_dir, "packages", "base", "sample-base.prayspec")
     File.write(prayspec_path, File.read(prayspec_path).sub("small guidance bundle", "revised guidance bundle"))
     specification_project = Pray::Resolve.resolve_project(File.join(project_dir, "Prayfile"))
-    described_class.publish_to_root(specification_project, publish_root)
+    described_class.publish_to_root(specification_project, publish_root, signer: "replacement")
     specification_changed = JSON.parse(File.read(metadata_path))["versions"].first
-    expect(specification_changed["artifact_hash"]).not_to eq(resigned["artifact_hash"])
+    expect(specification_changed["signer"]).to eq("replacement")
+    expect(specification_changed["artifact_hash"]).not_to eq(unchanged["artifact_hash"])
     expect(specification_changed["published_at"]).not_to eq(1_577_836_800)
     expect(specification_changed["yanked"]).to be(true)
 
