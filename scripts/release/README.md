@@ -51,7 +51,7 @@ scripts/release/npm.sh --publish
 scripts/release/rubygems.sh --publish
 ```
 
-Publish local packages under `packages/` to a distribution root:
+Publish local prayers under `prayers/` to a distribution root:
 
 ```sh
 scripts/release/distribution.sh --root ./prayers

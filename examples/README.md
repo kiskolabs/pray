@@ -9,3 +9,5 @@ This folder contains small, self-contained Prayfile examples that show different
 - `customized-render/` — custom source wiring, optional local input, and an explicit render policy
 
 Each example includes a `Prayfile`, the package definitions it depends on, and a small set of exported fragments that the renderer can assemble.
+
+These examples keep path prayers under `prayers/`. See [docs/repository-layouts.md](../docs/repository-layouts.md).

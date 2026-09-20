@@ -5,7 +5,7 @@ target :tool_c do
   rules ".tool-c/rules"
 end
 agent "sample/compliance", "~> 0.9",
-  path: "packages/compliance",
+  path: "prayers/compliance",
   exports: ["audit-notes", "rollback-plan"]
 local ".agents/project.md"
 local ".agents/security.md", optional: true

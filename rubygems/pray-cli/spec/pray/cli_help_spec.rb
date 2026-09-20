@@ -66,6 +66,16 @@ RSpec.describe "pray CLI help" do
     expect(status).to be_success
     expect(stdout).to include("prayers/")
     expect(stdout).to include("pray prayer init")
+    expect(stdout).to include("prayers/<name>/")
+    expect(stdout).not_to include("root packages/")
+  end
+
+  it "documents product and catalog layouts on repo init" do
+    stdout, _stderr, status = run_pray("help", "repo")
+    expect(status).to be_success
+    expect(stdout).to include("prayers/v1")
+    expect(stdout).to include("prayers/<name>/")
+    expect(stdout).not_to include("root packages/")
   end
 
   it "prints help for listed commands" do

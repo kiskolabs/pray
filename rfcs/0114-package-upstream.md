@@ -30,7 +30,7 @@ The catalog Prayfile names a source that can resolve `sample/base` and keeps the
 
 ```manifest
 source "sample", git: "https://example.com/sample-prayers.git"
-pray "fork/base", path: "packages/base"
+pray "fork/base", path: "prayers/base"
 ```
 
 `pray install` resolves upstream, verifies hashes, and records them on the fork's lock entry. It does not compose upstream and does not replace path files.

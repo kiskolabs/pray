@@ -1,8 +1,8 @@
 #!/usr/bin/env bash
-# Package local prayer packages and publish them to a distribution point.
+# Package path-owned prayers from the project Prayfile and publish them.
 #
-# Builds a temporary publisher workspace that only declares packages under
-# packages/, then runs `pray package` and `pray publish`.
+# Remote git dependencies are not packed. pray package and pray publish
+# select path-owned packages only (RFC 0118).
 #
 # Usage:
 #   scripts/release/distribution.sh --root ./prayers
@@ -66,51 +66,16 @@ fi
 
 release_require_command "${PRAY_BIN}"
 
-PACKAGES_DIR="${ROOT}/packages"
-if [[ ! -d "${PACKAGES_DIR}" ]]; then
-  echo "missing packages directory: ${PACKAGES_DIR}" >&2
-  exit 2
-fi
-
-PACKAGE_SPECS=()
-while IFS= read -r spec; do
-  PACKAGE_SPECS+=("${spec}")
-done < <(find "${PACKAGES_DIR}" -mindepth 2 -maxdepth 2 -type f -name '*.prayspec' | sort)
-if [[ ${#PACKAGE_SPECS[@]} -eq 0 ]]; then
-  echo "no *.prayspec files found under ${PACKAGES_DIR}" >&2
-  exit 2
-fi
-
-PUBLISHER="$(mktemp -d "${TMPDIR:-/tmp}/pray-release-publisher.XXXXXX")"
-cleanup() {
-  rm -rf "${PUBLISHER}"
-}
-trap cleanup EXIT
-
-ln -s "${PACKAGES_DIR}" "${PUBLISHER}/packages"
-
-{
-  echo 'prayfile "1"'
-  echo
-  for spec in "${PACKAGE_SPECS[@]}"; do
-    package_dir="$(dirname "${spec}")"
-    relative="${package_dir#"${PACKAGES_DIR}"/}"
-    name="$(basename "${relative}")"
-    echo "pray \"${name}\", path: \"packages/${relative}\""
-  done
-} >"${PUBLISHER}/Prayfile"
-
-echo "publisher workspace: ${PUBLISHER}"
-echo "packages:"
-for spec in "${PACKAGE_SPECS[@]}"; do
-  echo "  - ${spec#"${ROOT}/"}"
-done
-
-cd "${PUBLISHER}"
+cd "${ROOT}"
 
 echo "==> ${PRAY_BIN} package ($(command -v "${PRAY_BIN}"))"
 "${PRAY_BIN}" --version 2>/dev/null || true
-"${PRAY_BIN}" package
+
+if [[ "${DRY_RUN}" -eq 1 ]]; then
+  echo "==> dry-run: would run ${PRAY_BIN} package"
+else
+  "${PRAY_BIN}" package
+fi
 
 PUBLISH_ARGS=()
 if ((${#ROOTS[@]} > 0)); then
@@ -136,7 +101,7 @@ if [[ "${DRY_RUN}" -eq 1 ]]; then
   exit 0
 fi
 
-if ! release_confirm "Publish local packages to distribution point?"; then
+if ! release_confirm "Publish local prayers to distribution point?"; then
   echo "skipped distribution publish"
   exit 0
 fi

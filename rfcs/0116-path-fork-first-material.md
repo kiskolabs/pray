@@ -29,7 +29,7 @@ end
 
 ```manifest
 source "sample", git: "https://example.com/sample-prayers.git"
-pray "fork/base", path: "packages/base"
+pray "fork/base", path: "prayers/base"
 ```
 
 `spec.files` lists content. The `*.prayspec` on disk is identity and is not listed there. Empty `spec.files` means no content yet.

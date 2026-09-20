@@ -14,7 +14,7 @@ Prayfile MAY declare named publish remotes. `pray publish` uses those remotes wh
 
 ## Motivation
 
-`pray publish` required `--root` or `--server` on every run. A mixed consumer and publisher Prayfile also packed every resolved dependency into that dest. Operators mistype dest paths, and this repository already builds a temporary Prayfile of `packages/` only before publish.
+`pray publish` required `--root` or `--server` on every run. A mixed consumer and publisher Prayfile also packed every resolved dependency into that dest. Operators mistype dest paths.
 
 ## Guide-level explanation
 

@@ -1,5 +1,9 @@
 # CHANGELOG
 
+## Unreleased
+
+- Keep prayer sources under `prayers/<name>/`, beside `prayers/v1/` when this project publishes. `prayers/v1/packages/` is catalog metadata. A root `packages/` folder is not a pray source convention.
+
 ## 1.20.0 (2026-09-18)
 
 - Fetch a locked git catalog revision during `pray install` when the local cache does not have that commit yet. `pray install --offline` still refuses a missing commit.

@@ -11,7 +11,7 @@ Publishing is not automated in CI. Operators run the scripts under `scripts/rele
 | [crates.io](https://crates.io/crates/pray-cli) | `pray-core`, `pray-transport`, `pray-cli` | `pray` (from `pray-cli`) |
 | [npm](https://www.npmjs.com/package/pray-cli) | `pray-cli` | `pray` |
 | [RubyGems](https://rubygems.org/gems/pray-cli) | `pray-cli` | `pray` |
-| pray distribution point | packages under `packages/` | n/a |
+| pray distribution point | prayers under `prayers/` (see [repository-layouts.md](repository-layouts.md)) | n/a |
 
 The crates.io name `pray` is already taken by an unrelated project, so the Rust CLI publishes as `pray-cli` while keeping the binary name `pray`.
 

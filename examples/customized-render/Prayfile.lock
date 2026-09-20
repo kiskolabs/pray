@@ -7,10 +7,10 @@ source = []
 [[package]]
 name = "sample/compliance"
 version = "0.9.1"
-path = "./packages/compliance"
+path = "./prayers/compliance"
 tree_hash = "sha256:8c05c4bc268ee1697343526f12ba5a0c514455bfa6352c861506cc8cb42f859a"
 artifact_hash = "sha256:8c05c4bc268ee1697343526f12ba5a0c514455bfa6352c861506cc8cb42f859a"
-artifact = "path:./packages/compliance"
+artifact = "path:./prayers/compliance"
 exports = [
     "audit-notes",
     "rollback-plan",

@@ -39,6 +39,14 @@ end
 
 The directory name is the author's. `prayers/` is the default when `pray prayer init` adds a path source. `pray prayer init notes --path guidance` writes `guidance/notes/`.
 
+Three repository shapes share these folders.
+
+A consumer keeps local prayers under a path source. The default is `prayers/<name>/`. There is no catalog.
+
+A publisher keeps those sources beside `prayers/v1/`. A catalog of many prayers uses the same tree: one named directory per prayer.
+
+`prayers/v1/packages/` is catalog metadata. Root `packages/`, `dist/`, and `shared/` are not pray source conventions. `pray prayer init` without a Prayfile still scaffolds a standalone package in the current directory.
+
 `pray prayer init` in a directory with a Prayfile writes `<dir>/<name>/` with no `spec.version`. It adds `source "local", path: "<dir>"` when the project has no path source. It declares `pray "<source>/<name>"` once, such as `pray "local/project"`: inside the first `compose` block when one exists, otherwise at the top level, never with `path:`. `spec.name` is that same token. A starter fragment is included.
 
 Without a Prayfile, `pray prayer init` still scaffolds a versioned package in the current directory for a standalone package repository.
@@ -71,7 +79,7 @@ If the Prayfile does not already declare the package, implementations MUST appen
 
 `pray prayer init` without a Prayfile MUST keep the current-directory package scaffold and MUST write `spec.version`.
 
-The folder `prayers/v1/` remains the distribution checkout from `pray repo init`. When the path source directory is `prayers/`, named prayer directories MAY sit beside `v1/`.
+The folder `prayers/v1/` remains the distribution checkout from `pray repo init`. When the path source directory is `prayers/`, named prayer directories MAY sit beside `v1/`. Implementations MUST NOT require a root `packages/` directory to publish a path-owned package.
 
 ## Implementation notes
 

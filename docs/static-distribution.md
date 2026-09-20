@@ -2,6 +2,8 @@
 
 Pray v1 distribution points are a static file tree. No server API is required for install.
 
+Where that tree sits in a git repository, and where package sources live beside it, is described in [repository-layouts.md](repository-layouts.md).
+
 ## Layout
 
 Given a distribution root (directory or HTTP origin):

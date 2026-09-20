@@ -55,6 +55,13 @@ describe("help", () => {
     const prayer = commandHelpText("prayer");
     assert.ok(prayer);
     assert.match(prayer, /prayers\//);
+    assert.match(prayer, /prayers\/<name>\//);
+    assert.doesNotMatch(prayer, /root packages\//);
+    const repo = commandHelpText("repo");
+    assert.ok(repo);
+    assert.match(repo, /prayers\/v1/);
+    assert.match(repo, /prayers\/<name>\//);
+    assert.doesNotMatch(repo, /root packages\//);
   });
 
   it("documents login and upgrade", () => {

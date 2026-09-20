@@ -213,11 +213,17 @@ pub(crate) fn command_help_text(command: &str) -> Option<&'static str> {
              The default directory is prayers/. Use --path to choose another.\n\
              Declares pray \"<source>/<name>\" once, such as pray \"local/project\", inside compose when a compose block exists.\n\
              The default name is project. The name v1 is reserved for the distribution layout.\n\
+             Named prayers may sit beside prayers/v1/. Keep sources under prayers/<name>/.\n\
              Without a Prayfile, writes a versioned package spec in the current directory.\n\
              Add spec.version before pray package or pray publish.\n\
              A compose file such as .agents/project.md remains a shortcut for one local file.",
         ),
-        "repo" => Some("scaffold a distribution root\n\nUsage: pray repo init"),
+        "repo" => Some(
+            "scaffold a distribution root\n\n\
+             Usage: pray repo init\n\n\
+             Writes prayers/v1/. Git install discovers that catalog. Named prayers may sit beside v1/.\n\
+             Keep sources under prayers/<name>/.",
+        ),
         "manifest" => Some("print canonical Prayfile JSON\n\nUsage: pray manifest"),
         "package" => Some("build a distributable prayer archive\n\nUsage: pray package"),
         "upgrade" => Some(
