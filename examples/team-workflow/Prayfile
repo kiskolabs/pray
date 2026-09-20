@@ -11,12 +11,12 @@ target :tool_b do
 end
 group :core do
   agent "sample/core", "~> 3.2",
-    path: "packages/core",
+    path: "prayers/core",
     exports: ["incident-triage", "testing-basics"]
 end
 group :ui do
   agent "sample/ui", "~> 2.1",
-    path: "packages/ui",
+    path: "prayers/ui",
     exports: ["webapp-review", "live-pages"]
 end
 local ".agents/project.md", position: :before

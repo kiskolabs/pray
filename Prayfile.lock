@@ -241,10 +241,10 @@ dependencies = []
 [[package]]
 name = "prayer-publisher"
 version = "0.1.0"
-path = "./packages/prayer-publisher"
+path = "./prayers/prayer-publisher"
 tree_hash = "sha256:0d728cf913686ac98aecb4e4b01c53c34a8f3b58c939332eb3215441a1113c4c"
 artifact_hash = "sha256:0d728cf913686ac98aecb4e4b01c53c34a8f3b58c939332eb3215441a1113c4c"
-artifact = "path:./packages/prayer-publisher"
+artifact = "path:./prayers/prayer-publisher"
 exports = ["skill"]
 dependencies = []
 

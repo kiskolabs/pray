@@ -107,7 +107,7 @@ fn manifest_schema_rejects_non_fail_conflict() {
 #[test]
 fn parsed_example_package_spec_validates_against_package_schema() {
     let validator = load_validator("package.schema.json");
-    let path = workspace_root().join("examples/simple-project/packages/base/sample-base.prayspec");
+    let path = workspace_root().join("examples/simple-project/prayers/base/sample-base.prayspec");
     let package_text = fs::read_to_string(&path).expect("read prayspec");
     let package_spec = parse_package_spec(&package_text).expect("parse prayspec");
     let value = serde_json::to_value(package_spec.canonicalized()).expect("serialize package spec");

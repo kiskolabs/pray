@@ -5,7 +5,7 @@ target :tool_a do
   folder ".agents/skills"
 end
 agent "sample/base", "~> 1.4",
-  path: "packages/base",
+  path: "prayers/base",
   exports: ["testing-basics", "security-basics"]
 local ".agents/project.md"
 render mode: :managed,

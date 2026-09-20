@@ -120,7 +120,7 @@ Prayfile:
 * can serve a local or self-hosted distribution point through `pray serve`
 * can install packages directly from git repositories when they are used as distribution roots
 * can record `publish` and `sync` updates through Git, Mercurial, or configured command backends, with optional remote push when enabled
-* can scaffold consumer projects, package repositories, and distribution repositories through `pray init`, `pray prayer init`, and `pray repo init`
+* can scaffold a Prayfile, a local prayer, and a distribution root through `pray init`, `pray prayer init`, and `pray repo init`. Repository shapes: [docs/repository-layouts.md](docs/repository-layouts.md)
 * enables reviewable updates through normal version control workflows
 * avoids arbitrary package code execution
 
@@ -162,6 +162,8 @@ CLAUDE.md
 .pray/           # ignored by default
 .pray/vendor/    # optional, committed only for hermetic/offline mode
 ```
+
+A project that authors or publishes prayers uses `prayers/` as described in [repository layouts](docs/repository-layouts.md).
 
 `Prayfile` is committed because it declares desired input dependencies.
 

@@ -207,11 +207,19 @@ module Pray
           The default directory is prayers/. Use --path to choose another.
           Declares pray "<source>/<name>" once, such as pray "local/project", inside compose when a compose block exists.
           The default name is project. The name v1 is reserved for the distribution layout.
+          Named prayers may sit beside prayers/v1/. Keep sources under prayers/<name>/.
           Without a Prayfile, writes a versioned package spec in the current directory.
           Add spec.version before pray package or pray publish.
           A compose file such as .agents/project.md remains a shortcut for one local file.
         TEXT
-        "repo" => "scaffold a distribution root\n\nUsage: pray repo init",
+        "repo" => <<~TEXT.strip,
+          scaffold a distribution root
+
+          Usage: pray repo init
+
+          Writes prayers/v1/. Git install discovers that catalog. Named prayers may sit beside v1/.
+          Keep sources under prayers/<name>/.
+        TEXT
         "manifest" => "print canonical Prayfile JSON\n\nUsage: pray manifest",
         "package" => "build a distributable prayer archive\n\nUsage: pray package",
         "version" => <<~TEXT.strip,

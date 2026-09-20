@@ -7,10 +7,10 @@ source = []
 [[package]]
 name = "sample/core"
 version = "3.2.0"
-path = "./packages/core"
+path = "./prayers/core"
 tree_hash = "sha256:f2c91485563e5402327f8e69365d8dae82be7b36b0c705b72a30f890d3d0b6a8"
 artifact_hash = "sha256:f2c91485563e5402327f8e69365d8dae82be7b36b0c705b72a30f890d3d0b6a8"
-artifact = "path:./packages/core"
+artifact = "path:./prayers/core"
 exports = [
     "incident-triage",
     "testing-basics",
@@ -20,10 +20,10 @@ dependencies = []
 [[package]]
 name = "sample/ui"
 version = "2.1.0"
-path = "./packages/ui"
+path = "./prayers/ui"
 tree_hash = "sha256:f90be3d10fe47930e42832baa4e6f3e0e81018354c5fbe30d0eb82fdacbd3f90"
 artifact_hash = "sha256:f90be3d10fe47930e42832baa4e6f3e0e81018354c5fbe30d0eb82fdacbd3f90"
-artifact = "path:./packages/ui"
+artifact = "path:./prayers/ui"
 exports = [
     "webapp-review",
     "live-pages",

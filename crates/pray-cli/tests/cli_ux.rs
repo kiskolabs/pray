@@ -100,6 +100,18 @@ fn workflow_help_names_what_each_command_compares() {
     assert!(prayer.contains("pray prayer init"));
 }
 
+#[test]
+fn prayer_and_repo_help_name_product_and_catalog_layouts() {
+    let prayer = stdout_of(&["help", "prayer"]);
+    assert!(prayer.contains("prayers/v1"));
+    assert!(prayer.contains("prayers/<name>/"));
+    assert!(!prayer.contains("root packages/"));
+    let repo = stdout_of(&["help", "repo"]);
+    assert!(repo.contains("prayers/v1"));
+    assert!(repo.contains("prayers/<name>/"));
+    assert!(!repo.contains("root packages/"));
+}
+
 fn stdout_of(arguments: &[&str]) -> String {
     let output = run_pray(arguments);
     assert!(

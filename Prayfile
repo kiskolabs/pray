@@ -33,7 +33,7 @@ tree ".agents/skills" do
   pray "amkisko/changelog-update", "~> 2.1"
   pray "amkisko/claims-audit", "~> 1.0"
   pray "amkisko/rfc-process", "~> 1.2"
-  pray "prayer-publisher", path: "packages/prayer-publisher"
+  pray "prayer-publisher", path: "prayers/prayer-publisher"
 end
 
 pray "amkisko/community-security", "~> 1.2", file: "SECURITY.md"
