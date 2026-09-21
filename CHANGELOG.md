@@ -3,6 +3,7 @@
 ## Unreleased
 
 - Keep prayer sources under `prayers/<name>/`, beside `prayers/v1/` when this project publishes. `prayers/v1/packages/` is catalog metadata. A root `packages/` folder is not a pray source convention.
+- Recalculate committed `Prayfile.lock` hashes after path sources moved under `prayers/`.
 
 ## 1.20.0 (2026-09-18)
 

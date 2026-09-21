@@ -51,10 +51,7 @@ describe("publish", () => {
     const preserved = unchangedMetadata.versions[0];
     assert.ok(preserved);
 
-    const prayspecPath = join(
-      projectRoot,
-      "packages/base/sample-base.prayspec",
-    );
+    const prayspecPath = join(projectRoot, "prayers/base/sample-base.prayspec");
     writeFileSync(
       prayspecPath,
       readFileSync(prayspecPath, "utf8").replace(
@@ -78,7 +75,7 @@ describe("publish", () => {
     assert.equal(specificationChanged.yanked, true);
 
     writeFileSync(
-      join(projectRoot, "packages/base/README.md"),
+      join(projectRoot, "prayers/base/README.md"),
       "Changed package\n",
     );
     await publishToRoot(await resolveProject(manifestPath), distributionRoot);

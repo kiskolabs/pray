@@ -258,18 +258,13 @@ render mode: :managed, conflict: :fail, churn: :minimal
         "locked install should keep the pinned revision:\n{lockfile_after}"
     );
 
-    let cache_head = String::from_utf8_lossy(
-        &git(
-            &git_cache_repository(&consumer_repo),
-            &["rev-parse", "HEAD"],
-        )
-        .stdout,
-    )
-    .trim()
-    .to_string();
+    let catalog_revision =
+        fs::read_to_string(git_cache_repository(&consumer_repo).join(".pray-revision"))
+            .expect("catalog revision marker");
     assert_eq!(
-        cache_head, initial_commit,
-        "git cache should remain on the locked revision after distribution moved forward"
+        catalog_revision.trim(),
+        initial_commit,
+        "git catalog should remain on the locked revision after distribution moved forward"
     );
 }
 
