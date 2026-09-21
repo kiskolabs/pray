@@ -261,7 +261,7 @@ RSpec.describe "Pray parser" do
     prayfile = File.read(File.expand_path("../../../../examples/simple-project/Prayfile", __dir__))
     manifest = Pray.parse_manifest(prayfile)
     expect(manifest.manifest_hash).to eq(
-      "sha256:286de6b550c26f05c4bff8f30a6a43f152a2bcf73d6d49e1cc9f6817a5e32c91"
+      "sha256:52235a67dc445cbf8548de90999310ef42be3cafd81fe63a43a5ccd89ed047a1"
     )
   end
 

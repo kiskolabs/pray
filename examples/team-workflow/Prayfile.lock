@@ -1,7 +1,7 @@
 prayfile_lock = "1"
 spec = "0.1"
 generated_by = "pray 0.1.0"
-manifest_hash = "sha256:04932da0b4b77b547596d8a464ea0f835c4f1f80aee560b566ebc5969e7c23cc"
+manifest_hash = "sha256:ad32fba7cdab425f89f04853ce4cd10d660d2fc70fedaca2ae9199b35cda10c5"
 source = []
 
 [[package]]

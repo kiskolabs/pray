@@ -60,7 +60,7 @@ RSpec.describe Pray::Publish do
     described_class.publish_to_root(project, publish_root, signer: "replacement")
     expect(JSON.parse(File.read(metadata_path))).to eq(unchanged_metadata)
 
-    prayspec_path = File.join(project_dir, "packages", "base", "sample-base.prayspec")
+    prayspec_path = File.join(project_dir, "prayers", "base", "sample-base.prayspec")
     File.write(prayspec_path, File.read(prayspec_path).sub("small guidance bundle", "revised guidance bundle"))
     specification_project = Pray::Resolve.resolve_project(File.join(project_dir, "Prayfile"))
     described_class.publish_to_root(specification_project, publish_root, signer: "replacement")
@@ -70,7 +70,7 @@ RSpec.describe Pray::Publish do
     expect(specification_changed["published_at"]).not_to eq(1_577_836_800)
     expect(specification_changed["yanked"]).to be(true)
 
-    File.write(File.join(project_dir, "packages", "base", "README.md"), "Changed package\n")
+    File.write(File.join(project_dir, "prayers", "base", "README.md"), "Changed package\n")
     changed_project = Pray::Resolve.resolve_project(File.join(project_dir, "Prayfile"))
     described_class.publish_to_root(changed_project, publish_root)
     changed = JSON.parse(File.read(metadata_path))["versions"].first

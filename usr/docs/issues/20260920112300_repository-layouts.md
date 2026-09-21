@@ -22,6 +22,8 @@ This repository moved packages/prayer-publisher to prayers/prayer-publisher, bes
 
 Person-facing surface: pray help prayer and pray help repo, plus docs/repository-layouts.md. Hierarchy is consumer versus publisher under one prayers/ tree. Copy is folder names and init commands. Interactive states and empty or error screens do not apply. Remaining for a human: read the help text on a terminal.
 
+A later pass on 2026-09-21 recalculated committed Prayfile.lock hashes for this repository and the examples after the path change. Publish tests that copy simple-project now edit prayers/base. The locked-install git catalog check reads .pray-revision instead of git HEAD, because the project catalog is a file tree without a git directory.
+
 ## Next
 
 Downstream product repos can point at docs/repository-layouts.md.
