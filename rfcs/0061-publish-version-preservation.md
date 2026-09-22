@@ -67,13 +67,13 @@ Registry merge identity MUST exclude `published_at`. A merge of rows that differ
 
 `published_at` is optional. When present, it MUST be a JSON integer containing whole UTC seconds since `1970-01-01T00:00:00Z`. Its inclusive range is 0 through 253402300799, ending at `9999-12-31T23:59:59Z`. Producers MUST omit an unknown value. They MUST NOT emit a string, a number with a non-zero fractional part, a negative number, an out-of-range integer, or `null`. Registry and federation package-version payloads use this same representation.
 
-Readers MAY accept numeric strings or RFC 3339 strings written by earlier reference clients for migration. They MUST truncate any legacy fractional second toward the preceding whole second and normalize the value to the canonical integer on the next metadata write. Other invalid representations fail validation.
+Readers MAY accept numeric strings or RFC 3339 strings written by earlier reference clients for migration. They MAY treat JSON null as absent, matching catalogs that serialized an unknown value as null. They MUST truncate any legacy fractional second toward the preceding whole second and normalize the value to the canonical integer on the next metadata write. Other invalid representations fail validation.
 
 The package signature contract in RFC 0050 remains unchanged. `published_at` is catalog metadata and is not part of the signed payload.
 
 ## Implementation notes
 
-The reference implementation covers local preservation and legacy timestamp normalization in the Rust, Ruby, and TypeScript publish tests. Rust accepts legacy numeric strings. Ruby and TypeScript also accept prior RFC 3339 output. The registry schema test rejects strings, numbers with non-zero fractional parts, negatives, out-of-range integers, and null. The Rust registry identity test covers timestamp-only merge input. Only Rust exposes ed25519 publish signing and `--resign` today. Its publish tests cover explicit key upgrade, rotation, and replacement of a self-consistent but false stored artifact from local package source.
+The reference implementation covers local preservation and legacy timestamp normalization in the Rust, Ruby, and TypeScript publish tests. Rust, Ruby, and TypeScript accept legacy numeric strings, RFC 3339 strings, and JSON null as absent. The registry schema test rejects strings, numbers with non-zero fractional parts, negatives, out-of-range integers, and null. The Rust registry identity test covers timestamp-only merge input. Only Rust exposes ed25519 publish signing and `--resign` today. Its publish tests cover explicit key upgrade, rotation, and replacement of a self-consistent but false stored artifact from local package source.
 
 ## Security considerations
 

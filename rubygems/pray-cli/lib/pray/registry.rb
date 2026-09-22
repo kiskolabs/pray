@@ -165,9 +165,9 @@ module Pray
 
     def publish_timestamp_from_value(value)
       timestamp = case value
+      when nil then return nil
       when Integer then value
-      when String
-        value.match?(/\A\d+\z/) ? value.to_i : Time.iso8601(value).to_i
+      when String then value.match?(/\A\d+\z/) ? value.to_i : Time.iso8601(value).to_i
       end
       unless timestamp&.between?(0, 253_402_300_799)
         raise Error.integrity("registry published_at must be whole UTC Unix seconds")

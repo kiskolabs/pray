@@ -25,12 +25,14 @@ RSpec.describe Pray::Registry do
         version.merge("published_at" => "2020-01-01T00:00:00.999Z")
       )
       numeric = described_class.version_from_hash(version.merge("published_at" => "1234567890"))
+      absent = described_class.version_from_hash(version.merge("published_at" => nil))
       expect(rfc3339.published_at).to eq(1_577_836_800)
       expect(numeric.published_at).to eq(1_234_567_890)
+      expect(absent.published_at).to be_nil
     end
 
     it "rejects non-canonical values outside migration formats" do
-      [nil, 1.5, -1, 253_402_300_800, "tomorrow"].each do |published_at|
+      [1.5, -1, 253_402_300_800, "tomorrow"].each do |published_at|
         expect do
           described_class.version_from_hash(version.merge("published_at" => published_at))
         end.to raise_error(Pray::Error, /whole UTC Unix seconds/)
