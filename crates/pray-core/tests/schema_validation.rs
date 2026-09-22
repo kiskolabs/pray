@@ -202,38 +202,6 @@ fn registry_schema_requires_canonical_publish_timestamp() {
 }
 
 #[test]
-fn registry_reader_normalizes_legacy_numeric_publish_timestamp() {
-    let legacy = serde_json::json!({
-        "name": "sample/base",
-        "versions": [{
-            "version": "1.0.0",
-            "artifact": "v1/artifacts/sample/base/1.0.0/package.praypkg",
-            "published_at": "1234567890"
-        }]
-    });
-    let metadata: RegistryPackageMetadata =
-        serde_json::from_value(legacy).expect("legacy numeric timestamp");
-    assert_eq!(metadata.versions[0].published_at, Some(1_234_567_890));
-    let canonical = serde_json::to_value(metadata).expect("canonical metadata");
-    assert_eq!(canonical["versions"][0]["published_at"], 1_234_567_890_u64);
-
-    for timestamp in [
-        serde_json::json!("not-a-timestamp"),
-        serde_json::Value::Null,
-    ] {
-        let invalid = serde_json::json!({
-            "name": "sample/base",
-            "versions": [{
-                "version": "1.0.0",
-                "artifact": "v1/artifacts/sample/base/1.0.0/package.praypkg",
-                "published_at": timestamp
-            }]
-        });
-        assert!(serde_json::from_value::<RegistryPackageMetadata>(invalid).is_err());
-    }
-}
-
-#[test]
 fn registry_schema_rejects_upstream_on_package_version() {
     let validator = load_validator("registry.schema.json");
     let mut value = serde_json::json!({

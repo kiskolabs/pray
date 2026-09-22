@@ -2,6 +2,7 @@
 
 ## Unreleased
 
+- Read package catalogs whose `published_at` is an RFC 3339 string or JSON null.
 - Keep prayer sources under `prayers/<name>/`, beside `prayers/v1/` when this project publishes. `prayers/v1/packages/` is catalog metadata. A root `packages/` folder is not a pray source convention.
 
 ## 1.20.0 (2026-09-18)

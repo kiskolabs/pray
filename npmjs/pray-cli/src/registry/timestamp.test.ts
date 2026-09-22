@@ -20,10 +20,14 @@ describe("registry publish timestamps", () => {
       versionFromHash({ ...version, published_at: "1234567890" }).publishedAt,
       1_234_567_890,
     );
+    assert.equal(
+      versionFromHash({ ...version, published_at: null }).publishedAt,
+      undefined,
+    );
   });
 
   it("rejects non-canonical values outside migration formats", () => {
-    for (const publishedAt of [null, 1.5, -1, 253_402_300_800, "tomorrow"]) {
+    for (const publishedAt of [1.5, -1, 253_402_300_800, "tomorrow"]) {
       assert.throws(() =>
         versionFromHash({ ...version, published_at: publishedAt }),
       );

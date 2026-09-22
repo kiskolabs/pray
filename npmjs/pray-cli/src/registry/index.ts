@@ -207,7 +207,7 @@ export function versionFromHash(
 }
 
 function publishTimestampFromValue(value: unknown): number | undefined {
-  if (value === undefined) return undefined;
+  if (value == null) return undefined;
   let timestamp = value;
   if (typeof value === "string") {
     const legacyDateTime =

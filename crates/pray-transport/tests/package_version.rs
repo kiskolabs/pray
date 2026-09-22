@@ -26,7 +26,7 @@ fn package_version_omits_unknown_publish_timestamp() {
 }
 
 #[test]
-fn package_version_normalizes_legacy_timestamp_and_rejects_null() {
+fn package_version_normalizes_legacy_timestamps() {
     let version: PackageVersion =
         serde_json::from_value(package_version(Some(json!("1234567890")))).unwrap();
     assert_eq!(
@@ -34,5 +34,17 @@ fn package_version_normalizes_legacy_timestamp_and_rejects_null() {
         1_234_567_890_u64
     );
 
-    assert!(serde_json::from_value::<PackageVersion>(package_version(Some(json!(null)))).is_err());
+    let rfc3339: PackageVersion =
+        serde_json::from_value(package_version(Some(json!("2020-01-01T00:00:00.999Z")))).unwrap();
+    assert_eq!(
+        serde_json::to_value(rfc3339).unwrap()["published_at"],
+        1_577_836_800_u64
+    );
+
+    let absent: PackageVersion =
+        serde_json::from_value(package_version(Some(json!(null)))).unwrap();
+    assert!(serde_json::to_value(absent)
+        .unwrap()
+        .get("published_at")
+        .is_none());
 }
