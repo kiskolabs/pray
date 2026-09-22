@@ -101,11 +101,13 @@ release-distribution:
 	if [ -n "$(SIGNING_KEY)" ]; then args="$$args --signing-key $(SIGNING_KEY)"; fi; \
 	./scripts/release/distribution.sh $$args
 
+# After a successful full publish, wipe target/ so release and tooling artifacts do not accumulate.
 release-all:
 	@args="--publish --root $(ROOT)"; \
 	if [ -n "$(SERVER)" ]; then args="$$args --server $(SERVER)"; fi; \
 	if [ -n "$(SIGNING_KEY)" ]; then args="$$args --signing-key $(SIGNING_KEY)"; fi; \
 	./scripts/release/all.sh $$args
+	$(MAKE) clean
 
 # GitHub Release title is vX.Y.Z. Notes are that version's CHANGELOG.md section.
 release-github:

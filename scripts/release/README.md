@@ -69,6 +69,8 @@ Full release including distribution point:
 scripts/release/all.sh --publish --root ./prayers --server https://pray.example/registry
 ```
 
+`make release-all` runs the same publish path, then `make clean` (`cargo clean`) so workspace `target/` does not accumulate. The script alone does not clean.
+
 Create or edit the GitHub Release for the workspace version:
 
 ```sh
