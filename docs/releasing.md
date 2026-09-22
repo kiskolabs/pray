@@ -26,7 +26,7 @@ Keep these equal before a full language-registry publish (`make release-all`):
 
 The next version crates.io, npm, and RubyGems may share is the max of those numbers. A max held by one surface only cannot be aligned, whether that cut was a patch or a minor. The other surfaces skip that number and jump to the next patch. 1.18.1 is a Ruby-only example; an npm-only 1.19.0 or a crates-only 1.19.0 would likewise be skipped, with the next shared cut at 1.19.1 or later.
 
-`make release-all` still requires all surfaces equal. `make release-crates`, `make release-npm`, and `make release-rubygems` may publish a one-surface version when that surface is uniquely ahead, print the next coordinated version, and leave the other registries where they are. A shared publish refuses a version that is missing from the root, npm, or Ruby changelog.
+`make release-all` still requires all surfaces equal. After a successful full publish it runs `make clean` so `target/` does not keep release and tooling build residue. Calling `scripts/release/all.sh` directly does not clean. `make release-crates`, `make release-npm`, and `make release-rubygems` may publish a one-surface version when that surface is uniquely ahead, print the next coordinated version, and leave the other registries where they are. A shared publish refuses a version that is missing from the root, npm, or Ruby changelog.
 
 ## Commands
 
