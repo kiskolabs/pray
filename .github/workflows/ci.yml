@@ -38,6 +38,16 @@ jobs:
         run: cargo machete
       - name: Run Rust tests
         run: cargo test --workspace
+      - name: Check managed instructions for drift
+        env:
+          PRAY_NO_VERSION_CHECK: "1"
+        run: |
+          cargo run -q -p pray-cli -- drift && status=0 || status=$?
+          case $status in
+            0) ;;
+            6) echo "::error::AGENTS.md has drifted from .agents/. Run 'pray install' and commit the result."; exit 1 ;;
+            *) echo "::error::pray drift could not run (exit $status) - infrastructure, not drift."; exit 1 ;;
+          esac
       - name: Install cargo-llvm-cov
         uses: taiki-e/install-action@9534c84618278caac52cb373bb164ed464dbd8af # v2
         with:
