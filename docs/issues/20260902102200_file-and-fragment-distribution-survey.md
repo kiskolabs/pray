@@ -6,9 +6,11 @@ Andrei Makarov
 
 ## Decisions
 
-None yet. This note inventories known implementations that distribute whole files or splice fragments into destinations. It sits beside usr/docs/issues/20260902101500_dotfile-manager-prior-art.md, which already covers Chezmoi, yadm, GNU Stow, and Nix home-manager. Prayers must not ship secrets.
+None yet. This note inventories known implementations that distribute whole files or splice fragments into destinations. It sits beside docs/issues/20260902101500_dotfile-manager-prior-art.md, which already covers Chezmoi, yadm, GNU Stow, and Nix home-manager. Prayers must not ship secrets.
 
 The survey is not a complete catalogue. It groups tools by contract so Prayfile can steal the right analog and skip the rest.
+
+Later pass 2026-09-28: dropped the sPTC and related harness-runtime paper trail. That material is not file or fragment distribution. Also dropped unverified name-drops, claims-audit process paragraphs in Effects, and soft marketing claims that do not change adapt or reject.
 
 ## Effects
 
@@ -29,8 +31,6 @@ rcm (thoughtbot): rcup, mkrc, rcdn, lsrc. Source directory, usually ~/.dotfiles.
 vcsh (RichiH/vcsh): several Git repositories whose work tree is HOME. Files live in HOME, not as symlinks. myrepos (mr) batches clone and update. Whole files. No fragment splice. Analog of treating HOME as a git root, not of compose.
 
 bare git: a Git repo with work tree HOME. Same whole-file contract as vcsh without multi-repo.
-
-Other names that show up in the same class and were not fetched as primary this run: homesick or homeshick, Mackup, Pearl, fresh. Treat as unverified until a later pass. They are expected to be whole-file copy or symlink.
 
 ### Nested VCS, not fragment compose
 
@@ -98,6 +98,22 @@ includes consent. APM audit warns when local content is deployed without an expl
 
 Reject from APM: MCP and LSP in the same manifest; scripts and apm run (host execution, including ${{ secrets.KEY }} in the schema appendix); marketplace authoring as a product surface; hidden Unicode scan as a substitute for hash verify (optional later, not a contract); generated_at timestamps as identity; compile auto-detect; replacing opaque pray:id with named start/end; merging instruction conflicts by applyTo glob (RFC 0031: no three-way merge, package-versus-package compose collision fails).
 
+### Skill registries and SKILL.md installers (pass 2026-09-28)
+
+Pass checked primary product docs 2026-09-28 for company-centralized AI skill registries. Four options: GitLab or GitHub plus vercel-labs/skills (npx skills); the same git store plus RoleCraft; Scalefocus Skilly (self-hosted governed registry); SkillReg by Kairia (SaaS private registry).
+
+These tools distribute Anthropic-style SKILL.md folders into agent skill directories (often via a canonical .agents/skills copy plus symlinks). They are inference-input neighbors of a different shape than APM compile: install-path package managers for skills, not compose-and-render of marked spans across packages. Prayfile already owns lock hashes, multi-source declare, yank, static or self-hosted distribution, frozen install, verify, and drift for broader inference-input trees. RFC 0002 lists governance platform, marketplace ranking, and prompt-injection firewall as non-goals. Do not turn pray into Skilly or SkillReg.
+
+vercel-labs/skills: npx skills add from git; --list and --skill selection; multi-agent install; canonical .agents/skills with symlink default and --copy; Windows junction fallback. Project skills-lock.json records a SHA-256 of skill folder contents; the global lock often uses a GitHub tree SHA. Adapt as competitive awareness and as an optional later SKILL.md render or import path. Reject symlink fan-out as the materialize strategy (same Stow lesson as AgentSync).
+
+RoleCraft: install from local, GitHub, GitLab, SSH, or npm; rolecraft bundle for multi-source; check, rollback, verify by content hash; MCP in the same CLI; static analysis score 0-100 with SAFE / REVIEW / DANGER gates. Bundle is a cousin of declaring many packages in Prayfile. Security scoring is regex heuristics, not a substitute for hash verify. Optional later as an annotation or external gate, not a pray core contract.
+
+Skilly: self-hosted catalog with Entra ID or OIDC, SCIM, RBAC, review before publish, ClamAV plus secret and heuristic scans, immutable semver git tags, one skill equals one authenticated git repo, yank or revoke, audit trail, install analytics. Consumer install stays npx skills add with a skill-scoped token in the URL. Stack is Postgres, object storage, git volume, web, worker, ClamAV. Adapt nothing into the CLI product. Catalog UI, identity lifecycle, and approval are the Skilly moat and sit in pray non-goals. Operator lesson only: at hundreds of packages, a searchable index beats browsing one monorepo; pray search and package units already lean that way.
+
+SkillReg (skillreg.dev; built by Kairia): SaaS push and pull of named org packages with semver, SHA-256 on push, approval workflows, search, pull-all, desktop app. Getting Started setup listed Claude, Codex, and Cursor with explicit --agent (no filesystem autodetection in that flow). Adapt: explicit destinations already match the no-autodetect warning from APM. Reject SaaS governance, desktop catalog, and install analytics as product pillars.
+
+What to learn: keep the positioning sentence that pray is not npx skills and not SkillReg. Thin interop only if demand appears (import a SKILL.md tree as a path or git source, or render one export into .agents/skills/name/SKILL.md as an adapter target). Use lock semantics comparison when explaining reproducibility to people coming from skills.sh. Do not chase Entra or SCIM, approval portals, desktop browsers, or symlink-to-every-agent installer UX.
+
 ### Patch series
 
 quilt, StGit, git format-patch: ordered hunks applied to a tree. The unit is a diff, not a named export with an ideal checksum. Do not adapt as compose.
@@ -110,7 +126,9 @@ Keep B6b refuse-clobber. rcup -i, Stow conflict, home-manager force false, and A
 
 Do not add Copier merge, Kustomize JSON Patch of live files, AgentSync symlink fan-out, sx session hooks, or APM named start/end markers as a replacement for opaque pray:id pairs.
 
-If an RFC later compares inference-input neighbors, cite APM compile managed_section and lockfile hashes as the nearest shipped analog, then state the span-id and no-execution gaps. Implementation notes: usr/docs/issues/20260902102800_agentsync-and-apm-implementation.md.
+Do not add Skilly or SkillReg governance UI, RoleCraft security scoring as a core gate, or vercel-labs/skills symlink fan-out as materialize. If demand appears, consider only thin SKILL.md import or one adapter render target. If an RFC later compares inference-input neighbors, cite APM compile managed_section and lockfile hashes as the nearest shipped analog for compose, then state the span-id and no-execution gaps; cite vercel-labs/skills and SkillReg as the nearest skill-path installers, then state that pray packages broader inference input and does not own agent-dir skill delivery.
+
+Implementation notes: docs/issues/20260902102800_agentsync-and-apm-implementation.md.
 
 ## Source
 
@@ -131,8 +149,14 @@ APM security model: https://microsoft.github.io/apm/enterprise/security/
 AgentSync getting started: https://dallay.github.io/agentsync/guides/getting-started/
 rulesync: https://pypi.org/project/rulesync/
 sx: https://github.com/sleuth-io/sx and https://sleuth-io.github.io/sx/2026/06/05/a-package-manager-for-ai-assets.html
+vercel-labs/skills: https://github.com/vercel-labs/skills and local lock https://github.com/vercel-labs/skills/blob/main/src/local-lock.ts
+RoleCraft: https://github.com/rolecraft-sh/rolecraft and https://rolecraft-sh.github.io/rolecraft/
+RoleCraft security scoring: https://github.com/rolecraft-sh/rolecraft/blob/main/docs/security.md
+Skilly: https://github.com/scalefocus/skilly
+SkillReg docs: https://skillreg.dev/docs
+SkillReg about (Kairia): https://skillreg.dev/about
 RFC 0002, RFC 0031, RFC 0050, RFC 0108, README nested VCS section
-usr/docs/issues/20260902101500_dotfile-manager-prior-art.md
-usr/docs/issues/20260902100800_home-prayfile-and-marker-dialects.md
+docs/issues/20260902101500_dotfile-manager-prior-art.md
+docs/issues/20260902100800_home-prayfile-and-marker-dialects.md
 
-Claims: APM lock hashes and managed_section markers are supported by the manifest schema. Copier three-way update is supported by the official updating page. systemd drop-in merge is supported by systemd.unit. sx per-user lock and SessionStart hook are supported by the 2026-06-05 sx blog. AgentSync symlink model is supported by its getting-started guide. homesick, Mackup, Pearl, fresh were not verified this run.
+Claims: APM lock hashes and managed_section markers are supported by the manifest schema. Copier three-way update is supported by the official updating page. systemd drop-in merge is supported by systemd.unit. sx per-user lock and SessionStart hook are supported by the 2026-06-05 sx blog. AgentSync symlink model is supported by its getting-started guide. 2026-09-28 skill-registry pass: vercel-labs/skills install, symlink or copy, and local SHA-256 lock supported; RoleCraft bundle, rollback, verify, and 0-100 scoring supported; Skilly Entra or OIDC, SCIM, ClamAV, immutable semver tags, and npx skills consumer path supported; SkillReg SaaS push or pull, semver, and Kairia attribution supported.
