@@ -61,6 +61,8 @@ Over HTTP that is serial GETs. At 50 ms RTT, 20 matches is about 1 s plus index 
 
 Version select over 50 to 400 published versions: ratio 1.13, 400-version metadata JSON 100 KiB. Release 1000 versions: 383 us. History growth is linear and far from the 64 MiB GET ceiling.
 
+Later measurement supersedes the 100 KiB figure for real catalog density: docs/issues/20261007192126_package-json-version-growth.md (about 378 KiB compact / 630 KiB pretty at 400 versions on amkisko/prayers means).
+
 ### Coverage
 
 Missing before this pass: request accounting for update versus index, index size versus the HTTP GET ceiling, scaling of index parse and name search, summary N+1 cost, --latest as two resolves, version-history select cost, RSS and CPU-seconds on those fixtures.
@@ -78,6 +80,8 @@ Search: names-only by default, or copy latest non-yanked summary onto the index 
 Pretty versus compact index.json is a small storage tax, not the cliff. Compact write is optional.
 
 Git catalog fetch bytes against a tree that stores artifacts are in usr/docs/issues/20260917154800_multi-source-prayfile-efficiency.md.
+
+Per-package JSON growth budgets and tip/history plan: docs/issues/20261007192126_package-json-version-growth.md.
 
 Unused multi-source git catalogs are no longer cloned. See that same issue.
 
