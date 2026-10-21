@@ -9,6 +9,7 @@
 - Recalculate committed `Prayfile.lock` hashes after path sources moved under `prayers/`.
 - Keep the Ruby and TypeScript CLIs out of the calling repository when they run from a git hook, and make them refuse a git cache that resolves to another repository, matching the Rust CLI.
 - Require Rust 1.91 to build the pray crates. `cargo install pray-cli` with an older compiler now stops with a message naming that minimum, instead of a compile error. Development and CI build with exactly 1.91.0 from `rust-toolchain.toml`.
+- Agree with `pray plan` in `pray render --check` about a dest file that keeps unmarked text or an earlier span order. It no longer reports the file stale when `pray install` would leave it unchanged.
 
 ## 1.20.0 (2026-09-18)
 
