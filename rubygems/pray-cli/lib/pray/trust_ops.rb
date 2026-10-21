@@ -1,6 +1,7 @@
 # frozen_string_literal: true
 
 require "json"
+require_relative "git_run"
 
 module Pray
   module Trust
@@ -189,7 +190,7 @@ module Pray
 
     def git_format(repository, format)
       output = IO.popen(
-        ["git", "-C", repository, "log", "-1", "--format=#{format}"],
+        [GitRun.git_env, "git", "-C", repository, "log", "-1", "--format=#{format}"],
         err: File::NULL, &:read
       )
       return "" unless $?.success?

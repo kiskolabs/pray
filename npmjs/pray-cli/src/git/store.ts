@@ -3,6 +3,7 @@ import { homedir } from "node:os";
 import { join } from "node:path";
 import { PrayError } from "../errors.js";
 import { cloneBareGitDb } from "./clone.js";
+import { requireOwnGitDir } from "./own-git-dir.js";
 import { cacheKey } from "./paths.js";
 import { runGit, runGitCapture, tryRunGit } from "./run.js";
 
@@ -96,6 +97,7 @@ function ensureRevisionInDb(
 }
 
 function ensureGitRemoteOrigin(repository: string, cloneUrl: string): void {
+  requireOwnGitDir(repository);
   if (tryRunGit(repository, "remote", "get-url", "origin")) {
     runGit(repository, "remote", "set-url", "origin", cloneUrl);
   } else {

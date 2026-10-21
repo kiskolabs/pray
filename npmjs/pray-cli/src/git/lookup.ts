@@ -1,6 +1,7 @@
 import { spawnSync } from "node:child_process";
 import { existsSync, readdirSync } from "node:fs";
 import { join } from "node:path";
+import { gitEnvironment } from "./environment.js";
 import { gitSourceCacheDirectory } from "./paths.js";
 import { globalGitCacheDirectory, globalGitCacheReady } from "./store.js";
 
@@ -46,6 +47,7 @@ function originMatches(repository: string, cloneUrl: string): boolean {
     ["-C", repository, "remote", "get-url", "origin"],
     {
       encoding: "utf8",
+      env: gitEnvironment(),
     },
   );
   if (result.status !== 0) {

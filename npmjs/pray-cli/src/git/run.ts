@@ -1,5 +1,6 @@
 import { spawnSync } from "node:child_process";
 import { PrayError } from "../errors.js";
+import { gitEnvironment } from "./environment.js";
 
 function spawnGit(repository: string, argumentsList: string[]) {
   return spawnSync(
@@ -7,7 +8,7 @@ function spawnGit(repository: string, argumentsList: string[]) {
     ["-c", "protocol.file.allow=always", "-C", repository, ...argumentsList],
     {
       encoding: "utf8" as const,
-      env: { ...process.env, GIT_TERMINAL_PROMPT: "0" },
+      env: gitEnvironment({ GIT_TERMINAL_PROMPT: "0" }),
       input: "",
     },
   );
