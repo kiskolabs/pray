@@ -1,6 +1,6 @@
+use crate::git_process::git_command;
 use crate::{PrayError, PrayResult};
 use std::path::Path;
-use std::process::Command;
 
 pub(crate) fn run_git_success(root: &Path, arguments: &[&str]) -> PrayResult<()> {
     let output = run_git_command(root, arguments)?;
@@ -12,27 +12,13 @@ pub(crate) fn run_git_success(root: &Path, arguments: &[&str]) -> PrayResult<()>
 }
 
 pub(crate) fn run_git_command(root: &Path, arguments: &[&str]) -> PrayResult<std::process::Output> {
-    Command::new(git_program())
-        .current_dir(root)
+    git_command(root)
         .env("GIT_TERMINAL_PROMPT", "0")
         .stdin(std::process::Stdio::null())
         .args(["-c", "protocol.file.allow=always"])
         .args(arguments)
         .output()
         .map_err(|error| PrayError::Unsupported(format!("failed to run `git`: {error}")))
-}
-
-pub(crate) fn git_program() -> String {
-    [
-        "/usr/bin/git",
-        "/opt/homebrew/bin/git",
-        "/usr/local/bin/git",
-        "git",
-    ]
-    .into_iter()
-    .find(|candidate| Path::new(candidate).exists() || *candidate == "git")
-    .unwrap_or("git")
-    .to_string()
 }
 
 pub(crate) fn command_error(program: &str, output: std::process::Output) -> PrayError {
