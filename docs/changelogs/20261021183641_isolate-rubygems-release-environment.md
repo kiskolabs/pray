@@ -26,10 +26,10 @@ Validation completed with these commands and observed results:
 - `cargo fmt --all --check`: passed.
 - `bash -n scripts/release/common.sh scripts/release/rubygems.sh scripts/release/rubygems_environment_test.sh`: passed.
 - `git diff --check`: passed.
+- Hosted CI and the separate Scorecard analysis: passed.
 
 ## Next
 
-- Confirm the new regression check in hosted CI.
 - Publish the remaining RubyGems 1.21.0 surface.
 
 ## Source
