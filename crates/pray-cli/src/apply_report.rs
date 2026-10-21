@@ -1,3 +1,4 @@
+use crate::cli_output::println_stdout;
 use pray_core::lockfile::{lockfiles_equivalent, Lockfile};
 use pray_core::render::{
     provisioned_destination_statuses, ProvisionedDestinationStatus, RenderedTarget,
@@ -129,35 +130,29 @@ fn target_change_label(change: TargetChange) -> &'static str {
 }
 
 pub fn print_materialization_report(preview: &MaterializationPreview, mode: MaterializationMode) {
-    println!("{}...", mode.heading());
-
+    println_stdout(format!("{}...", mode.heading()));
     for line in &preview.package_lines {
-        println!("{line}");
+        println_stdout(line);
     }
-
-    println!("{}", lockfile_line(preview.lockfile, mode));
-
+    println_stdout(lockfile_line(preview.lockfile, mode));
     for (path, change) in &preview.targets {
-        println!("{} {}", path.display(), target_verb(*change, mode));
+        println_stdout(format!("{} {}", path.display(), target_verb(*change, mode)));
     }
-
     for (path, change) in &preview.provisioned {
         if *change == TargetChange::Unchanged {
             continue;
         }
-        println!("{} {}", path.display(), target_verb(*change, mode));
+        println_stdout(format!("{} {}", path.display(), target_verb(*change, mode)));
     }
-
     if !preview.warnings.is_empty() {
-        println!();
-        println!("Warnings");
+        println_stdout("");
+        println_stdout("Warnings");
         for warning in &preview.warnings {
-            println!("  {warning}");
+            println_stdout(format!("  {warning}"));
         }
     }
-
-    println!();
-    println!("{}", lines::summary_footer(preview, mode));
+    println_stdout("");
+    println_stdout(lines::summary_footer(preview, mode));
 }
 
 impl MaterializationMode {

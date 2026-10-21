@@ -3,6 +3,7 @@ import { join } from "node:path";
 import { PrayError } from "../errors.js";
 import { sha256Prefixed } from "../hashing.js";
 import type { PackageSpec } from "./types.js";
+import { validateRelativePaths } from "./validate-paths.js";
 
 export function treeHashFromFileBytes(fileBytes: Map<string, Buffer>): string {
   const entries = [...fileBytes.entries()]
@@ -20,6 +21,7 @@ export function treeHashFromFileBytes(fileBytes: Map<string, Buffer>): string {
 }
 
 export function treeHashForRoot(root: string, spec: PackageSpec): string {
+  validateRelativePaths(spec);
   const fileBytes = new Map<string, Buffer>();
   for (const file of spec.files) {
     const path = join(root, file);

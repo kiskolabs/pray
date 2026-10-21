@@ -8,7 +8,10 @@ use crate::resolve_exports::{
 use crate::resolve_git_sources::{prepare_git_sources, prepare_pray_ssh_host_keys, GitSourceSet};
 
 use crate::paths::find_prayspec_file;
-pub use crate::resolve_git::{discover_distribution_root, git_source_cache_directory};
+pub use crate::resolve_git::{
+    discover_distribution_root, git_source_cache_directory, global_git_cache_ready,
+};
+pub use crate::resolve_git_legacy::quarantine_legacy_git_checkouts;
 pub use crate::resolve_git_lookup::git_source_cached_repository;
 pub use crate::resolve_git_paths::git_source_cache_directory_with_subdir;
 pub use crate::resolve_git_refresh::{
@@ -144,7 +147,11 @@ pub(crate) use package_root::{resolve_package_root, PackageRootResolution};
 
 #[path = "resolve_upstream.rs"]
 pub mod resolve_upstream;
-pub use resolve_upstream::{apply_path_upstream_refreshes, path_fork_drift_lines};
+pub use crate::resolve_git_materialize_confirm::confirm_git_source_revisions_materializable;
+pub use resolve_upstream::{
+    apply_path_upstream_refreshes, path_fork_drift_lines, plan_path_upstream_conflicts,
+    PathUpstreamConflict,
+};
 
 fn resolve_package(
     project_root: &Path,

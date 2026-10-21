@@ -5,7 +5,10 @@ require "open3"
 require_relative "error"
 require_relative "git_clone"
 require_relative "git_run"
+require_relative "git_store"
 require_relative "path_safety"
+require_relative "resource_limits"
+require_relative "tar_validation"
 
 module Pray
   module GitMaterialize
@@ -14,75 +17,130 @@ module Pray
 
     module_function
 
-    def read_local_artifact_bytes(source_root, artifact)
-      if artifact.start_with?("file://")
-        path = PathSafety.join_under_root(source_root, artifact.delete_prefix("file://"))
-        raise Error.resolution("package artifact path escapes distribution root") unless path
-
-        return File.binread(path)
-      end
-      if artifact.match?(%r{\A[a-z][a-z0-9+.-]*:}i)
-        raise Error.integrity("remote artifact path must be relative: #{artifact}")
+    def read_local_artifact_bytes(source_root, artifact, offline: false)
+      if artifact.include?("://") || artifact.start_with?("file:")
+        raise Error.integrity(
+          "local and git catalog artifacts must be relative paths under the distribution root, not URLs: #{artifact}"
+        )
       end
 
       path = PathSafety.join_under_root(source_root, artifact)
       raise Error.resolution("package artifact path escapes distribution root") unless path
 
-      materialize_catalog_file(source_root, artifact) unless File.exist?(path)
+      materialize_catalog_file(source_root, artifact, offline: offline) unless File.exist?(path)
       raise Error.resolution("package artifact missing at #{path}") unless File.exist?(path)
 
       File.binread(path)
     end
 
-    def materialize_catalog_tree(git_dir, dest, revision, subdir, refresh)
+    def materialize_catalog_tree(git_dir, dest, revision, subdir, refresh, offline: false)
       return if !refresh && catalog_matches?(dest, git_dir, revision)
 
-      require_revision_present!(git_dir, revision)
-      FileUtils.rm_rf(dest) if File.exist?(dest)
-      FileUtils.mkdir_p(dest)
-      unpacked = GitClone.catalog_sparse_cones(subdir).any? do |prefix|
-        unpack_archive_prefix(git_dir, dest, revision, prefix)
-      end
-      raise Error.resolution("no pray distribution root in git source at revision #{revision}") unless unpacked
+      require_revision_present!(git_dir, revision, offline: offline)
+      GitStore.with_git_cache_lock(dest) do
+        staging = "#{dest}.partial"
+        FileUtils.rm_rf(staging)
+        FileUtils.mkdir_p(staging)
+        unpacked = GitClone.catalog_sparse_cones(subdir).any? do |prefix|
+          unpack_archive_prefix(git_dir, staging, revision, prefix, offline: offline)
+        end
+        unless unpacked
+          FileUtils.rm_rf(staging)
+          if offline
+            raise Error.resolution(
+              "git catalog at revision #{revision} is not materializable locally and offline mode is enabled"
+            )
+          end
+          raise Error.resolution("no pray distribution root in git source at revision #{revision}")
+        end
 
-      File.write(File.join(dest, REVISION_MARKER), revision)
-      File.write(File.join(dest, GIT_DIR_MARKER), git_dir)
+        File.write(File.join(staging, REVISION_MARKER), revision)
+        File.write(File.join(staging, GIT_DIR_MARKER), git_dir)
+        publish_catalog_tree!(dest, staging)
+      end
     end
 
-    def materialize_catalog_file(source_root, relative)
-      return if File.file?(File.join(source_root, relative))
+    def publish_catalog_tree!(dest, staging)
+      FileUtils.mkdir_p(File.dirname(dest))
+      if File.exist?(dest)
+        backup = "#{dest}.previous"
+        FileUtils.rm_rf(backup)
+        File.rename(dest, backup)
+        begin
+          File.rename(staging, dest)
+        rescue StandardError
+          File.rename(backup, dest) if File.exist?(backup)
+          FileUtils.rm_rf(staging)
+          raise
+        end
+        FileUtils.rm_rf(backup)
+      else
+        File.rename(staging, dest)
+      end
+    end
+    private_class_method :publish_catalog_tree!
+
+    def materialize_catalog_file(source_root, relative, offline: false)
+      full_path = File.join(source_root, relative)
+      return if File.file?(full_path)
 
       markers = find_catalog_markers(source_root)
       return unless markers
 
-      require_revision_present!(markers.fetch(:git_dir), markers.fetch(:revision))
-      full_path = File.join(source_root, relative)
-      repo_relative = full_path.delete_prefix(markers.fetch(:work_tree)).delete_prefix("/")
-      begin
-        GitRun.run_git(
-          markers.fetch(:git_dir),
-          "--work-tree",
-          markers.fetch(:work_tree),
-          "checkout",
-          markers.fetch(:revision),
-          "--",
-          repo_relative
-        )
-      rescue Error => error
+      require_revision_present!(markers.fetch(:git_dir), markers.fetch(:revision), offline: offline)
+      repo_relative = full_path.delete_prefix(markers.fetch(:catalog_root)).delete_prefix("/")
+      object = "#{markers.fetch(:revision)}:#{repo_relative}"
+      env = GitRun.git_env(offline_git_env(offline))
+      stdout, status = Open3.capture2(
+        env,
+        "git",
+        "-c",
+        "protocol.file.allow=always",
+        "-C",
+        markers.fetch(:git_dir),
+        "show",
+        object,
+        stdin_data: ""
+      )
+      unless status.success?
+        if offline
+          raise Error.resolution(
+            "git catalog blob #{repo_relative} at revision #{markers.fetch(:revision)} is not available locally and offline mode is enabled"
+          )
+        end
         raise Error.resolution(
           "git catalog materialize failed for revision #{markers.fetch(:revision)} in " \
-          "#{markers.fetch(:git_dir)} (git_cache_stale): #{error.message}. " \
+          "#{markers.fetch(:git_dir)} (git_cache_stale): git show failed. " \
           "Run `pray install --locked`, or clear `.pray/cache/git` and the shared bare then install again."
         )
       end
+      if stdout.bytesize > ResourceLimits::MAX_ARCHIVE_ENTRY_BYTES
+        raise Error.integrity(
+          "git catalog blob #{repo_relative} exceeds #{ResourceLimits::MAX_ARCHIVE_ENTRY_BYTES} bytes"
+        )
+      end
+      FileUtils.mkdir_p(File.dirname(full_path))
+      File.binwrite(full_path, stdout)
     end
 
-    def require_revision_present!(git_dir, revision)
+    def require_revision_present!(git_dir, revision, offline: false)
       return if GitRun.try_run_git(git_dir, "cat-file", "-e", revision)
 
+      if offline
+        raise Error.resolution(
+          "git revision #{revision} is not available in #{git_dir} and offline mode is enabled (git_revision_unfetched)."
+        )
+      end
       raise Error.resolution(
         "git revision #{revision} is not available in #{git_dir} (git_revision_unfetched). " \
         "Run `pray install --locked`, or clear the project git cache and shared bare then install again."
+      )
+    end
+
+    def annotate_git_materialize_failure!(git_dir, revision, detail)
+      raise Error.resolution(
+        "git catalog materialize failed for revision #{revision} in #{git_dir} (git_cache_stale): #{detail}. " \
+        "Run `pray install --locked`, or clear `.pray/cache/git` and the shared bare then install again."
       )
     end
 
@@ -101,8 +159,8 @@ module Pray
       false
     end
 
-    def unpack_archive_prefix(git_dir, dest, revision, prefix)
-      env = GitRun.git_env("GIT_TERMINAL_PROMPT" => "0")
+    def unpack_archive_prefix(git_dir, dest, revision, prefix, offline: false)
+      env = GitRun.git_env(offline_git_env(offline).merge("GIT_TERMINAL_PROMPT" => "0"))
       stdout, _stderr, status = Open3.capture3(
         env,
         "git",
@@ -118,10 +176,13 @@ module Pray
         stdin_data: ""
       )
       return false unless status.success? && !stdout.empty?
+      if stdout.bytesize > ResourceLimits::MAX_ARCHIVE_TOTAL_BYTES
+        raise Error.integrity(
+          "git catalog archive exceeds #{ResourceLimits::MAX_ARCHIVE_TOTAL_BYTES} bytes"
+        )
+      end
 
-      _ignored, extract_status = Open3.capture2(env, "tar", "-x", "-C", dest, stdin_data: stdout)
-      raise Error.resolution("failed to unpack git catalog archive") unless extract_status.success?
-
+      TarValidation.extract!(stdout, dest)
       true
     end
 
@@ -135,7 +196,7 @@ module Pray
           git_dir = File.read(git_dir_path).strip
           return if revision.empty? || !File.exist?(git_dir)
 
-          return {git_dir: git_dir, revision: revision, work_tree: current}
+          return {git_dir: git_dir, revision: revision, catalog_root: current}
         end
         parent = File.dirname(current)
         return if parent == current
@@ -143,6 +204,10 @@ module Pray
         current = parent
       end
       nil
+    end
+
+    def offline_git_env(offline)
+      offline ? {"GIT_NO_LAZY_FETCH" => "1"} : {}
     end
   end
 end

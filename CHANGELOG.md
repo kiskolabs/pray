@@ -2,11 +2,26 @@
 
 ## Unreleased
 
+- Bound git catalog archive and `git show` blob fills to the same size ceilings as `.praypkg` unpack; unpack through the shared tar validators in Ruby and TypeScript instead of system tar.
+- Publish project git catalogs through staging, an advisory lock, and atomic rename; refuse stub `.pray-git-dir` paths that are not the expected shared bare.
+- Refuse URL-shaped registry and catalog artifact paths; validate prayspec member paths on parse and tree hash.
+- Extend global `-q`/`--quiet` to apply, install, plan, doctor, and unlock status stdout; redact URL userinfo in `pray doctor`.
+- Add recovery-hint and doctor conformance coverage across the reference CLIs.
+- Require Rust 1.99 to build the pray crates. Development and CI build with exactly 1.99.1 from `rust-toolchain.toml`.
+
+## 1.22.0 (2026-10-21)
+
 - Ignore leftover project git full clones when resolving a shared bare or stub catalog. Install renames those leftovers so they cannot shadow the locked revision.
 - Print a pray-level recovery hint when a locked git revision is missing from the shared bare or when catalog checkout fails.
 - On path-fork upstream merge conflict, name the reset-then-rebrand workflow and tag the error as `upstream_merge_conflict`. `pray update --help` documents the same steps.
-- Print `published` / `unchanged` lines and a count footer after `pray publish` (same shape as `--dry-run`). Add global `-q`/`--quiet` and `-v`/`--verbose`.
+- Print `published` / `unchanged` lines and a count footer after `pray publish` (same shape as `--dry-run`). Add global `-q`/`--quiet` and `-v`/`--verbose` for publish status stdout. Redact URL userinfo in those lines.
 - Conflict when a path fork deleted an upstream file and upstream later changes that file, instead of restoring it silently.
+- Publish shared bare git clones through a temporary directory, advisory lock, and `.pray-ready` marker. Rebuild a damaged shared bare without rewriting the calling repository remote.
+- Prefer `git show` for lazy catalog file fill; accept catalog markers only at the materialized root; set `GIT_NO_LAZY_FETCH` when offline.
+- Make `pray update --latest --dry-run` list would-conflict path-fork paths before write. Confirm a new git lock revision is materializable before update writes.
+- Add `pray doctor` git cache layout report and optional `--migrate-git-cache` quarantine. Keep shallow plus partial clones as the distribution git default.
+- Verify trust-signed git commits against the locked revision, and run that gate before unpacking the catalog.
+- When trust policy requires signed packages, accept only `ed25519:` signatures and reject a `signer_fingerprint` that does not match `signer_public_key`.
 
 ## 1.21.0 (2026-10-21)
 

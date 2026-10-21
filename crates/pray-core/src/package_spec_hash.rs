@@ -19,7 +19,29 @@ impl PackageSpec {
         package
     }
 
+    pub fn validate_relative_paths(&self) -> PrayResult<()> {
+        use crate::paths::validate_package_relative_path;
+        use std::path::Path;
+        for file in &self.files {
+            validate_package_relative_path(Path::new(file))?;
+        }
+        for export in self.exports.values() {
+            validate_package_relative_path(Path::new(&export.path))?;
+            if let Some(default_path) = &export.default_path {
+                validate_package_relative_path(Path::new(default_path))?;
+            }
+        }
+        for skill in self.skills.values() {
+            validate_package_relative_path(Path::new(&skill.path))?;
+        }
+        for template in self.templates.values() {
+            validate_package_relative_path(Path::new(&template.path))?;
+        }
+        Ok(())
+    }
+
     pub fn tree_hash_for_root(&self, root: &std::path::Path) -> PrayResult<String> {
+        self.validate_relative_paths()?;
         let mut file_bytes = BTreeMap::new();
         for file in &self.files {
             let path = root.join(file);

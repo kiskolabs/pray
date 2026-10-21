@@ -52,7 +52,10 @@ module Pray
       )
       print_latest_constraint_plans(manifest_updates, upstream_plans)
 
-      return if dry_run
+      if dry_run
+        Upstream.report_path_upstream_would_conflicts(project, previous, package, options)
+        return
+      end
 
       if !manifest_updates.empty? || !upstream_plans.empty?
         Upstream.apply_path_upstream_latest_constraints(upstream_plans)

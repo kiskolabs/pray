@@ -4,6 +4,7 @@ pub const TOP_LEVEL_COMMANDS: &[&str] = &[
     "clean",
     "completion",
     "confess",
+    "doctor",
     "drift",
     "explain",
     "fmt",

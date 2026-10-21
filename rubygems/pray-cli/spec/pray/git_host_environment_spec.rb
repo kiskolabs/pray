@@ -61,15 +61,20 @@ RSpec.describe "git commands started from a hook" do
     expect(revision).to eq(GitCatalogFixture.run_git(fixture.fetch(:origin), "rev-parse", "HEAD").strip)
   end
 
-  it "refuses a broken cache inside another repository" do
+  it "repairs a broken cache without touching the host repository" do
     host_remote = "https://example.com/host.git"
     File.write(File.join(workspace, "README.md"), "host\n")
     GitCatalogFixture.run_git(workspace, "init", "--template=", "-b", "main")
     GitCatalogFixture.run_git(workspace, "remote", "add", "origin", host_remote)
     FileUtils.rm_rf(File.join(fixture.fetch(:db), "objects"))
-    expect do
-      ensure_repository(fixture.fetch(:clone_url), refresh: false, pinned_revision: fixture.fetch(:pinned))
-    end.to raise_error(Pray::Error, /#{Regexp.escape(fixture.fetch(:db))}/)
+    _cache, revision = ensure_repository(
+      fixture.fetch(:clone_url),
+      refresh: false,
+      pinned_revision: fixture.fetch(:pinned)
+    )
+    expect(File).to exist(File.join(fixture.fetch(:db), "HEAD"))
+    expect(File).to be_directory(File.join(fixture.fetch(:db), "objects"))
+    expect(revision).to eq(fixture.fetch(:pinned))
     expect(GitCatalogFixture.run_git(workspace, "remote", "get-url", "origin").strip).to eq(host_remote)
   end
 

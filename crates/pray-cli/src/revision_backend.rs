@@ -140,9 +140,14 @@ fn run_command_success(root: &Path, program: &str, arguments: &[&str]) -> PrayRe
 }
 
 fn run_command_output(root: &Path, program: &str, arguments: &[&str]) -> PrayResult<Output> {
-    Command::new(command_program(program))
-        .current_dir(root)
-        .args(arguments)
+    let mut command = Command::new(command_program(program));
+    command.current_dir(root).args(arguments);
+    if program == "git" {
+        // Hooks export GIT_DIR / GIT_INDEX_FILE; strip them so publish/sync
+        // records the destination repository, not the calling host checkout.
+        pray_core::clear_repository_local_env(&mut command);
+    }
+    command
         .output()
         .map_err(|error| PrayError::Unsupported(format!("failed to run `{program}`: {error}")))
 }
@@ -165,7 +170,12 @@ fn command_program(program: &str) -> String {
 }
 
 fn push_git_revision(root: &Path, remote: &str, refspec: &str, branch: &str) -> PrayResult<()> {
-    let output = run_command_output(root, "git", &["push", remote, refspec])?;
+    if remote.starts_with('-') {
+        return Err(PrayError::Usage(format!(
+            "git push remote must not start with '-': {remote}"
+        )));
+    }
+    let output = run_command_output(root, "git", &["push", "--", remote, refspec])?;
     if output.status.success() {
         return Ok(());
     }

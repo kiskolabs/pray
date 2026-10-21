@@ -3,9 +3,7 @@ use crate::publish_context::{PublishDestLabel, PublishIdentity};
 use crate::publish_plan::{report_published, PublishStats};
 use crate::publish_ssh::publish_to_ssh_server;
 use crate::publish_version::published_registry_package_version;
-use crate::registry_ops::{
-    registry_artifact_path, torrent_manifest_bytes, torrent_manifest_path,
-};
+use crate::registry_ops::{registry_artifact_path, torrent_manifest_bytes, torrent_manifest_path};
 use crate::sync_peers::map_transport_error;
 use crate::transport_metadata::transport_package_metadata;
 use pray_core::distribution::fetch_registry_distribution_settings;

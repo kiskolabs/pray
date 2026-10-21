@@ -23,14 +23,19 @@ const REPOSITORY_LOCAL_VARIABLES: [&str; 13] = [
     "GIT_COMMON_DIR",
 ];
 
+/// Remove git repository-local variables that hooks export into child processes.
+pub fn clear_repository_local_env(command: &mut Command) {
+    for name in REPOSITORY_LOCAL_VARIABLES {
+        command.env_remove(name);
+    }
+}
+
 // Credential, SSH, proxy and global config variables still pass through, so
 // the environment is pruned rather than cleared.
 pub(crate) fn git_command(repository: &Path) -> Command {
     let mut command = Command::new(git_program());
     command.current_dir(repository);
-    for name in REPOSITORY_LOCAL_VARIABLES {
-        command.env_remove(name);
-    }
+    clear_repository_local_env(&mut command);
     command
 }
 

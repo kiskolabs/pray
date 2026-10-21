@@ -118,7 +118,7 @@ module Pray
 
       raise Error.resolution(offline_package_error(declaration.name, selected.version)) if offline
 
-      artifact_bytes = read_local_artifact_bytes(source_root, selected.artifact)
+      artifact_bytes = read_local_artifact_bytes(source_root, selected.artifact, offline: offline)
       RegistryInstall.install_artifact_to_cache(
         cache_directory, declaration, selected, artifact_bytes, source_url: source_root
       )
@@ -206,8 +206,8 @@ module Pray
       Gem::Version.new(left) <=> Gem::Version.new(right)
     end
 
-    def read_local_artifact_bytes(source_root, artifact)
-      GitMaterialize.read_local_artifact_bytes(source_root, artifact)
+    def read_local_artifact_bytes(source_root, artifact, offline: false)
+      GitMaterialize.read_local_artifact_bytes(source_root, artifact, offline: offline)
     end
 
     def read_artifact_bytes(source_url, artifact)

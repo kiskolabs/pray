@@ -8,21 +8,31 @@ use super::git::{
 };
 use super::policy::{best_rule, load_policy, normalize_key, ClientTrustRule};
 
-pub fn gate_git_source(home: &Path, source_url: &str, repository: &Path) -> PrayResult<()> {
+pub fn gate_git_source(
+    home: &Path,
+    source_url: &str,
+    repository: &Path,
+    revision: Option<&str>,
+) -> PrayResult<()> {
     if !is_remote_git_url(source_url) {
         return Ok(());
     }
     if !is_git_repository(repository) {
         return Ok(());
     }
-    enforce_source_trust(home, source_url, repository)?;
+    enforce_source_trust(home, source_url, repository, revision)?;
     if load_policy(home)?.is_some() {
         super::prompt::prompt_untrusted_source_consent(home, source_url, repository)?;
     }
     Ok(())
 }
 
-pub fn enforce_source_trust(home: &Path, source_url: &str, repository: &Path) -> PrayResult<()> {
+pub fn enforce_source_trust(
+    home: &Path,
+    source_url: &str,
+    repository: &Path,
+    revision: Option<&str>,
+) -> PrayResult<()> {
     let Some(policy) = load_policy(home)? else {
         return Ok(());
     };
@@ -33,7 +43,13 @@ pub fn enforce_source_trust(home: &Path, source_url: &str, repository: &Path) ->
         )));
     }
     if rule.require_signed_commit {
-        enforce_signed_commit(home, source_url, repository, &rule.allowed_signing_keys)?;
+        enforce_signed_commit(
+            home,
+            source_url,
+            repository,
+            revision,
+            &rule.allowed_signing_keys,
+        )?;
     }
     Ok(())
 }
@@ -42,11 +58,13 @@ fn enforce_signed_commit(
     home: &Path,
     source_url: &str,
     repository: &Path,
+    revision: Option<&str>,
     allowed_signing_keys: &[String],
 ) -> PrayResult<()> {
-    trust_git_run(home, source_url, repository, &["verify-commit", "HEAD"]).map_err(|error| {
+    let target = commit_ref(revision)?;
+    trust_git_run(home, source_url, repository, &["verify-commit", target]).map_err(|error| {
         PrayError::Integrity(format!(
-            "trust policy requires signed commit, but HEAD failed signature verification in {}: {error}",
+            "trust policy requires signed commit, but {target} failed signature verification in {}: {error}",
             repository.display()
         ))
     })?;
@@ -55,9 +73,10 @@ fn enforce_signed_commit(
         return Ok(());
     }
 
-    let key = commit_signing_key(home, source_url, repository).map(|value| normalize_key(&value));
-    let fingerprint =
-        commit_signing_fingerprint(home, source_url, repository).map(|value| normalize_key(&value));
+    let key = commit_signing_key(home, source_url, repository, revision)
+        .map(|value| normalize_key(&value));
+    let fingerprint = commit_signing_fingerprint(home, source_url, repository, revision)
+        .map(|value| normalize_key(&value));
     let allowed: Vec<String> = allowed_signing_keys
         .iter()
         .map(|value| normalize_key(value))
@@ -72,10 +91,21 @@ fn enforce_signed_commit(
         return Ok(());
     }
 
-    Err(PrayError::Integrity(
-        "trust policy signer mismatch: HEAD signing key/fingerprint is not in allowed_signing_keys"
-            .into(),
-    ))
+    Err(PrayError::Integrity(format!(
+        "trust policy signer mismatch: {target} signing key/fingerprint is not in allowed_signing_keys"
+    )))
+}
+
+fn commit_ref(revision: Option<&str>) -> PrayResult<&str> {
+    let Some(revision) = revision else {
+        return Ok("HEAD");
+    };
+    if revision.is_empty() || revision.starts_with('-') {
+        return Err(PrayError::Integrity(format!(
+            "refusing trust verification for unsafe revision {revision:?}"
+        )));
+    }
+    Ok(revision)
 }
 
 pub fn signer_matches_allowed(
@@ -87,9 +117,10 @@ pub fn signer_matches_allowed(
     if rule.allowed_signing_keys.is_empty() {
         return false;
     }
-    let key = commit_signing_key(home, source_url, repository).map(|value| normalize_key(&value));
-    let fingerprint =
-        commit_signing_fingerprint(home, source_url, repository).map(|value| normalize_key(&value));
+    let key =
+        commit_signing_key(home, source_url, repository, None).map(|value| normalize_key(&value));
+    let fingerprint = commit_signing_fingerprint(home, source_url, repository, None)
+        .map(|value| normalize_key(&value));
     let allowed: Vec<String> = rule
         .allowed_signing_keys
         .iter()
@@ -103,12 +134,11 @@ pub fn signer_matches_allowed(
 }
 
 pub fn env_truthy(name: &str) -> bool {
-    std::env::var(name)
-        .map(|value| {
-            matches!(
-                value.to_ascii_lowercase().as_str(),
-                "1" | "true" | "yes" | "on"
-            )
-        })
-        .unwrap_or(false)
+    std::env::var_os(name).is_some_and(|value| {
+        let text = value.to_string_lossy();
+        matches!(
+            text.trim().to_ascii_lowercase().as_str(),
+            "1" | "true" | "yes" | "on"
+        )
+    })
 }

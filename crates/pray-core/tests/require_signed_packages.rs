@@ -31,6 +31,16 @@ fn require_signed_packages_fails_when_signature_missing() {
         .expect_err("unsigned rejected");
     assert!(error.to_string().contains("requires signed packages"));
 
+    let digest_only = RegistryPackageVersion {
+        version: "1.0.0".to_string(),
+        signature: Some("sha256:deadbeef".to_string()),
+        ..RegistryPackageVersion::default()
+    };
+    let digest_error =
+        enforce_require_signed_packages("https://example.test", "sample/base", &digest_only)
+            .expect_err("content digest is not a signature");
+    assert!(digest_error.to_string().contains("not ed25519"));
+
     let signed = RegistryPackageVersion {
         version: "1.0.0".to_string(),
         signature: Some("ed25519:abc".to_string()),

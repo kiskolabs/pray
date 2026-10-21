@@ -40,14 +40,7 @@ Mode B: reset conflicting content files to the locked upstream tree, run `pray u
 
 ## Next
 
-- Add `pray update --latest --dry-run` simulation that lists would-conflict path-fork paths before write
-- Optional branding rename map after clean upstream refresh
-- `pray clean` / `pray doctor` layout report and optional `--migrate-git-cache`
-- Document whether shallow plus partial stays permanent for distribution git sources
-- Confirm update success only after the new lock revision is materializable on the same path verify uses
-- Global bare store: clone to a temporary directory then rename, advisory lock around clone/fetch, tighter readiness than HEAD alone (concurrent install race)
-- Lazy catalog fill: prefer archive or show over work-tree checkout into the shared bare; only accept markers at the materialized catalog root
-- Offline mode: refuse lazy blob fetch from remotes when offline is set
+Backlog items moved to docs/issues/20261021220000_git-cache-concurrency-offline-and-update-simulation.md and implemented there, except branding rename map (still needs RFC).
 
 ## Effects note
 

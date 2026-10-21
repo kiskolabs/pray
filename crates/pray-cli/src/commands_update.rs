@@ -148,6 +148,7 @@ fn write_update(
         print_materialization_report(&preview, MaterializationMode::Plan);
         return Ok(());
     }
+    pray_core::resolve::confirm_git_source_revisions_materializable(&project)?;
     write_rendered_targets_with_previous_lockfile(&project, &rendered, previous_lockfile.as_ref())?;
     if let Some(text) = manifest_update {
         pray_core::transaction::write_file(&project.manifest_path, text)?;
@@ -198,7 +199,7 @@ pub(crate) fn unlock_command(package: String) -> PrayResult<()> {
         merge_selected_package_update(&previous_lockfile, &updated_lockfile, &package);
     write_rendered_targets_with_previous_lockfile(&project, &rendered, Some(&previous_lockfile))?;
     write_lockfile(&lockfile_path(), &merged_lockfile)?;
-    println!("Unlocked {package}");
+    crate::cli_output::println_stdout(format!("Unlocked {package}"));
     Ok(())
 }
 
@@ -221,7 +222,14 @@ pub(crate) fn preview_remote_updates(selected_package: Option<&str>, json: bool)
         ));
     }
     let previous_lockfile = read_lockfile(&lockfile_path()).ok();
-    let project = resolve_project_with_options(&manifest_path(), &remote_preview_options())?;
+    let options = remote_preview_options();
+    let project = resolve_project_with_options(&manifest_path(), &options)?;
+    latest::report_path_upstream_would_conflicts(
+        &project,
+        previous_lockfile.as_ref(),
+        selected_package,
+        &options,
+    )?;
     let rendered = render_project(&project)?;
     let laid_out = layout_rendered_targets(&project, &rendered)?;
     let updated_lockfile = build_lockfile(&project, &laid_out)?;

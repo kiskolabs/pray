@@ -2,7 +2,15 @@
 
 ## Unreleased
 
-- Print `published` / `unchanged` lines after `pray publish`. Add global `-q`/`--quiet` and `-v`/`--verbose`.
+## 1.22.0 (2026-10-21)
+
+- Ignore leftover project git full clones when resolving a shared bare or stub catalog. Install renames those leftovers so they cannot shadow the locked revision.
+- Print a pray-level recovery hint when a locked git revision is missing from the shared bare or when catalog checkout fails.
+- On path-fork upstream merge conflict, name the reset-then-rebrand workflow and tag the error as `upstream_merge_conflict`. `pray update --help` documents the same steps.
+- Print `published` / `unchanged` lines and a count footer after `pray publish` (same shape as `--dry-run`). Add global `-q`/`--quiet` and `-v`/`--verbose` for publish status stdout. Redact URL userinfo in those lines.
+- Conflict when a path fork deleted an upstream file and upstream later changes that file, instead of restoring it silently.
+- Publish shared bare git clones through a temporary directory, `*.lock.d`, and `.pray-ready` marker. Prefer `git show` for lazy catalog fill; set `GIT_NO_LAZY_FETCH` when offline.
+- Make `pray update --latest --dry-run` list would-conflict path-fork paths before write.
 
 ## 1.21.0 (2026-10-21)
 

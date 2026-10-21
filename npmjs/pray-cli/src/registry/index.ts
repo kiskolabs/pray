@@ -314,9 +314,9 @@ async function readArtifactBytes(
 }
 
 function readLocalArtifactBytes(sourceRoot: string, artifact: string): Buffer {
-  if (artifact.startsWith("file://")) {
-    return readFileSync(
-      resolveDistributionPath(sourceRoot, artifact.slice("file://".length)),
+  if (artifact.includes("://") || artifact.startsWith("file:")) {
+    throw PrayError.integrity(
+      `local and git catalog artifacts must be relative paths under the distribution root, not URLs: ${artifact}`,
     );
   }
   rejectAbsoluteArtifactPath(artifact);

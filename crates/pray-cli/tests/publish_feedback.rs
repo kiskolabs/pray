@@ -100,17 +100,45 @@ fn publish_verbose_includes_detail_lines() {
 }
 
 #[test]
-fn quiet_and_verbose_are_global_flags() {
-    let version = assert_success(run_pray_cwd(&["--quiet", "version"]));
-    assert!(
-        String::from_utf8_lossy(&version.stdout).contains("pray "),
-        "version still prints under --quiet"
-    );
-
+fn quiet_and_verbose_are_documented_as_publish_scoped() {
     let help = assert_success(run_pray_cwd(&["--help"]));
     let stdout = String::from_utf8_lossy(&help.stdout);
-    assert!(stdout.contains("--quiet") || stdout.contains("-q"));
-    assert!(stdout.contains("--verbose") || stdout.contains("-v"));
+    assert!(
+        stdout.contains("suppress publish status stdout"),
+        "quiet help should name publish scope:\n{stdout}"
+    );
+    assert!(
+        stdout.contains("extra publish detail on stdout"),
+        "verbose help should name publish scope:\n{stdout}"
+    );
+}
+
+#[test]
+fn publish_redacts_url_userinfo_in_dry_run() {
+    let repo = temporary_directory("pray-publish-redact");
+    create_add_fixture(&repo);
+    assert_success(run_pray(
+        &repo,
+        &["add", "sample/base", "--path", "packages/base"],
+    ));
+    let output = assert_success(run_pray(
+        &repo,
+        &[
+            "publish",
+            "--dry-run",
+            "--server",
+            "https://user:secret@example.invalid/reg",
+        ],
+    ));
+    let stdout = String::from_utf8_lossy(&output.stdout);
+    assert!(
+        !stdout.contains("user:secret"),
+        "credentials must not appear:\n{stdout}"
+    );
+    assert!(
+        stdout.contains("https://***@example.invalid/reg"),
+        "redacted target missing:\n{stdout}"
+    );
 }
 
 fn publish(

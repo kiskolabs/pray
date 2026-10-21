@@ -12,6 +12,7 @@ import { join, resolve } from "node:path";
 import { describe, it } from "node:test";
 import { resolveProject } from "../resolve/project.js";
 import { publishToRoot } from "./index.js";
+import { redactPublishTarget } from "./report.js";
 
 describe("publish", () => {
   it("preserves publish metadata until package content changes", async () => {
@@ -188,6 +189,54 @@ describe("publish", () => {
       "v1/artifacts/sample/base/1.4.3/sample-base-1.4.3.praypkg",
     );
     assert.equal(existsSync(`${artifact}.praytorrent.json`), true);
+  });
+
+  it("prints published and unchanged lines", async () => {
+    const workspace = mkdtempSync(join(tmpdir(), "pray-publish-feedback-"));
+    const projectRoot = join(workspace, "project");
+    const distributionRoot = join(workspace, "distribution");
+    cpSync(
+      resolve(import.meta.dirname, "../../../../examples/simple-project"),
+      projectRoot,
+      { recursive: true },
+    );
+    const project = await resolveProject(join(projectRoot, "Prayfile"));
+    const chunks: string[] = [];
+    const originalWrite = process.stdout.write.bind(process.stdout);
+    process.stdout.write = ((
+      chunk: string | Uint8Array,
+      encoding?: BufferEncoding | ((error?: Error | null) => void),
+      callback?: (error?: Error | null) => void,
+    ) => {
+      chunks.push(String(chunk));
+      if (typeof encoding === "function") {
+        encoding(null);
+        return true;
+      }
+      if (callback) {
+        callback(null);
+      }
+      return true;
+    }) as typeof process.stdout.write;
+    try {
+      await publishToRoot(project, distributionRoot);
+      const first = chunks.join("");
+      assert.match(first, /published sample\/base/);
+      chunks.length = 0;
+      await publishToRoot(project, distributionRoot);
+      const second = chunks.join("");
+      assert.match(second, /unchanged sample\/base/);
+    } finally {
+      process.stdout.write = originalWrite;
+    }
+  });
+
+  it("redacts URL userinfo in publish targets", () => {
+    assert.equal(
+      redactPublishTarget("https://user:secret@example.test/reg"),
+      "https://***@example.test/reg",
+    );
+    assert.equal(redactPublishTarget("/tmp/dist"), "/tmp/dist");
   });
 });
 

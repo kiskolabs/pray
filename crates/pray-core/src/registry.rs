@@ -281,8 +281,11 @@ pub fn resolve_local_registry_package_root(
     }
     fs::create_dir_all(&cache_directory)?;
 
-    let artifact_bytes =
-        crate::registry_cache::read_local_registry_artifact_bytes(source_root, &selected.artifact)?;
+    let artifact_bytes = crate::registry_cache::read_local_registry_artifact_bytes(
+        source_root,
+        &selected.artifact,
+        context.offline,
+    )?;
     crate::registry_cache::validate_and_unpack_registry_package(
         &cache_directory,
         declaration,

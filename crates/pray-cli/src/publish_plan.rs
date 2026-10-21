@@ -1,4 +1,4 @@
-use crate::cli_output::{println_stdout, println_verbose};
+use crate::cli_output::{println_stdout, println_verbose, redact_destination_target};
 use pray_core::publish_remote::{allowed_publish_names, PublishDestination};
 use pray_core::resolve::{ResolvedPackage, ResolvedProject};
 use pray_core::{PrayError, PrayResult};
@@ -37,11 +37,13 @@ pub(crate) fn selected_packages<'a>(
 }
 
 pub(crate) fn dest_target(dest: &PublishDestination) -> String {
-    dest.root
+    let raw = dest
+        .root
         .as_ref()
         .map(|path| path.display().to_string())
         .or_else(|| dest.server.clone())
-        .unwrap_or_else(|| dest.name.clone())
+        .unwrap_or_else(|| dest.name.clone());
+    redact_destination_target(&raw)
 }
 
 pub(crate) fn print_publish_plan(
@@ -109,5 +111,9 @@ fn format_publish_line(
     dest_name: &str,
     target: &str,
 ) -> String {
-    format!("{verb} {name} {version} -> {dest_name} ({target})")
+    format!(
+        "{verb} {name} {version} -> {} ({})",
+        redact_destination_target(dest_name),
+        redact_destination_target(target)
+    )
 }

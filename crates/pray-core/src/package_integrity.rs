@@ -197,6 +197,16 @@ pub fn verify_package_signature(
                 "package signature mismatch for {package_name} {version}"
             ))
         })?;
+        if let Some(claimed) = selected.signer_fingerprint.as_deref() {
+            let derived = crate::ssh_identity::ssh_public_key_fingerprint(public_key)?;
+            let claimed_key = crate::client_trust::normalize_key(claimed);
+            let derived_key = crate::client_trust::normalize_key(&derived);
+            if claimed_key != derived_key {
+                return Err(PrayError::Integrity(format!(
+                    "package {package_name} {version} signer_fingerprint does not match signer_public_key"
+                )));
+            }
+        }
         return Ok(());
     }
 

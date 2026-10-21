@@ -180,6 +180,15 @@ mod tests {
     use super::*;
 
     #[test]
+    fn try_merge_reports_would_conflict_paths_without_writing() {
+        let old = BTreeMap::from([("README.md".to_string(), b"old".to_vec())]);
+        let new = BTreeMap::from([("README.md".to_string(), b"new".to_vec())]);
+        let local = BTreeMap::from([("README.md".to_string(), b"brand".to_vec())]);
+        let paths = try_merge_content_files(&old, &new, &local).expect_err("conflict");
+        assert_eq!(paths, vec!["README.md".to_string()]);
+    }
+
+    #[test]
     fn clean_replica_takes_new_tree() {
         let old = BTreeMap::from([("exports/a.md".to_string(), b"old".to_vec())]);
         let new = BTreeMap::from([("exports/a.md".to_string(), b"new".to_vec())]);

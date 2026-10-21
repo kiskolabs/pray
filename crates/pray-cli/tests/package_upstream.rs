@@ -353,6 +353,40 @@ fn update_latest_dry_run_does_not_rewrite_upstream_pin() {
 }
 
 #[test]
+fn update_latest_dry_run_lists_would_conflict_path_fork_paths() {
+    let catalog = catalog_after_upstream_bump("~> 1.4");
+    fs::write(
+        catalog.join("packages/fork-base/README.md"),
+        "branded readme\n",
+    )
+    .expect("brand readme");
+    fs::write(
+        catalog.join("packages/fork-base/exports/testing-basics.md"),
+        "branded testing\n",
+    )
+    .expect("brand testing");
+    let preview = run_pray(&catalog, &["update", "--latest", "--dry-run"]);
+    assert!(
+        !preview.status.success(),
+        "dry-run should fail closed on would-conflict"
+    );
+    let stdout = String::from_utf8_lossy(&preview.stdout);
+    let stderr = String::from_utf8_lossy(&preview.stderr);
+    assert!(
+        stdout.contains("would-conflict") || stderr.contains("upstream_merge_conflict"),
+        "dry-run should list would-conflict paths:\nstdout={stdout}\nstderr={stderr}"
+    );
+    assert!(
+        stderr.contains("exports/testing-basics.md")
+            || stdout.contains("exports/testing-basics.md"),
+        "dry-run should name conflicting paths:\nstdout={stdout}\nstderr={stderr}"
+    );
+    let testing = fs::read_to_string(catalog.join("packages/fork-base/exports/testing-basics.md"))
+        .expect("fork export");
+    assert_eq!(testing, "branded testing\n");
+}
+
+#[test]
 fn publish_omits_upstream_from_registry_metadata() {
     let catalog = catalog_after_upstream_bump("~> 1.4");
     let registry_root = catalog.join("published");

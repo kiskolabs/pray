@@ -119,16 +119,27 @@ module Pray
 
     def report_published(package, dest_name, target, artifact_path)
       Terminal.println_stdout(
-        "published #{package.declaration.name} #{package.spec.version} -> #{dest_name} (#{target})"
+        "published #{package.declaration.name} #{package.spec.version} -> #{redact_publish_target(dest_name)} (#{redact_publish_target(target)})"
       )
       Terminal.println_verbose("  artifact #{artifact_path}")
     end
 
     def report_unchanged(package, dest_name, target)
       Terminal.println_stdout(
-        "unchanged #{package.declaration.name} #{package.spec.version} -> #{dest_name} (#{target})"
+        "unchanged #{package.declaration.name} #{package.spec.version} -> #{redact_publish_target(dest_name)} (#{redact_publish_target(target)})"
       )
       Terminal.println_verbose("  skip reason: stored publish matches")
+    end
+
+    def redact_publish_target(target)
+      text = target.to_s
+      return text unless text.include?("://")
+
+      scheme, remainder = text.split("://", 2)
+      return text unless remainder&.include?("@")
+
+      _userinfo, host_and_path = remainder.split("@", 2)
+      "#{scheme}://***@#{host_and_path}"
     end
     private_class_method :report_published, :report_unchanged
 

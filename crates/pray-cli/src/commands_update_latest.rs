@@ -8,6 +8,7 @@ use pray_core::{PrayError, PrayResult};
 
 #[path = "commands_update_upstream.rs"]
 mod upstream;
+pub(crate) use upstream::report_path_upstream_would_conflicts;
 use upstream::{
     latest_upstream_constraint_updates_json, plan_latest_upstream_constraints,
     print_latest_upstream_constraints, resolve_after_latest_upstream,
@@ -116,6 +117,13 @@ pub(super) fn update_latest_command(
             dry_run,
         )?
     } else if dry_run {
+        let previous = read_lockfile(&lockfile_path()).ok();
+        upstream::report_path_upstream_would_conflicts(
+            &project,
+            previous.as_ref(),
+            package.as_deref(),
+            &options,
+        )?;
         project
     } else {
         let previous = read_lockfile(&lockfile_path()).ok();

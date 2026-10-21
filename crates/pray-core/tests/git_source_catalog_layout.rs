@@ -10,6 +10,7 @@ use git_catalog::{
 use pray_core::embed::{resolve_project_with_options, ResolveOptions};
 use pray_core::resolve::git_source_cache_directory;
 use std::fs;
+use std::path::PathBuf;
 
 #[test]
 fn install_materializes_a_git_free_catalog_tree() {
@@ -45,6 +46,14 @@ fn install_materializes_a_git_free_catalog_tree() {
     assert!(
         db.join("HEAD").is_file(),
         "git objects must live in the global bare db"
+    );
+    assert!(
+        db.join(".pray-ready").is_file(),
+        "shared bare must be marked ready after atomic clone"
+    );
+    assert!(
+        !PathBuf::from(format!("{}.partial", db.display())).exists(),
+        "staging partial clone must not remain after publish"
     );
     let _ = fs::remove_dir_all(&root);
 }

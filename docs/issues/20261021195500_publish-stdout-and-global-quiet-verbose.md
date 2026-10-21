@@ -6,7 +6,7 @@ Andrei Makarov
 
 ## Decisions
 
-Live `pray publish` must print the same line shape as `--dry-run`, with verbs `published` and `unchanged`, plus a footer `N published, M unchanged`. Exit codes stay unchanged. Global `-q`/`--quiet` suppresses non-error stdout; `-v`/`--verbose` adds artifact paths and the unchanged skip reason. Help, man page, and completion list the flags. Parity in Rust, Ruby, and TypeScript CLIs.
+Live `pray publish` must print the same line shape as `--dry-run`, with verbs `published` and `unchanged`, plus a footer `N published, M unchanged`. Exit codes stay unchanged. Global `-q`/`--quiet` suppresses publish status stdout; `-v`/`--verbose` adds artifact paths and the unchanged skip reason. Help, man page, and completion list the flags. Parity in Rust, Ruby, and TypeScript CLIs. Publish destination URLs redact userinfo before printing.
 
 ## Effects
 

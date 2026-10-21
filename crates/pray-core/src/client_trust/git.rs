@@ -51,8 +51,22 @@ pub fn trust_git_run(
     git_run(repository, arguments, &environment)
 }
 
-pub fn commit_signing_key(home: &Path, source_url: &str, repository: &Path) -> Option<String> {
-    trust_git_output(home, source_url, repository, &["log", "-1", "--format=%GK"])
+pub fn commit_signing_key(
+    home: &Path,
+    source_url: &str,
+    repository: &Path,
+    revision: Option<&str>,
+) -> Option<String> {
+    let output = match revision.filter(|value| !value.is_empty() && !value.starts_with('-')) {
+        Some(revision) => trust_git_output(
+            home,
+            source_url,
+            repository,
+            &["log", "-1", "--format=%GK", revision, "--"],
+        ),
+        None => trust_git_output(home, source_url, repository, &["log", "-1", "--format=%GK"]),
+    };
+    output
         .ok()
         .map(|value| value.trim().to_string())
         .filter(|value| !value.is_empty())
@@ -62,8 +76,18 @@ pub fn commit_signing_fingerprint(
     home: &Path,
     source_url: &str,
     repository: &Path,
+    revision: Option<&str>,
 ) -> Option<String> {
-    trust_git_output(home, source_url, repository, &["log", "-1", "--format=%GF"])
+    let output = match revision.filter(|value| !value.is_empty() && !value.starts_with('-')) {
+        Some(revision) => trust_git_output(
+            home,
+            source_url,
+            repository,
+            &["log", "-1", "--format=%GF", revision, "--"],
+        ),
+        None => trust_git_output(home, source_url, repository, &["log", "-1", "--format=%GF"]),
+    };
+    output
         .ok()
         .map(|value| value.trim().to_string())
         .filter(|value| !value.is_empty())
@@ -72,12 +96,12 @@ pub fn commit_signing_fingerprint(
 pub fn repository_signing_keys(home: &Path, source_url: &str, repository: &Path) -> Vec<String> {
     let mut keys = Vec::new();
     if let Some(key) =
-        commit_signing_key(home, source_url, repository).map(|value| normalize_key(&value))
+        commit_signing_key(home, source_url, repository, None).map(|value| normalize_key(&value))
     {
         keys.push(key);
     }
-    if let Some(fingerprint) =
-        commit_signing_fingerprint(home, source_url, repository).map(|value| normalize_key(&value))
+    if let Some(fingerprint) = commit_signing_fingerprint(home, source_url, repository, None)
+        .map(|value| normalize_key(&value))
     {
         if !keys.iter().any(|existing| existing == &fingerprint) {
             keys.push(fingerprint);

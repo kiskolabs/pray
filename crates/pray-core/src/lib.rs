@@ -69,9 +69,13 @@ mod resolve_git_clone;
 mod resolve_git_command;
 mod resolve_git_ensure;
 mod resolve_git_legacy;
+mod resolve_git_lock;
 mod resolve_git_lookup;
 mod resolve_git_materialize;
 mod resolve_git_materialize_check;
+mod resolve_git_materialize_confirm;
+mod resolve_git_materialize_markers;
+mod resolve_git_materialize_unpack;
 mod resolve_git_paths;
 mod resolve_git_refresh;
 mod resolve_git_source_set;
@@ -91,6 +95,7 @@ pub mod trust;
 pub mod verify;
 
 pub use error::{PrayError, PrayResult};
+pub use git_process::clear_repository_local_env;
 
 pub mod embed;
 pub mod transaction;

@@ -1,7 +1,7 @@
 # Grandfathered production sources above the 300 LOC hard limit.
 # Columns: repository-relative path<TAB>max lines (ratchet; file must not grow).
 # Remove a row when the file drops to 300 or below.
-crates/pray-cli/src/apply_report.rs	366
+crates/pray-cli/src/apply_report.rs	361
 crates/pray-cli/src/auth_client.rs	413
 crates/pray-cli/src/server_http.rs	320
 crates/pray-cli/src/sync_command.rs	395

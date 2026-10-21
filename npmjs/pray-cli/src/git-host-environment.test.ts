@@ -1,8 +1,13 @@
 import assert from "node:assert/strict";
-import { mkdirSync, readFileSync, rmSync, writeFileSync } from "node:fs";
+import {
+  existsSync,
+  mkdirSync,
+  readFileSync,
+  rmSync,
+  writeFileSync,
+} from "node:fs";
 import { join } from "node:path";
 import { describe, it } from "node:test";
-import { PrayError } from "./errors.js";
 import { ensureGitRepository } from "./git/cache.js";
 import {
   commitAll,
@@ -80,7 +85,7 @@ describe("git commands started from a hook", () => {
     }
   });
 
-  it("refuse a broken cache inside another repository", () => {
+  it("repairs a broken cache without touching the host repository", () => {
     const fixture = pinnedShallowCache();
     try {
       const hostRemote = "https://example.com/host.git";
@@ -88,23 +93,15 @@ describe("git commands started from a hook", () => {
       runGit(fixture.root, "init", "--template=", "-b", "main");
       runGit(fixture.root, "remote", "add", "origin", hostRemote);
       rmSync(join(fixture.db, "objects"), { recursive: true, force: true });
-      assert.throws(
-        () =>
-          ensureGitRepository(
-            fixture.root,
-            fixture.cloneUrl,
-            false,
-            fixture.pinned,
-          ),
-        (error: unknown) => {
-          assert.ok(error instanceof PrayError);
-          assert.ok(
-            error.message.includes(fixture.db),
-            `error should name the broken cache: ${error.message}`,
-          );
-          return true;
-        },
+      const result = ensureGitRepository(
+        fixture.root,
+        fixture.cloneUrl,
+        false,
+        fixture.pinned,
       );
+      assert.ok(existsSync(join(fixture.db, "HEAD")));
+      assert.ok(existsSync(join(fixture.db, "objects")));
+      assert.equal(result.revision, fixture.pinned);
       assert.equal(
         runGit(fixture.root, "remote", "get-url", "origin").trim(),
         hostRemote,

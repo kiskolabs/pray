@@ -1,5 +1,6 @@
 use crate::client_trust::home::effective_trust_home;
 use crate::client_trust::policy::{best_rule, load_policy_or_default};
+use crate::package_integrity::ED25519_SIGNATURE_PREFIX;
 use crate::registry::RegistryPackageVersion;
 use crate::{PrayError, PrayResult};
 
@@ -23,6 +24,12 @@ pub fn enforce_require_signed_packages(
     if signature.trim().is_empty() {
         return Err(PrayError::Integrity(format!(
             "trust policy requires signed packages, but {package_name} {} has an empty signature",
+            selected.version
+        )));
+    }
+    if !signature.starts_with(ED25519_SIGNATURE_PREFIX) {
+        return Err(PrayError::Integrity(format!(
+            "trust policy requires signed packages, but {package_name} {} signature is not ed25519",
             selected.version
         )));
     }

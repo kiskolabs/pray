@@ -78,8 +78,9 @@ fn install_quarantines_legacy_full_clone_at_url_key() {
 #[test]
 fn lookup_prefers_stub_marker_over_leftover_full_clone() {
     let root = unique_temp("pray-git-stub-over-legacy");
+    let _cache_env = pin_cache(&root);
     let clone_url = "file://example-distribution";
-    let shared = root.join("objects");
+    let shared = global_git_directory(&root.join("cache"), clone_url);
     fs::create_dir_all(&shared).expect("shared");
     git(&shared, &["init", "--bare", "-b", "main"]);
 
@@ -97,6 +98,27 @@ fn lookup_prefers_stub_marker_over_leftover_full_clone() {
         git_source_cached_repository(&root, clone_url).as_deref(),
         Some(shared.as_path()),
         "stub .pray-git-dir must win over a leftover full clone"
+    );
+    let _ = fs::remove_dir_all(&root);
+}
+
+#[test]
+fn lookup_rejects_stub_marker_outside_expected_global_bare() {
+    let root = unique_temp("pray-git-stub-wrong-bare");
+    let _cache_env = pin_cache(&root);
+    let clone_url = "file://example-distribution";
+    let foreign = root.join("foreign-bare");
+    fs::create_dir_all(&foreign).expect("foreign");
+    git(&foreign, &["init", "--bare", "-b", "main"]);
+
+    let stub = git_source_cache_directory(&root, clone_url);
+    fs::create_dir_all(&stub).expect("stub");
+    fs::write(stub.join(".pray-git-dir"), foreign.to_str().expect("utf8")).expect("marker");
+    fs::write(stub.join(".pray-revision"), "abc").expect("revision");
+
+    assert!(
+        git_source_cached_repository(&root, clone_url).is_none(),
+        "stub must not bind trust to a foreign git directory"
     );
     let _ = fs::remove_dir_all(&root);
 }

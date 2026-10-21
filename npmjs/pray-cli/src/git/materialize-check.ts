@@ -1,9 +1,18 @@
 import { PrayError } from "../errors.js";
 import { tryRunGit } from "./run.js";
 
-export function requireRevisionPresent(gitDir: string, revision: string): void {
+export function requireRevisionPresent(
+  gitDir: string,
+  revision: string,
+  offline = false,
+): void {
   if (tryRunGit(gitDir, "cat-file", "-e", revision)) {
     return;
+  }
+  if (offline) {
+    throw PrayError.resolution(
+      `git revision ${revision} is not available in ${gitDir} and offline mode is enabled (git_revision_unfetched).`,
+    );
   }
   throw PrayError.resolution(
     `git revision ${revision} is not available in ${gitDir} (git_revision_unfetched). Run \`pray install --locked\`, or clear the project git cache and shared bare then install again.`,

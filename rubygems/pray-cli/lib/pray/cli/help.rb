@@ -52,8 +52,8 @@ module Pray
 
       GLOBAL_OPTIONS = [
         "--no-input            disable prompts",
-        "-q, --quiet           suppress non-error stdout",
-        "-v, --verbose         extra detail on stdout (repeatable later)",
+        "-q, --quiet           suppress non-error status stdout",
+        "-v, --verbose         extra status detail on stdout",
         "--rm                  use an ephemeral home directory",
         "--trust [--global]    import trust on first use"
       ].freeze

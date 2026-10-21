@@ -26,6 +26,13 @@ export function ensureGitRepository(
     cloneUrl,
     sparseSubdir,
   );
-  materializeCatalogTree(db, cacheDirectory, revision, sparseSubdir, refresh);
+  materializeCatalogTree(
+    db,
+    cacheDirectory,
+    revision,
+    sparseSubdir,
+    refresh,
+    offline,
+  );
   return { cacheDirectory, revision };
 }

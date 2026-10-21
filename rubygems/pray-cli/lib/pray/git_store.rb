@@ -8,27 +8,28 @@ require_relative "git_clone"
 
 module Pray
   module GitStore
+    READY_MARKER = ".pray-ready"
+
     module_function
 
     def ensure_global_git_db(clone_url, pinned_revision:, refresh:, offline:, working_directory:)
       db = global_git_cache_directory(clone_url)
       raise Error.resolution("git object cache is not configured") unless db
 
-      unless global_git_cache_ready?(db)
-        raise Error.resolution(offline_git_source_uncached(clone_url)) if offline
+      with_git_cache_lock(db) do
+        unless global_git_cache_ready?(db)
+          raise Error.resolution(offline_git_source_uncached(clone_url)) if offline
 
-        FileUtils.rm_rf(db) if File.exist?(db)
-        FileUtils.mkdir_p(File.dirname(db))
-        GitClone.clone_bare_git_db(working_directory, clone_url, db, quiet: false)
-        ensure_git_remote_origin(db, clone_url)
-      end
-      fetch_origin_tip(db, clone_url) if refresh && !offline
-      if pinned_revision
-        ensure_revision_in_db(db, clone_url, pinned_revision, !offline)
-        return [db, pinned_revision]
-      end
+          install_bare_clone(working_directory, clone_url, db)
+        end
+        fetch_origin_tip(db, clone_url) if refresh && !offline
+        if pinned_revision
+          ensure_revision_in_db(db, clone_url, pinned_revision, !offline)
+          return [db, pinned_revision]
+        end
 
-      [db, git_head_revision(db)]
+        [db, git_head_revision(db)]
+      end
     end
 
     def global_cache_root
@@ -45,11 +46,64 @@ module Pray
     end
 
     def global_git_cache_ready?(global_cache)
-      File.file?(File.join(global_cache, "HEAD")) || File.directory?(File.join(global_cache, ".git"))
+      return false unless File.file?(File.join(global_cache, "HEAD"))
+      return false unless File.directory?(File.join(global_cache, "objects"))
+      return true if File.file?(File.join(global_cache, READY_MARKER))
+
+      begin
+        git_head_revision(global_cache)
+        true
+      rescue Error
+        false
+      end
+    end
+
+    def mark_git_cache_ready(global_cache)
+      File.write(File.join(global_cache, READY_MARKER), "1")
     end
 
     def offline_git_source_uncached(clone_url)
       "git source #{clone_url} is not cached locally and offline mode is enabled"
+    end
+
+    def install_bare_clone(working_directory, clone_url, db)
+      FileUtils.mkdir_p(File.dirname(db))
+      staging = "#{db}.partial"
+      FileUtils.rm_rf(staging) if File.exist?(staging)
+      GitClone.clone_bare_git_db(working_directory, clone_url, staging, quiet: false)
+      ensure_git_remote_origin(staging, clone_url)
+      git_head_revision(staging)
+      mark_git_cache_ready(staging)
+      if File.exist?(db)
+        if global_git_cache_ready?(db)
+          FileUtils.rm_rf(staging)
+          return
+        end
+        FileUtils.rm_rf(db)
+      end
+      FileUtils.mv(staging, db)
+    end
+
+    def with_git_cache_lock(db)
+      lock_directory = "#{db}.lock.d"
+      FileUtils.mkdir_p(File.dirname(lock_directory))
+      acquired = false
+      400.times do
+        begin
+          Dir.mkdir(lock_directory)
+          acquired = true
+          break
+        rescue Errno::EEXIST
+          sleep 0.025
+        end
+      end
+      raise Error.resolution("timed out waiting for git cache lock #{lock_directory}") unless acquired
+
+      begin
+        yield
+      ensure
+        FileUtils.rm_rf(lock_directory)
+      end
     end
 
     def ensure_revision_in_db(db, clone_url, revision, allow_fetch)
@@ -110,6 +164,7 @@ module Pray
         GitRun.run_git(db, "fetch", "--depth", "1", "origin")
       end
       GitRun.run_git(db, "update-ref", "HEAD", "FETCH_HEAD")
+      mark_git_cache_ready(db)
     end
 
     def fetch_unshallow(db)

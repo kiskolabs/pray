@@ -1,17 +1,19 @@
 use crate::paths::remove_path_if_exists;
 use crate::resolve_git::{git_object_exists, is_local_distribution_root};
 use crate::resolve_git_clone::catalog_sparse_cones;
-use crate::resolve_git_command::{run_git_command, run_git_success};
+use crate::resolve_git_command::run_git_command_with_env;
+use crate::resolve_git_lock::acquire_git_cache_lock;
 use crate::resolve_git_materialize_check::{
-    annotate_git_materialize_failure, require_revision_present,
+    annotate_git_materialize_failure, require_revision_present_offline,
 };
+use crate::resolve_git_materialize_markers::{
+    catalog_root_markers, offline_git_env, GIT_DIR_MARKER, REVISION_MARKER,
+};
+use crate::resolve_git_materialize_unpack::unpack_bounded_catalog_tar;
+use crate::resource_limits::MAX_ARCHIVE_ENTRY_BYTES;
 use crate::{PrayError, PrayResult};
 use std::fs;
-use std::io::Cursor;
 use std::path::{Path, PathBuf};
-
-const REVISION_MARKER: &str = ".pray-revision";
-const GIT_DIR_MARKER: &str = ".pray-git-dir";
 
 pub(crate) fn materialize_catalog_tree(
     git_dir: &Path,
@@ -19,64 +21,89 @@ pub(crate) fn materialize_catalog_tree(
     revision: &str,
     subdir: Option<&str>,
     refresh: bool,
+    offline: bool,
 ) -> PrayResult<()> {
     if !refresh && catalog_matches(dest, git_dir, revision) {
         return Ok(());
     }
-    require_revision_present(git_dir, revision)?;
-    if dest.exists() {
-        remove_path_if_exists(dest)?;
+    require_revision_present_offline(git_dir, revision, offline)?;
+    let _lock = acquire_git_cache_lock(dest)?;
+    let staging = staging_catalog_path(dest);
+    if staging.exists() {
+        remove_path_if_exists(&staging)?;
     }
-    fs::create_dir_all(dest)?;
+    fs::create_dir_all(&staging)?;
     let mut unpacked = false;
     for prefix in catalog_sparse_cones(subdir) {
-        if unpack_archive_prefix(git_dir, dest, revision, &prefix)? {
+        if unpack_archive_prefix(git_dir, &staging, revision, &prefix, offline)? {
             unpacked = true;
         }
     }
     if !unpacked {
+        remove_path_if_exists(&staging)?;
+        if offline {
+            return Err(PrayError::Resolution(format!(
+                "git catalog at revision {revision} is not materializable locally and offline mode is enabled"
+            )));
+        }
         return Err(PrayError::Resolution(format!(
             "no pray distribution root in git source at revision {revision}"
         )));
     }
-    fs::write(dest.join(REVISION_MARKER), revision)?;
+    fs::write(staging.join(REVISION_MARKER), revision)?;
     let git_dir_text = git_dir.to_str().ok_or_else(|| {
         PrayError::Resolution(format!("invalid global git cache path: {:?}", git_dir))
     })?;
-    fs::write(dest.join(GIT_DIR_MARKER), git_dir_text)?;
-    Ok(())
+    fs::write(staging.join(GIT_DIR_MARKER), git_dir_text)?;
+    publish_catalog_tree(dest, &staging)
 }
 
-pub(crate) fn materialize_git_catalog_file(source_root: &Path, relative: &Path) -> PrayResult<()> {
+pub(crate) fn materialize_git_catalog_file(
+    source_root: &Path,
+    relative: &Path,
+    offline: bool,
+) -> PrayResult<()> {
     let full_path = source_root.join(relative);
     if full_path.is_file() {
         return Ok(());
     }
-    let Some((git_dir, revision, work_tree)) = find_catalog_markers(source_root) else {
+    let Some((git_dir, revision, catalog_root)) = catalog_root_markers(source_root) else {
         return Ok(());
     };
-    require_revision_present(&git_dir, &revision)?;
-    let Ok(repo_relative) = full_path.strip_prefix(&work_tree) else {
+    require_revision_present_offline(&git_dir, &revision, offline)?;
+    let Ok(repo_relative) = full_path.strip_prefix(&catalog_root) else {
         return Ok(());
     };
     let Some(repo_relative) = repo_relative.to_str() else {
         return Ok(());
     };
-    let work_tree_text = work_tree.to_str().ok_or_else(|| {
-        PrayError::Resolution(format!("invalid catalog cache path: {:?}", work_tree))
+    let object = format!("{revision}:{repo_relative}");
+    let output = run_git_command_with_env(&git_dir, &["show", &object], offline_git_env(offline))
+        .map_err(|error| annotate_git_materialize_failure(&git_dir, &revision, error))?;
+    if !output.status.success() {
+        let error = crate::resolve_git_command::command_error("git show", output);
+        if offline {
+            return Err(PrayError::Resolution(format!(
+                "git catalog blob {repo_relative} at revision {revision} is not available locally and offline mode is enabled"
+            )));
+        }
+        return Err(annotate_git_materialize_failure(&git_dir, &revision, error));
+    }
+    if output.stdout.len() as u64 > MAX_ARCHIVE_ENTRY_BYTES {
+        return Err(PrayError::Integrity(format!(
+            "git catalog blob {repo_relative} exceeds {MAX_ARCHIVE_ENTRY_BYTES} bytes"
+        )));
+    }
+    if let Some(parent) = full_path.parent() {
+        fs::create_dir_all(parent)?;
+    }
+    fs::write(&full_path, output.stdout).map_err(|error| {
+        PrayError::Resolution(format!(
+            "failed to write git catalog file {}: {error}",
+            full_path.display()
+        ))
     })?;
-    run_git_success(
-        &git_dir,
-        &[
-            "--work-tree",
-            work_tree_text,
-            "checkout",
-            &revision,
-            "--",
-            repo_relative,
-        ],
-    )
-    .map_err(|error| annotate_git_materialize_failure(&git_dir, &revision, error))
+    Ok(())
 }
 
 fn catalog_matches(dest: &Path, git_dir: &Path, revision: &str) -> bool {
@@ -105,36 +132,60 @@ fn unpack_archive_prefix(
     dest: &Path,
     revision: &str,
     prefix: &str,
+    offline: bool,
 ) -> PrayResult<bool> {
-    let output = run_git_command(
+    let output = run_git_command_with_env(
         git_dir,
         &["archive", "--format=tar", revision, "--", prefix],
+        offline_git_env(offline),
     )?;
     if !output.status.success() || output.stdout.is_empty() {
         return Ok(false);
     }
-    tar::Archive::new(Cursor::new(output.stdout))
-        .unpack(dest)
-        .map_err(|error| {
-            PrayError::Resolution(format!("failed to unpack git catalog archive: {error}"))
-        })?;
+    unpack_bounded_catalog_tar(&output.stdout, dest)?;
     Ok(true)
 }
 
-fn find_catalog_markers(start: &Path) -> Option<(PathBuf, String, PathBuf)> {
-    let mut current = start.to_path_buf();
-    for _ in 0..8 {
-        let revision_path = current.join(REVISION_MARKER);
-        let git_dir_path = current.join(GIT_DIR_MARKER);
-        if revision_path.is_file() && git_dir_path.is_file() {
-            let revision = fs::read_to_string(revision_path).ok()?.trim().to_string();
-            let git_dir = PathBuf::from(fs::read_to_string(git_dir_path).ok()?.trim());
-            if revision.is_empty() || !git_dir.exists() {
-                return None;
-            }
-            return Some((git_dir, revision, current));
-        }
-        current = current.parent()?.to_path_buf();
+fn staging_catalog_path(dest: &Path) -> PathBuf {
+    let mut staging = dest.as_os_str().to_os_string();
+    staging.push(".partial");
+    PathBuf::from(staging)
+}
+
+fn publish_catalog_tree(dest: &Path, staging: &Path) -> PrayResult<()> {
+    if let Some(parent) = dest.parent() {
+        fs::create_dir_all(parent)?;
     }
-    None
+    if dest.exists() {
+        let backup = {
+            let mut path = dest.as_os_str().to_os_string();
+            path.push(".previous");
+            PathBuf::from(path)
+        };
+        if backup.exists() {
+            remove_path_if_exists(&backup)?;
+        }
+        fs::rename(dest, &backup).map_err(|error| {
+            PrayError::Resolution(format!(
+                "failed to retire previous git catalog {}: {error}",
+                dest.display()
+            ))
+        })?;
+        if let Err(error) = fs::rename(staging, dest) {
+            let _ = fs::rename(&backup, dest);
+            let _ = remove_path_if_exists(staging);
+            return Err(PrayError::Resolution(format!(
+                "failed to publish git catalog {}: {error}",
+                dest.display()
+            )));
+        }
+        remove_path_if_exists(&backup)?;
+        return Ok(());
+    }
+    fs::rename(staging, dest).map_err(|error| {
+        PrayError::Resolution(format!(
+            "failed to publish git catalog {}: {error}",
+            dest.display()
+        ))
+    })
 }

@@ -21,6 +21,7 @@ import {
   emptyPublishStats,
   mergePublishStats,
   printPublishFooter,
+  redactPublishTarget,
 } from "./report.js";
 
 export function loadPublishRemotes(): {
@@ -173,7 +174,7 @@ function printPublishPlan(
     const target = dest.root ?? dest.server ?? dest.name;
     for (const packageEntry of packages) {
       printlnStdout(
-        `publish ${packageEntry.declaration.name} ${packageEntry.spec.version} -> ${dest.name} (${target})`,
+        `publish ${packageEntry.declaration.name} ${packageEntry.spec.version} -> ${redactPublishTarget(dest.name)} (${redactPublishTarget(target)})`,
       );
     }
   }

@@ -13,6 +13,7 @@ import {
   parseUpstream,
 } from "./parse-maps.js";
 import { canonicalPackageSpec, type PackageSpec } from "./types.js";
+import { validateRelativePaths } from "./validate-paths.js";
 
 const PARSE_CONTEXT = "prayspec";
 
@@ -58,7 +59,9 @@ class BlockParser {
         throw PrayError.parse(PARSE_CONTEXT, "missing 'end'");
       }
       if (statement === "end") {
-        return canonicalPackageSpec(spec);
+        const packageSpec = canonicalPackageSpec(spec);
+        validateRelativePaths(packageSpec);
+        return packageSpec;
       }
       this.applyStatement(spec, statement);
     }

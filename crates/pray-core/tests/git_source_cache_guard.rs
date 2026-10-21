@@ -10,7 +10,7 @@ use std::path::Path;
 use std::process::Command;
 
 #[test]
-fn install_refuses_a_broken_cache_inside_another_repository() {
+fn install_repairs_a_broken_cache_without_touching_the_host_repository() {
     let fixture = pinned_shallow_cache_fixture(false);
     let host_remote = "https://example.com/host.git";
     fs::write(fixture.root.join("README.md"), "host\n").expect("host file");
@@ -19,9 +19,8 @@ fn install_refuses_a_broken_cache_inside_another_repository() {
     let db = global_git_directory(&fixture.root.join("cache"), &fixture.clone_url);
     fs::remove_dir_all(db.join("objects")).expect("break cache");
 
-    let error =
-        resolve_project_with_options(&fixture.root.join("Prayfile"), &ResolveOptions::default())
-            .expect_err("install must not use a repository outside the cache");
+    resolve_project_with_options(&fixture.root.join("Prayfile"), &ResolveOptions::default())
+        .expect("install should rebuild a broken shared bare cache");
 
     assert_eq!(
         origin_url(&fixture.root),
@@ -29,8 +28,8 @@ fn install_refuses_a_broken_cache_inside_another_repository() {
         "host origin URL changed"
     );
     assert!(
-        error.to_string().contains(&db.display().to_string()),
-        "error should name the broken cache:\n{error}"
+        db.join("HEAD").is_file() && db.join("objects").is_dir(),
+        "shared bare cache should exist after repair"
     );
 }
 

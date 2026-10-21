@@ -30,10 +30,13 @@ module Pray
       if arguments.delete("--no-input")
         ENV["PRAY_NO_INPUT"] = "1"
       end
-      quiet = !!(arguments.delete("--quiet") || arguments.delete("-q"))
+      quiet = false
       verbose = 0
       arguments.reject! do |argument|
-        if argument == "--verbose" || argument == "-v"
+        if argument == "--quiet" || argument == "-q"
+          quiet = true
+          true
+        elsif argument == "--verbose" || argument == "-v"
           verbose += 1
           true
         else

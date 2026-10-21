@@ -11,8 +11,8 @@ export function configureOutput(quiet: boolean, verbose: number): void {
 }
 
 export function quiet(): boolean {
-  const value = process.env.PRAY_QUIET;
-  return value !== undefined && value !== "0";
+  const value = (process.env.PRAY_QUIET ?? "").trim().toLowerCase();
+  return value === "1" || value === "true" || value === "yes" || value === "on";
 }
 
 export function verbose(): boolean {

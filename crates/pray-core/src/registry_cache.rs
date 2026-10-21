@@ -8,7 +8,6 @@ use crate::paths::{
     validate_registry_cache_identity,
 };
 use crate::registry::{RegistryPackageResolution, RegistryPackageVersion};
-use crate::registry_http::http_get;
 use crate::{PrayError, PrayResult};
 use std::fs;
 use std::path::{Path, PathBuf};
@@ -226,18 +225,22 @@ pub(crate) fn offline_package_error(package_name: &str, version: &str) -> PrayEr
 pub(crate) fn read_local_registry_artifact_bytes(
     source_root: &Path,
     artifact: &str,
+    offline: bool,
 ) -> PrayResult<Vec<u8>> {
-    if artifact.starts_with("http://") || artifact.starts_with("https://") {
-        return http_get(artifact);
-    }
-    if let Some(path) = artifact.strip_prefix("file://") {
-        return fs::read(Path::new(path)).map_err(Into::into);
+    if artifact.contains("://") || artifact.starts_with("file:") {
+        return Err(PrayError::Integrity(format!(
+            "local and git catalog artifacts must be relative paths under the distribution root, not URLs: {artifact}"
+        )));
     }
     let artifact_path = Path::new(artifact);
     validate_package_relative_path(artifact_path)?;
     let full_path = source_root.join(artifact_path);
     if !full_path.is_file() {
-        crate::resolve_git_materialize::materialize_git_catalog_file(source_root, artifact_path)?;
+        crate::resolve_git_materialize::materialize_git_catalog_file(
+            source_root,
+            artifact_path,
+            offline,
+        )?;
     }
     fs::read(&full_path).map_err(|error| {
         if error.kind() == std::io::ErrorKind::NotFound {

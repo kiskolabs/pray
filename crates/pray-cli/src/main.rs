@@ -10,6 +10,7 @@ mod cli_parse_packages;
 mod cli_parse_remote;
 mod cli_release;
 mod command;
+mod commands_doctor;
 mod commands_init;
 mod commands_init_prayer;
 mod commands_init_prayer_manifest;
@@ -80,6 +81,7 @@ pub(crate) use registry_ops::{
 };
 
 use cli_parse::parse_command;
+use commands_doctor::doctor_command;
 use commands_init::{init_command, prayer_init_command, repo_init_command};
 use commands_inspect::{
     clean_command, explain_command, list_command, manifest_command, outdated_command, plan_command,
@@ -118,47 +120,24 @@ fn main() {
 }
 
 fn run(arguments: Vec<String>) -> PrayResult<()> {
-    let ephemeral = arguments.iter().any(|argument| argument == "--rm");
-    let trust_import = arguments.iter().any(|argument| argument == "--trust");
-    let trust_global = arguments.iter().any(|argument| argument == "--global");
-    let no_input = arguments.iter().any(|argument| argument == "--no-input");
-    let quiet = arguments
-        .iter()
-        .any(|argument| argument == "--quiet" || argument == "-q");
-    let verbose = arguments
-        .iter()
-        .filter(|argument| argument.as_str() == "--verbose" || argument.as_str() == "-v")
-        .count() as u32;
-    let filtered: Vec<String> = arguments
-        .into_iter()
-        .filter(|argument| {
-            argument != "--rm"
-                && argument != "--trust"
-                && argument != "--global"
-                && argument != "--no-input"
-                && argument != "--quiet"
-                && argument != "-q"
-                && argument != "--verbose"
-                && argument != "-v"
-        })
-        .collect();
+    let (flags, filtered) = cli_output::extract_global_flags(arguments);
     let filtered = invocation::initialize(filtered)?;
-    if no_input {
+    if flags.no_input {
         std::env::set_var("PRAY_NO_INPUT", "1");
     }
-    cli_output::configure(quiet, verbose);
+    cli_output::configure(flags.quiet, flags.verbose);
     if let Some(()) = maybe_print_help(&filtered)? {
         return Ok(());
     }
-    let ephemeral_home = if ephemeral {
+    let ephemeral_home = if flags.ephemeral {
         Some(prepare_ephemeral_home()?)
     } else {
         None
     };
-    if trust_import {
+    if flags.trust_import {
         std::env::set_var("PRAY_TRUST_IMPORT", "1");
     }
-    if trust_global && !trust_import {
+    if flags.trust_global && !flags.trust_import {
         return Err(PrayError::Unsupported(
             "--global requires --trust on install, update, or refresh".into(),
         ));
@@ -272,6 +251,7 @@ fn run(arguments: Vec<String>) -> PrayResult<()> {
         Command::Explain { package } => explain_command(package),
         Command::Vendor => vendor_command(),
         Command::Clean { unused } => clean_command(unused),
+        Command::Doctor { migrate_git_cache } => doctor_command(migrate_git_cache),
         Command::Tree => tree_command(),
         Command::Sync { root, peers } => sync_command(root, peers),
         Command::Trust { arguments } => trust_command::run_trust_command(arguments),

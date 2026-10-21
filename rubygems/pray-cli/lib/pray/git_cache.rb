@@ -21,7 +21,14 @@ module Pray
       )
       GitLegacy.quarantine_legacy_project_git_checkouts(project_root, clone_url)
       catalog = git_source_cache_directory(project_root, clone_url, sparse_subdir)
-      GitMaterialize.materialize_catalog_tree(db, catalog, revision, sparse_subdir, refresh)
+      GitMaterialize.materialize_catalog_tree(
+        db,
+        catalog,
+        revision,
+        sparse_subdir,
+        refresh,
+        offline: offline
+      )
       [catalog, revision]
     end
 
@@ -31,11 +38,12 @@ module Pray
     end
 
     def git_source_cached_repository(project_root, clone_url)
-      global_cache = GitStore.global_git_cache_directory(clone_url)
-      return global_cache if global_cache && GitStore.global_git_cache_ready?(global_cache)
+      expected = GitStore.global_git_cache_directory(clone_url)
+      return nil unless expected
+      return expected if GitStore.global_git_cache_ready?(expected)
 
-      stub_git_dir(git_source_cache_directory(project_root, clone_url)) ||
-        find_stub_git_dir(project_root, clone_url)
+      stub_git_dir(git_source_cache_directory(project_root, clone_url), expected) ||
+        find_stub_git_dir(project_root, expected)
     end
 
     def git_checkout?(path)
@@ -46,20 +54,18 @@ module Pray
       Hashing.sha256_prefixed(text)[7, 16]
     end
 
-    def stub_git_dir(catalog)
+    def stub_git_dir(catalog, expected)
       marker = File.join(catalog, GitMaterialize::GIT_DIR_MARKER)
       return nil unless File.file?(marker)
 
       git_dir = File.read(marker).strip
       return nil if git_dir.empty? || !File.exist?(git_dir)
+      return nil unless paths_equal?(git_dir, expected)
 
       git_dir
     end
 
-    def find_stub_git_dir(project_root, clone_url)
-      expected = GitStore.global_git_cache_directory(clone_url)
-      return nil unless expected
-
+    def find_stub_git_dir(project_root, expected)
       cache_root = File.join(project_root, ".pray", "cache", "git")
       return nil unless File.directory?(cache_root)
 
@@ -67,11 +73,19 @@ module Pray
         path = File.join(cache_root, name)
         next if git_checkout?(path)
 
-        git_dir = stub_git_dir(path)
-        return git_dir if git_dir == expected
+        git_dir = stub_git_dir(path, expected)
+        return git_dir if git_dir
       end
       nil
     end
-    private_class_method :stub_git_dir, :find_stub_git_dir
+
+    def paths_equal?(left, right)
+      return true if left == right
+
+      File.realpath(left) == File.realpath(right)
+    rescue Errno::ENOENT
+      false
+    end
+    private_class_method :stub_git_dir, :find_stub_git_dir, :paths_equal?
   end
 end

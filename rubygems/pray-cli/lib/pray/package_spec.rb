@@ -55,6 +55,7 @@ module Pray
     end
 
     def tree_hash_for_root(root)
+      validate_relative_paths!
       file_bytes = {}
       files.each do |file|
         path = File.join(root, file)
@@ -196,7 +197,11 @@ module Pray
         expect_start!
         spec = PackageSpec.new
         while (statement = next_statement)
-          return spec.canonicalized if statement == "end"
+          if statement == "end"
+            package = spec.canonicalized
+            package.validate_relative_paths!
+            return package
+          end
 
           apply_statement(spec, statement)
         end

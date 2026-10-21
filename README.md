@@ -379,8 +379,8 @@ A confession may include an optional free-form note.
 Examples:
 
 ```sh
-pray confess kiskolabs/rails-review --version 0.4.2 --accepted
-pray confess kiskolabs/rails-review --version 0.4.2 --rejected --note "Too broad for small maintenance tasks."
+pray confess amkisko/engineering-audit --version 2.11.0 --accepted
+pray confess amkisko/engineering-audit --version 2.11.0 --rejected --note "Too broad for small maintenance tasks."
 pray confess --from-lock p7f3k9m2 --accepted --note "Useful authorization checklist."
 ```
 
@@ -755,7 +755,7 @@ Example command set:
 pray init
 pray prayer init
 pray repo init
-pray add kiskolabs/rails-review
+pray add amkisko/engineering-audit
 pray install
 pray update
 pray plan

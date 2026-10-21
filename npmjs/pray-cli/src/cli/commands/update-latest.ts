@@ -13,6 +13,7 @@ import {
   type PathUpstreamLatestConstraint,
   planPathUpstreamLatestConstraints,
 } from "../../resolve/upstream-latest.js";
+import { reportPathUpstreamWouldConflicts } from "../../resolve/upstream-plan.js";
 import { applyPathUpstreamRefreshes } from "../../resolve/upstream-refresh.js";
 import {
   lockfilePath,
@@ -118,14 +119,20 @@ export async function updateLatestCommand(
       options,
       parseManifest(manifestText),
     );
-    if (
-      !dryRun &&
-      (await applyPathUpstreamRefreshes(
+    if (dryRun) {
+      await reportPathUpstreamWouldConflicts(
         candidate,
         previous,
         packageName,
         options,
-      ))
+      );
+    } else if (
+      await applyPathUpstreamRefreshes(
+        candidate,
+        previous,
+        packageName,
+        options,
+      )
     ) {
       candidate = await resolveProject(
         path,
@@ -133,9 +140,15 @@ export async function updateLatestCommand(
         parseManifest(manifestText),
       );
     }
+  } else if (dryRun) {
+    await reportPathUpstreamWouldConflicts(
+      project,
+      previous,
+      packageName,
+      options,
+    );
   } else if (
-    !dryRun &&
-    (await applyPathUpstreamRefreshes(project, previous, packageName, options))
+    await applyPathUpstreamRefreshes(project, previous, packageName, options)
   ) {
     candidate = await resolveProject(
       path,

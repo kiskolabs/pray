@@ -59,7 +59,7 @@ module Pray
         target = dest.root || dest.server || dest.name
         packages.each do |package|
           Terminal.println_stdout(
-            "publish #{package.declaration.name} #{package.spec.version} -> #{dest.name} (#{target})"
+            "publish #{package.declaration.name} #{package.spec.version} -> #{Publish.redact_publish_target(dest.name)} (#{Publish.redact_publish_target(target)})"
           )
         end
       end

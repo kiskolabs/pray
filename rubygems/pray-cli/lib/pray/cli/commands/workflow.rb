@@ -18,7 +18,9 @@ module Pray
       return if flags[:frozen] || flags[:locked]
 
       project = resolve_current_project
-      ApplyReport.local_summary_lines(previous_lockfile, project).each { |line| puts line }
+      ApplyReport.local_summary_lines(previous_lockfile, project).each do |line|
+        Terminal.println_stdout(line)
+      end
     end
 
     def render_command(flags)
@@ -146,7 +148,7 @@ module Pray
       merged_lockfile = merge_selected_package_update(previous_lockfile, updated_lockfile, name)
       Render.write_rendered_targets(project, rendered, previous_lockfile)
       Pray.write_lockfile(lockfile_path, merged_lockfile)
-      puts "Unlocked #{name}"
+      Terminal.println_stdout("Unlocked #{name}")
     end
 
     def merge_selected_package_update(previous, updated, selected_package)

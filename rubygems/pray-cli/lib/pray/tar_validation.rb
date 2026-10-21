@@ -38,6 +38,8 @@ module Pray
 
     def process_entry(header, data, size, state, output_directory)
       type = header.byteslice(156, 1)
+      # git archive emits a pax global header (`g`); ignore without applying path.
+      return if type == "g"
       if type == "x"
         state.pending_path = pax_path(data)
         return

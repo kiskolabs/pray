@@ -1,4 +1,10 @@
-import { existsSync, mkdirSync, rmSync } from "node:fs";
+import {
+  existsSync,
+  mkdirSync,
+  renameSync,
+  rmSync,
+  writeFileSync,
+} from "node:fs";
 import { homedir } from "node:os";
 import { join } from "node:path";
 import { PrayError } from "../errors.js";
@@ -6,6 +12,9 @@ import { cloneBareGitDb } from "./clone.js";
 import { requireOwnGitDir } from "./own-git-dir.js";
 import { cacheKey } from "./paths.js";
 import { runGit, runGitCapture, tryRunGit } from "./run.js";
+import { withGitCacheLock } from "./store-lock.js";
+
+const READY_MARKER = ".pray-ready";
 
 export function globalCacheRoot(): string | undefined {
   if (process.env.PRAY_CACHE) {
@@ -23,10 +32,21 @@ export function globalGitCacheDirectory(cloneUrl: string): string | undefined {
 }
 
 export function globalGitCacheReady(globalCache: string): boolean {
-  return (
-    existsSync(join(globalCache, "HEAD")) ||
-    existsSync(join(globalCache, ".git"))
-  );
+  if (
+    !existsSync(join(globalCache, "HEAD")) ||
+    !existsSync(join(globalCache, "objects"))
+  ) {
+    return false;
+  }
+  if (existsSync(join(globalCache, READY_MARKER))) {
+    return true;
+  }
+  try {
+    gitHeadRevision(globalCache);
+    return true;
+  } catch {
+    return false;
+  }
 }
 
 export function offlineGitSourceUncached(cloneUrl: string): never {
@@ -46,25 +66,50 @@ export function ensureGlobalGitDb(
   if (db === undefined) {
     throw PrayError.resolution("git object cache is not configured");
   }
-  if (!globalGitCacheReady(db)) {
-    if (offline) {
-      offlineGitSourceUncached(cloneUrl);
+  return withGitCacheLock(db, () => {
+    if (!globalGitCacheReady(db)) {
+      if (offline) {
+        offlineGitSourceUncached(cloneUrl);
+      }
+      installBareClone(workingDirectory, cloneUrl, db);
     }
-    if (existsSync(db)) {
-      rmSync(db, { recursive: true, force: true });
+    if (refresh && !offline) {
+      fetchOriginTip(db, cloneUrl);
     }
-    mkdirSync(join(db, ".."), { recursive: true });
-    cloneBareGitDb(workingDirectory, cloneUrl, db, false);
-    ensureGitRemoteOrigin(db, cloneUrl);
+    if (pinnedRevision) {
+      ensureRevisionInDb(db, cloneUrl, pinnedRevision, !offline);
+      return { db, revision: pinnedRevision };
+    }
+    return { db, revision: gitHeadRevision(db) };
+  });
+}
+
+function installBareClone(
+  workingDirectory: string,
+  cloneUrl: string,
+  db: string,
+): void {
+  mkdirSync(join(db, ".."), { recursive: true });
+  const staging = `${db}.partial`;
+  if (existsSync(staging)) {
+    rmSync(staging, { recursive: true, force: true });
   }
-  if (refresh && !offline) {
-    fetchOriginTip(db, cloneUrl);
+  cloneBareGitDb(workingDirectory, cloneUrl, staging, false);
+  ensureGitRemoteOrigin(staging, cloneUrl);
+  gitHeadRevision(staging);
+  markGitCacheReady(staging);
+  if (existsSync(db)) {
+    if (globalGitCacheReady(db)) {
+      rmSync(staging, { recursive: true, force: true });
+      return;
+    }
+    rmSync(db, { recursive: true, force: true });
   }
-  if (pinnedRevision) {
-    ensureRevisionInDb(db, cloneUrl, pinnedRevision, !offline);
-    return { db, revision: pinnedRevision };
-  }
-  return { db, revision: gitHeadRevision(db) };
+  renameSync(staging, db);
+}
+
+function markGitCacheReady(globalCache: string): void {
+  writeFileSync(join(globalCache, READY_MARKER), "1");
 }
 
 function ensureRevisionInDb(
@@ -111,6 +156,7 @@ function fetchOriginTip(db: string, cloneUrl: string): void {
     runGit(db, "fetch", "--depth", "1", "origin");
   }
   runGit(db, "update-ref", "HEAD", "FETCH_HEAD");
+  markGitCacheReady(db);
 }
 
 function fetchUnshallow(db: string): void {

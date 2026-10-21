@@ -4,18 +4,22 @@ import {
   mkdirSync,
   readdirSync,
   readFileSync,
+  renameSync,
   rmSync,
   writeFileSync,
 } from "node:fs";
-import { join } from "node:path";
+import { dirname, join } from "node:path";
+import { extractTarArchive } from "../archive/tar.js";
 import { PrayError } from "../errors.js";
+import { MAX_ARCHIVE_TOTAL_BYTES } from "../resource-limits.js";
 import { catalogSparseCones } from "./clone.js";
 import { gitEnvironment } from "./environment.js";
-import {
-  annotateGitMaterializeFailure,
-  requireRevisionPresent,
-} from "./materialize-check.js";
-import { runGit, tryRunGit } from "./run.js";
+import { requireRevisionPresent } from "./materialize-check.js";
+import { offlineGitEnv } from "./materialize-file.js";
+import { tryRunGit } from "./run.js";
+import { withGitCacheLock } from "./store-lock.js";
+
+export { materializeGitCatalogFile } from "./materialize-file.js";
 
 const REVISION_MARKER = ".pray-revision";
 const GIT_DIR_MARKER = ".pray-git-dir";
@@ -26,62 +30,39 @@ export function materializeCatalogTree(
   revision: string,
   subdir: string | undefined,
   refresh: boolean,
+  offline = false,
 ): void {
   if (!refresh && catalogMatches(dest, gitDir, revision)) {
     return;
   }
-  requireRevisionPresent(gitDir, revision);
-  if (existsSync(dest)) {
-    rmSync(dest, { recursive: true, force: true });
-  }
-  mkdirSync(dest, { recursive: true });
-  let unpacked = false;
-  for (const prefix of catalogSparseCones(subdir)) {
-    if (unpackArchivePrefix(gitDir, dest, revision, prefix)) {
-      unpacked = true;
+  requireRevisionPresent(gitDir, revision, offline);
+  withGitCacheLock(dest, () => {
+    const staging = `${dest}.partial`;
+    if (existsSync(staging)) {
+      rmSync(staging, { recursive: true, force: true });
     }
-  }
-  if (!unpacked) {
-    throw PrayError.resolution(
-      `no pray distribution root in git source at revision ${revision}`,
-    );
-  }
-  writeFileSync(join(dest, REVISION_MARKER), revision);
-  writeFileSync(join(dest, GIT_DIR_MARKER), gitDir);
-}
-
-export function materializeGitCatalogFile(
-  sourceRoot: string,
-  relative: string,
-): void {
-  if (existsSync(join(sourceRoot, relative))) {
-    return;
-  }
-  const markers = findCatalogMarkers(sourceRoot);
-  if (markers === undefined) {
-    return;
-  }
-  requireRevisionPresent(markers.gitDir, markers.revision);
-  const fullPath = join(sourceRoot, relative);
-  if (!fullPath.startsWith(markers.workTree)) {
-    return;
-  }
-  const repoRelative = fullPath
-    .slice(markers.workTree.length)
-    .replace(/^\/+/, "");
-  try {
-    runGit(
-      markers.gitDir,
-      "--work-tree",
-      markers.workTree,
-      "checkout",
-      markers.revision,
-      "--",
-      repoRelative,
-    );
-  } catch (error) {
-    annotateGitMaterializeFailure(markers.gitDir, markers.revision, error);
-  }
+    mkdirSync(staging, { recursive: true });
+    let unpacked = false;
+    for (const prefix of catalogSparseCones(subdir)) {
+      if (unpackArchivePrefix(gitDir, staging, revision, prefix, offline)) {
+        unpacked = true;
+      }
+    }
+    if (!unpacked) {
+      rmSync(staging, { recursive: true, force: true });
+      if (offline) {
+        throw PrayError.resolution(
+          `git catalog at revision ${revision} is not materializable locally and offline mode is enabled`,
+        );
+      }
+      throw PrayError.resolution(
+        `no pray distribution root in git source at revision ${revision}`,
+      );
+    }
+    writeFileSync(join(staging, REVISION_MARKER), revision);
+    writeFileSync(join(staging, GIT_DIR_MARKER), gitDir);
+    publishCatalogTree(dest, staging);
+  });
 }
 
 function catalogMatches(
@@ -118,6 +99,7 @@ function unpackArchivePrefix(
   dest: string,
   revision: string,
   prefix: string,
+  offline: boolean,
 ): boolean {
   const archive = spawnSync(
     "git",
@@ -132,41 +114,48 @@ function unpackArchivePrefix(
       "--",
       prefix,
     ],
-    { encoding: "buffer", env: gitEnvironment({ GIT_TERMINAL_PROMPT: "0" }) },
+    {
+      encoding: "buffer",
+      env: gitEnvironment(offlineGitEnv(offline)),
+      maxBuffer: MAX_ARCHIVE_TOTAL_BYTES + 1,
+    },
   );
+  if (archive.error && (archive.error as NodeJS.ErrnoException).code === "ENOBUFS") {
+    throw PrayError.integrity(
+      `git catalog archive exceeds ${MAX_ARCHIVE_TOTAL_BYTES} bytes`,
+    );
+  }
   if (archive.status !== 0 || !archive.stdout || archive.stdout.length === 0) {
     return false;
   }
-  const extract = spawnSync("tar", ["-x", "-C", dest], {
-    input: archive.stdout,
-    encoding: "buffer",
-  });
-  if (extract.status !== 0) {
-    throw PrayError.resolution("failed to unpack git catalog archive");
+  if (archive.stdout.length > MAX_ARCHIVE_TOTAL_BYTES) {
+    throw PrayError.integrity(
+      `git catalog archive exceeds ${MAX_ARCHIVE_TOTAL_BYTES} bytes`,
+    );
   }
+  extractTarArchive(archive.stdout, dest);
   return true;
 }
 
-function findCatalogMarkers(
-  start: string,
-): { gitDir: string; revision: string; workTree: string } | undefined {
-  let current = start;
-  for (let index = 0; index < 8; index += 1) {
-    const revisionPath = join(current, REVISION_MARKER);
-    const gitDirPath = join(current, GIT_DIR_MARKER);
-    if (existsSync(revisionPath) && existsSync(gitDirPath)) {
-      const revision = readFileSync(revisionPath, "utf8").trim();
-      const gitDir = readFileSync(gitDirPath, "utf8").trim();
-      if (revision.length === 0 || !existsSync(gitDir)) {
-        return undefined;
+function publishCatalogTree(dest: string, staging: string): void {
+  mkdirSync(dirname(dest), { recursive: true });
+  if (existsSync(dest)) {
+    const backup = `${dest}.previous`;
+    if (existsSync(backup)) {
+      rmSync(backup, { recursive: true, force: true });
+    }
+    renameSync(dest, backup);
+    try {
+      renameSync(staging, dest);
+    } catch (error) {
+      if (existsSync(backup)) {
+        renameSync(backup, dest);
       }
-      return { gitDir, revision, workTree: current };
+      rmSync(staging, { recursive: true, force: true });
+      throw error;
     }
-    const parent = join(current, "..");
-    if (parent === current) {
-      return undefined;
-    }
-    current = parent;
+    rmSync(backup, { recursive: true, force: true });
+    return;
   }
-  return undefined;
+  renameSync(staging, dest);
 }

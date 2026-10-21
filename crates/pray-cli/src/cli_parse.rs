@@ -104,6 +104,7 @@ pub(crate) fn parse_command(arguments: Vec<String>) -> PrayResult<Command> {
         "explain" => parse_explain_command(iter),
         "vendor" => Ok(Command::Vendor),
         "clean" => parse_clean_command(iter),
+        "doctor" => parse_doctor_command(iter),
         "tree" => Ok(Command::Tree),
         "sync" => parse_sync_command(iter),
         "trust" => {
@@ -128,6 +129,25 @@ fn parse_clean_command(mut arguments: std::vec::IntoIter<String>) -> PrayResult<
         ))),
         Some(argument) => Err(PrayError::Unsupported(format!(
             "unexpected clean argument: {argument}"
+        ))),
+    }
+}
+
+fn parse_doctor_command(mut arguments: std::vec::IntoIter<String>) -> PrayResult<Command> {
+    match arguments.next() {
+        None => Ok(Command::Doctor {
+            migrate_git_cache: false,
+        }),
+        Some(argument) if argument == "--migrate-git-cache" && arguments.next().is_none() => {
+            Ok(Command::Doctor {
+                migrate_git_cache: true,
+            })
+        }
+        Some(argument) if argument.starts_with("--") => Err(PrayError::Unsupported(format!(
+            "unknown doctor flag: {argument}"
+        ))),
+        Some(argument) => Err(PrayError::Unsupported(format!(
+            "unexpected doctor argument: {argument}"
         ))),
     }
 }

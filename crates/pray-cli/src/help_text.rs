@@ -15,6 +15,7 @@ pub(crate) const PACKAGE_COMMANDS: &[&str] = &[
     "unlock <package>                       clear a locked package pin",
     "vendor                                 copy resolved packages locally",
     "clean [--unused]                       remove local state or unused registry entries",
+    "doctor [--migrate-git-cache]           report git cache layout; optional legacy quarantine",
 ];
 
 #[cfg(feature = "auth")]
@@ -64,8 +65,8 @@ pub(crate) const GLOBAL_OPTIONS: &[&str] = &[
     "--file-path PATH      Prayfile path",
     "--env NAME            environment name",
     "--no-input            disable prompts",
-    "-q, --quiet           suppress non-error stdout",
-    "-v, --verbose         extra detail on stdout (repeatable later)",
+    "-q, --quiet           suppress non-error status stdout",
+    "-v, --verbose         extra status detail on stdout",
     "--rm                  use an ephemeral home directory",
     "--trust [--global]    import trust on first use",
 ];
@@ -135,7 +136,8 @@ pub(crate) fn command_help_text(command: &str) -> Option<&'static str> {
              Listed local compose files are re-embedded by pray install, not by update.\n\n\
              --major requires a package name.\n\
              --latest rewrites Prayfile constraints and exact spec.upstream pins to admit the latest versions, then refreshes those trees.\n\
-             --latest --dry-run previews those versions and checks destination conflicts.\n\
+             --latest --dry-run previews those versions, checks destination conflicts,\n\
+             and lists would-conflict path-fork content paths before write.\n\
              If a destination conflicts, inspect it and move it aside before retrying.\n\
              --json prints machine-readable output.\n\
              For files from an older pray, install the original package version first.",
@@ -145,6 +147,12 @@ pub(crate) fn command_help_text(command: &str) -> Option<&'static str> {
         "clean" => Some(
             "remove local cache and vendor trees, or only unused registry entries\n\n\
              Usage: pray clean [--unused]",
+        ),
+        "doctor" => Some(
+            "report project git cache layout and shared-bare trust paths\n\n\
+             Usage: pray doctor [--migrate-git-cache]\n\n\
+             --migrate-git-cache renames matching project full clones to *.legacy-git.\n\
+             Shallow plus partial clones remain the default for distribution git sources.",
         ),
         "publish" => Some(
             "upload path packages to a registry or local root\n\n\

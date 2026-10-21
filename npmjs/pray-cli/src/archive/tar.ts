@@ -41,7 +41,9 @@ function walkTarArchive(bytes: Buffer, outputDirectory?: string): void {
     }
     const type = String.fromCharCode(header[156] ?? 0);
     const data = bytes.subarray(dataStart, dataEnd);
-    if (type === "x") {
+    if (type === "g") {
+      // git archive emits a pax global header; ignore without applying path.
+    } else if (type === "x") {
       pendingPath = paxPath(data);
     } else if (type === "L") {
       pendingPath = cString(data).replace(/\n$/, "");

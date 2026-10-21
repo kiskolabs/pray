@@ -18,6 +18,8 @@ pub(crate) fn ensure_git_repository(
         ensure_global_git_db(clone_url, pinned_revision, refresh, offline, project_root)?;
     quarantine_legacy_project_git_checkouts(project_root, clone_url)?;
     let catalog = git_source_cache_directory_with_subdir(project_root, clone_url, sparse_subdir);
-    materialize_catalog_tree(&db, &catalog, &revision, sparse_subdir, refresh)?;
-    finalize_git_repository(clone_url, &db, catalog, revision)
+    // Gate the pinned revision before unpacking catalog bytes onto disk.
+    finalize_git_repository(clone_url, &db, catalog.clone(), revision.clone())?;
+    materialize_catalog_tree(&db, &catalog, &revision, sparse_subdir, refresh, offline)?;
+    Ok((catalog, revision))
 }

@@ -20,17 +20,23 @@ mod input_output;
 mod latest;
 #[path = "resolve_upstream_lock.rs"]
 mod lock;
+#[path = "resolve_upstream_plan.rs"]
+mod plan;
 #[path = "resolve_upstream_context.rs"]
 mod resolution_context;
 
 pub use drift::path_fork_drift_lines;
-use input_output::{content_file_bytes, local_content_for_refresh, write_content_files};
+use input_output::{
+    content_file_bytes, local_content_for_refresh, should_materialize_empty_fork,
+    write_content_files,
+};
 pub use latest::{
     apply_path_upstream_latest_constraints, plan_path_upstream_latest_constraints,
     PathUpstreamLatestConstraint,
 };
 use lock::ensure_locked_upstream_matches;
 pub(super) use lock::lock_path_upstream;
+pub use plan::{plan_path_upstream_conflicts, PathUpstreamConflict};
 pub(super) use resolution_context::UpstreamResolutionContext;
 
 pub fn apply_path_upstream_refreshes(
@@ -91,16 +97,17 @@ fn apply_one_path_upstream(
         previous,
         options,
     );
-    if local_content.is_empty() {
-        return materialize_empty_path_fork(package, new_upstream, &resolution_context);
-    }
-    let Some(old_upstream) = previous.and_then(|lockfile| {
+    let old_upstream = previous.and_then(|lockfile| {
         lockfile
             .package
             .iter()
             .find(|entry| entry.name == package.declaration.name)
             .and_then(|entry| entry.upstream.clone())
-    }) else {
+    });
+    if should_materialize_empty_fork(&local_content, &package.spec, old_upstream.is_some()) {
+        return materialize_empty_path_fork(package, new_upstream, &resolution_context);
+    }
+    let Some(old_upstream) = old_upstream else {
         return Ok(false);
     };
     if old_upstream.version == new_upstream.version

@@ -111,6 +111,9 @@ pub(crate) enum Command {
     Clean {
         unused: bool,
     },
+    Doctor {
+        migrate_git_cache: bool,
+    },
     Tree,
     Sync {
         root: PathBuf,

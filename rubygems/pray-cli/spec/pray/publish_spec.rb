@@ -150,4 +150,27 @@ RSpec.describe Pray::Publish do
     )
     expect(File).to exist("#{artifact}.praytorrent.json")
   end
+
+  it "prints published and unchanged lines" do
+    project_dir = File.join(workspace, "project")
+    publish_root = File.join(workspace, "dist")
+    FileUtils.cp_r(simple_project, project_dir)
+    project = Pray::Resolve.resolve_project(File.join(project_dir, "Prayfile"))
+
+    first = capture_stdout { described_class.publish_to_root(project, publish_root) }
+    expect(first).to include("published sample/base")
+
+    second = capture_stdout { described_class.publish_to_root(project, publish_root) }
+    expect(second).to include("unchanged sample/base")
+  end
+
+  def capture_stdout
+    original = $stdout
+    buffer = StringIO.new
+    $stdout = buffer
+    yield
+    buffer.string
+  ensure
+    $stdout = original
+  end
 end

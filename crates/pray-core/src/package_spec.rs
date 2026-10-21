@@ -98,7 +98,9 @@ impl<'a> BlockParser<'a> {
         let mut spec = PackageSpec::default();
         while let Some(statement) = self.next_statement()? {
             if statement == "end" {
-                return Ok(spec.canonicalized());
+                let package = spec.canonicalized();
+                package.validate_relative_paths()?;
+                return Ok(package);
             }
             self.apply_statement(&mut spec, statement)?;
         }

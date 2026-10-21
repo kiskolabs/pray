@@ -2,6 +2,7 @@ use crate::client_trust::{effective_trust_home, gate_git_source};
 use crate::resolve_git_command::{command_error, run_git_command, run_git_success};
 use crate::resolve_git_paths::cache_key;
 use crate::{PrayError, PrayResult};
+use std::fs;
 use std::path::{Path, PathBuf};
 
 pub use crate::resolve_git_paths::git_source_cache_directory;
@@ -20,8 +21,26 @@ pub(crate) fn global_git_cache_directory(clone_url: &str) -> Option<PathBuf> {
     global_cache_root().map(|root| root.join("git").join(cache_key(clone_url)))
 }
 
-pub(crate) fn global_git_cache_ready(global_cache: &Path) -> bool {
-    global_cache.join(".git").is_dir() || global_cache.join("HEAD").is_file()
+const READY_MARKER: &str = ".pray-ready";
+
+pub fn global_git_cache_ready(global_cache: &Path) -> bool {
+    if !global_cache.join("HEAD").is_file() || !global_cache.join("objects").is_dir() {
+        return false;
+    }
+    if global_cache.join(READY_MARKER).is_file() {
+        return true;
+    }
+    // Legacy caches written before the ready marker: require a resolvable HEAD.
+    git_head_revision(global_cache).is_ok()
+}
+
+pub(crate) fn mark_git_cache_ready(global_cache: &Path) -> PrayResult<()> {
+    fs::write(global_cache.join(READY_MARKER), "1").map_err(|error| {
+        PrayError::Resolution(format!(
+            "failed to mark git cache ready at {}: {error}",
+            global_cache.display()
+        ))
+    })
 }
 
 pub(crate) fn offline_git_source_uncached(clone_url: &str) -> PrayError {
@@ -53,7 +72,12 @@ pub(crate) fn finalize_git_repository(
     catalog: PathBuf,
     revision: String,
 ) -> PrayResult<(PathBuf, String)> {
-    gate_git_source(&effective_trust_home()?, clone_url, trust_repository)?;
+    gate_git_source(
+        &effective_trust_home()?,
+        clone_url,
+        trust_repository,
+        Some(&revision),
+    )?;
     if crate::client_trust::env_truthy("PRAY_TRUST_IMPORT") {
         let global_scope = crate::client_trust::env_truthy("PRAY_TRUST_GLOBAL");
         crate::client_trust::prompt_import_signing_keys_for_source(
@@ -97,7 +121,20 @@ fn require_own_git_dir(repository: &Path) -> PrayResult<()> {
 }
 
 pub(crate) fn git_object_exists(repository: &Path, object: &str) -> bool {
-    run_git_success(repository, &["cat-file", "-e", object]).is_ok()
+    git_object_exists_offline(repository, object, false)
+}
+
+pub(crate) fn git_object_exists_offline(repository: &Path, object: &str, offline: bool) -> bool {
+    use crate::resolve_git_command::run_git_command_with_env;
+    use crate::resolve_git_materialize_markers::offline_git_env;
+    let Ok(output) = run_git_command_with_env(
+        repository,
+        &["cat-file", "-e", object],
+        offline_git_env(offline),
+    ) else {
+        return false;
+    };
+    output.status.success()
 }
 
 pub(crate) fn git_head_revision(repository: &Path) -> PrayResult<String> {

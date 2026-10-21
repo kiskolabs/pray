@@ -12,11 +12,24 @@ pub(crate) fn run_git_success(root: &Path, arguments: &[&str]) -> PrayResult<()>
 }
 
 pub(crate) fn run_git_command(root: &Path, arguments: &[&str]) -> PrayResult<std::process::Output> {
-    git_command(root)
+    run_git_command_with_env(root, arguments, &[])
+}
+
+pub(crate) fn run_git_command_with_env(
+    root: &Path,
+    arguments: &[&str],
+    extra_env: &[(&str, &str)],
+) -> PrayResult<std::process::Output> {
+    let mut command = git_command(root);
+    command
         .env("GIT_TERMINAL_PROMPT", "0")
         .stdin(std::process::Stdio::null())
         .args(["-c", "protocol.file.allow=always"])
-        .args(arguments)
+        .args(arguments);
+    for (key, value) in extra_env {
+        command.env(key, value);
+    }
+    command
         .output()
         .map_err(|error| PrayError::Unsupported(format!("failed to run `git`: {error}")))
 }
