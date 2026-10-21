@@ -10,6 +10,7 @@ import {
 import { join } from "node:path";
 import { PrayError } from "../errors.js";
 import { catalogSparseCones } from "./clone.js";
+import { gitEnvironment } from "./environment.js";
 import { runGit } from "./run.js";
 
 const REVISION_MARKER = ".pray-revision";
@@ -118,7 +119,7 @@ function unpackArchivePrefix(
       "--",
       prefix,
     ],
-    { encoding: "buffer", env: { ...process.env, GIT_TERMINAL_PROMPT: "0" } },
+    { encoding: "buffer", env: gitEnvironment({ GIT_TERMINAL_PROMPT: "0" }) },
   );
   if (archive.status !== 0 || !archive.stdout || archive.stdout.length === 0) {
     return false;
