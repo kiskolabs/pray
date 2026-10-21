@@ -1,6 +1,7 @@
+use crate::git_process::git_command;
 use crate::{PrayError, PrayResult};
 use std::path::{Path, PathBuf};
-use std::process::{Command, Output};
+use std::process::Output;
 
 use super::policy::{normalize_key, source_scope_id};
 
@@ -90,7 +91,7 @@ pub fn git_run(
     arguments: &[&str],
     environment: &[(String, String)],
 ) -> PrayResult<()> {
-    let output = git_command(repository, arguments, environment)?;
+    let output = run_git(repository, arguments, environment)?;
     if output.status.success() {
         Ok(())
     } else {
@@ -103,7 +104,7 @@ pub fn git_output(
     arguments: &[&str],
     environment: &[(String, String)],
 ) -> PrayResult<String> {
-    let output = git_command(repository, arguments, environment)?;
+    let output = run_git(repository, arguments, environment)?;
     if output.status.success() {
         Ok(String::from_utf8_lossy(&output.stdout).trim().to_string())
     } else {
@@ -111,33 +112,19 @@ pub fn git_output(
     }
 }
 
-fn git_command(
+fn run_git(
     repository: &Path,
     arguments: &[&str],
     environment: &[(String, String)],
 ) -> PrayResult<Output> {
-    let mut command = Command::new(git_program());
-    command.current_dir(repository).args(arguments);
+    let mut command = git_command(repository);
+    command.args(arguments);
     for (key, value) in environment {
         command.env(key, value);
     }
     command
         .output()
         .map_err(|error| PrayError::Unsupported(format!("failed to run git: {error}")))
-}
-
-fn git_program() -> &'static str {
-    for candidate in [
-        "/usr/bin/git",
-        "/opt/homebrew/bin/git",
-        "/usr/local/bin/git",
-        "git",
-    ] {
-        if candidate == "git" || Path::new(candidate).exists() {
-            return candidate;
-        }
-    }
-    "git"
 }
 
 fn git_command_error(program: &str, arguments: &[&str], output: Output) -> PrayError {
