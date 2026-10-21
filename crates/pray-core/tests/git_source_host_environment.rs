@@ -8,6 +8,9 @@ use pray_core::embed::{resolve_project_with_options, ResolveOptions};
 use std::fs;
 use std::path::{Path, PathBuf};
 use std::process::Command;
+use std::sync::Mutex;
+
+static CALLER_ENVIRONMENT_LOCK: Mutex<()> = Mutex::new(());
 
 struct HostRepository {
     path: PathBuf,
@@ -34,16 +37,19 @@ impl Drop for CallerEnv {
 
 #[test]
 fn install_from_a_hook_with_git_dir_leaves_the_host_repository_alone() {
+    let _environment_guard = CALLER_ENVIRONMENT_LOCK.lock().expect("environment lock");
     assert_host_untouched_with(|host| vec![("GIT_DIR", host.git_dir.clone())]);
 }
 
 #[test]
 fn install_from_a_hook_with_git_index_file_leaves_the_host_repository_alone() {
+    let _environment_guard = CALLER_ENVIRONMENT_LOCK.lock().expect("environment lock");
     assert_host_untouched_with(|host| vec![("GIT_INDEX_FILE", host.git_dir.join("index"))]);
 }
 
 #[test]
 fn install_from_a_hook_with_git_work_tree_leaves_the_host_repository_alone() {
+    let _environment_guard = CALLER_ENVIRONMENT_LOCK.lock().expect("environment lock");
     assert_host_untouched_with(|host| {
         vec![
             ("GIT_DIR", host.git_dir.clone()),
@@ -55,6 +61,7 @@ fn install_from_a_hook_with_git_work_tree_leaves_the_host_repository_alone() {
 
 #[test]
 fn update_from_a_hook_with_git_dir_leaves_the_host_head_and_branches_alone() {
+    let _environment_guard = CALLER_ENVIRONMENT_LOCK.lock().expect("environment lock");
     let fixture = pinned_shallow_cache_fixture(false);
     let host = host_repository(&fixture);
     let before = host_state(&host);

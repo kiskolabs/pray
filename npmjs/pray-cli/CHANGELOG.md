@@ -4,8 +4,8 @@
 
 - Read package catalogs whose `published_at` is an RFC 3339 string or JSON null.
 - Keep prayer sources under `prayers/<name>/`, beside `prayers/v1/` when this project publishes. `prayers/v1/packages/` is catalog metadata. A root `packages/` folder is not a pray source convention.
-- Ignore repository variables such as `GIT_DIR` and `GIT_INDEX_FILE` that a git hook passes on, so pray run from a hook works only in its own git cache. Before this, `pray install` and `pray update` from a hook could rewrite the calling repository's `origin` URL and move its branches and HEAD. Git settings passed in `GIT_CONFIG_COUNT` or `GIT_CONFIG_PARAMETERS`, such as CI credentials or URL rewrites, still apply.
-- Refuse to update a git cache that is not a usable repository of its own. Before this, a damaged cache inside another checkout let git fall back to that checkout and rewrite its `origin` URL.
+- Prevent commands from changing the calling repository when a Git hook passes repository variables such as `GIT_DIR` or `GIT_WORK_TREE`. Explicit Git configuration, including CI credentials and URL rewrites, still applies.
+- Refuse a damaged Git cache that resolves to a parent repository before changing its remote.
 
 ## 1.20.0 (2026-09-18)
 

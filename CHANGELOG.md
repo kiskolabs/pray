@@ -2,14 +2,13 @@
 
 ## Unreleased
 
-- Ignore repository variables such as `GIT_DIR` and `GIT_INDEX_FILE` that a git hook passes on, so pray run from a hook works only in its own git cache. Before this, `pray install` and `pray update` from a hook could rewrite the calling repository's `origin` URL, move its branches and HEAD, and change its index. Git settings passed in `GIT_CONFIG_COUNT` or `GIT_CONFIG_PARAMETERS`, such as CI credentials or URL rewrites, still apply.
-- Refuse to update a git cache that is not a usable repository of its own. Before this, a damaged cache inside another checkout let git fall back to that checkout and rewrite its `origin` URL.
+- Prevent the Rust, Ruby, and TypeScript CLIs from changing the calling repository or index when a Git hook passes repository variables such as `GIT_DIR` or `GIT_INDEX_FILE`. Explicit Git configuration, including CI credentials and URL rewrites, still applies.
+- Refuse a damaged Git cache that resolves to a parent repository before changing its remote.
 - Read package catalogs whose `published_at` is an RFC 3339 string or JSON null.
 - Keep prayer sources under `prayers/<name>/`, beside `prayers/v1/` when this project publishes. `prayers/v1/packages/` is catalog metadata. A root `packages/` folder is not a pray source convention.
 - Recalculate committed `Prayfile.lock` hashes after path sources moved under `prayers/`.
-- Keep the Ruby and TypeScript CLIs out of the calling repository when they run from a git hook, and make them refuse a git cache that resolves to another repository, matching the Rust CLI.
 - Require Rust 1.91 to build the pray crates. `cargo install pray-cli` with an older compiler now stops with a message naming that minimum, instead of a compile error. Development and CI build with exactly 1.91.0 from `rust-toolchain.toml`.
-- Agree with `pray plan` in `pray render --check` about a dest file that keeps unmarked text or an earlier span order. It no longer reports the file stale when `pray install` would leave it unchanged.
+- Make `pray render --check` use the same layout as `pray plan` and `pray install`, so preserved unmarked text or earlier managed-span ordering no longer causes a false stale result.
 
 ## 1.20.0 (2026-09-18)
 
