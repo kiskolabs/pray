@@ -1,16 +1,15 @@
 use std::path::Path;
 use std::process::Command;
 
-// Mirrors `git rev-parse --local-env-vars`. Git exports these to hooks, so pray
-// started from a hook would otherwise run every cache command against the host
-// repository. GIT_CONFIG_KEY_n/GIT_CONFIG_VALUE_n are left alone: git reads them
-// only when GIT_CONFIG_COUNT is set, and callers that set a count also set their
-// own pairs.
-const REPOSITORY_LOCAL_VARIABLES: [&str; 15] = [
+// Mirrors git's own sanitize_repo_env: `git rev-parse --local-env-vars` minus
+// GIT_CONFIG_PARAMETERS and GIT_CONFIG_COUNT. Git exports these to hooks, so
+// pray started from a hook would otherwise run every cache command against the
+// host repository. The two config variables pass through, as they do when git
+// enters a submodule, because callers such as CI jobs use them to hand git
+// credentials or URL rewrites, and they cannot select a repository.
+const REPOSITORY_LOCAL_VARIABLES: [&str; 13] = [
     "GIT_ALTERNATE_OBJECT_DIRECTORIES",
     "GIT_CONFIG",
-    "GIT_CONFIG_PARAMETERS",
-    "GIT_CONFIG_COUNT",
     "GIT_OBJECT_DIRECTORY",
     "GIT_DIR",
     "GIT_WORK_TREE",
