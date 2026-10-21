@@ -30,11 +30,11 @@
 - All nine ignored scaling tests passed. The largest reported peak resident memory was 11,698,176 bytes in the index parsing case; the measured growth ratios stayed within their near-linear test budgets.
 - Cargo advisories, licenses, bans, and sources passed. npm production and full audits reported no vulnerabilities. Bundler Audit reported no vulnerabilities. Cargo Machete reported no unused dependencies.
 - Release changelog, coordinated-version, crate-status, RFC identifier, and drift checks passed.
+- Hosted CI run 39616472505 passed the npm, Ruby, and Rust jobs, including coverage, mutation, advisory, lint, and full-suite checks.
 - The CLI is the changed person-facing surface. Error copy identifies a damaged cache and the recovery action. No interactive, loading, or graphical state changed; narrow terminal wrapping remains the terminal's responsibility. A person can complete the operation after removing the named cache and rerunning the command.
 
 ## Next
 
-- Let hosted CI verify the integration branch on Linux and with repository secrets that are unavailable locally.
 - Obtain the required review before merging the integration branch into `main`.
 
 ## Source
