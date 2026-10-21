@@ -18,6 +18,7 @@ pub mod error;
 pub mod fetch;
 pub mod format_manifest;
 mod format_serialize;
+mod git_process;
 pub mod hashing;
 pub mod literal;
 pub mod local_prayer;
