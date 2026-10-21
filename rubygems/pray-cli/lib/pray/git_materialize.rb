@@ -82,7 +82,7 @@ module Pray
     end
 
     def unpack_archive_prefix(git_dir, dest, revision, prefix)
-      env = ENV.to_h.merge("GIT_TERMINAL_PROMPT" => "0")
+      env = GitRun.git_env("GIT_TERMINAL_PROMPT" => "0")
       stdout, _stderr, status = Open3.capture3(
         env,
         "git",
