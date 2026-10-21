@@ -76,6 +76,8 @@ jobs:
           ruby-version: "3.4"
           bundler-cache: true
           working-directory: rubygems/pray-cli
+      - name: Check RubyGems release environment isolation
+        run: bash scripts/release/rubygems_environment_test.sh
       - name: Install archive tools
         run: sudo apt-get update && sudo apt-get install -y zstd
       - name: Audit Ruby dependencies

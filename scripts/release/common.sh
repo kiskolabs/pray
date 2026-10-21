@@ -26,6 +26,25 @@ release_require_command() {
   fi
 }
 
+release_configure_ruby_environment() {
+  local package_dir="$1"
+  local ruby_build
+  package_dir="$(cd "${package_dir}" && pwd)"
+  ruby_build="$(
+    ruby -rrbconfig -e '
+      parts = [RUBY_ENGINE, RUBY_VERSION, RUBY_PATCHLEVEL, RbConfig::CONFIG.fetch("arch")]
+      print parts.join("-").gsub(/[^0-9A-Za-z._-]/, "_")
+    '
+  )"
+
+  export GEM_HOME="${package_dir}/tmp/release-gems/${ruby_build}"
+  export GEM_PATH="${GEM_HOME}"
+  export BUNDLE_PATH="${GEM_HOME}"
+  export BUNDLE_USER_HOME="${GEM_HOME}/.bundler"
+  export BUNDLE_APP_CONFIG="${GEM_HOME}/.bundler-app-config"
+  mkdir -p "${GEM_HOME}" "${BUNDLE_USER_HOME}" "${BUNDLE_APP_CONFIG}"
+}
+
 release_assert_version_alignment() {
   local root="$1"
   local version="$2"

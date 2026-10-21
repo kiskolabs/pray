@@ -25,6 +25,7 @@ First crates.io publish must go in order: `pray-core`, then `pray-transport`, th
 - `cargo login` / `CARGO_REGISTRY_TOKEN` for crates.io
 - `npm login` for npmjs
 - `gem push` credentials (MFA) for RubyGems
+- RubyGems release dependencies are installed under `rubygems/pray-cli/tmp/release-gems/` in a cache keyed by the complete Ruby build and platform. The release helper ignores user-installed gems so native extensions from another Ruby patch release cannot enter the build.
 - A working `pray` binary for distribution-point publish (`PRAY` selects it; after `gem push`, PATH `pray` may be the RubyGems CLI)
 - `gh` authenticated for `kiskolabs/pray` when creating or editing GitHub Releases
 - Optional: `PRAY_RELEASE_YES=1` to skip confirmation prompts
@@ -70,6 +71,8 @@ scripts/release/all.sh --publish --root ./prayers --server https://pray.example/
 ```
 
 `make release-all` runs the same publish path, then `make clean` (`cargo clean`) so workspace `target/` does not accumulate. The script alone does not clean.
+
+If a full publish stops after one or more registries succeed, resume from the first unpublished surface instead of repeating completed surfaces. For example, after crates.io and npm succeed but RubyGems fails, run `make release-rubygems`.
 
 Create or edit the GitHub Release for the workspace version:
 
