@@ -67,12 +67,33 @@ pub(crate) fn finalize_git_repository(
 }
 
 pub(crate) fn ensure_git_remote_origin(repository: &Path, clone_url: &str) -> PrayResult<()> {
+    require_own_git_dir(repository)?;
     if run_git_success(repository, &["remote", "get-url", "origin"]).is_ok() {
         run_git_success(repository, &["remote", "set-url", "origin", clone_url])?;
     } else {
         run_git_success(repository, &["remote", "add", "origin", clone_url])?;
     }
     Ok(())
+}
+
+// Git searches parent directories when `repository` is not a valid git
+// directory, so a damaged cache inside another checkout would otherwise
+// rewrite that checkout's origin.
+fn require_own_git_dir(repository: &Path) -> PrayResult<()> {
+    let output = run_git_command(repository, &["rev-parse", "--absolute-git-dir"])?;
+    let resolved = String::from_utf8_lossy(&output.stdout).trim().to_string();
+    let resolved_path = Path::new(&resolved).canonicalize().ok();
+    let own = [repository.to_path_buf(), repository.join(".git")]
+        .iter()
+        .any(|candidate| candidate.canonicalize().ok() == resolved_path);
+    if output.status.success() && own {
+        return Ok(());
+    }
+    Err(PrayError::Resolution(format!(
+        "git cache {} is not a usable git repository (git resolved {:?}). Remove it and run the command again.",
+        repository.display(),
+        resolved
+    )))
 }
 
 pub(crate) fn git_object_exists(repository: &Path, object: &str) -> bool {
