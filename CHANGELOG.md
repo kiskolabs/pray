@@ -1,6 +1,6 @@
 # CHANGELOG
 
-## Unreleased
+## 1.21.0 (2026-10-21)
 
 - Prevent the Rust, Ruby, and TypeScript CLIs from changing the calling repository or index when a Git hook passes repository variables such as `GIT_DIR` or `GIT_INDEX_FILE`. Explicit Git configuration, including CI credentials and URL rewrites, still applies.
 - Refuse a damaged Git cache that resolves to a parent repository before changing its remote.
