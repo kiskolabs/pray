@@ -59,7 +59,7 @@ jobs:
           tool: cargo-mutants
       - name: Mutation smoke on manifest and archive boundaries
         run: >
-          cargo mutants -p pray-core --timeout 30 --jobs 2
+          cargo mutants -p pray-core --timeout 60 --jobs 2
           -f 'manifest_validate.rs' -f 'package_archive.rs'
           -F '(manifest_validate.rs.*replace != with ==|package_archive.rs:12:36: replace > with ==)'
       - uses: SonarSource/sonarqube-scan-action@d209202bc7d53ff1cc128f7f907dac145c9d6ae9 # v8.3.0

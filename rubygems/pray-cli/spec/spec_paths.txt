@@ -2,6 +2,7 @@ spec/pray/apply_report_spec.rb
 spec/pray/archive_spec.rb
 spec/pray/clean_spec.rb
 spec/pray/cli_help_spec.rb
+spec/pray/cli_helpers_spec.rb
 spec/pray/cli_parse_spec.rb
 spec/pray/cli_run_context_spec.rb
 spec/pray/cli_suggest_spec.rb
@@ -15,7 +16,10 @@ spec/pray/distribution_spec.rb
 spec/pray/dotenv_spec.rb
 spec/pray/environment_spec.rb
 spec/pray/format_manifest_spec.rb
+spec/pray/git_clone_spec.rb
 spec/pray/git_distribution_spec.rb
+spec/pray/git_host_environment_spec.rb
+spec/pray/git_pinned_fetch_spec.rb
 spec/pray/git_refresh_spec.rb
 spec/pray/git_sources_spec.rb
 spec/pray/http_body_spec.rb
@@ -33,9 +37,11 @@ spec/pray/package_tree_hash_spec.rb
 spec/pray/parser_spec.rb
 spec/pray/project_context_spec.rb
 spec/pray/provisioned_dest_spec.rb
+spec/pray/publish_remote_spec.rb
 spec/pray/publish_spec.rb
 spec/pray/registry_spec.rb
 spec/pray/render_content_spec.rb
+spec/pray/render_patch_spec.rb
 spec/pray/render_spec.rb
 spec/pray/resolve_context_spec.rb
 spec/pray/resolve_source_spec.rb
