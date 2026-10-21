@@ -18,7 +18,7 @@
 - The check also invokes the helper with a relative package path from another working directory. This exposed and then verified the package-path canonicalization used by the release cache.
 - The RubyGems dry-run installed Bundler 4.0.15 and the locked dependencies in the Ruby 3.4.7 cache, inspected 192 Ruby files without offenses, passed 331 examples, and built `pray-cli-1.21.0.gem` without pushing it.
 - The updated Ruby advisory database reported no vulnerabilities in the locked gem graph.
-- Hosted CI passed the Ruby, npm, and Rust jobs, including the new release-environment check, coverage floors, mutation smoke, and SonarQube scan. The separate Scorecard analysis also passed.
+- Hosted CI passed the Ruby, npm, and Rust jobs, including the new release-environment check, coverage floors, and mutation smoke. The separate Scorecard analysis also passed. The non-blocking SonarQube step exited with an error because `SONAR_TOKEN` is not configured, so this run provides no SonarQube result.
 - Registry checks on 2026-10-21 found `pray-core`, `pray-transport`, and the Rust `pray-cli` at 1.21.0 on crates.io, npm `pray-cli` at 1.21.0, and RubyGems `pray-cli` at 1.20.0. The RubyGems surface remains unpublished.
 - The operator-facing surface is the terminal release flow. The successful dry-run reaches the artifact summary instead of a Bundler error report. There are no interactive states before the existing publish confirmation. A narrow terminal wraps dependency-install output but preserves the failure or completion line. A person can identify the artifact and whether it was pushed.
 
@@ -26,6 +26,7 @@
 
 - Publish only the RubyGems surface after the repair is on `main`.
 - Create the GitHub release after all registry surfaces report 1.21.0.
+- Configure `SONAR_TOKEN` or remove the non-blocking scan if SonarQube is not part of the maintained CI contract.
 
 ## Source
 
