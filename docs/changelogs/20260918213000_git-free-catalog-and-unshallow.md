@@ -30,7 +30,7 @@ Ship in 1.20.0. Close GitHub issue 31 after release.
 
 PRAY_CACHE is still process environment, so parallel test binaries can race that variable. Tests use a mutex inside one binary and unique cache roots.
 
-Leftover project worktrees with .git remain a fallback for pray trust import-repo when the global store is missing.
+Leftover project worktrees with .git were a fallback for pray trust import-repo when the global store was missing. Later work removes that fallback: lookup uses the shared bare or a stub `.pray-git-dir` only, and install quarantines matching full clones. See docs/issues/20261021194040_git-cache-legacy-and-path-fork-refresh.md.
 
 ## Source
 

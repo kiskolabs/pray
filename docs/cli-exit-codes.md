@@ -1,6 +1,6 @@
 # pray CLI exit codes
 
-The reference CLI (`pray`) uses stable numeric exit codes so scripts and CI can branch on failure class. Errors go to stderr; primary command output goes to stdout.
+The reference CLI (`pray`) uses stable numeric exit codes so scripts and CI can branch on failure class. Errors go to stderr; primary command output goes to stdout. Global `-q`/`--quiet` suppresses non-error stdout; exit codes are unchanged.
 
 | Code | Meaning |
 |------|---------|

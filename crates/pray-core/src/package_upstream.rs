@@ -122,9 +122,7 @@ pub fn try_merge_content_files(
             (None, None, Some(local_bytes)) => {
                 merged.insert(path.clone(), local_bytes.clone());
             }
-            (Some(_), Some(new_bytes), None) => {
-                merged.insert(path.clone(), new_bytes.clone());
-            }
+            (Some(_), None, None) => {}
             _ => {
                 conflicts.push(path.clone());
             }
@@ -145,7 +143,9 @@ pub fn upstream_merge_conflict_message(
     paths: &[String],
 ) -> String {
     format!(
-        "upstream merge conflict in {fork} while refreshing {upstream_name} {old_version} to {new_version}: {}",
+        "upstream merge conflict in {fork} while refreshing {upstream_name} {old_version} to {new_version}: {}. \
+         Reset those content files to the locked upstream tree, run `pray update --latest`, \
+         re-apply intentional overlays, then bump the fork version (upstream_merge_conflict).",
         paths.join(", ")
     )
 }
@@ -222,6 +222,8 @@ mod tests {
         assert!(message.contains("sample/base 1.4.3 to 1.4.4"));
         assert!(message.contains("README.md"));
         assert!(message.contains("exports/a.md"));
+        assert!(message.contains("upstream_merge_conflict"));
+        assert!(message.contains("pray update --latest"));
     }
 
     #[test]
@@ -233,6 +235,32 @@ mod tests {
             merged.get("exports/a.md").map(Vec::as_slice),
             Some(&b"edit"[..])
         );
+    }
+
+    #[test]
+    fn fork_deleted_file_conflicts_when_upstream_changes_it() {
+        let old = BTreeMap::from([("exports/drop.md".to_string(), b"old".to_vec())]);
+        let new = BTreeMap::from([("exports/drop.md".to_string(), b"new".to_vec())]);
+        let local = BTreeMap::new();
+        let paths = try_merge_content_files(&old, &new, &local).expect_err("conflict");
+        assert!(paths.contains(&"exports/drop.md".to_string()));
+    }
+
+    #[test]
+    fn both_sides_deleted_omits_path() {
+        let old = BTreeMap::from([("exports/drop.md".to_string(), b"old".to_vec())]);
+        let new = BTreeMap::new();
+        let local = BTreeMap::new();
+        let merged = merge_content_files(&old, &new, &local).expect("merge");
+        assert!(!merged.contains_key("exports/drop.md"));
+    }
+
+    #[test]
+    fn fork_deleted_stays_deleted_when_upstream_unchanged() {
+        let old = BTreeMap::from([("exports/drop.md".to_string(), b"old".to_vec())]);
+        let local = BTreeMap::new();
+        let merged = merge_content_files(&old, &old, &local).expect("merge");
+        assert!(!merged.contains_key("exports/drop.md"));
     }
 
     #[test]

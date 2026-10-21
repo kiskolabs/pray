@@ -22,6 +22,12 @@ import {
   writeRegistryPackageMetadata,
 } from "./registry-store.js";
 import {
+  emptyPublishStats,
+  type PublishStats,
+  reportPublished,
+  reportUnchanged,
+} from "./report.js";
+import {
   fetchDistributionSettings,
   torrentManifestBytes,
   torrentManifestPath,
@@ -38,11 +44,14 @@ export async function publishToRoot(
   root: string,
   signer = "local",
   signerFingerprint?: string,
-): Promise<void> {
+  destName = root,
+  target = root,
+): Promise<PublishStats> {
   const distributionRoot = root;
   const index = loadRegistryIndex(distributionRoot);
   const distribution = readDistributionSettings(distributionRoot);
   const packageNames = new Set(index.packages);
+  const stats = emptyPublishStats();
 
   for (const packageEntry of project.packages) {
     requireReleaseVersion(packageEntry.spec);
@@ -75,6 +84,8 @@ export async function publishToRoot(
     ) {
       packageNames.add(packageEntry.declaration.name);
       writeRegistryPackageMetadata(metadataPath, metadata);
+      reportUnchanged(packageEntry, destName, target);
+      stats.unchanged += 1;
       continue;
     }
 
@@ -102,10 +113,13 @@ export async function publishToRoot(
     metadata.versions.push(versionEntry);
     writeRegistryPackageMetadata(metadataPath, metadata);
     packageNames.add(packageEntry.declaration.name);
+    reportPublished(packageEntry, destName, target, artifactPath);
+    stats.published += 1;
   }
 
   index.packages = [...packageNames].sort();
   writeRegistryIndex(distributionRoot, index);
+  return stats;
 }
 
 export async function publishToServer(
@@ -113,8 +127,11 @@ export async function publishToServer(
   serverUrl: string,
   signer = "local",
   signerFingerprint?: string,
-): Promise<void> {
+  destName = serverUrl,
+  target = serverUrl,
+): Promise<PublishStats> {
   const distribution = await fetchDistributionSettings(serverUrl);
+  const stats = emptyPublishStats();
   for (const packageEntry of project.packages) {
     const archiveBytes = buildPackageArchiveBytes(packageEntry);
     const artifactPath = registryArtifactPath(
@@ -156,7 +173,10 @@ export async function publishToServer(
       "application/json",
       JSON.stringify(metadataToHash(metadata), null, 2),
     );
+    reportPublished(packageEntry, destName, target, artifactPath);
+    stats.published += 1;
   }
+  return stats;
 }
 
 function publishedRegistryPackageVersion(

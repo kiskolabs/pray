@@ -1,7 +1,10 @@
 use crate::paths::remove_path_if_exists;
-use crate::resolve_git::is_local_distribution_root;
+use crate::resolve_git::{git_object_exists, is_local_distribution_root};
 use crate::resolve_git_clone::catalog_sparse_cones;
 use crate::resolve_git_command::{run_git_command, run_git_success};
+use crate::resolve_git_materialize_check::{
+    annotate_git_materialize_failure, require_revision_present,
+};
 use crate::{PrayError, PrayResult};
 use std::fs;
 use std::io::Cursor;
@@ -20,6 +23,7 @@ pub(crate) fn materialize_catalog_tree(
     if !refresh && catalog_matches(dest, git_dir, revision) {
         return Ok(());
     }
+    require_revision_present(git_dir, revision)?;
     if dest.exists() {
         remove_path_if_exists(dest)?;
     }
@@ -51,6 +55,7 @@ pub(crate) fn materialize_git_catalog_file(source_root: &Path, relative: &Path) 
     let Some((git_dir, revision, work_tree)) = find_catalog_markers(source_root) else {
         return Ok(());
     };
+    require_revision_present(&git_dir, &revision)?;
     let Ok(repo_relative) = full_path.strip_prefix(&work_tree) else {
         return Ok(());
     };
@@ -71,6 +76,7 @@ pub(crate) fn materialize_git_catalog_file(source_root: &Path, relative: &Path) 
             repo_relative,
         ],
     )
+    .map_err(|error| annotate_git_materialize_failure(&git_dir, &revision, error))
 }
 
 fn catalog_matches(dest: &Path, git_dir: &Path, revision: &str) -> bool {
@@ -80,6 +86,9 @@ fn catalog_matches(dest: &Path, git_dir: &Path, revision: &str) -> bool {
     }
     let recorded_dir = fs::read_to_string(dest.join(GIT_DIR_MARKER)).unwrap_or_default();
     if Path::new(recorded_dir.trim()) != git_dir {
+        return false;
+    }
+    if !git_object_exists(git_dir, revision) {
         return false;
     }
     is_local_distribution_root(dest)

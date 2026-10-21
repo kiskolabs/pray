@@ -64,6 +64,8 @@ pub(crate) const GLOBAL_OPTIONS: &[&str] = &[
     "--file-path PATH      Prayfile path",
     "--env NAME            environment name",
     "--no-input            disable prompts",
+    "-q, --quiet           suppress non-error stdout",
+    "-v, --verbose         extra detail on stdout (repeatable later)",
     "--rm                  use an ephemeral home directory",
     "--trust [--global]    import trust on first use",
 ];
@@ -128,6 +130,8 @@ pub(crate) fn command_help_text(command: &str) -> Option<&'static str> {
              With no package name, update re-resolves the whole graph within constraints\n\
              and refreshes git source revisions. A package name unlocks that package only.\n\
              Path-fork packages can refresh from upstream.\n\
+             When a branded path fork conflicts, reset conflicting content to the locked upstream,\n\
+             run update --latest, re-apply overlays, then bump the fork version.\n\
              Listed local compose files are re-embedded by pray install, not by update.\n\n\
              --major requires a package name.\n\
              --latest rewrites Prayfile constraints and exact spec.upstream pins to admit the latest versions, then refreshes those trees.\n\
@@ -146,9 +150,12 @@ pub(crate) fn command_help_text(command: &str) -> Option<&'static str> {
             "upload path packages to a registry or local root\n\n\
              Usage: pray publish [--root PATH] [--server URL ...] [--to NAME] [--dry-run] [--signing-key PATH] [--resign]\n\n\
              Prayfile publish remotes supply dests when flags are omitted.\n\
+             Live publish prints published or unchanged lines and a short count footer.\n\
+             --dry-run prints the planned lines without writing.\n\
              Prefer --signing-key PATH or PRAY_SIGNING_KEY (32-byte ed25519 seed).\n\
              Without a signing key, publish records a legacy content digest.\n\
-             --resign uses that key for unchanged versions in a local root.",
+             --resign uses that key for unchanged versions in a local root.\n\
+             Global -q/--quiet suppresses this stdout; -v/--verbose adds artifact paths.",
         ),
         "yank" => Some(
             "mark or unmark a published version as yanked in a distribution root\n\n\

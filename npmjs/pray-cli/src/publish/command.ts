@@ -1,3 +1,4 @@
+import { printlnStdout } from "../cli/output.js";
 import { PrayError } from "../errors.js";
 import {
   defaultManifestPath,
@@ -16,6 +17,11 @@ import {
   resolvePathRemote,
   resolvePublishDestinations,
 } from "./remote.js";
+import {
+  emptyPublishStats,
+  mergePublishStats,
+  printPublishFooter,
+} from "./report.js";
 
 export function loadPublishRemotes(): {
   projectRoot: string;
@@ -38,16 +44,39 @@ export async function runPublish(argumentsList: string[]): Promise<void> {
     printPublishPlan(project, dests);
     return;
   }
+  let stats = emptyPublishStats();
   for (const dest of dests) {
     const packages = selectedPackages(project, dest.packages);
     const filtered = { ...project, packages };
+    const target = dest.root ?? dest.server ?? dest.name;
     if (dest.root) {
-      await publishToRoot(filtered, dest.root);
+      stats = mergePublishStats(
+        stats,
+        await publishToRoot(
+          filtered,
+          dest.root,
+          "local",
+          undefined,
+          dest.name,
+          target,
+        ),
+      );
     }
     if (dest.server) {
-      await publishToServer(filtered, dest.server);
+      stats = mergePublishStats(
+        stats,
+        await publishToServer(
+          filtered,
+          dest.server,
+          "local",
+          undefined,
+          dest.name,
+          target,
+        ),
+      );
     }
   }
+  printPublishFooter(stats);
 }
 
 export function optionalPathRemoteRoot(
@@ -143,8 +172,8 @@ function printPublishPlan(
     const packages = selectedPackages(project, dest.packages);
     const target = dest.root ?? dest.server ?? dest.name;
     for (const packageEntry of packages) {
-      process.stdout.write(
-        `publish ${packageEntry.declaration.name} ${packageEntry.spec.version} -> ${dest.name} (${target})\n`,
+      printlnStdout(
+        `publish ${packageEntry.declaration.name} ${packageEntry.spec.version} -> ${dest.name} (${target})`,
       );
     }
   }

@@ -164,6 +164,8 @@ fn no_input_flag_is_documented_in_help() {
     let output = run_pray(&["--help"]);
     let stdout = String::from_utf8_lossy(&output.stdout);
     assert!(stdout.contains("--no-input"));
+    assert!(stdout.contains("--quiet") || stdout.contains("-q"));
+    assert!(stdout.contains("--verbose") || stdout.contains("-v"));
     assert!(stdout.contains("completion bash|zsh|fish"));
 }
 

@@ -5,6 +5,7 @@ require_relative "hashing"
 require_relative "git_run"
 require_relative "git_store"
 require_relative "git_materialize"
+require_relative "git_legacy"
 
 module Pray
   module GitCache
@@ -18,6 +19,7 @@ module Pray
         offline: offline,
         working_directory: project_root
       )
+      GitLegacy.quarantine_legacy_project_git_checkouts(project_root, clone_url)
       catalog = git_source_cache_directory(project_root, clone_url, sparse_subdir)
       GitMaterialize.materialize_catalog_tree(db, catalog, revision, sparse_subdir, refresh)
       [catalog, revision]
@@ -32,17 +34,8 @@ module Pray
       global_cache = GitStore.global_git_cache_directory(clone_url)
       return global_cache if global_cache && GitStore.global_git_cache_ready?(global_cache)
 
-      shared = git_source_cache_directory(project_root, clone_url)
-      return shared if git_checkout?(shared)
-
-      cache_root = File.join(project_root, ".pray", "cache", "git")
-      return nil unless File.directory?(cache_root)
-
-      Dir.children(cache_root).each do |name|
-        path = File.join(cache_root, name)
-        return path if git_checkout?(path) && origin_matches?(path, clone_url)
-      end
-      nil
+      stub_git_dir(git_source_cache_directory(project_root, clone_url)) ||
+        find_stub_git_dir(project_root, clone_url)
     end
 
     def git_checkout?(path)
@@ -53,12 +46,32 @@ module Pray
       Hashing.sha256_prefixed(text)[7, 16]
     end
 
-    def origin_matches?(repository, clone_url)
-      output, status = GitRun.capture_git(repository, "remote", "get-url", "origin")
-      return false unless status.success?
+    def stub_git_dir(catalog)
+      marker = File.join(catalog, GitMaterialize::GIT_DIR_MARKER)
+      return nil unless File.file?(marker)
 
-      origin = output.strip.delete_prefix("git+")
-      origin == clone_url
+      git_dir = File.read(marker).strip
+      return nil if git_dir.empty? || !File.exist?(git_dir)
+
+      git_dir
     end
+
+    def find_stub_git_dir(project_root, clone_url)
+      expected = GitStore.global_git_cache_directory(clone_url)
+      return nil unless expected
+
+      cache_root = File.join(project_root, ".pray", "cache", "git")
+      return nil unless File.directory?(cache_root)
+
+      Dir.children(cache_root).each do |name|
+        path = File.join(cache_root, name)
+        next if git_checkout?(path)
+
+        git_dir = stub_git_dir(path)
+        return git_dir if git_dir == expected
+      end
+      nil
+    end
+    private_class_method :stub_git_dir, :find_stub_git_dir
   end
 end

@@ -1,5 +1,9 @@
 # CHANGELOG
 
+## Unreleased
+
+- Print `published` / `unchanged` lines after `pray publish`. Add global `-q`/`--quiet` and `-v`/`--verbose`.
+
 ## 1.21.0 (2026-10-21)
 
 - Read package catalogs whose `published_at` is an RFC 3339 string or JSON null.

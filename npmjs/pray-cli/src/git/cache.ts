@@ -1,3 +1,4 @@
+import { quarantineLegacyProjectGitCheckouts } from "./legacy.js";
 import { materializeCatalogTree } from "./materialize.js";
 import { gitSourceCacheDirectory } from "./paths.js";
 import { ensureGlobalGitDb } from "./store.js";
@@ -19,6 +20,7 @@ export function ensureGitRepository(
     offline,
     projectRoot,
   );
+  quarantineLegacyProjectGitCheckouts(projectRoot, cloneUrl);
   const cacheDirectory = gitSourceCacheDirectory(
     projectRoot,
     cloneUrl,

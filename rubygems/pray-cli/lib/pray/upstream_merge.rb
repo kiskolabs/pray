@@ -39,13 +39,15 @@ module Pray
       when [false, true, false]
         (local == old) ? :omit : :conflict
       when [false, false, true]
-        (old == new) ? :omit : new
+        (old == new) ? :omit : :conflict
       when [true, false, true]
         new
       when [true, true, false]
         local
       when [true, false, false]
         (local == new) ? new : :conflict
+      when [false, true, true]
+        :omit
       else
         :conflict
       end
@@ -67,7 +69,9 @@ module Pray
 
     def merge_conflict_message(fork, upstream_name, old_version, new_version, paths)
       "upstream merge conflict in #{fork} while refreshing #{upstream_name} " \
-        "#{old_version} to #{new_version}: #{paths.join(", ")}"
+        "#{old_version} to #{new_version}: #{paths.join(", ")}. " \
+        "Reset those content files to the locked upstream tree, run `pray update --latest`, " \
+        "re-apply intentional overlays, then bump the fork version (upstream_merge_conflict)."
     end
 
     def next_upstream_constraint(current, new_version)

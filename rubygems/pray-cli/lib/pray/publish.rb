@@ -4,6 +4,7 @@ require "json"
 require "fileutils"
 require "time"
 require "tmpdir"
+require_relative "terminal"
 
 module Pray
   RegistryIndex = Struct.new(:spec, :packages) do
@@ -15,11 +16,14 @@ module Pray
   module Publish
     module_function
 
-    def publish_to_root(project, root, signer: "local", signer_fingerprint: nil)
+    def publish_to_root(project, root, signer: "local", signer_fingerprint: nil, dest_name: nil, target: nil)
       root = File.expand_path(root)
+      dest_name ||= root
+      target ||= root
       index = load_registry_index(root)
       distribution = Distribution.read_settings(root)
       package_names = index.packages.to_set
+      stats = {published: 0, unchanged: 0}
 
       project.packages.each do |package|
         package.spec.require_release_version!
@@ -31,6 +35,8 @@ module Pray
         if stored_artifact && stored_publish_matches?(stored_artifact, package, existing)
           package_names << package.declaration.name
           write_registry_package_metadata(metadata_path, metadata)
+          report_unchanged(package, dest_name, target)
+          stats[:unchanged] += 1
           next
         end
 
@@ -56,14 +62,20 @@ module Pray
         metadata.versions << version_entry
         write_registry_package_metadata(metadata_path, metadata)
         package_names << package.declaration.name
+        report_published(package, dest_name, target, artifact_path)
+        stats[:published] += 1
       end
 
       index.packages = package_names.sort
       write_registry_index(root, index)
+      stats
     end
 
-    def publish_to_server(project, server_url, signer: "local", signer_fingerprint: nil)
+    def publish_to_server(project, server_url, signer: "local", signer_fingerprint: nil, dest_name: nil, target: nil)
+      dest_name ||= server_url
+      target ||= server_url
       distribution = Distribution.fetch_settings(server_url)
+      stats = {published: 0, unchanged: 0}
       project.packages.each do |package|
         archive_bytes = Archive.build_package_archive_bytes(package)
         artifact_path = registry_artifact_path(package.declaration.name, package.spec.version)
@@ -99,8 +111,26 @@ module Pray
           "application/json",
           JSON.pretty_generate(metadata_to_hash(metadata))
         )
+        report_published(package, dest_name, target, artifact_path)
+        stats[:published] += 1
       end
+      stats
     end
+
+    def report_published(package, dest_name, target, artifact_path)
+      Terminal.println_stdout(
+        "published #{package.declaration.name} #{package.spec.version} -> #{dest_name} (#{target})"
+      )
+      Terminal.println_verbose("  artifact #{artifact_path}")
+    end
+
+    def report_unchanged(package, dest_name, target)
+      Terminal.println_stdout(
+        "unchanged #{package.declaration.name} #{package.spec.version} -> #{dest_name} (#{target})"
+      )
+      Terminal.println_verbose("  skip reason: stored publish matches")
+    end
+    private_class_method :report_published, :report_unchanged
 
     def published_registry_package_version(package, signer, signer_fingerprint, archive_bytes, artifact_path)
       RegistryPackageVersion.new(

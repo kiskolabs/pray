@@ -51,12 +51,25 @@ RSpec.describe Pray::GitSources do
     expect(right).not_to eq(shared)
   end
 
-  it "finds a leftover subdir checkout when the URL-only cache is missing" do
+  it "ignores a leftover full clone when the shared bare is missing" do
     clone_url = "file://repo-from-prayfile"
     leftover = described_class.git_source_cache_directory(workspace, clone_url, "left")
     FileUtils.mkdir_p(leftover)
     system("git", "init", "-b", "main", leftover, out: File::NULL, err: File::NULL)
     system("git", "-C", leftover, "remote", "add", "origin", clone_url, out: File::NULL, err: File::NULL)
-    expect(described_class.git_source_cached_repository(workspace, clone_url)).to eq(leftover)
+    expect(described_class.git_source_cached_repository(workspace, clone_url)).to be_nil
+  end
+
+  it "prefers a stub .pray-git-dir over a leftover full clone" do
+    clone_url = "file://repo-from-prayfile"
+    objects = File.join(workspace, "objects")
+    FileUtils.mkdir_p(objects)
+    File.write(File.join(objects, "HEAD"), "ref: refs/heads/main\n")
+    leftover = described_class.git_source_cache_directory(workspace, clone_url, "left")
+    FileUtils.mkdir_p(File.join(leftover, ".git"))
+    stub = described_class.git_source_cache_directory(workspace, clone_url)
+    FileUtils.mkdir_p(stub)
+    File.write(File.join(stub, ".pray-git-dir"), objects)
+    expect(described_class.git_source_cached_repository(workspace, clone_url)).to eq(objects)
   end
 end

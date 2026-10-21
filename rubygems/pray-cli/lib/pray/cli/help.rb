@@ -52,6 +52,8 @@ module Pray
 
       GLOBAL_OPTIONS = [
         "--no-input            disable prompts",
+        "-q, --quiet           suppress non-error stdout",
+        "-v, --verbose         extra detail on stdout (repeatable later)",
         "--rm                  use an ephemeral home directory",
         "--trust [--global]    import trust on first use"
       ].freeze
@@ -122,6 +124,8 @@ module Pray
           With no package name, update re-resolves the whole graph within constraints
           and refreshes git source revisions. A package name unlocks that package only.
           Path-fork packages can refresh from upstream.
+          When a branded path fork conflicts, reset conflicting content to the locked upstream,
+          run update --latest, re-apply overlays, then bump the fork version.
           Listed local compose files are re-embedded by pray install, not by update.
 
           --latest adjusts constraints to allow the latest package versions.
@@ -151,6 +155,9 @@ module Pray
           Usage: pray publish [--root PATH] [--server URL ...] [--to NAME] [--dry-run]
 
           Prayfile publish remotes supply dests when flags are omitted.
+          Live publish prints published or unchanged lines and a short count footer.
+          --dry-run prints the planned lines without writing.
+          Global -q/--quiet suppresses this stdout; -v/--verbose adds artifact paths.
         TEXT
         "login" => <<~TEXT.strip,
           authenticate to a registry server

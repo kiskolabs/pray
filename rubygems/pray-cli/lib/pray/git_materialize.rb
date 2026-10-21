@@ -37,6 +37,7 @@ module Pray
     def materialize_catalog_tree(git_dir, dest, revision, subdir, refresh)
       return if !refresh && catalog_matches?(dest, git_dir, revision)
 
+      require_revision_present!(git_dir, revision)
       FileUtils.rm_rf(dest) if File.exist?(dest)
       FileUtils.mkdir_p(dest)
       unpacked = GitClone.catalog_sparse_cones(subdir).any? do |prefix|
@@ -54,16 +55,34 @@ module Pray
       markers = find_catalog_markers(source_root)
       return unless markers
 
+      require_revision_present!(markers.fetch(:git_dir), markers.fetch(:revision))
       full_path = File.join(source_root, relative)
       repo_relative = full_path.delete_prefix(markers.fetch(:work_tree)).delete_prefix("/")
-      GitRun.run_git(
-        markers.fetch(:git_dir),
-        "--work-tree",
-        markers.fetch(:work_tree),
-        "checkout",
-        markers.fetch(:revision),
-        "--",
-        repo_relative
+      begin
+        GitRun.run_git(
+          markers.fetch(:git_dir),
+          "--work-tree",
+          markers.fetch(:work_tree),
+          "checkout",
+          markers.fetch(:revision),
+          "--",
+          repo_relative
+        )
+      rescue Error => error
+        raise Error.resolution(
+          "git catalog materialize failed for revision #{markers.fetch(:revision)} in " \
+          "#{markers.fetch(:git_dir)} (git_cache_stale): #{error.message}. " \
+          "Run `pray install --locked`, or clear `.pray/cache/git` and the shared bare then install again."
+        )
+      end
+    end
+
+    def require_revision_present!(git_dir, revision)
+      return if GitRun.try_run_git(git_dir, "cat-file", "-e", revision)
+
+      raise Error.resolution(
+        "git revision #{revision} is not available in #{git_dir} (git_revision_unfetched). " \
+        "Run `pray install --locked`, or clear the project git cache and shared bare then install again."
       )
     end
 
@@ -73,6 +92,7 @@ module Pray
       return false unless File.file?(revision_path) && File.file?(git_dir_path)
       return false unless File.read(revision_path).strip == revision
       return false unless File.read(git_dir_path).strip == git_dir
+      return false unless GitRun.try_run_git(git_dir, "cat-file", "-e", revision)
 
       File.directory?(File.join(dest, "v1", "packages")) ||
         File.directory?(File.join(dest, "prayers", "v1", "packages")) ||

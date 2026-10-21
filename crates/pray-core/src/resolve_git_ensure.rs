@@ -1,4 +1,5 @@
 use crate::resolve_git::finalize_git_repository;
+use crate::resolve_git_legacy::quarantine_legacy_project_git_checkouts;
 use crate::resolve_git_materialize::materialize_catalog_tree;
 use crate::resolve_git_paths::git_source_cache_directory_with_subdir;
 use crate::resolve_git_store::ensure_global_git_db;
@@ -15,6 +16,7 @@ pub(crate) fn ensure_git_repository(
 ) -> PrayResult<(PathBuf, String)> {
     let (db, revision) =
         ensure_global_git_db(clone_url, pinned_revision, refresh, offline, project_root)?;
+    quarantine_legacy_project_git_checkouts(project_root, clone_url)?;
     let catalog = git_source_cache_directory_with_subdir(project_root, clone_url, sparse_subdir);
     materialize_catalog_tree(&db, &catalog, &revision, sparse_subdir, refresh)?;
     finalize_git_repository(clone_url, &db, catalog, revision)

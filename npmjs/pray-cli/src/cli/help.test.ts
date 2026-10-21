@@ -14,6 +14,8 @@ describe("help", () => {
     assert.match(text, /See 'pray help <command>'/);
     assert.match(text, /Options:/);
     assert.match(text, /--no-input/);
+    assert.match(text, /--quiet/);
+    assert.match(text, /--verbose/);
     assert.match(text, /upgrade/);
     assert.match(text, /outdated \[--remote\]/);
     assert.doesNotMatch(text, /Documentation:/);

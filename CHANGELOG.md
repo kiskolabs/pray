@@ -1,5 +1,13 @@
 # CHANGELOG
 
+## Unreleased
+
+- Ignore leftover project git full clones when resolving a shared bare or stub catalog. Install renames those leftovers so they cannot shadow the locked revision.
+- Print a pray-level recovery hint when a locked git revision is missing from the shared bare or when catalog checkout fails.
+- On path-fork upstream merge conflict, name the reset-then-rebrand workflow and tag the error as `upstream_merge_conflict`. `pray update --help` documents the same steps.
+- Print `published` / `unchanged` lines and a count footer after `pray publish` (same shape as `--dry-run`). Add global `-q`/`--quiet` and `-v`/`--verbose`.
+- Conflict when a path fork deleted an upstream file and upstream later changes that file, instead of restoring it silently.
+
 ## 1.21.0 (2026-10-21)
 
 - Prevent the Rust, Ruby, and TypeScript CLIs from changing the calling repository or index when a Git hook passes repository variables such as `GIT_DIR` or `GIT_INDEX_FILE`. Explicit Git configuration, including CI credentials and URL rewrites, still applies.

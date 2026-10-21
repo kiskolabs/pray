@@ -30,6 +30,17 @@ module Pray
       if arguments.delete("--no-input")
         ENV["PRAY_NO_INPUT"] = "1"
       end
+      quiet = !!(arguments.delete("--quiet") || arguments.delete("-q"))
+      verbose = 0
+      arguments.reject! do |argument|
+        if argument == "--verbose" || argument == "-v"
+          verbose += 1
+          true
+        else
+          false
+        end
+      end
+      Terminal.configure_output!(quiet: quiet, verbose: verbose)
       arguments = Invocation.initialize(arguments)
       return if maybe_print_help(arguments)
 

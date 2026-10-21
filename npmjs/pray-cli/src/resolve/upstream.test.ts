@@ -104,6 +104,26 @@ describe("package upstream", () => {
     assert.equal(merged.has("gone.md"), false);
   });
 
+  it("conflicts when the fork deleted a file upstream then changed", () => {
+    const oldContent = new Map([["exports/drop.md", Buffer.from("old")]]);
+    const newContent = new Map([["exports/drop.md", Buffer.from("new")]]);
+    const paths = tryMergeContentFiles(oldContent, newContent, new Map());
+    assert.ok(Array.isArray(paths));
+    assert.ok((paths as string[]).includes("exports/drop.md"));
+  });
+
+  it("omits a path both sides deleted", () => {
+    const oldContent = new Map([["exports/drop.md", Buffer.from("old")]]);
+    const merged = mergeContentFiles(oldContent, new Map(), new Map());
+    assert.equal(merged.has("exports/drop.md"), false);
+  });
+
+  it("keeps a fork deletion when upstream is unchanged", () => {
+    const oldContent = new Map([["exports/drop.md", Buffer.from("old")]]);
+    const merged = mergeContentFiles(oldContent, oldContent, new Map());
+    assert.equal(merged.has("exports/drop.md"), false);
+  });
+
   it("names overlay drift for changed local-only and missing paths", () => {
     const localContent = new Map([
       ["README.md", Buffer.from("edit")],

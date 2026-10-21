@@ -3,6 +3,7 @@ mod archive_members;
 mod auth_client;
 mod auth_session_store;
 mod cache_clean;
+mod cli_output;
 mod cli_parse;
 mod cli_parse_auth;
 mod cli_parse_packages;
@@ -28,9 +29,11 @@ mod lockfile_ops;
 mod materialize;
 mod project_paths;
 mod publish;
+mod publish_context;
 mod publish_dest;
 mod publish_integrity;
 mod publish_plan;
+mod publish_server;
 mod publish_ssh;
 mod publish_version;
 mod registry_ops;
@@ -119,6 +122,13 @@ fn run(arguments: Vec<String>) -> PrayResult<()> {
     let trust_import = arguments.iter().any(|argument| argument == "--trust");
     let trust_global = arguments.iter().any(|argument| argument == "--global");
     let no_input = arguments.iter().any(|argument| argument == "--no-input");
+    let quiet = arguments
+        .iter()
+        .any(|argument| argument == "--quiet" || argument == "-q");
+    let verbose = arguments
+        .iter()
+        .filter(|argument| argument.as_str() == "--verbose" || argument.as_str() == "-v")
+        .count() as u32;
     let filtered: Vec<String> = arguments
         .into_iter()
         .filter(|argument| {
@@ -126,12 +136,17 @@ fn run(arguments: Vec<String>) -> PrayResult<()> {
                 && argument != "--trust"
                 && argument != "--global"
                 && argument != "--no-input"
+                && argument != "--quiet"
+                && argument != "-q"
+                && argument != "--verbose"
+                && argument != "-v"
         })
         .collect();
     let filtered = invocation::initialize(filtered)?;
     if no_input {
         std::env::set_var("PRAY_NO_INPUT", "1");
     }
+    cli_output::configure(quiet, verbose);
     if let Some(()) = maybe_print_help(&filtered)? {
         return Ok(());
     }

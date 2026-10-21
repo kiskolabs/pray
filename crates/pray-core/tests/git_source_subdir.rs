@@ -113,8 +113,8 @@ fn same_git_url_with_different_subdirs_resolves_both_distributions() {
 }
 
 #[test]
-fn cached_repository_finds_a_subdir_worktree_when_url_only_cache_is_missing() {
-    let root = unique_temp("pray-git-cached-repo-fallback");
+fn cached_repository_ignores_a_leftover_full_clone_when_shared_bare_is_missing() {
+    let root = unique_temp("pray-git-cached-repo-no-legacy");
     let clone_url = "file://repo-from-prayfile";
     let leftover =
         pray_core::resolve::git_source_cache_directory_with_subdir(&root, clone_url, Some("left"));
@@ -122,8 +122,9 @@ fn cached_repository_finds_a_subdir_worktree_when_url_only_cache_is_missing() {
     git(&leftover, &["init", "-b", "main"]);
     git(&leftover, &["remote", "add", "origin", clone_url]);
     assert_eq!(
-        pray_core::resolve::git_source_cached_repository(&root, clone_url).as_deref(),
-        Some(leftover.as_path())
+        pray_core::resolve::git_source_cached_repository(&root, clone_url),
+        None,
+        "legacy project full clones must not satisfy trust/object lookup"
     );
     let _ = fs::remove_dir_all(&root);
 }

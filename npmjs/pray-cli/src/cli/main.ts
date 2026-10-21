@@ -39,6 +39,7 @@ import {
   resolveCurrentProject,
 } from "./invocation.js";
 import { materializeProject, printManifest } from "./materialize.js";
+import { configureOutput } from "./output.js";
 import { unknownCommandMessage } from "./suggest.js";
 import { runUpgradeCommand } from "./upgrade.js";
 
@@ -56,6 +57,19 @@ export async function runCli(argumentsList: string[]): Promise<number> {
         filteredArguments.splice(index, 1);
       }
     }
+    let quiet = false;
+    let verbose = 0;
+    for (let index = filteredArguments.length - 1; index >= 0; index -= 1) {
+      const argument = filteredArguments[index];
+      if (argument === "--quiet" || argument === "-q") {
+        quiet = true;
+        filteredArguments.splice(index, 1);
+      } else if (argument === "--verbose" || argument === "-v") {
+        verbose += 1;
+        filteredArguments.splice(index, 1);
+      }
+    }
+    configureOutput(quiet, verbose);
 
     const helpResult = maybePrintHelp(filteredArguments);
     if (helpResult === "printed") {

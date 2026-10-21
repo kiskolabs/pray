@@ -48,6 +48,8 @@ const META_COMMANDS = [
 
 const GLOBAL_OPTIONS = [
   "--no-input            disable prompts",
+  "-q, --quiet           suppress non-error stdout",
+  "-v, --verbose         extra detail on stdout (repeatable later)",
   "--rm                  use an ephemeral home directory",
   "--trust [--global]    import trust on first use",
 ];
@@ -97,6 +99,8 @@ const COMMAND_HELP: Record<string, string> = {
     "With no package name, update re-resolves the whole graph within constraints\n" +
     "and refreshes git source revisions. A package name unlocks that package only.\n" +
     "Path-fork packages can refresh from upstream.\n" +
+    "When a branded path fork conflicts, reset conflicting content to the locked upstream,\n" +
+    "run update --latest, re-apply overlays, then bump the fork version.\n" +
     "Listed local compose files are re-embedded by pray install, not by update.\n\n" +
     "--major requires a package name.\n" +
     "--latest rewrites Prayfile constraints and exact spec.upstream pins to admit the latest versions, then refreshes those trees.\n" +
@@ -134,7 +138,10 @@ const COMMAND_HELP: Record<string, string> = {
   publish:
     "upload path packages to a registry or local root\n\n" +
     "Usage: pray publish [--root PATH] [--server URL ...] [--to NAME] [--dry-run]\n\n" +
-    "Prayfile publish remotes supply dests when flags are omitted.",
+    "Prayfile publish remotes supply dests when flags are omitted.\n" +
+    "Live publish prints published or unchanged lines and a short count footer.\n" +
+    "--dry-run prints the planned lines without writing.\n" +
+    "Global -q/--quiet suppresses this stdout; -v/--verbose adds artifact paths.",
   serve:
     "run a local registry server\n\n" +
     "Usage: pray serve [--root PATH | --to NAME] [--host HOST] [--port PORT] [--stdio]",

@@ -1,31 +1,26 @@
 use crate::materialize::build_package_archive_bytes;
 use crate::project_paths::manifest_path;
+use crate::publish_context::{PublishDestLabel, PublishIdentity};
 use crate::publish_dest::publish_destinations;
 use crate::publish_integrity::{stored_package_artifact, stored_publish_matches};
-use crate::publish_plan::{print_publish_plan, selected_packages};
-use crate::publish_ssh::publish_to_ssh_server;
+use crate::publish_plan::{
+    dest_target, print_publish_footer, print_publish_plan, report_published, report_unchanged,
+    selected_packages, PublishStats,
+};
+use crate::publish_server::publish_to_server;
 use crate::publish_version::published_registry_package_version;
 use crate::registry_ops::{
     current_signer, current_signer_fingerprint, current_timestamp, load_registry_index,
     load_registry_package_metadata, registry_artifact_path, registry_metadata_path,
-    torrent_manifest_bytes, torrent_manifest_path, write_output_bytes, write_registry_index,
-    write_registry_package_metadata, write_torrent_manifest,
+    write_output_bytes, write_registry_index, write_registry_package_metadata,
+    write_torrent_manifest,
 };
 use crate::revision::{record_root_revision, RevisionAction};
-use crate::sync_peers::map_transport_error;
-use crate::transport_metadata::transport_package_metadata;
-use pray_core::distribution::{
-    fetch_registry_distribution_settings, read_registry_distribution_settings,
-};
+use pray_core::distribution::read_registry_distribution_settings;
 use pray_core::package_integrity::resolve_publish_signing_key;
 use pray_core::publish_remote::PublishCliDest;
-use pray_core::registry::{
-    publish_authorization_header, upload_registry_artifact_with_authorization,
-    RegistryPackageMetadata,
-};
 use pray_core::resolve::{resolve_project, ResolvedPackage};
 use pray_core::{PrayError, PrayResult};
-use pray_transport::{PeerConfig, SyncDirection, TransportRegistry, TrustLevel};
 use std::path::{Path, PathBuf};
 
 pub(crate) fn publish_command(
@@ -74,44 +69,44 @@ pub(crate) fn publish_command(
         None
     };
 
+    let identity = PublishIdentity {
+        signer: &signer,
+        signer_fingerprint: signer_fingerprint.as_deref(),
+        published_at,
+        signing_key: signing_key.as_ref(),
+        resign,
+    };
+    let mut stats = PublishStats {
+        published: 0,
+        unchanged: 0,
+    };
     for dest in dests {
         let packages = selected_packages(&project, &dest.packages)?;
+        let target = dest_target(&dest);
+        let label = PublishDestLabel {
+            dest_name: &dest.name,
+            target: &target,
+        };
         if let Some(root) = &dest.root {
-            publish_to_root(
-                &packages,
-                &signer,
-                signer_fingerprint.as_deref(),
-                published_at,
-                signing_key.as_ref(),
-                resign,
-                root,
-            )?;
+            stats.merge(publish_to_root(&packages, &identity, root, &label)?);
             record_root_revision(root, RevisionAction::Publish)?;
         }
         if let (Some(server_url), Some(runtime)) = (&dest.server, &runtime) {
-            publish_to_server(
-                &packages,
-                &signer,
-                signer_fingerprint.as_deref(),
-                published_at,
-                signing_key.as_ref(),
-                server_url,
-                runtime,
-            )?;
+            stats.merge(publish_to_server(
+                &packages, &identity, server_url, runtime, &label,
+            )?);
         }
     }
+    print_publish_footer(&stats);
     Ok(())
 }
 
 pub(crate) fn publish_to_root(
     packages: &[&ResolvedPackage],
-    signer: &str,
-    signer_fingerprint: Option<&str>,
-    published_at: u64,
-    signing_key: Option<&ed25519_dalek::SigningKey>,
-    resign: bool,
+    identity: &PublishIdentity<'_>,
     root: &Path,
-) -> PrayResult<()> {
+    label: &PublishDestLabel<'_>,
+) -> PrayResult<PublishStats> {
     let mut registry_index = load_registry_index(root)?;
     let distribution = read_registry_distribution_settings(root)?;
     let mut package_names = registry_index
@@ -119,6 +114,10 @@ pub(crate) fn publish_to_root(
         .iter()
         .cloned()
         .collect::<std::collections::BTreeSet<_>>();
+    let mut stats = PublishStats {
+        published: 0,
+        unchanged: 0,
+    };
 
     for package in packages {
         let artifact_path =
@@ -133,7 +132,7 @@ pub(crate) fn publish_to_root(
         let stored_artifact = existing.and_then(|entry| {
             stored_package_artifact(root, &artifact_path, package, entry, &distribution)
         });
-        if !resign
+        if !identity.resign
             && existing
                 .zip(stored_artifact.as_deref())
                 .is_some_and(|(entry, artifact_bytes)| {
@@ -142,6 +141,8 @@ pub(crate) fn publish_to_root(
         {
             package_names.insert(package.declaration.name.clone());
             write_registry_package_metadata(&metadata_path, &metadata)?;
+            report_unchanged(package, label.dest_name, label.target);
+            stats.unchanged += 1;
             continue;
         }
 
@@ -150,10 +151,10 @@ pub(crate) fn publish_to_root(
         write_torrent_manifest(root, package, &artifact_path, &archive_bytes, &distribution)?;
         let mut version_entry = published_registry_package_version(
             package,
-            signer,
-            signer_fingerprint,
-            published_at,
-            signing_key,
+            identity.signer,
+            identity.signer_fingerprint,
+            identity.published_at,
+            identity.signing_key,
             &artifact_path,
             &archive_bytes,
         )?;
@@ -173,94 +174,11 @@ pub(crate) fn publish_to_root(
         metadata.versions.push(version_entry);
         write_registry_package_metadata(&metadata_path, &metadata)?;
         package_names.insert(package.declaration.name.clone());
+        report_published(package, label.dest_name, label.target, &artifact_path);
+        stats.published += 1;
     }
 
     registry_index.packages = package_names.into_iter().collect();
     write_registry_index(root, &registry_index)?;
-    Ok(())
-}
-
-pub(crate) fn publish_to_server(
-    packages: &[&ResolvedPackage],
-    signer: &str,
-    signer_fingerprint: Option<&str>,
-    published_at: u64,
-    signing_key: Option<&ed25519_dalek::SigningKey>,
-    server_url: &str,
-    runtime: &tokio::runtime::Runtime,
-) -> PrayResult<()> {
-    if pray_core::ssh_client::is_pray_ssh_url(server_url) {
-        return publish_to_ssh_server(
-            packages,
-            signer,
-            signer_fingerprint,
-            published_at,
-            signing_key,
-            server_url,
-        );
-    }
-
-    let authorization = publish_authorization_header();
-    let mut headers = serde_json::Map::new();
-    if let Some(authorization) = authorization.as_ref() {
-        headers.insert(
-            "Authorization".to_string(),
-            serde_json::Value::String(authorization.clone()),
-        );
-    }
-    let peer = PeerConfig {
-        name: server_url.to_string(),
-        transport: "http".to_string(),
-        url: Some(server_url.to_string()),
-        trust: TrustLevel::Full,
-        direction: SyncDirection::Push,
-        config: serde_json::json!({ "headers": headers }),
-    };
-    let registry = TransportRegistry::new();
-    let transport = registry.create(&peer).map_err(map_transport_error)?;
-    let distribution = fetch_registry_distribution_settings(server_url)?;
-
-    for package in packages {
-        let archive_bytes = build_package_archive_bytes(package)?;
-        let artifact_path =
-            registry_artifact_path(&package.declaration.name, &package.spec.version);
-        upload_registry_artifact_with_authorization(
-            server_url,
-            &artifact_path,
-            &archive_bytes,
-            authorization.as_deref(),
-        )?;
-        if distribution.allows_torrent() {
-            upload_registry_artifact_with_authorization(
-                server_url,
-                &torrent_manifest_path(&artifact_path),
-                &torrent_manifest_bytes(
-                    package,
-                    &artifact_path,
-                    &archive_bytes,
-                    distribution.bootstrap_trackers.clone(),
-                )?,
-                authorization.as_deref(),
-            )?;
-        }
-
-        let metadata = RegistryPackageMetadata {
-            name: package.declaration.name.clone(),
-            versions: vec![published_registry_package_version(
-                package,
-                signer,
-                signer_fingerprint,
-                published_at,
-                signing_key,
-                &artifact_path,
-                &archive_bytes,
-            )?],
-        };
-        let transport_metadata = transport_package_metadata(&metadata);
-        runtime
-            .block_on(transport.push_package(&peer, &transport_metadata))
-            .map_err(map_transport_error)?;
-    }
-
-    Ok(())
+    Ok(stats)
 }

@@ -90,10 +90,9 @@ export function tryMergeContentFiles(
       merged.set(path, localBytes);
     } else if (
       oldBytes !== undefined &&
-      newBytes !== undefined &&
+      newBytes === undefined &&
       localBytes === undefined
     ) {
-      merged.set(path, newBytes);
     } else {
       conflicts.push(path);
     }
@@ -120,7 +119,7 @@ export function upstreamMergeConflictMessage(
   newVersion: string,
   paths: readonly string[],
 ): string {
-  return `upstream merge conflict in ${fork} while refreshing ${upstreamName} ${oldVersion} to ${newVersion}: ${paths.join(", ")}`;
+  return `upstream merge conflict in ${fork} while refreshing ${upstreamName} ${oldVersion} to ${newVersion}: ${paths.join(", ")}. Reset those content files to the locked upstream tree, run \`pray update --latest\`, re-apply intentional overlays, then bump the fork version (upstream_merge_conflict).`;
 }
 
 export type OverlayFileChange = "changed" | "local_only" | "missing";

@@ -11,7 +11,11 @@ import { join } from "node:path";
 import { PrayError } from "../errors.js";
 import { catalogSparseCones } from "./clone.js";
 import { gitEnvironment } from "./environment.js";
-import { runGit } from "./run.js";
+import {
+  annotateGitMaterializeFailure,
+  requireRevisionPresent,
+} from "./materialize-check.js";
+import { runGit, tryRunGit } from "./run.js";
 
 const REVISION_MARKER = ".pray-revision";
 const GIT_DIR_MARKER = ".pray-git-dir";
@@ -26,6 +30,7 @@ export function materializeCatalogTree(
   if (!refresh && catalogMatches(dest, gitDir, revision)) {
     return;
   }
+  requireRevisionPresent(gitDir, revision);
   if (existsSync(dest)) {
     rmSync(dest, { recursive: true, force: true });
   }
@@ -56,6 +61,7 @@ export function materializeGitCatalogFile(
   if (markers === undefined) {
     return;
   }
+  requireRevisionPresent(markers.gitDir, markers.revision);
   const fullPath = join(sourceRoot, relative);
   if (!fullPath.startsWith(markers.workTree)) {
     return;
@@ -63,15 +69,19 @@ export function materializeGitCatalogFile(
   const repoRelative = fullPath
     .slice(markers.workTree.length)
     .replace(/^\/+/, "");
-  runGit(
-    markers.gitDir,
-    "--work-tree",
-    markers.workTree,
-    "checkout",
-    markers.revision,
-    "--",
-    repoRelative,
-  );
+  try {
+    runGit(
+      markers.gitDir,
+      "--work-tree",
+      markers.workTree,
+      "checkout",
+      markers.revision,
+      "--",
+      repoRelative,
+    );
+  } catch (error) {
+    annotateGitMaterializeFailure(markers.gitDir, markers.revision, error);
+  }
 }
 
 function catalogMatches(
@@ -88,6 +98,9 @@ function catalogMatches(
     return false;
   }
   if (readFileSync(gitDirPath, "utf8").trim() !== gitDir) {
+    return false;
+  }
+  if (!tryRunGit(gitDir, "cat-file", "-e", revision)) {
     return false;
   }
   return (

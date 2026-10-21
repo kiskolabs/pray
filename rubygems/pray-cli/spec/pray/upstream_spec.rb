@@ -71,6 +71,25 @@ RSpec.describe Pray::Upstream do
     expect(merged).not_to have_key("gone.md")
   end
 
+  it "conflicts when the fork deleted a file upstream then changed" do
+    old = {"exports/drop.md" => "old"}
+    new = {"exports/drop.md" => "new"}
+    _merged, paths = described_class.try_merge_content_files(old, new, {})
+    expect(paths).to include("exports/drop.md")
+  end
+
+  it "omits a path both sides deleted" do
+    old = {"exports/drop.md" => "old"}
+    merged = described_class.merge_content_files(old, {}, {})
+    expect(merged).not_to have_key("exports/drop.md")
+  end
+
+  it "keeps a fork deletion when upstream is unchanged" do
+    old = {"exports/drop.md" => "old"}
+    merged = described_class.merge_content_files(old, old, {})
+    expect(merged).not_to have_key("exports/drop.md")
+  end
+
   it "names overlay drift for changed local-only and missing paths" do
     local = {"README.md" => "edit", "extra.md" => "local"}
     upstream = {"README.md" => "base", "gone.md" => "upstream"}

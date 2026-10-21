@@ -13,13 +13,34 @@ module Pray
         print_publish_plan(project, dests)
         return
       end
+      stats = {published: 0, unchanged: 0}
       dests.each do |dest|
         packages = selected_publish_packages(project, dest.packages)
         filtered = project.dup
         filtered.packages = packages
-        Publish.publish_to_root(filtered, dest.root) if dest.root
-        Publish.publish_to_server(filtered, dest.server) if dest.server
+        target = dest.root || dest.server || dest.name
+        if dest.root
+          result = Publish.publish_to_root(
+            filtered,
+            dest.root,
+            dest_name: dest.name,
+            target: target
+          )
+          stats[:published] += result[:published]
+          stats[:unchanged] += result[:unchanged]
+        end
+        if dest.server
+          result = Publish.publish_to_server(
+            filtered,
+            dest.server,
+            dest_name: dest.name,
+            target: target
+          )
+          stats[:published] += result[:published]
+          stats[:unchanged] += result[:unchanged]
+        end
       end
+      print_publish_footer(stats)
     end
 
     def selected_publish_packages(project, listed)
@@ -37,9 +58,19 @@ module Pray
         packages = selected_publish_packages(project, dest.packages)
         target = dest.root || dest.server || dest.name
         packages.each do |package|
-          puts "publish #{package.declaration.name} #{package.spec.version} -> #{dest.name} (#{target})"
+          Terminal.println_stdout(
+            "publish #{package.declaration.name} #{package.spec.version} -> #{dest.name} (#{target})"
+          )
         end
       end
+    end
+
+    def print_publish_footer(stats)
+      if stats[:published].zero? && stats[:unchanged].zero?
+        Terminal.println_stdout("nothing to publish")
+        return
+      end
+      Terminal.println_stdout("#{stats[:published]} published, #{stats[:unchanged]} unchanged")
     end
 
     def serve_command(root:, host:, port:, stdio:, to: nil)
