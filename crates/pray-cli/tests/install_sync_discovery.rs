@@ -56,9 +56,12 @@ fn sync_crawls_discovered_peers_and_persists_them() {
     .expect("write seed index");
 
     let seed_port = find_free_port();
+    let seed_url = format!("http://127.0.0.1:{seed_port}");
+    let mut seed_server = spawn_server(&seed_root, seed_port);
+    wait_for_server(seed_port);
+
     let upstream_port = find_free_port();
     let upstream_url = format!("http://127.0.0.1:{upstream_port}");
-    let seed_url = format!("http://127.0.0.1:{seed_port}");
     fs::write(
         seed_root.join("v1/peers.json"),
         format!(
@@ -87,9 +90,7 @@ fn sync_crawls_discovered_peers_and_persists_them() {
     )
     .expect("write downstream peer list");
 
-    let mut seed_server = spawn_server(&seed_root, seed_port);
     let mut upstream_server = spawn_server(&upstream_root, upstream_port);
-    wait_for_server(seed_port);
     wait_for_server(upstream_port);
 
     let sync = run_pray(
@@ -106,7 +107,10 @@ fn sync_crawls_discovered_peers_and_persists_them() {
         String::from_utf8_lossy(&sync.stderr)
     );
     let stdout = String::from_utf8_lossy(&sync.stdout);
-    assert!(stdout.contains("Synchronized 1 package(s) from 2 peer(s); learned 2 peer(s)"));
+    assert!(
+        stdout.contains("Synchronized 1 package(s) from 2 peer(s); learned 2 peer(s)"),
+        "unexpected sync summary: {stdout}"
+    );
 
     let downstream_index_text =
         fs::read_to_string(downstream_root.join("v1/index.json")).expect("downstream index");
