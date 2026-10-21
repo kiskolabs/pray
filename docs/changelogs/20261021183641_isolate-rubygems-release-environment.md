@@ -26,7 +26,7 @@ Validation completed with these commands and observed results:
 - `cargo fmt --all --check`: passed.
 - `bash -n scripts/release/common.sh scripts/release/rubygems.sh scripts/release/rubygems_environment_test.sh`: passed.
 - `git diff --check`: passed.
-- Hosted CI and the separate Scorecard analysis: passed.
+- Hosted CI and the separate Scorecard analysis: passed. The non-blocking SonarQube step produced no result because `SONAR_TOKEN` is not configured.
 
 ## Next
 
