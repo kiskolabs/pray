@@ -73,11 +73,35 @@ module Pray
     end
 
     def ensure_git_remote_origin(repository, clone_url)
+      require_own_git_dir(repository)
       if GitRun.try_run_git(repository, "remote", "get-url", "origin")
         GitRun.run_git(repository, "remote", "set-url", "origin", clone_url)
       else
         GitRun.run_git(repository, "remote", "add", "origin", clone_url)
       end
+    end
+
+    # Git searches parent directories when `repository` is not a valid git
+    # directory, so a damaged cache inside another checkout would otherwise
+    # rewrite that checkout's origin.
+    def require_own_git_dir(repository)
+      output, status = GitRun.capture_git(repository, "rev-parse", "--absolute-git-dir")
+      resolved = status.success? ? output.strip : ""
+      own = [repository, File.join(repository, ".git")].any? do |candidate|
+        real_path(candidate) && real_path(candidate) == real_path(resolved)
+      end
+      return if own
+
+      raise Error.resolution(
+        "git cache #{repository} is not a usable git repository (git resolved #{resolved.inspect}). " \
+        "Remove it and run the command again."
+      )
+    end
+
+    def real_path(path)
+      File.realpath(path)
+    rescue SystemCallError
+      nil
     end
 
     def fetch_origin_tip(db, clone_url)

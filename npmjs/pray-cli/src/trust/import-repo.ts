@@ -1,5 +1,6 @@
 import { spawnSync } from "node:child_process";
 import { PrayError } from "../errors.js";
+import { gitEnvironment } from "../git/environment.js";
 import { gitSourceCachedRepository } from "../git/lookup.js";
 import {
   appendMissingKeys,
@@ -51,6 +52,7 @@ function gitLogFormat(repository: string, format: string): string | undefined {
   const result = spawnSync("git", ["log", "-1", `--format=${format}`], {
     cwd: repository,
     encoding: "utf8",
+    env: gitEnvironment(),
   });
   if (result.status !== 0) {
     return undefined;

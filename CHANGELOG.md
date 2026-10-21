@@ -5,6 +5,7 @@
 - Read package catalogs whose `published_at` is an RFC 3339 string or JSON null.
 - Keep prayer sources under `prayers/<name>/`, beside `prayers/v1/` when this project publishes. `prayers/v1/packages/` is catalog metadata. A root `packages/` folder is not a pray source convention.
 - Recalculate committed `Prayfile.lock` hashes after path sources moved under `prayers/`.
+- Keep the Ruby and TypeScript CLIs out of the calling repository when they run from a git hook, and make them refuse a git cache that resolves to another repository, matching the Rust CLI.
 
 ## 1.20.0 (2026-09-18)
 
