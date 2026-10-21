@@ -49,7 +49,7 @@ pub(crate) fn ensure_rendered_outputs_current(
     project: &pray_core::resolve::ResolvedProject,
     rendered: &[pray_core::render::RenderedTarget],
 ) -> PrayResult<()> {
-    for target in rendered {
+    for target in pray_core::render::layout_rendered_targets(project, rendered)? {
         let path = project.project_root.join(&target.path);
         let on_disk = fs::read_to_string(&path).map_err(PrayError::from)?;
         if on_disk != target.content {
