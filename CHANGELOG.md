@@ -5,6 +5,7 @@
 - Read package catalogs whose `published_at` is an RFC 3339 string or JSON null.
 - Keep prayer sources under `prayers/<name>/`, beside `prayers/v1/` when this project publishes. `prayers/v1/packages/` is catalog metadata. A root `packages/` folder is not a pray source convention.
 - Recalculate committed `Prayfile.lock` hashes after path sources moved under `prayers/`.
+- Require Rust 1.91 to build the pray crates. `cargo install pray-cli` with an older compiler now stops with a message naming that minimum, instead of a compile error. Development and CI build with exactly 1.91.0 from `rust-toolchain.toml`.
 
 ## 1.20.0 (2026-09-18)
 

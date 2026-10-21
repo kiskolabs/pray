@@ -12,9 +12,8 @@ jobs:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           fetch-depth: 0  # Shallow clones should be disabled for a better relevancy of analysis
-      - uses: dtolnay/rust-toolchain@4cda84d5c5c54efe2404f9d843567869ab1699d4 # stable
-        with:
-          components: rustfmt, clippy, llvm-tools-preview
+      - name: Install the Rust toolchain from rust-toolchain.toml
+        run: rustup toolchain install
       - name: Check formatting
         run: cargo fmt --all --check
       - name: Check source file LOC limits
