@@ -13,7 +13,6 @@ SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 source "${SCRIPT_DIR}/common.sh"
 
 ROOT="$(release_repo_root)"
-VERSION="$(release_read_gem_version "${ROOT}")"
 MODE="dry-run"
 PACKAGE_DIR="${ROOT}/rubygems/pray-cli"
 
@@ -35,6 +34,8 @@ done
 release_require_command gem
 release_require_command bundle
 release_require_command ruby
+release_configure_ruby_environment "${PACKAGE_DIR}"
+VERSION="$(release_read_gem_version "${ROOT}")"
 release_begin_surface_publish "${ROOT}" "gem"
 
 cd "${PACKAGE_DIR}"
