@@ -12,6 +12,7 @@ import { resolveProject } from "../../resolve/project.js";
 import { pathForkDriftLines } from "../../resolve/upstream-drift.js";
 import { packageSourceSummary } from "../../tree/index.js";
 import { outdatedLocalLines } from "../apply-report.js";
+import { printlnStdout } from "../output.js";
 import { previewRemoteUpdates } from "./update.js";
 import {
   printConstraintBlockedPackages,
@@ -83,9 +84,9 @@ export async function runOutdated(argumentsList: string[] = []): Promise<void> {
     reported;
   const localLines = outdatedLocalLines(previous, project);
   if (localLines.length > 0) {
-    process.stdout.write("Outdated local files\n");
+    printlnStdout("Outdated local files");
     for (const line of localLines) {
-      process.stdout.write(`${line}\n`);
+      printlnStdout(line);
     }
     reported = true;
   }
@@ -95,15 +96,15 @@ export async function runOutdated(argumentsList: string[] = []): Promise<void> {
     ignoreLockedVersions: true,
   });
   if (forkLines.length > 0) {
-    process.stdout.write("Outdated path forks\n");
+    printlnStdout("Outdated path forks");
     for (const line of forkLines) {
-      process.stdout.write(`${line}\n`);
+      printlnStdout(line);
     }
     reported = true;
   }
   if (!reported) {
-    process.stdout.write("Outdated packages\n");
-    process.stdout.write("All packages up to date\n");
+    printlnStdout("Outdated packages");
+    printlnStdout("All packages up to date");
   }
 }
 

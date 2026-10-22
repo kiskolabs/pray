@@ -209,10 +209,8 @@ impl TransportAdapter for HttpTransport {
         let artifact_path = artifact.url.clone();
         let artifact_name = artifact.url.clone();
         tokio::task::spawn_blocking(move || {
-            if artifact_path.starts_with("http://") || artifact_path.starts_with("https://") {
-                return pray_core::fetch::http_get(&artifact_path)
-                    .map_err(|error| map_core_fetch_error(error, &artifact_name));
-            }
+            pray_core::fetch::reject_absolute_artifact_path(&artifact_path)
+                .map_err(|error| map_core_fetch_error(error, &artifact_name))?;
             pray_core::fetch::download_registry_artifact(&base, &artifact_path)
                 .map_err(|error| map_core_fetch_error(error, &artifact_name))
         })

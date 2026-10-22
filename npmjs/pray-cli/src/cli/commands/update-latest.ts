@@ -20,6 +20,7 @@ import {
   manifestPath,
   resolveCurrentProject,
 } from "../invocation.js";
+import { printlnStdout } from "../output.js";
 import { updateResolveOptions, writeUpdate } from "./update-core.js";
 
 export async function updateLatestCommand(
@@ -96,13 +97,11 @@ export async function updateLatestCommand(
 
   if (!json) {
     if (manifestUpdates.length === 0 && upstreamPlans.length === 0) {
-      process.stdout.write(
-        "All package constraints already allow latest versions\n",
-      );
+      printlnStdout("All package constraints already allow latest versions");
     } else {
       for (const update of manifestUpdates) {
-        process.stdout.write(
-          `Prayfile: ${update.name} constraint ${update.from_constraint} -> ${update.to_constraint} (registry latest ${update.registry_latest_version})\n`,
+        printlnStdout(
+          `Prayfile: ${update.name} constraint ${update.from_constraint} -> ${update.to_constraint} (registry latest ${update.registry_latest_version})`,
         );
       }
       printLatestUpstreamConstraints(upstreamPlans);
@@ -171,8 +170,8 @@ function printLatestUpstreamConstraints(
   plans: readonly PathUpstreamLatestConstraint[],
 ): void {
   for (const plan of plans) {
-    process.stdout.write(
-      `${plan.packageName} upstream ${plan.currentConstraint} -> ${plan.newConstraint} (latest ${plan.latestVersion})\n`,
+    printlnStdout(
+      `${plan.packageName} upstream ${plan.currentConstraint} -> ${plan.newConstraint} (latest ${plan.latestVersion})`,
     );
   }
 }

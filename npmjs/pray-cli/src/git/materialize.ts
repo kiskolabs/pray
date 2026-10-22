@@ -11,7 +11,11 @@ import {
 import { dirname, join } from "node:path";
 import { extractTarArchive } from "../archive/tar.js";
 import { PrayError } from "../errors.js";
-import { MAX_ARCHIVE_TOTAL_BYTES } from "../resource-limits.js";
+import {
+  MAX_ARCHIVE_ENTRIES,
+  MAX_ARCHIVE_ENTRY_BYTES,
+  MAX_ARCHIVE_TOTAL_BYTES,
+} from "../resource-limits.js";
 import { catalogSparseCones } from "./clone.js";
 import { gitEnvironment } from "./environment.js";
 import { requireRevisionPresent } from "./materialize-check.js";
@@ -32,11 +36,11 @@ export function materializeCatalogTree(
   refresh: boolean,
   offline = false,
 ): void {
-  if (!refresh && catalogMatches(dest, gitDir, revision)) {
-    return;
-  }
   requireRevisionPresent(gitDir, revision, offline);
   withGitCacheLock(dest, () => {
+    if (!refresh && catalogMatches(dest, gitDir, revision)) {
+      return;
+    }
     const staging = `${dest}.partial`;
     if (existsSync(staging)) {
       rmSync(staging, { recursive: true, force: true });
@@ -101,6 +105,9 @@ function unpackArchivePrefix(
   prefix: string,
   offline: boolean,
 ): boolean {
+  if (!treePrefixWithinLimits(gitDir, revision, prefix, offline)) {
+    return false;
+  }
   const archive = spawnSync(
     "git",
     [
@@ -135,6 +142,66 @@ function unpackArchivePrefix(
   }
   extractTarArchive(archive.stdout, dest);
   return true;
+}
+
+function treePrefixWithinLimits(
+  gitDir: string,
+  revision: string,
+  prefix: string,
+  offline: boolean,
+): boolean {
+  const listed = spawnSync(
+    "git",
+    [
+      "-c",
+      "protocol.file.allow=always",
+      "-C",
+      gitDir,
+      "ls-tree",
+      "-r",
+      "-l",
+      revision,
+      "--",
+      prefix,
+    ],
+    {
+      encoding: "utf8",
+      env: gitEnvironment(offlineGitEnv(offline)),
+    },
+  );
+  if (listed.status !== 0 || !listed.stdout?.trim()) {
+    return false;
+  }
+  let entryCount = 0;
+  let totalBytes = 0;
+  for (const line of listed.stdout.split("\n")) {
+    const parts = line.trim().split(/\s+/);
+    if (parts[1] !== "blob") {
+      continue;
+    }
+    const size = Number.parseInt(parts[3] ?? "", 10);
+    if (!Number.isFinite(size)) {
+      continue;
+    }
+    entryCount += 1;
+    if (entryCount > MAX_ARCHIVE_ENTRIES) {
+      throw PrayError.integrity(
+        `git catalog archive exceeds ${MAX_ARCHIVE_ENTRIES} entries`,
+      );
+    }
+    if (size > MAX_ARCHIVE_ENTRY_BYTES) {
+      throw PrayError.integrity(
+        `git catalog archive entry exceeds ${MAX_ARCHIVE_ENTRY_BYTES} bytes`,
+      );
+    }
+    totalBytes += size;
+    if (totalBytes > MAX_ARCHIVE_TOTAL_BYTES) {
+      throw PrayError.integrity(
+        `git catalog archive exceeds ${MAX_ARCHIVE_TOTAL_BYTES} bytes`,
+      );
+    }
+  }
+  return entryCount > 0;
 }
 
 function publishCatalogTree(dest: string, staging: string): void {

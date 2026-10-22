@@ -79,16 +79,20 @@ module Pray
 
     def print_latest_constraint_plans(manifest_updates, upstream_plans)
       if manifest_updates.empty? && upstream_plans.empty?
-        puts "All package constraints already allow latest versions"
+        Terminal.println_stdout("All package constraints already allow latest versions")
         return
       end
 
       manifest_updates.each do |update|
-        puts "Prayfile: #{update[:name]} constraint #{update[:from_constraint]} -> #{update[:to_constraint]} " \
+        Terminal.println_stdout(
+          "Prayfile: #{update[:name]} constraint #{update[:from_constraint]} -> #{update[:to_constraint]} " \
           "(registry latest #{update[:registry_latest_version]})"
+        )
       end
       upstream_plans.each do |plan|
-        puts "#{plan.package_name} upstream #{plan.current_constraint} -> #{plan.new_constraint} (latest #{plan.latest_version})"
+        Terminal.println_stdout(
+          "#{plan.package_name} upstream #{plan.current_constraint} -> #{plan.new_constraint} (latest #{plan.latest_version})"
+        )
       end
     end
   end

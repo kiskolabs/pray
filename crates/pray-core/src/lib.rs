@@ -75,6 +75,7 @@ mod resolve_git_materialize;
 mod resolve_git_materialize_check;
 mod resolve_git_materialize_confirm;
 mod resolve_git_materialize_markers;
+mod resolve_git_materialize_size;
 mod resolve_git_materialize_unpack;
 mod resolve_git_paths;
 mod resolve_git_refresh;
@@ -95,6 +96,7 @@ pub mod trust;
 pub mod verify;
 
 pub use error::{PrayError, PrayResult};
+pub use fetch::reject_absolute_artifact_path;
 pub use git_process::clear_repository_local_env;
 
 pub mod embed;

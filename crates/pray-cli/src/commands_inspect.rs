@@ -118,9 +118,9 @@ pub(crate) fn outdated_command(remote: bool) -> PrayResult<()> {
     reported |= print_constraint_blocked_packages(&project, "Outdated packages", !reported)?;
     let local_lines = outdated_local_lines(previous_lockfile.as_ref(), &project);
     if !local_lines.is_empty() {
-        println!("Outdated local files");
+        crate::cli_output::println_stdout("Outdated local files");
         for line in &local_lines {
-            println!("{line}");
+            crate::cli_output::println_stdout(line);
         }
         reported = true;
     }
@@ -130,15 +130,15 @@ pub(crate) fn outdated_command(remote: bool) -> PrayResult<()> {
         &constraint_preview_options(),
     )?;
     if !fork_lines.is_empty() {
-        println!("Outdated path forks");
+        crate::cli_output::println_stdout("Outdated path forks");
         for line in &fork_lines {
-            println!("{line}");
+            crate::cli_output::println_stdout(line);
         }
         reported = true;
     }
     if !reported {
-        println!("Outdated packages");
-        println!("All packages up to date");
+        crate::cli_output::println_stdout("Outdated packages");
+        crate::cli_output::println_stdout("All packages up to date");
     }
     Ok(())
 }

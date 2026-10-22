@@ -92,14 +92,16 @@ pub(super) fn update_latest_command(
 
     if !json {
         if manifest_updates.is_empty() && upstream_plans.is_empty() {
-            println!("All package constraints already allow latest versions");
+            crate::cli_output::println_stdout(
+                "All package constraints already allow latest versions",
+            );
         } else {
             for (name, previous_constraint, new_constraint, registry_latest_version) in
                 &manifest_updates
             {
-                println!(
+                crate::cli_output::println_stdout(format!(
                     "Prayfile: {name} constraint {previous_constraint} -> {new_constraint} (registry latest {registry_latest_version})"
-                );
+                ));
             }
             print_latest_upstream_constraints(&upstream_plans);
         }

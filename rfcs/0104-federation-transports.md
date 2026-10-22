@@ -32,7 +32,7 @@ Key words follow RFC 2119.
 
 Transport independence: discovery, index, metadata, artifact fetch as capabilities; adapters declare pull/push/streaming.
 
-Experimental HTTP wire served by `server_federation.rs` and fetched by `HttpTransport`: GET `{peer}/.well-known/pray-federation.json` (`spec` `pray-federation-v1`); GET `{peer}/v1/sync/index` with optional `since`; GET `{peer}/v1/sync/package/{name}`; POST `{peer}/v1/sync/push` gated by `authorize_distribution_push` (`--allow-open-push`, bearer token, SSH publishers, or loopback). Relative artifacts use `download_registry_artifact` in `fetch.rs`; absolute `http://` or `https://` artifact URLs use `http_get`.
+Experimental HTTP wire served by `server_federation.rs` and fetched by `HttpTransport`: GET `{peer}/.well-known/pray-federation.json` (`spec` `pray-federation-v1`); GET `{peer}/v1/sync/index` with optional `since`; GET `{peer}/v1/sync/package/{name}`; POST `{peer}/v1/sync/push` gated by `authorize_distribution_push` (`--allow-open-push`, bearer token, SSH publishers, or loopback). Artifact paths must be relative to the peer base URL; absolute `http://`, `https://`, and other scheme URLs are refused.
 
 Experimental SSH wire (`pray+ssh://`, `SshTransport`): JSON-RPC `federation.discovery`, `sync.index`, `sync.package`, `sync.push`; bytes `artifact.get`.
 

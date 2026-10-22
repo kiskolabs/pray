@@ -102,21 +102,23 @@ module Pray
       project = resolve_current_project
       rendered = Render.render_project(project)
       latest_lockfile = build_lockfile(project, rendered)
-      puts "Outdated packages"
+      Terminal.println_stdout("Outdated packages")
       if previous_lockfile && Pray.lockfiles_equivalent?(latest_lockfile, previous_lockfile)
-        puts "All packages up to date"
+        Terminal.println_stdout("All packages up to date")
       else
-        Plan.package_summary_lines(previous_lockfile, latest_lockfile, project).each { |line| puts line }
+        Plan.package_summary_lines(previous_lockfile, latest_lockfile, project).each do |line|
+          Terminal.println_stdout(line)
+        end
       end
       local_lines = ApplyReport.outdated_local_lines(previous_lockfile, project)
       unless local_lines.empty?
-        puts "Outdated local files"
-        local_lines.each { |line| puts line }
+        Terminal.println_stdout("Outdated local files")
+        local_lines.each { |line| Terminal.println_stdout(line) }
       end
       fork_lines = Upstream.path_fork_drift_lines(project, previous_lockfile, ResolveOptions.new)
       unless fork_lines.empty?
-        puts "Outdated path forks"
-        fork_lines.each { |line| puts line }
+        Terminal.println_stdout("Outdated path forks")
+        fork_lines.each { |line| Terminal.println_stdout(line) }
       end
     end
   end

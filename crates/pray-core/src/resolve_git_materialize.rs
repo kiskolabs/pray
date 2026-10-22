@@ -9,8 +9,10 @@ use crate::resolve_git_materialize_check::{
 use crate::resolve_git_materialize_markers::{
     catalog_root_markers, offline_git_env, GIT_DIR_MARKER, REVISION_MARKER,
 };
+use crate::resolve_git_materialize_size::{
+    require_blob_within_limit, require_tree_prefix_within_limits,
+};
 use crate::resolve_git_materialize_unpack::unpack_bounded_catalog_tar;
-use crate::resource_limits::MAX_ARCHIVE_ENTRY_BYTES;
 use crate::{PrayError, PrayResult};
 use std::fs;
 use std::path::{Path, PathBuf};
@@ -23,11 +25,11 @@ pub(crate) fn materialize_catalog_tree(
     refresh: bool,
     offline: bool,
 ) -> PrayResult<()> {
+    require_revision_present_offline(git_dir, revision, offline)?;
+    let _lock = acquire_git_cache_lock(dest)?;
     if !refresh && catalog_matches(dest, git_dir, revision) {
         return Ok(());
     }
-    require_revision_present_offline(git_dir, revision, offline)?;
-    let _lock = acquire_git_cache_lock(dest)?;
     let staging = staging_catalog_path(dest);
     if staging.exists() {
         remove_path_if_exists(&staging)?;
@@ -70,6 +72,10 @@ pub(crate) fn materialize_git_catalog_file(
     let Some((git_dir, revision, catalog_root)) = catalog_root_markers(source_root) else {
         return Ok(());
     };
+    let _lock = acquire_git_cache_lock(&catalog_root)?;
+    if full_path.is_file() {
+        return Ok(());
+    }
     require_revision_present_offline(&git_dir, &revision, offline)?;
     let Ok(repo_relative) = full_path.strip_prefix(&catalog_root) else {
         return Ok(());
@@ -78,6 +84,8 @@ pub(crate) fn materialize_git_catalog_file(
         return Ok(());
     };
     let object = format!("{revision}:{repo_relative}");
+    require_blob_within_limit(&git_dir, &object, offline)
+        .map_err(|error| annotate_git_materialize_failure(&git_dir, &revision, error))?;
     let output = run_git_command_with_env(&git_dir, &["show", &object], offline_git_env(offline))
         .map_err(|error| annotate_git_materialize_failure(&git_dir, &revision, error))?;
     if !output.status.success() {
@@ -89,21 +97,29 @@ pub(crate) fn materialize_git_catalog_file(
         }
         return Err(annotate_git_materialize_failure(&git_dir, &revision, error));
     }
-    if output.stdout.len() as u64 > MAX_ARCHIVE_ENTRY_BYTES {
-        return Err(PrayError::Integrity(format!(
-            "git catalog blob {repo_relative} exceeds {MAX_ARCHIVE_ENTRY_BYTES} bytes"
-        )));
-    }
+    write_catalog_blob_atomic(&full_path, &output.stdout)
+}
+
+fn write_catalog_blob_atomic(full_path: &Path, bytes: &[u8]) -> PrayResult<()> {
     if let Some(parent) = full_path.parent() {
         fs::create_dir_all(parent)?;
     }
-    fs::write(&full_path, output.stdout).map_err(|error| {
+    let mut partial = full_path.as_os_str().to_os_string();
+    partial.push(".partial");
+    let partial = PathBuf::from(partial);
+    fs::write(&partial, bytes).map_err(|error| {
         PrayError::Resolution(format!(
             "failed to write git catalog file {}: {error}",
             full_path.display()
         ))
     })?;
-    Ok(())
+    fs::rename(&partial, full_path).map_err(|error| {
+        let _ = remove_path_if_exists(&partial);
+        PrayError::Resolution(format!(
+            "failed to publish git catalog file {}: {error}",
+            full_path.display()
+        ))
+    })
 }
 
 fn catalog_matches(dest: &Path, git_dir: &Path, revision: &str) -> bool {
@@ -134,6 +150,9 @@ fn unpack_archive_prefix(
     prefix: &str,
     offline: bool,
 ) -> PrayResult<bool> {
+    if !require_tree_prefix_within_limits(git_dir, revision, prefix, offline)? {
+        return Ok(false);
+    }
     let output = run_git_command_with_env(
         git_dir,
         &["archive", "--format=tar", revision, "--", prefix],

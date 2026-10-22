@@ -1,6 +1,7 @@
 use crate::apply_report::{
     materialization_preview_to_json, MaterializationMode, MaterializationPreview,
 };
+use crate::cli_output::println_stdout;
 use crate::update_summary::build_update_summary;
 use pray_core::lockfile::Lockfile;
 use pray_core::registry::version_is_greater_than;
@@ -90,10 +91,10 @@ pub(crate) fn print_constraint_blocked_packages(
         return Ok(false);
     }
     if print_title {
-        println!("{title}");
+        println_stdout(title);
     }
     for line in lines {
-        println!("{line}");
+        println_stdout(line);
     }
     Ok(true)
 }
@@ -110,9 +111,9 @@ pub(crate) fn print_update_summary(
         return Ok(false);
     }
 
-    println!("{title}");
+    println_stdout(title);
     for line in report.lines {
-        println!("{line}");
+        println_stdout(line);
     }
     Ok(true)
 }

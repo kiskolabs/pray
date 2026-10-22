@@ -205,10 +205,7 @@ module Pray
     end
 
     def fetch_bytes(peer_source, artifact)
-      if artifact.start_with?("http://", "https://")
-        return Registry.http_get(artifact).b
-      end
-
+      Registry.reject_absolute_artifact!(artifact)
       Registry.http_get("#{trim_slash(peer_source)}/#{artifact.delete_prefix("/")}").b
     end
 

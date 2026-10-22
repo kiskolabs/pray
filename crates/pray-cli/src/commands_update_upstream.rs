@@ -22,10 +22,10 @@ pub(super) fn plan_latest_upstream_constraints(
 
 pub(super) fn print_latest_upstream_constraints(plans: &[PathUpstreamLatestConstraint]) {
     for plan in plans {
-        println!(
+        crate::cli_output::println_stdout(format!(
             "{} upstream {} -> {} (latest {})",
             plan.package_name, plan.current_constraint, plan.new_constraint, plan.latest_version
-        );
+        ));
     }
 }
 
@@ -98,11 +98,11 @@ pub(crate) fn report_path_upstream_would_conflicts(
             &conflict.new_version,
             &conflict.paths,
         ));
-        println!(
+        crate::cli_output::println_stdout(format!(
             "would-conflict {}: {}",
             conflict.package_name,
             conflict.paths.join(", ")
-        );
+        ));
     }
     Err(PrayError::Resolution(messages.join("\n")))
 }

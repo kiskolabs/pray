@@ -128,28 +128,18 @@ pub(crate) fn fetch_torrent_artifact_to_path(
     manifest: &TorrentManifest,
     destination: &Path,
 ) -> PrayResult<Vec<u8>> {
-    let artifact_url = if manifest.artifact_url.starts_with("http://")
-        || manifest.artifact_url.starts_with("https://")
-    {
-        manifest.artifact_url.clone()
-    } else {
-        join_url(source_url, &manifest.artifact_url)
-    };
+    crate::fetch::reject_absolute_artifact_path(&manifest.artifact_url)?;
+    let artifact_url = join_url(source_url, &manifest.artifact_url);
 
     let sources = if manifest.sources.is_empty() {
         vec![artifact_url]
     } else {
-        manifest
-            .sources
-            .iter()
-            .map(|source| {
-                if source.starts_with("http://") || source.starts_with("https://") {
-                    source.clone()
-                } else {
-                    join_url(source_url, source)
-                }
-            })
-            .collect()
+        let mut resolved = Vec::with_capacity(manifest.sources.len());
+        for source in &manifest.sources {
+            crate::fetch::reject_absolute_artifact_path(source)?;
+            resolved.push(join_url(source_url, source));
+        }
+        resolved
     };
 
     if manifest.length > MAX_TORRENT_ARTIFACT_BYTES {

@@ -1,6 +1,7 @@
 import { versionIsGreaterThan } from "../../constraint.js";
 import type { Lockfile } from "../../lockfile/types.js";
 import type { ResolvedProject } from "../../resolve/types.js";
+import { printlnStdout } from "../output.js";
 
 export interface UpdatePackageEntry {
   name: string;
@@ -126,9 +127,9 @@ export function printUpdateSummary(
   if (report.lines.length === 0) {
     return false;
   }
-  process.stdout.write(`${title}\n`);
+  printlnStdout(title);
   for (const line of report.lines) {
-    process.stdout.write(`${line}\n`);
+    printlnStdout(line);
   }
   return true;
 }
@@ -143,10 +144,10 @@ export function printConstraintBlockedPackages(
     return false;
   }
   if (printTitle) {
-    process.stdout.write(`${title}\n`);
+    printlnStdout(title);
   }
   for (const line of lines) {
-    process.stdout.write(`${line}\n`);
+    printlnStdout(line);
   }
   return true;
 }

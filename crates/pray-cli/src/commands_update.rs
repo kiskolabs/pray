@@ -246,7 +246,7 @@ pub(crate) fn preview_remote_updates(selected_package: Option<&str>, json: bool)
     if print_constraint_blocked_packages(&project, "Outdated packages", true)? {
         return Ok(());
     }
-    println!("Outdated packages");
-    println!("All packages up to date");
+    crate::cli_output::println_stdout("Outdated packages");
+    crate::cli_output::println_stdout("All packages up to date");
     Ok(())
 }

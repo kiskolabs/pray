@@ -84,20 +84,31 @@ module Pray
       FileUtils.mv(staging, db)
     end
 
+    LOCK_ATTEMPTS = 2_400
+    LOCK_RETRY_SECONDS = 0.025
+    STALE_LOCK_SECONDS = 600
+
     def with_git_cache_lock(db)
       lock_directory = "#{db}.lock.d"
       FileUtils.mkdir_p(File.dirname(lock_directory))
       acquired = false
-      400.times do
+      LOCK_ATTEMPTS.times do
         begin
           Dir.mkdir(lock_directory)
+          write_lock_owner!(lock_directory)
           acquired = true
           break
         rescue Errno::EEXIST
-          sleep 0.025
+          clear_stale_lock!(lock_directory)
+          sleep LOCK_RETRY_SECONDS
         end
       end
-      raise Error.resolution("timed out waiting for git cache lock #{lock_directory}") unless acquired
+      unless acquired
+        raise Error.resolution(
+          "timed out waiting for git cache lock #{lock_directory}. " \
+          "If no other pray process is using that cache, remove the lock directory and retry."
+        )
+      end
 
       begin
         yield
@@ -105,6 +116,29 @@ module Pray
         FileUtils.rm_rf(lock_directory)
       end
     end
+
+    def write_lock_owner!(lock_directory)
+      File.write(File.join(lock_directory, "owner"), "#{Process.pid}\n#{Time.now.to_i}\n")
+    end
+
+    def clear_stale_lock!(lock_directory)
+      age = lock_age_seconds(lock_directory)
+      return if age < STALE_LOCK_SECONDS
+
+      FileUtils.rm_rf(lock_directory)
+    end
+
+    def lock_age_seconds(lock_directory)
+      owner = File.join(lock_directory, "owner")
+      if File.file?(owner)
+        stamp = File.read(owner).lines[1].to_s.strip.to_i
+        return Time.now.to_i - stamp if stamp.positive?
+      end
+      Time.now.to_i - File.mtime(lock_directory).to_i
+    rescue Errno::ENOENT
+      0
+    end
+    private_class_method :write_lock_owner!, :clear_stale_lock!, :lock_age_seconds
 
     def ensure_revision_in_db(db, clone_url, revision, allow_fetch)
       return if GitRun.try_run_git(db, "cat-file", "-e", revision)

@@ -51,7 +51,9 @@ pub(crate) fn doctor_command(migrate_git_cache: bool) -> PrayResult<()> {
         }
     }
     if migrate_git_cache {
-        println_stdout(format!("migrated {migrated} legacy project git checkout(s)"));
+        println_stdout(format!(
+            "migrated {migrated} legacy project git checkout(s)"
+        ));
     }
     Ok(())
 }

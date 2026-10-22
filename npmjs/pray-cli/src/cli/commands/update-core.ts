@@ -21,6 +21,7 @@ import type { ResolvedProject } from "../../resolve/types.js";
 import { applyPathUpstreamRefreshes } from "../../resolve/upstream-refresh.js";
 import { writeProjectFile } from "../../transaction/index.js";
 import { lockfilePath, resolveCurrentProject } from "../invocation.js";
+import { printlnStdout } from "../output.js";
 import {
   buildUpdateSummary,
   constraintBlockedPackagesJson,
@@ -71,8 +72,8 @@ export async function previewRemoteUpdates(
   if (printConstraintBlockedPackages(project, "Outdated packages", true)) {
     return;
   }
-  process.stdout.write("Outdated packages\n");
-  process.stdout.write("All packages up to date\n");
+  printlnStdout("Outdated packages");
+  printlnStdout("All packages up to date");
 }
 
 export function updateResolveOptions(

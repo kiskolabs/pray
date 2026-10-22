@@ -3,9 +3,13 @@
 ## Unreleased
 
 - Bound git catalog archive and `git show` blob fills to the same size ceilings as `.praypkg` unpack; unpack through the shared tar validators in Ruby and TypeScript instead of system tar.
+- Probe catalog sizes with `git cat-file -s` and `git ls-tree -r -l` before buffering archive or blob bodies.
 - Publish project git catalogs through staging, an advisory lock, and atomic rename; refuse stub `.pray-git-dir` paths that are not the expected shared bare.
+- Recover stale git cache lock directories after ten minutes; wait up to about one minute for a live lock; name the lock path on timeout.
+- Lock catalog file fill and publish blobs through a partial rename; re-check catalog match under the materialize lock.
+- Refuse absolute federation and torrent artifact URLs; accept catalog markers only for hex revisions under the global git cache root.
 - Refuse URL-shaped registry and catalog artifact paths; validate prayspec member paths on parse and tree hash.
-- Extend global `-q`/`--quiet` to apply, install, plan, doctor, and unlock status stdout; redact URL userinfo in `pray doctor`.
+- Extend global `-q`/`--quiet` to apply, install, plan, doctor, unlock, update, outdated, and would-conflict status stdout; redact URL userinfo in `pray doctor`.
 - Add recovery-hint and doctor conformance coverage across the reference CLIs.
 - Require Rust 1.99 to build the pray crates. Development and CI build with exactly 1.99.1 from `rust-toolchain.toml`.
 

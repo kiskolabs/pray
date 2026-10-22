@@ -1,3 +1,4 @@
+import { printlnStdout } from "../cli/output.js";
 import { PrayError } from "../errors.js";
 import { prepareGitSources } from "../git/sources.js";
 import type { LockedUpstream, Lockfile } from "../lockfile/types.js";
@@ -72,8 +73,8 @@ export async function reportPathUpstreamWouldConflicts(
   }
   const messages: string[] = [];
   for (const conflict of conflicts) {
-    process.stdout.write(
-      `would-conflict ${conflict.packageName}: ${conflict.paths.join(", ")}\n`,
+    printlnStdout(
+      `would-conflict ${conflict.packageName}: ${conflict.paths.join(", ")}`,
     );
     messages.push(
       upstreamMergeConflictMessage(

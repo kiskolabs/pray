@@ -1,6 +1,7 @@
 use crate::resolve_git_command::run_git_command_with_env;
 use crate::resolve_git_materialize_check::require_revision_present;
 use crate::resolve_git_materialize_markers::catalog_root_markers;
+use crate::resolve_git_materialize_size::require_tree_prefix_within_limits;
 use crate::{PrayError, PrayResult};
 use std::path::Path;
 
@@ -52,26 +53,26 @@ pub(crate) fn confirm_catalog_revision_materializable(
         )));
     }
     require_revision_present(&git_dir, &revision)?;
-    let smoke = run_git_command_with_env(
-        &git_dir,
-        &["archive", "--format=tar", &revision, "--", "v1/packages"],
-        &[],
-    )?;
-    if smoke.status.success() && !smoke.stdout.is_empty() {
+    if require_tree_prefix_within_limits(&git_dir, &revision, "v1/packages", false)? {
         return Ok(());
     }
-    let prayers = run_git_command_with_env(
+    if require_tree_prefix_within_limits(&git_dir, &revision, "prayers/v1/packages", false)? {
+        return Ok(());
+    }
+    // Fallback for older trees: presence probe without buffering the archive body.
+    let listed = run_git_command_with_env(
         &git_dir,
         &[
-            "archive",
-            "--format=tar",
+            "ls-tree",
+            "-r",
+            "--name-only",
             &revision,
             "--",
-            "prayers/v1/packages",
+            "v1/packages",
         ],
         &[],
     )?;
-    if prayers.status.success() && !prayers.stdout.is_empty() {
+    if listed.status.success() && !String::from_utf8_lossy(&listed.stdout).trim().is_empty() {
         return Ok(());
     }
     Err(PrayError::Resolution(format!(

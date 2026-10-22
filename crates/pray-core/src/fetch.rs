@@ -49,7 +49,7 @@ pub fn download_registry_artifact(
     http_get(&artifact_url)
 }
 
-fn reject_absolute_artifact_path(artifact: &str) -> PrayResult<()> {
+pub fn reject_absolute_artifact_path(artifact: &str) -> PrayResult<()> {
     let trimmed = artifact.trim();
     let mut chars = trimmed.chars();
     let Some(first) = chars.next() else {

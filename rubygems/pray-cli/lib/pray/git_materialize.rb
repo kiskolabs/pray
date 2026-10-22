@@ -34,10 +34,10 @@ module Pray
     end
 
     def materialize_catalog_tree(git_dir, dest, revision, subdir, refresh, offline: false)
-      return if !refresh && catalog_matches?(dest, git_dir, revision)
-
       require_revision_present!(git_dir, revision, offline: offline)
       GitStore.with_git_cache_lock(dest) do
+        return if !refresh && catalog_matches?(dest, git_dir, revision)
+
         staging = "#{dest}.partial"
         FileUtils.rm_rf(staging)
         FileUtils.mkdir_p(staging)
@@ -87,40 +87,39 @@ module Pray
       markers = find_catalog_markers(source_root)
       return unless markers
 
-      require_revision_present!(markers.fetch(:git_dir), markers.fetch(:revision), offline: offline)
-      repo_relative = full_path.delete_prefix(markers.fetch(:catalog_root)).delete_prefix("/")
-      object = "#{markers.fetch(:revision)}:#{repo_relative}"
-      env = GitRun.git_env(offline_git_env(offline))
-      stdout, status = Open3.capture2(
-        env,
-        "git",
-        "-c",
-        "protocol.file.allow=always",
-        "-C",
-        markers.fetch(:git_dir),
-        "show",
-        object,
-        stdin_data: ""
-      )
-      unless status.success?
-        if offline
-          raise Error.resolution(
-            "git catalog blob #{repo_relative} at revision #{markers.fetch(:revision)} is not available locally and offline mode is enabled"
+      GitStore.with_git_cache_lock(markers.fetch(:catalog_root)) do
+        return if File.file?(full_path)
+
+        require_revision_present!(markers.fetch(:git_dir), markers.fetch(:revision), offline: offline)
+        repo_relative = full_path.delete_prefix(markers.fetch(:catalog_root)).delete_prefix("/")
+        object = "#{markers.fetch(:revision)}:#{repo_relative}"
+        require_blob_within_limit!(markers.fetch(:git_dir), object, offline: offline)
+        env = GitRun.git_env(offline_git_env(offline))
+        stdout, status = Open3.capture2(
+          env,
+          "git",
+          "-c",
+          "protocol.file.allow=always",
+          "-C",
+          markers.fetch(:git_dir),
+          "show",
+          object,
+          stdin_data: ""
+        )
+        unless status.success?
+          if offline
+            raise Error.resolution(
+              "git catalog blob #{repo_relative} at revision #{markers.fetch(:revision)} is not available locally and offline mode is enabled"
+            )
+          end
+          annotate_git_materialize_failure!(
+            markers.fetch(:git_dir),
+            markers.fetch(:revision),
+            "git show failed"
           )
         end
-        raise Error.resolution(
-          "git catalog materialize failed for revision #{markers.fetch(:revision)} in " \
-          "#{markers.fetch(:git_dir)} (git_cache_stale): git show failed. " \
-          "Run `pray install --locked`, or clear `.pray/cache/git` and the shared bare then install again."
-        )
+        write_catalog_blob_atomic!(full_path, stdout)
       end
-      if stdout.bytesize > ResourceLimits::MAX_ARCHIVE_ENTRY_BYTES
-        raise Error.integrity(
-          "git catalog blob #{repo_relative} exceeds #{ResourceLimits::MAX_ARCHIVE_ENTRY_BYTES} bytes"
-        )
-      end
-      FileUtils.mkdir_p(File.dirname(full_path))
-      File.binwrite(full_path, stdout)
     end
 
     def require_revision_present!(git_dir, revision, offline: false)
@@ -160,6 +159,8 @@ module Pray
     end
 
     def unpack_archive_prefix(git_dir, dest, revision, prefix, offline: false)
+      return false unless tree_prefix_within_limits?(git_dir, revision, prefix, offline: offline)
+
       env = GitRun.git_env(offline_git_env(offline).merge("GIT_TERMINAL_PROMPT" => "0"))
       stdout, _stderr, status = Open3.capture3(
         env,
@@ -186,6 +187,68 @@ module Pray
       true
     end
 
+    def require_blob_within_limit!(git_dir, object, offline: false)
+      env = GitRun.git_env(offline_git_env(offline))
+      stdout, status = Open3.capture2(
+        env, "git", "-c", "protocol.file.allow=always", "-C", git_dir, "cat-file", "-s", object,
+        stdin_data: ""
+      )
+      return unless status.success?
+
+      size = stdout.strip.to_i
+      return if size <= ResourceLimits::MAX_ARCHIVE_ENTRY_BYTES
+
+      raise Error.integrity(
+        "git catalog blob exceeds #{ResourceLimits::MAX_ARCHIVE_ENTRY_BYTES} bytes"
+      )
+    end
+
+    def tree_prefix_within_limits?(git_dir, revision, prefix, offline: false)
+      env = GitRun.git_env(offline_git_env(offline))
+      stdout, status = Open3.capture2(
+        env, "git", "-c", "protocol.file.allow=always", "-C", git_dir,
+        "ls-tree", "-r", "-l", revision, "--", prefix, stdin_data: ""
+      )
+      return false unless status.success? && !stdout.strip.empty?
+
+      entry_count = 0
+      total_bytes = 0
+      stdout.each_line do |line|
+        parts = line.split
+        next unless parts[1] == "blob"
+
+        size = parts[3].to_i
+        entry_count += 1
+        if entry_count > ResourceLimits::MAX_ARCHIVE_ENTRIES
+          raise Error.integrity(
+            "git catalog archive exceeds #{ResourceLimits::MAX_ARCHIVE_ENTRIES} entries"
+          )
+        end
+        if size > ResourceLimits::MAX_ARCHIVE_ENTRY_BYTES
+          raise Error.integrity(
+            "git catalog archive entry exceeds #{ResourceLimits::MAX_ARCHIVE_ENTRY_BYTES} bytes"
+          )
+        end
+        total_bytes += size
+        if total_bytes > ResourceLimits::MAX_ARCHIVE_TOTAL_BYTES
+          raise Error.integrity(
+            "git catalog archive exceeds #{ResourceLimits::MAX_ARCHIVE_TOTAL_BYTES} bytes"
+          )
+        end
+      end
+      entry_count.positive?
+    end
+
+    def write_catalog_blob_atomic!(full_path, bytes)
+      FileUtils.mkdir_p(File.dirname(full_path))
+      partial = "#{full_path}.partial"
+      File.binwrite(partial, bytes)
+      File.rename(partial, full_path)
+    rescue StandardError
+      FileUtils.rm_f(partial)
+      raise
+    end
+
     def find_catalog_markers(start)
       current = start
       8.times do
@@ -194,7 +257,7 @@ module Pray
         if File.file?(revision_path) && File.file?(git_dir_path)
           revision = File.read(revision_path).strip
           git_dir = File.read(git_dir_path).strip
-          return if revision.empty? || !File.exist?(git_dir)
+          return unless acceptable_revision?(revision) && acceptable_shared_bare?(git_dir)
 
           return {git_dir: git_dir, revision: revision, catalog_root: current}
         end
@@ -204,6 +267,24 @@ module Pray
         current = parent
       end
       nil
+    end
+
+    def acceptable_revision?(revision)
+      return false if revision.empty? || revision.start_with?("-")
+      return false unless [40, 64].include?(revision.length)
+
+      revision.match?(/\A[0-9a-fA-F]+\z/)
+    end
+
+    def acceptable_shared_bare?(git_dir)
+      return false unless File.file?(File.join(git_dir, "HEAD"))
+      return false unless File.directory?(File.join(git_dir, "objects"))
+
+      root = GitStore.global_cache_root
+      return false unless root
+
+      expected = File.join(root, "git")
+      PathSafety.path_under_root?(expected, git_dir)
     end
 
     def offline_git_env(offline)
