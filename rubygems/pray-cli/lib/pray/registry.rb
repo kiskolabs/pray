@@ -15,15 +15,17 @@ require_relative "git_materialize"
 module Pray
   RegistryPackageVersion = Struct.new(
     :version, :artifact, :artifact_hash, :tree_hash, :yanked, :targets, :exports,
-    :signer, :signer_fingerprint, :published_at, :signature
+    :signer, :signer_fingerprint, :published_at, :signature, :derived_metadata
   ) do
     def initialize(
       artifact_hash: nil, tree_hash: nil, yanked: false, targets: [], exports: [],
-      signer: nil, signer_fingerprint: nil, published_at: nil, signature: nil, **kwargs
+      signer: nil, signer_fingerprint: nil, published_at: nil, signature: nil,
+      derived_metadata: nil, **kwargs
     )
       super(**kwargs, artifact_hash: artifact_hash, tree_hash: tree_hash, yanked: yanked,
                       targets: targets, exports: exports, signer: signer,
-                      signer_fingerprint: signer_fingerprint, published_at: published_at, signature: signature)
+                      signer_fingerprint: signer_fingerprint, published_at: published_at,
+                      signature: signature, derived_metadata: derived_metadata)
     end
   end
 
@@ -159,7 +161,8 @@ module Pray
         signer: entry["signer"],
         signer_fingerprint: entry["signer_fingerprint"],
         published_at: entry.key?("published_at") ? publish_timestamp_from_value(entry["published_at"]) : nil,
-        signature: entry["signature"]
+        signature: entry["signature"],
+        derived_metadata: entry["derived_metadata"]
       )
     end
 

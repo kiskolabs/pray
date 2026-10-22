@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+- Keep and create catalog `derived_metadata` when the Ruby or TypeScript CLI publishes to a distribution root. Unchanged republishes and version appends no longer strip historical summaries, topics, or embeddings.
+
 ## 1.22.0 (2026-10-22)
 
 - Ignore leftover project git full clones when resolving a shared bare or stub catalog. Install renames those leftovers so they cannot shadow the locked revision.

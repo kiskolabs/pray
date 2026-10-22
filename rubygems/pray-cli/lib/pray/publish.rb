@@ -155,7 +155,8 @@ module Pray
         signer: signer,
         signer_fingerprint: signer_fingerprint,
         published_at: Time.now.to_i,
-        signature: Registry.registry_artifact_signature(archive_bytes, package.tree_hash, signer)
+        signature: Registry.registry_artifact_signature(archive_bytes, package.tree_hash, signer),
+        derived_metadata: DerivedMetadata.from_package_root(package.root, package.spec)
       )
     end
 
@@ -204,6 +205,7 @@ module Pray
 
       version_entry.yanked = existing.yanked
       version_entry.published_at = existing.published_at if stored_artifact
+      version_entry.derived_metadata ||= existing.derived_metadata
     end
 
     def load_registry_index(root)
@@ -222,7 +224,7 @@ module Pray
 
     def load_registry_package_metadata(path, package_name)
       if File.exist?(path)
-        data = JSON.parse(File.read(path))
+        data = JSON.parse(File.read(path, encoding: "UTF-8"))
         RegistryPackageMetadata.new(
           name: data["name"],
           versions: Array(data["versions"]).map { |entry| Registry.version_from_hash(entry) }
@@ -234,7 +236,7 @@ module Pray
 
     def write_registry_package_metadata(path, metadata)
       FileUtils.mkdir_p(File.dirname(path))
-      File.write(path, JSON.pretty_generate(metadata_to_hash(metadata)))
+      File.write(path, JSON.pretty_generate(metadata_to_hash(metadata)), encoding: "UTF-8")
     end
 
     def metadata_to_hash(metadata)
@@ -258,6 +260,7 @@ module Pray
       hash["signer_fingerprint"] = entry.signer_fingerprint if entry.signer_fingerprint
       hash["published_at"] = entry.published_at if entry.published_at
       hash["signature"] = entry.signature if entry.signature
+      hash["derived_metadata"] = entry.derived_metadata if entry.derived_metadata
       hash
     end
 

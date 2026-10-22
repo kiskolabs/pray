@@ -30,7 +30,7 @@ RSpec.describe Pray::Publish do
 
     metadata_path = File.join(publish_root, "v1", "packages", "sample/base.json")
     expect(File).to exist(metadata_path)
-    metadata = JSON.parse(File.read(metadata_path))
+    metadata = JSON.parse(File.read(metadata_path, encoding: "UTF-8"))
     expect(metadata["versions"].first["version"]).to eq("1.4.3")
   end
 
@@ -42,29 +42,32 @@ RSpec.describe Pray::Publish do
 
     described_class.publish_to_root(project, publish_root)
     metadata_path = File.join(publish_root, "v1", "packages", "sample", "base.json")
-    metadata = JSON.parse(File.read(metadata_path))
+    metadata = JSON.parse(File.read(metadata_path, encoding: "UTF-8"))
     metadata["versions"].first["published_at"] = "2020-01-01T00:00:00.999Z"
     metadata["versions"].first["yanked"] = true
-    File.write(metadata_path, JSON.pretty_generate(metadata))
+    File.write(metadata_path, JSON.pretty_generate(metadata), encoding: "UTF-8")
 
     described_class.publish_to_root(project, publish_root)
-    unchanged_metadata = JSON.parse(File.read(metadata_path))
+    unchanged_metadata = JSON.parse(File.read(metadata_path, encoding: "UTF-8"))
     unchanged = unchanged_metadata["versions"].first
     expect(unchanged["published_at"]).to eq(1_577_836_800)
     expect(unchanged["yanked"]).to be(true)
+    expect(unchanged["derived_metadata"]).to be_a(Hash)
+    expect(unchanged["derived_metadata"]["summary"]).to be_a(String)
+    expect(unchanged["derived_metadata"]["summary"]).not_to be_empty
     described_class.publish_to_root(project, publish_root)
-    expect(JSON.parse(File.read(metadata_path))).to eq(unchanged_metadata)
+    expect(JSON.parse(File.read(metadata_path, encoding: "UTF-8"))).to eq(unchanged_metadata)
 
     # A second publisher over unchanged packages must not restate authorship of bytes
     # nobody rebuilt, or one maintainer's release buries itself in the other's identity.
     described_class.publish_to_root(project, publish_root, signer: "replacement")
-    expect(JSON.parse(File.read(metadata_path))).to eq(unchanged_metadata)
+    expect(JSON.parse(File.read(metadata_path, encoding: "UTF-8"))).to eq(unchanged_metadata)
 
     prayspec_path = File.join(project_dir, "prayers", "base", "sample-base.prayspec")
     File.write(prayspec_path, File.read(prayspec_path).sub("small guidance bundle", "revised guidance bundle"))
     specification_project = Pray::Resolve.resolve_project(File.join(project_dir, "Prayfile"))
     described_class.publish_to_root(specification_project, publish_root, signer: "replacement")
-    specification_changed = JSON.parse(File.read(metadata_path))["versions"].first
+    specification_changed = JSON.parse(File.read(metadata_path, encoding: "UTF-8"))["versions"].first
     expect(specification_changed["signer"]).to eq("replacement")
     expect(specification_changed["artifact_hash"]).not_to eq(unchanged["artifact_hash"])
     expect(specification_changed["published_at"]).not_to eq(1_577_836_800)
@@ -73,8 +76,51 @@ RSpec.describe Pray::Publish do
     File.write(File.join(project_dir, "prayers", "base", "README.md"), "Changed package\n")
     changed_project = Pray::Resolve.resolve_project(File.join(project_dir, "Prayfile"))
     described_class.publish_to_root(changed_project, publish_root)
-    changed = JSON.parse(File.read(metadata_path))["versions"].first
+    changed = JSON.parse(File.read(metadata_path, encoding: "UTF-8"))["versions"].first
     expect(changed["artifact_hash"]).not_to eq(specification_changed["artifact_hash"])
+  end
+
+  it "keeps historical derived_metadata when appending a version" do
+    project_dir = File.join(workspace, "project")
+    publish_root = File.join(workspace, "dist")
+    FileUtils.cp_r(simple_project, project_dir)
+    project = Pray::Resolve.resolve_project(File.join(project_dir, "Prayfile"))
+    described_class.publish_to_root(project, publish_root)
+
+    metadata_path = File.join(publish_root, "v1", "packages", "sample", "base.json")
+    metadata = JSON.parse(File.read(metadata_path, encoding: "UTF-8"))
+    historical = {
+      "version" => "1.0.0",
+      "artifact" => "v1/artifacts/sample/base/1.0.0/sample-base-1.0.0.praypkg",
+      "yanked" => false,
+      "targets" => [],
+      "exports" => [],
+      "derived_metadata" => {
+        "summary" => "historical summary",
+        "topics" => ["cache"],
+        "categories" => ["general"],
+        "possible_effects" => ["improves package discovery"],
+        "possible_side_effects" => [],
+        "embeddings" => [{"model" => "pray-hash-bucket-v1", "vector" => [1] * 16}],
+        "file_count" => 2,
+        "character_count" => 40,
+        "token_count" => 8
+      }
+    }
+    metadata["versions"].unshift(historical)
+    File.write(metadata_path, JSON.pretty_generate(metadata), encoding: "UTF-8")
+
+    prayspec_path = File.join(project_dir, "prayers", "base", "sample-base.prayspec")
+    File.write(prayspec_path, File.read(prayspec_path).sub("1.4.3", "1.4.4"))
+    next_project = Pray::Resolve.resolve_project(File.join(project_dir, "Prayfile"))
+    described_class.publish_to_root(next_project, publish_root)
+
+    rewritten = JSON.parse(File.read(metadata_path, encoding: "UTF-8"))
+    historical_row = rewritten["versions"].find { |entry| entry["version"] == "1.0.0" }
+    expect(historical_row["derived_metadata"]).to eq(historical["derived_metadata"])
+    tip = rewritten["versions"].find { |entry| entry["version"] == "1.4.4" }
+    expect(tip["derived_metadata"]).to be_a(Hash)
+    expect(tip["derived_metadata"]["summary"]).not_to be_empty
   end
 
   it "writes a torrent descriptor when the root lists torrent" do

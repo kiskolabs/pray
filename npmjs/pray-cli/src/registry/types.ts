@@ -1,3 +1,5 @@
+import type { RegistryDerivedMetadata } from "./derived-metadata.js";
+
 export interface RegistryPackageVersion {
   version: string;
   artifact: string;
@@ -10,6 +12,7 @@ export interface RegistryPackageVersion {
   signerFingerprint?: string;
   publishedAt?: number;
   signature?: string;
+  derivedMetadata?: RegistryDerivedMetadata;
 }
 
 export interface RegistryPackageMetadata {

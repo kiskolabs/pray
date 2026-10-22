@@ -2,6 +2,7 @@ import { join } from "node:path";
 import { buildPackageArchiveBytes } from "../archive/praypkg.js";
 import { allowsTorrent, readDistributionSettings } from "../distribution.js";
 import { sha256Prefixed } from "../hashing.js";
+import { deriveRegistryDerivedMetadataFromRoot } from "../registry/derived-metadata.js";
 import { httpPut, joinUrl } from "../http/client.js";
 import { requireReleaseVersion } from "../package-spec/index.js";
 import { registryArtifactSignature } from "../registry/index.js";
@@ -202,6 +203,10 @@ function publishedRegistryPackageVersion(
       packageEntry.treeHash,
       signer,
     ),
+    derivedMetadata: deriveRegistryDerivedMetadataFromRoot(
+      packageEntry.root,
+      packageEntry.spec,
+    ),
   };
 }
 
@@ -219,4 +224,5 @@ function preserveExistingPublishMetadata(
   if (storedArtifact !== undefined) {
     versionEntry.publishedAt = existing.publishedAt;
   }
+  versionEntry.derivedMetadata ??= existing.derivedMetadata;
 }

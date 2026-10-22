@@ -113,5 +113,6 @@ function versionToHash(entry: RegistryPackageVersion): Record<string, unknown> {
     hash.signer_fingerprint = entry.signerFingerprint;
   if (entry.publishedAt !== undefined) hash.published_at = entry.publishedAt;
   if (entry.signature) hash.signature = entry.signature;
+  if (entry.derivedMetadata) hash.derived_metadata = entry.derivedMetadata;
   return hash;
 }

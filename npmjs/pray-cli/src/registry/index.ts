@@ -22,6 +22,7 @@ import {
   validatePackageName,
 } from "../sync/path-safety.js";
 import { registryCacheDirectory } from "./cache.js";
+import { derivedMetadataFromHash } from "./derived-metadata.js";
 import { installArtifactToCache, requireIntegrityFields } from "./install.js";
 
 export { registryCacheDirectory } from "./cache.js";
@@ -203,6 +204,7 @@ export function versionFromHash(
       : undefined,
     publishedAt: publishTimestampFromValue(entry.published_at),
     signature: entry.signature ? String(entry.signature) : undefined,
+    derivedMetadata: derivedMetadataFromHash(entry.derived_metadata),
   };
 }
 
