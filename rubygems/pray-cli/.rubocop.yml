@@ -194,6 +194,7 @@ Metrics/AbcSize:
     - lib/pray/manifest.rb
     - lib/pray/materialize.rb
     - lib/pray/package_spec.rb
+    - lib/pray/publish.rb
     - lib/pray/render.rb
     - lib/pray/resolve.rb
     - lib/pray/sync.rb

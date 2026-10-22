@@ -1,4 +1,4 @@
-import { existsSync, realpathSync, readdirSync, readFileSync } from "node:fs";
+import { existsSync, readdirSync, readFileSync, realpathSync } from "node:fs";
 import { join } from "node:path";
 import { gitSourceCacheDirectory } from "./paths.js";
 import { globalGitCacheDirectory, globalGitCacheReady } from "./store.js";
@@ -31,10 +31,7 @@ export function isGitCheckout(path: string): boolean {
   return existsSync(join(path, ".git"));
 }
 
-function stubGitDir(
-  catalog: string,
-  expected: string,
-): string | undefined {
+function stubGitDir(catalog: string, expected: string): string | undefined {
   const marker = join(catalog, GIT_DIR_MARKER);
   if (!existsSync(marker)) {
     return undefined;

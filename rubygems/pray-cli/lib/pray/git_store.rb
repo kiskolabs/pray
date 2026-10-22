@@ -93,15 +93,13 @@ module Pray
       FileUtils.mkdir_p(File.dirname(lock_directory))
       acquired = false
       LOCK_ATTEMPTS.times do
-        begin
-          Dir.mkdir(lock_directory)
-          write_lock_owner!(lock_directory)
-          acquired = true
-          break
-        rescue Errno::EEXIST
-          clear_stale_lock!(lock_directory)
-          sleep LOCK_RETRY_SECONDS
-        end
+        Dir.mkdir(lock_directory)
+        write_lock_owner!(lock_directory)
+        acquired = true
+        break
+      rescue Errno::EEXIST
+        clear_stale_lock!(lock_directory)
+        sleep LOCK_RETRY_SECONDS
       end
       unless acquired
         raise Error.resolution(

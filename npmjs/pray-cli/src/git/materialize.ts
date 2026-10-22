@@ -127,7 +127,10 @@ function unpackArchivePrefix(
       maxBuffer: MAX_ARCHIVE_TOTAL_BYTES + 1,
     },
   );
-  if (archive.error && (archive.error as NodeJS.ErrnoException).code === "ENOBUFS") {
+  if (
+    archive.error &&
+    (archive.error as NodeJS.ErrnoException).code === "ENOBUFS"
+  ) {
     throw PrayError.integrity(
       `git catalog archive exceeds ${MAX_ARCHIVE_TOTAL_BYTES} bytes`,
     );

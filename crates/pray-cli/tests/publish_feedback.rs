@@ -100,16 +100,16 @@ fn publish_verbose_includes_detail_lines() {
 }
 
 #[test]
-fn quiet_and_verbose_are_documented_as_publish_scoped() {
+fn quiet_and_verbose_are_documented_as_status_stdout() {
     let help = assert_success(run_pray_cwd(&["--help"]));
     let stdout = String::from_utf8_lossy(&help.stdout);
     assert!(
-        stdout.contains("suppress publish status stdout"),
-        "quiet help should name publish scope:\n{stdout}"
+        stdout.contains("suppress non-error status stdout"),
+        "quiet help should name status stdout:\n{stdout}"
     );
     assert!(
-        stdout.contains("extra publish detail on stdout"),
-        "verbose help should name publish scope:\n{stdout}"
+        stdout.contains("extra status detail on stdout"),
+        "verbose help should name status detail:\n{stdout}"
     );
 }
 

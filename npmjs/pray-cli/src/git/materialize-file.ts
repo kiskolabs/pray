@@ -169,7 +169,10 @@ function acceptableRevision(revision: string): boolean {
 }
 
 function acceptableSharedBare(gitDir: string): boolean {
-  if (!existsSync(join(gitDir, "HEAD")) || !existsSync(join(gitDir, "objects"))) {
+  if (
+    !existsSync(join(gitDir, "HEAD")) ||
+    !existsSync(join(gitDir, "objects"))
+  ) {
     return false;
   }
   const root = globalCacheRoot();

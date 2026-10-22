@@ -2,14 +2,19 @@
 
 ## Unreleased
 
-## 1.22.0 (2026-10-21)
+## 1.22.0 (2026-10-22)
 
 - Ignore leftover project git full clones when resolving a shared bare or stub catalog. Install renames those leftovers so they cannot shadow the locked revision.
 - Print a pray-level recovery hint when a locked git revision is missing from the shared bare or when catalog checkout fails.
 - On path-fork upstream merge conflict, name the reset-then-rebrand workflow and tag the error as `upstream_merge_conflict`. `pray update --help` documents the same steps.
-- Print `published` / `unchanged` lines and a count footer after `pray publish` (same shape as `--dry-run`). Add global `-q`/`--quiet` and `-v`/`--verbose` for publish status stdout. Redact URL userinfo in those lines.
+- Print `published` / `unchanged` lines and a count footer after `pray publish` (same shape as `--dry-run`). Add global `-q`/`--quiet` and `-v`/`--verbose` for non-error status stdout across publish, apply, install, plan, doctor, unlock, update, outdated, and would-conflict. Redact URL userinfo in publish and doctor lines.
 - Conflict when a path fork deleted an upstream file and upstream later changes that file, instead of restoring it silently.
 - Publish shared bare git clones through a temporary directory, `*.lock.d`, and `.pray-ready` marker. Prefer `git show` for lazy catalog fill; set `GIT_NO_LAZY_FETCH` when offline.
+- Bound git catalog archive and `git show` blob fills to the same size ceilings as `.praypkg` unpack; probe sizes before buffering; unpack through the shared tar validators instead of system tar.
+- Publish project git catalogs through staging, an advisory lock, and atomic rename; refuse stub `.pray-git-dir` paths that are not the expected shared bare.
+- Recover stale git cache lock directories after ten minutes; wait up to about one minute for a live lock; name the lock path on timeout.
+- Lock catalog file fill and publish blobs through a partial rename; re-check catalog match under the materialize lock.
+- Refuse absolute federation and torrent artifact URLs; refuse URL-shaped registry and catalog artifact paths; validate prayspec member paths on parse and tree hash.
 - Make `pray update --latest --dry-run` list would-conflict path-fork paths before write.
 
 ## 1.21.0 (2026-10-21)

@@ -1,9 +1,9 @@
 import assert from "node:assert/strict";
+import { spawnSync } from "node:child_process";
 import { mkdirSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { describe, it } from "node:test";
-import { spawnSync } from "node:child_process";
 import {
   gitSourceCacheDirectory,
   gitSourceCachedRepository,
@@ -64,7 +64,10 @@ describe("git source cache directory", () => {
   });
 
   it("rejects a stub .pray-git-dir outside the expected global bare", () => {
-    const root = join(tmpdir(), `pray-git-stub-wrong-${process.pid}-${Date.now()}`);
+    const root = join(
+      tmpdir(),
+      `pray-git-stub-wrong-${process.pid}-${Date.now()}`,
+    );
     const cloneUrl = "file://repo";
     const previous = process.env.PRAY_CACHE;
     process.env.PRAY_CACHE = join(root, "global-cache");

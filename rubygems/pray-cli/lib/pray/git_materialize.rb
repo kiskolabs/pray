@@ -68,7 +68,7 @@ module Pray
         File.rename(dest, backup)
         begin
           File.rename(staging, dest)
-        rescue StandardError
+        rescue
           File.rename(backup, dest) if File.exist?(backup)
           FileUtils.rm_rf(staging)
           raise
@@ -244,7 +244,7 @@ module Pray
       partial = "#{full_path}.partial"
       File.binwrite(partial, bytes)
       File.rename(partial, full_path)
-    rescue StandardError
+    rescue
       FileUtils.rm_f(partial)
       raise
     end

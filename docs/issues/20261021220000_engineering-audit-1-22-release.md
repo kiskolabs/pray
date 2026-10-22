@@ -38,8 +38,8 @@ Deferred items implemented in this follow-up batch:
 
 ## Next
 
-- After tag of the follow-up cut: crates.io, npm, RubyGems, GitHub Release, Homebrew.
-- Second-iteration audit residuals (separate notes): pre-buffer size probes for git archive/show; lock stale recovery; catalog reader lock; federation/torrent absolute artifact policy; marker readers enforcing expected bare; remaining quiet writers on update/outdated listings.
+- Follow-up deferred batch and iteration-2 residuals are in the 1.22.0 release prep: docs/issues/20261022091000_prepare-1-22-0-release.md.
+- After tag of v1.22.0: crates.io, npm, RubyGems, GitHub Release, Homebrew.
 
 ## Source
 

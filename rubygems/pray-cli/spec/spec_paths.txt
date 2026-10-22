@@ -19,6 +19,7 @@ spec/pray/format_manifest_spec.rb
 spec/pray/git_clone_spec.rb
 spec/pray/git_distribution_spec.rb
 spec/pray/git_host_environment_spec.rb
+spec/pray/git_materialize_recovery_spec.rb
 spec/pray/git_pinned_fetch_spec.rb
 spec/pray/git_refresh_spec.rb
 spec/pray/git_sources_spec.rb

@@ -31,7 +31,9 @@ Addressed in the residual pass:
 
 ## Next
 
-None for this residual list. Open a new live-work note only if a later audit finds a distinct gap.
+Residual list is in the 1.22.0 release prep. Open a new live-work note only if a later audit finds a distinct gap.
+
+Later pass 20261022091000: folded into CHANGELOG 1.22.0 dated 2026-10-22. See docs/issues/20261022091000_prepare-1-22-0-release.md.
 
 ## Source
 
