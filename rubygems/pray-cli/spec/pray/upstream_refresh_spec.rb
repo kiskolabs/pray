@@ -76,7 +76,7 @@ RSpec.describe "package upstream refresh" do
     catalog = catalog_after_upstream_bump("~> 1.4")
     prayers = File.join(workspace, "catalog-prayers")
     Dir.chdir(catalog) { Pray::CLI.run(["publish", "--root", prayers]) }
-    metadata = JSON.parse(File.read(File.join(prayers, "v1/packages/fork/base.json")))
+    metadata = JSON.parse(File.read(File.join(prayers, "v1/packages/fork/base.json"), encoding: "UTF-8"))
     expect(metadata["name"]).to eq("fork/base")
     expect(metadata["versions"].first.keys).not_to include("upstream")
     spec = File.read(File.join(catalog, "packages/fork-base/fork-base.prayspec"))

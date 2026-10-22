@@ -141,7 +141,9 @@ function topTopics(text: string): string[] {
     counts.set(token, (counts.get(token) ?? 0) + 1);
   }
   return [...counts.entries()]
-    .sort((left, right) => right[1] - left[1] || left[0].localeCompare(right[0]))
+    .sort(
+      (left, right) => right[1] - left[1] || left[0].localeCompare(right[0]),
+    )
     .slice(0, 5)
     .map(([token]) => token);
 }
@@ -149,17 +151,33 @@ function topTopics(text: string): string[] {
 function inferCategories(text: string): string[] {
   const lowered = text.toLowerCase();
   const categories: string[] = [];
-  if (containsAny(lowered, ["guide", "guidance", "readme", "documentation", "doc"])) {
+  if (
+    containsAny(lowered, [
+      "guide",
+      "guidance",
+      "readme",
+      "documentation",
+      "doc",
+    ])
+  ) {
     categories.push("documentation");
   }
   if (containsAny(lowered, ["test", "testing", "fixture", "spec"])) {
     categories.push("testing");
   }
-  if (containsAny(lowered, ["auth", "security", "ssh", "key", "sign", "trust"])) {
+  if (
+    containsAny(lowered, ["auth", "security", "ssh", "key", "sign", "trust"])
+  ) {
     categories.push("security");
   }
   if (
-    containsAny(lowered, ["automation", "workflow", "render", "pipeline", "agent"])
+    containsAny(lowered, [
+      "automation",
+      "workflow",
+      "render",
+      "pipeline",
+      "agent",
+    ])
   ) {
     categories.push("automation");
   }
@@ -181,7 +199,16 @@ function inferPossibleEffects(categories: string[]): string[] {
 
 function inferPossibleSideEffects(text: string, topics: string[]): string[] {
   const sideEffects: string[] = [];
-  if (containsAny(text, ["write", "overwrite", "replace", "render", "inject", "delete"])) {
+  if (
+    containsAny(text, [
+      "write",
+      "overwrite",
+      "replace",
+      "render",
+      "inject",
+      "delete",
+    ])
+  ) {
     sideEffects.push("may change generated output or managed files");
   }
   if (containsAny(topics.join(" "), ["publish", "release", "deploy"])) {
@@ -215,7 +242,10 @@ function containsAny(text: string, needles: string[]): boolean {
   return needles.some((needle) => text.includes(needle));
 }
 
-function pushCandidate(candidates: string[], candidate: string | undefined): void {
+function pushCandidate(
+  candidates: string[],
+  candidate: string | undefined,
+): void {
   const trimmed = candidate?.trim() ?? "";
   if (!trimmed) return;
   candidates.push(truncate(trimmed, MAX_SNIPPET_LENGTH));

@@ -19,13 +19,40 @@ module Pray
     ].freeze
 
     def from_package_root(root, spec)
+      analysis = analyze_package_files(root, spec)
+      summary_candidates = collect_spec_summary_candidates(spec)
+      analysis.fetch(:sample_lines).each { |line| push_candidate(summary_candidates, line) }
+      analyzed_text = analysis.fetch(:analyzed_text)
+      if summary_candidates.empty?
+        top_topics(analyzed_text).each { |token| push_candidate(summary_candidates, token) }
+      end
+
+      tokens = tokenize(analyzed_text)
+      topics = top_topics(analyzed_text)
+      categories = infer_categories("#{summary_candidates.join(" \n")} #{topics.join(" ")}")
+      {
+        "summary" => build_summary(summary_candidates),
+        "topics" => topics,
+        "categories" => categories,
+        "possible_effects" => infer_possible_effects(categories),
+        "possible_side_effects" => infer_possible_side_effects(analyzed_text, topics),
+        "embeddings" => [{"model" => EMBEDDING_MODEL, "vector" => hashed_embedding(tokens)}],
+        "file_count" => analysis.fetch(:file_count),
+        "character_count" => analysis.fetch(:character_count),
+        "token_count" => tokens.length
+      }
+    end
+
+    def collect_spec_summary_candidates(spec)
       summary_candidates = []
       push_candidate(summary_candidates, spec.summary)
       push_candidate(summary_candidates, spec.description)
-      spec.exports.each_value do |export|
-        push_candidate(summary_candidates, export.summary)
-      end
+      spec.exports.each_value { |export| push_candidate(summary_candidates, export.summary) }
+      summary_candidates
+    end
+    private_class_method :collect_spec_summary_candidates
 
+    def analyze_package_files(root, spec)
       analyzed_text = +""
       sample_lines = []
       file_count = 0
@@ -39,31 +66,12 @@ module Pray
         push_candidate(sample_lines, line) if line
         file_count += 1
         character_count += normalized.chars.count
-        analyzed_text << normalized
-        analyzed_text << "\n"
+        analyzed_text << normalized << "\n"
       end
-
-      sample_lines.each { |line| push_candidate(summary_candidates, line) }
-      if summary_candidates.empty?
-        top_topics(analyzed_text).each { |token| push_candidate(summary_candidates, token) }
-      end
-
-      summary = build_summary(summary_candidates)
-      tokens = tokenize(analyzed_text)
-      topics = top_topics(analyzed_text)
-      categories = infer_categories("#{summary_candidates.join(" \n")} #{topics.join(' ')}")
-      {
-        "summary" => summary,
-        "topics" => topics,
-        "categories" => categories,
-        "possible_effects" => infer_possible_effects(categories),
-        "possible_side_effects" => infer_possible_side_effects(analyzed_text, topics),
-        "embeddings" => [{"model" => EMBEDDING_MODEL, "vector" => hashed_embedding(tokens)}],
-        "file_count" => file_count,
-        "character_count" => character_count,
-        "token_count" => tokens.length
-      }
+      {analyzed_text: analyzed_text, sample_lines: sample_lines, file_count: file_count,
+       character_count: character_count}
     end
+    private_class_method :analyze_package_files
 
     def from_archive_bytes(archive_bytes)
       Dir.mktmpdir("pray-derived-metadata-") do |directory|
@@ -179,7 +187,7 @@ module Pray
     private_class_method :first_meaningful_line
 
     def truncate(text, limit)
-      text.chars.take(limit).join
+      text[0...limit].chars.join
     end
     private_class_method :truncate
   end

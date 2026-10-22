@@ -2,10 +2,9 @@
 
 ## Unreleased
 
-- Keep and create catalog `derived_metadata` on publish. Unchanged republishes and version appends no longer strip historical summaries, topics, or embeddings.
-
 ## 1.22.0 (2026-10-22)
 
+- Keep and create catalog `derived_metadata` on publish. Unchanged republishes and version appends no longer strip historical summaries, topics, or embeddings.
 - Ignore leftover project git full clones when resolving a shared bare or stub catalog. Install renames those leftovers so they cannot shadow the locked revision.
 - Print a pray-level recovery hint when a locked git revision is missing from the shared bare or when catalog checkout fails.
 - On path-fork upstream merge conflict, name the reset-then-rebrand workflow and tag the error as `upstream_merge_conflict`. `pray update --help` documents the same steps.
