@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+- Leave package catalog JSON bytes alone when `pray publish` reports a version unchanged. A load and rewrite round trip no longer strips trailing newlines or reorders keys such as `artifact_hash` relative to `yanked`.
+
 ## 1.22.0 (2026-10-22)
 
 - Keep and create catalog `derived_metadata` when the Ruby or TypeScript CLI publishes to a distribution root. Unchanged republishes and version appends no longer strip historical summaries, topics, or embeddings.

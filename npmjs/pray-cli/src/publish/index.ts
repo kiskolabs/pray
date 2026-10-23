@@ -84,7 +84,7 @@ export async function publishToRoot(
       storedPublishMatches(storedArtifact, packageEntry, existing)
     ) {
       packageNames.add(packageEntry.declaration.name);
-      writeRegistryPackageMetadata(metadataPath, metadata);
+      // Intent: unchanged packages keep on-disk catalog bytes (newline, key order).
       reportUnchanged(packageEntry, destName, target);
       stats.unchanged += 1;
       continue;

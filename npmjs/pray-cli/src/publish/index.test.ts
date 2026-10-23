@@ -34,24 +34,28 @@ describe("publish", () => {
     assert.ok(initial);
     initial.published_at = "2020-01-01T00:00:00.123Z";
     initial.yanked = true;
-    writeFileSync(metadataPath, JSON.stringify(metadata, null, 2));
+    const catalogBytes = `${JSON.stringify(metadata, null, 2)}\n`;
+    writeFileSync(metadataPath, catalogBytes);
 
     await publishToRoot(project, distributionRoot);
+    assert.equal(readFileSync(metadataPath, "utf8"), catalogBytes);
     const unchangedMetadata = readMetadata(metadataPath);
     const unchanged = unchangedMetadata.versions[0];
     assert.ok(unchanged);
-    assert.equal(unchanged.published_at, 1_577_836_800);
+    assert.equal(unchanged.published_at, "2020-01-01T00:00:00.123Z");
     assert.equal(unchanged.yanked, true);
     assert.equal(typeof unchanged.derived_metadata, "object");
     assert.ok(unchanged.derived_metadata);
     assert.equal(typeof unchanged.derived_metadata.summary, "string");
     assert.ok(unchanged.derived_metadata.summary.length > 0);
     await publishToRoot(project, distributionRoot);
+    assert.equal(readFileSync(metadataPath, "utf8"), catalogBytes);
     assert.deepEqual(readMetadata(metadataPath), unchangedMetadata);
 
     // A second publisher over unchanged packages must not restate authorship of bytes
     // nobody rebuilt, or one maintainer's release buries itself in the other's identity.
     await publishToRoot(project, distributionRoot, "replacement");
+    assert.equal(readFileSync(metadataPath, "utf8"), catalogBytes);
     assert.deepEqual(readMetadata(metadataPath), unchangedMetadata);
     const preserved = unchangedMetadata.versions[0];
     assert.ok(preserved);

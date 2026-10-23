@@ -34,7 +34,7 @@ module Pray
         stored_artifact = stored_package_artifact(root, artifact_path, package, existing, distribution)
         if stored_artifact && stored_publish_matches?(stored_artifact, package, existing)
           package_names << package.declaration.name
-          write_registry_package_metadata(metadata_path, metadata)
+          # Intent: unchanged packages keep on-disk catalog bytes (newline, key order).
           report_unchanged(package, dest_name, target)
           stats[:unchanged] += 1
           next

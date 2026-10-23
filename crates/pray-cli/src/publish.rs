@@ -140,7 +140,7 @@ pub(crate) fn publish_to_root(
                 })
         {
             package_names.insert(package.declaration.name.clone());
-            write_registry_package_metadata(&metadata_path, &metadata)?;
+            // Intent: unchanged packages keep on-disk catalog bytes (newline, key order).
             report_unchanged(package, label.dest_name, label.target);
             stats.unchanged += 1;
             continue;

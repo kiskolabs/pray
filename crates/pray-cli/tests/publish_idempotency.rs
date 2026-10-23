@@ -24,17 +24,24 @@ fn republish_preserves_timestamp_and_yank_until_package_content_changes() {
     let mut metadata = read_metadata(&metadata_path);
     metadata["versions"][0]["published_at"] = Value::String("1234567890".to_string());
     metadata["versions"][0]["yanked"] = Value::Bool(true);
-    fs::write(
-        &metadata_path,
-        serde_json::to_string_pretty(&metadata).expect("serialize metadata"),
-    )
-    .expect("write metadata");
+    let mut catalog_bytes = serde_json::to_vec_pretty(&metadata).expect("serialize metadata");
+    catalog_bytes.push(b'\n');
+    fs::write(&metadata_path, &catalog_bytes).expect("write metadata");
 
     publish(&repo, &registry_root);
+    let unchanged_bytes = fs::read(&metadata_path).expect("read unchanged catalog");
+    assert_eq!(
+        unchanged_bytes, catalog_bytes,
+        "unchanged republish must leave catalog bytes alone"
+    );
     let unchanged = read_metadata(&metadata_path);
-    assert_eq!(unchanged["versions"][0]["published_at"], 1_234_567_890_u64);
+    assert_eq!(unchanged["versions"][0]["published_at"], "1234567890");
     assert_eq!(unchanged["versions"][0]["yanked"], true);
     publish(&repo, &registry_root);
+    assert_eq!(
+        fs::read(&metadata_path).expect("read catalog after second republish"),
+        unchanged_bytes
+    );
     assert_eq!(read_metadata(&metadata_path), unchanged);
 
     let prayspec_path = repo.join("packages/base/sample-base.prayspec");

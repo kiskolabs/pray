@@ -45,22 +45,27 @@ RSpec.describe Pray::Publish do
     metadata = JSON.parse(File.read(metadata_path, encoding: "UTF-8"))
     metadata["versions"].first["published_at"] = "2020-01-01T00:00:00.999Z"
     metadata["versions"].first["yanked"] = true
-    File.write(metadata_path, JSON.pretty_generate(metadata), encoding: "UTF-8")
+    catalog_bytes = "#{JSON.pretty_generate(metadata)}\n".b
+    File.binwrite(metadata_path, catalog_bytes)
 
     described_class.publish_to_root(project, publish_root)
+    unchanged_bytes = File.binread(metadata_path)
+    expect(unchanged_bytes).to eq(catalog_bytes)
     unchanged_metadata = JSON.parse(File.read(metadata_path, encoding: "UTF-8"))
     unchanged = unchanged_metadata["versions"].first
-    expect(unchanged["published_at"]).to eq(1_577_836_800)
+    expect(unchanged["published_at"]).to eq("2020-01-01T00:00:00.999Z")
     expect(unchanged["yanked"]).to be(true)
     expect(unchanged["derived_metadata"]).to be_a(Hash)
     expect(unchanged["derived_metadata"]["summary"]).to be_a(String)
     expect(unchanged["derived_metadata"]["summary"]).not_to be_empty
     described_class.publish_to_root(project, publish_root)
+    expect(File.binread(metadata_path)).to eq(unchanged_bytes)
     expect(JSON.parse(File.read(metadata_path, encoding: "UTF-8"))).to eq(unchanged_metadata)
 
     # A second publisher over unchanged packages must not restate authorship of bytes
     # nobody rebuilt, or one maintainer's release buries itself in the other's identity.
     described_class.publish_to_root(project, publish_root, signer: "replacement")
+    expect(File.binread(metadata_path)).to eq(unchanged_bytes)
     expect(JSON.parse(File.read(metadata_path, encoding: "UTF-8"))).to eq(unchanged_metadata)
 
     prayspec_path = File.join(project_dir, "prayers", "base", "sample-base.prayspec")
