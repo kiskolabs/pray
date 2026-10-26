@@ -14,7 +14,24 @@ release_fetch_http_status() {
 release_npm_already_exists() {
   local output="$1"
   [[ "${output}" == *"cannot publish over the previously published versions"* ]] ||
-    [[ "${output}" == *"EPUBLISHCONFLICT"* ]]
+    [[ "${output}" == *"previously staged version"* ]] ||
+    [[ "${output}" == *"EPUBLISHCONFLICT"* ]] ||
+    [[ "${output}" == *"code E409"* ]]
+}
+
+# After a publish attempt, the registry can return E409 for a staged version before
+# GET /package/version is 200. Wait briefly so release-all can skip and continue.
+release_npm_wait_for_version() {
+  local package="$1"
+  local version="$2"
+  local attempt
+  for attempt in 1 2 3 4 5 6 7 8; do
+    if release_npm_has_version "${package}" "${version}"; then
+      return 0
+    fi
+    sleep 2
+  done
+  return 1
 }
 
 release_rubygems_already_exists() {

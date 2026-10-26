@@ -6,15 +6,15 @@ Andrei Makarov
 
 ## Decisions
 
-Stop piping npm publish through tee. That change from the skip-if-published work caused EOTP under make release-all. Restore a direct terminal npm publish like before. Detect already-published races with a registry version check after a failed publish. Accept NPM_OTP for authenticator 2FA.
+Stop piping npm publish through tee so browser/device 2FA can finish. After a failed publish, wait for the registry version (covers E409 previously staged before GET is 200). JSR publish uses --allow-dirty so release-script edits do not abort resume.
 
 ## Effects
 
-PRAY_RELEASE_YES=1 make release-all failed at npm publish pray-core@1.24.0 with EOTP. Earlier successful releases used bare npm publish. Keeping /dev/tty on stdin while still piping stdout through tee was not enough; npm still exited with EOTP.
+PRAY_RELEASE_YES=1 make release-all failed at npm publish pray-core@1.24.0 with EOTP while tee stole the TTY. After restoring bare npm publish, browser auth worked, then E409 previously staged stopped the run instead of skipping. pray-core@1.24.0 is on npmjs; pray-cli@1.24.0 was still missing at that point.
 
 ## Next
 
-Resume with an authenticator code: NPM_OTP=<code> PRAY_RELEASE_YES=1 make release-all. Or publish once by hand from npmjs/pray-core then resume so skips cover the rest.
+Resume PRAY_RELEASE_YES=1 make release-all. pray-core should skip; continue with pray-cli, JSR, and RubyGems.
 
 ## Source
 

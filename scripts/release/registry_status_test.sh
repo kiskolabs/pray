@@ -23,6 +23,10 @@ npm_conflict='npm error code EPUBLISHCONFLICT
 npm error EPUBLISHCONFLICT Unable to publish overlapping ranges.'
 release_npm_already_exists "${npm_conflict}" || fail "npm EPUBLISHCONFLICT must skip"
 
+npm_staged='npm error code E409
+npm error 409 Conflict - PUT https://registry.npmjs.org/pray-core - Cannot publish over previously staged version "1.24.0".'
+release_npm_already_exists "${npm_staged}" || fail "npm previously staged E409 must skip"
+
 npm_other='npm error code EOTP
 npm error This operation requires a one-time password'
 release_npm_already_exists "${npm_other}" && fail "unrelated npm error must not skip"

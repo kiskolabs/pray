@@ -58,9 +58,11 @@ fi
 npm ci
 
 PUBLISH_ARGS=(publish)
+# Allow dirty trees: release-all often resumes with release-script or docs edits
+# that are not part of the published TypeScript sources.
+PUBLISH_ARGS+=(--allow-dirty)
 if [[ "${MODE}" == "dry-run" ]]; then
-  # Dry-run may run on a dirty tree while preparing a cut.
-  PUBLISH_ARGS+=(--dry-run --allow-dirty)
+  PUBLISH_ARGS+=(--dry-run)
 elif ! release_confirm "Publish ${JSR_PACKAGE}@${VERSION} to jsr.io?"; then
   echo "skipped jsr publish"
   exit 0

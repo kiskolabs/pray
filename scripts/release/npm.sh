@@ -80,18 +80,16 @@ publish_one() {
     fi
     echo "==> npm ${publish_args[*]} (${name})"
     set +e
-    # Same as pre-skip path: attach to the terminal. Piping through tee caused EOTP.
+    # Keep the real terminal so browser/device 2FA can finish (no pipes).
     npm "${publish_args[@]}"
     publish_status=$?
     set -e
     if [[ "${publish_status}" -eq 0 ]]; then
       :
-    elif release_npm_has_version "${name}" "${VERSION}"; then
+    elif release_npm_wait_for_version "${name}" "${VERSION}"; then
+      # E409 "previously staged" can land before GET /version is 200.
       echo "skip ${name}@${VERSION} (already on npmjs)"
     else
-      if [[ -z "${NPM_OTP:-}" ]]; then
-        echo "npm publish failed. For 2FA, rerun with NPM_OTP=<authenticator-code>." >&2
-      fi
       exit "${publish_status}"
     fi
   )
