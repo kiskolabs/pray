@@ -5,7 +5,9 @@
 #   scripts/release/rubygems.sh            # build only (default)
 #   scripts/release/rubygems.sh --publish  # gem push (manual)
 #
-# Requires: gem credentials (~/.gem/credentials) with MFA when enabled
+# Requires: gem credentials (~/.gem/credentials) with MFA when enabled.
+# Do not pipe gem push: a pipe hides the OTP / WebAuthn prompt under make release-all.
+# Already-published races are detected with a registry version check after failure.
 # Publish skips when pray-cli@version is already on RubyGems so release-all can resume.
 set -euo pipefail
 
@@ -73,20 +75,17 @@ else
     exit 0
   fi
   echo "==> gem push ${GEM_FILE}"
-  publish_log="$(mktemp)"
   set +e
-  gem push "${GEM_FILE}" 2>&1 | tee "${publish_log}"
-  publish_status="${PIPESTATUS[0]}"
+  # Keep the real terminal so OTP / WebAuthn can finish (no pipes).
+  gem push "${GEM_FILE}"
+  publish_status=$?
   set -e
-  outcome="$(
-    release_publish_outcome no "${publish_status}" release_rubygems_already_exists \
-      "$(cat "${publish_log}")" || true
-  )"
-  rm -f "${publish_log}"
-  if [[ "${outcome}" == "skip" ]]; then
-    echo "skip pray-cli@${VERSION} (already on RubyGems)"
-  elif [[ "${publish_status}" -ne 0 ]]; then
-    exit "${publish_status}"
+  if [[ "${publish_status}" -ne 0 ]]; then
+    if release_rubygems_has_version "pray-cli" "${VERSION}"; then
+      echo "skip pray-cli@${VERSION} (already on RubyGems)"
+    else
+      exit "${publish_status}"
+    fi
   fi
 fi
 

@@ -88,6 +88,8 @@ If a full publish stops after one or more registries succeed, resume with `make 
 
 npm publish with account 2FA: set `NPM_OTP` to an authenticator code for that run (`NPM_OTP=123456 make release-npm`). The script does not pipe `npm publish` (that broke 2FA with EOTP). CI should use a granular token that can publish without OTP.
 
+`gem push` uses the same rule: the script does not pipe it, so the RubyGems OTP or WebAuthn prompt stays on the terminal. Optional one-time code: `GEM_HOST_OTP_CODE`. After a failed push, a version already on RubyGems is skipped.
+
 Create or edit the GitHub Release for the workspace version:
 
 ```sh
