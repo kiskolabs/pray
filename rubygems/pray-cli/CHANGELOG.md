@@ -2,6 +2,10 @@
 
 ## Unreleased
 
+## 1.25.0 (2026-10-26)
+
+- Bump the gem version to 1.25.0 with the coordinated language-registry cut.
+
 ## 1.24.0 (2026-10-26)
 
 - Document `require "pray"` (library, no `Pray::CLI`) versus `require "pray-cli"` (library plus CLI).

@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+## 1.25.0 (2026-10-26)
+
 - Publish this CLI package to jsr.io as `@kiskolabs/pray-cli` (version synced with npm). Library imports stay on `pray-core` / `@kiskolabs/pray-core`.
 - Support Deno and Bun for `runCli` and the `pray` binary. Support Cloudflare Workers and browsers through `pray-cli/parse` (jsr `@kiskolabs/pray-cli/parse`), which re-exports `pray-core/parse`.
 

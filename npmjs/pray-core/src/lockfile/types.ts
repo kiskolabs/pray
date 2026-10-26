@@ -139,5 +139,5 @@ export function canonicalLockfile(lockfile: Lockfile): Lockfile {
 }
 
 /** Published package version string for this TypeScript surface. */
-export const PACKAGE_VERSION = "1.24.0";
+export const PACKAGE_VERSION = "1.25.0";
 export const GENERATED_BY = `pray ${PACKAGE_VERSION} (typescript)`;
