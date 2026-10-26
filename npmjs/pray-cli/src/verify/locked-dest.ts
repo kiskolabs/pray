@@ -5,6 +5,7 @@ import { readRegularBytes } from "../render/destination-io.js";
 import { markerPositions } from "./markers.js";
 import type { VerificationReport } from "./project.js";
 
+/** Inspect locked managed spans on disk without re-resolving the project. */
 export function inspectLockedDestinations(
   projectRoot: string,
   lockfile: Lockfile,

@@ -50,12 +50,16 @@ function lexicalNormalizePath(path: string): string {
   return `${prefix}${normalized.join("/")}`;
 }
 
+/** Project root directory containing the given Prayfile path. */
 export function projectRootFromManifest(manifestPath: string): string {
   const parent = resolve(manifestPath, "..");
   return parent.length === 0 ? "." : parent;
 }
 
-export function defaultManifestPath(workingDirectory = process.cwd()): string {
+/** Default Prayfile path for the working directory or active invocation. */
+export function defaultManifestPath(
+  workingDirectory: string = process.cwd(),
+): string {
   const active = activeInvocationContext();
   if (active) {
     return active.manifestPath;
@@ -63,7 +67,9 @@ export function defaultManifestPath(workingDirectory = process.cwd()): string {
   return resolve(workingDirectory, "Prayfile");
 }
 
-export function defaultProjectRoot(workingDirectory = process.cwd()): string {
+export function defaultProjectRoot(
+  workingDirectory: string = process.cwd(),
+): string {
   const active = activeInvocationContext();
   if (active) {
     return active.projectRoot;
@@ -71,6 +77,7 @@ export function defaultProjectRoot(workingDirectory = process.cwd()): string {
   return projectRootFromManifest(defaultManifestPath(workingDirectory));
 }
 
+/** Default `Prayfile.lock` path under the project root. */
 export function defaultLockfilePath(projectRoot: string): string {
   return resolve(projectRoot, "Prayfile.lock");
 }

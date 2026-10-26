@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+- Document `require "pray"` (library, no `Pray::CLI`) versus `require "pray-cli"` (library plus CLI).
+
 ## 1.23.0 (2026-10-26)
 
 - Leave package catalog JSON bytes alone when publish reports a version unchanged. A load and rewrite round trip no longer strips trailing newlines or reorders keys such as `artifact_hash` relative to `yanked`.

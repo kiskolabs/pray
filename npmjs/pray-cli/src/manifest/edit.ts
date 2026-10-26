@@ -41,6 +41,7 @@ export function removeManifestStatement(
   return `${lines.join("\n").replace(/\n*$/, "")}\n`;
 }
 
+/** Insert a package declaration into the Prayfile on disk. */
 export function addPackageToManifest(
   manifestPath: string,
   name: string,
@@ -69,6 +70,7 @@ export function addPackageToManifest(
   writeProjectFile(manifestPath, updated);
 }
 
+/** Remove a package declaration from the Prayfile on disk. */
 export function removePackageFromManifest(
   manifestPath: string,
   name: string,

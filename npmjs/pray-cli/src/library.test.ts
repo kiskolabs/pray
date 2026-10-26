@@ -2,6 +2,7 @@ import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
 import { resolve } from "node:path";
 import { describe, it } from "node:test";
+import * as library from "./index.js";
 import {
   inspectProject,
   lockfileHash,
@@ -13,6 +14,11 @@ import {
 } from "./index.js";
 
 describe("library API", () => {
+  it("keeps CLI dispatch off the library entrypoint", () => {
+    assert.equal("runCli" in library, false);
+    assert.equal("runTrustCommand" in library, false);
+  });
+
   it("exports manifest and lockfile parsers for embedding", () => {
     const manifest = parseManifest(`
 prayfile "1"

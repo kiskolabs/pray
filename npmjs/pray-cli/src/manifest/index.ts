@@ -17,6 +17,7 @@ import {
 } from "./types.js";
 import { validateManifestPaths } from "./validate.js";
 
+/** Read Prayfile text from disk, or throw {@link PrayError} when missing. */
 export function readManifestText(manifestPath: string): string {
   try {
     return readFileSync(manifestPath, "utf8");
@@ -36,6 +37,7 @@ export function readManifestText(manifestPath: string): string {
   }
 }
 
+/** Parse and validate Prayfile text into a {@link Manifest}. */
 export function parseManifest(text: string): Manifest {
   const manifest = parseManifestText(text);
   validateManifestPaths(manifest);
@@ -43,6 +45,7 @@ export function parseManifest(text: string): Manifest {
   return manifest;
 }
 
+/** Canonical hash of a manifest used for lockfile and resolve identity. */
 export function manifestHash(manifest: Manifest): string {
   const bytes = Buffer.from(JSON.stringify(manifestToJson(manifest)), "utf8");
   return sha256Prefixed(bytes);

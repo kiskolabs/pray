@@ -17,6 +17,7 @@ import { validateRelativePaths } from "./validate-paths.js";
 
 const PARSE_CONTEXT = "prayspec";
 
+/** Parse prayspec text into a {@link PackageSpec}. */
 export function parsePackageSpecText(text: string): PackageSpec {
   const parser = new BlockParser(prepareParserLines(text));
   return parser.parseRoot();

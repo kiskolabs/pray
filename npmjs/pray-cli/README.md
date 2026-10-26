@@ -39,6 +39,20 @@ pray publish --root ./prayers
 pray serve --root ./prayers --port 7429
 ```
 
+## Library vs CLI
+
+Import the library from the package root (or `@kiskolabs/pray-cli` on jsr.io). That entrypoint does not export CLI dispatch.
+
+```ts
+import { parseManifest, resolveProject } from "pray-cli";
+```
+
+Programmatic CLI dispatch uses the `pray-cli/cli` subpath (same module the `pray` binary loads):
+
+```ts
+import { runCli } from "pray-cli/cli";
+```
+
 ## Commands
 
 - `manifest`, `init`, `prayer init`, `repo init`

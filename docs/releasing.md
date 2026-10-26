@@ -48,7 +48,7 @@ Publish crates.io (order is handled by the script). A crate whose version is alr
 ./scripts/release/crates.sh --publish
 ```
 
-Publish npm, JSR, and RubyGems:
+Publish npm, JSR, and RubyGems. Each script skips when that version is already on the registry so `make release-all` can resume:
 
 ```sh
 ./scripts/release/npm.sh --publish
@@ -56,7 +56,7 @@ Publish npm, JSR, and RubyGems:
 ./scripts/release/rubygems.sh --publish
 ```
 
-First JSR publish needs the `@kiskolabs` scope and `pray-cli` package created on [jsr.io](https://jsr.io/new). Optional OS packaging notes live under [packaging/README.md](../packaging/README.md).
+First JSR publish needs the `@kiskolabs` scope and `pray-cli` package created on [jsr.io](https://jsr.io/new). For JSR score and provenance: set the package description and runtime compatibility (Node.js and Deno at minimum) under the package Settings tab; link the GitHub repository; prefer publishing via `.github/workflows/publish-jsr.yml` (OIDC) so the version gets a transparency-log provenance entry. Token publish from `scripts/release/jsr.sh` does not create provenance. Optional OS packaging notes live under [packaging/README.md](../packaging/README.md).
 
 Publish local prayer packages to a distribution point:
 

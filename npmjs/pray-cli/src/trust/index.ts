@@ -62,6 +62,7 @@ export function checkTrustPolicy(): string {
   return "trust check: no compromised key feed configured";
 }
 
+/** Run a `pray trust` subcommand against the given project root. */
 export async function runTrustCommand(
   argumentsList: string[],
   projectRoot: string,

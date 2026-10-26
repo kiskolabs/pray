@@ -2,6 +2,10 @@
 
 ## Unreleased
 
+- Skip npm, jsr.io, and RubyGems on `make release-all` when that version is already published, matching the crates.io resume path.
+- Keep TypeScript library imports free of CLI dispatch: `runCli` moves to `pray-cli/cli`; the package root and jsr.io `@kiskolabs/pray-cli` stay library-only. Document Ruby `require "pray"` versus `require "pray-cli"`.
+- Improve the jsr.io package for `@kiskolabs/pray-cli`: public API docs, typed exports without slow types, CI dry-run gate, and optional GitHub Actions OIDC publish for provenance. Description and runtime compatibility stay on the jsr.io Settings tab.
+
 ## 1.23.0 (2026-10-26)
 
 - Leave package catalog JSON bytes alone when `pray publish` reports a version unchanged. A load and rewrite round trip no longer strips trailing newlines or reorders keys such as `artifact_hash` relative to `yanked`.

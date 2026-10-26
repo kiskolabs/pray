@@ -2,6 +2,9 @@
 
 ## Unreleased
 
+- Document the public TypeScript library API for jsr.io (module and symbol docs). Require explicit types on exported defaults so JSR publish no longer needs `--allow-slow-types`.
+- Move `runCli` off the package root to `pray-cli/cli`. Library and jsr.io imports stay free of CLI dispatch; `runTrustCommand` is no longer re-exported from the root.
+
 ## 1.23.0 (2026-10-26)
 
 - Leave package catalog JSON bytes alone when publish reports a version unchanged. A load and rewrite round trip no longer strips trailing newlines or reorders keys such as `artifact_hash` relative to `yanked`.

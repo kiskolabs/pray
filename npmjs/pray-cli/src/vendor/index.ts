@@ -11,6 +11,7 @@ import type { ResolvedProject } from "../resolve/types.js";
 
 export { cleanUnusedRegistryCache } from "./clean.js";
 
+/** Copy resolved packages into `.pray/vendor` under the project root. */
 export function vendorProject(project: ResolvedProject): void {
   for (const packageEntry of project.packages) {
     const vendorRoot = join(

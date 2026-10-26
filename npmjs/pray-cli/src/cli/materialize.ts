@@ -26,14 +26,21 @@ import {
   resolveCurrentProjectWithGitRefreshFallback,
 } from "./invocation.js";
 
+/** Options for {@link materializeProject}: resolve, render, and write lockfile. */
 export interface MaterializeOptions {
+  /** Absolute or relative path to the Prayfile. */
   manifestPath?: string;
+  /** Require an existing lockfile and fail when resolution would change it. */
   frozen?: boolean;
+  /** Prefer locked versions without refreshing remote sources. */
   locked?: boolean;
+  /** Resolve without network access. */
   offline?: boolean;
+  /** Refresh pinned git source revisions during resolve. */
   refreshSourceRevisions?: boolean;
 }
 
+/** Resolve the project, render destinations, and update `Prayfile.lock` when needed. */
 export async function materializeProject(
   options: MaterializeOptions = {},
 ): Promise<void> {

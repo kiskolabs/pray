@@ -1,5 +1,8 @@
 # frozen_string_literal: true
 
+# Core library entry. Does not load Pray::CLI.
+# CLI consumers use require "pray-cli" or the pray executable.
+
 require_relative "pray/version"
 require_relative "pray/error"
 require_relative "pray/literal"

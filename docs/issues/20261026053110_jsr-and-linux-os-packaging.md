@@ -16,10 +16,12 @@ Andrei Makarov
 - `npmjs/pray-cli/jsr.json`, `scripts/release/jsr.sh`, and orchestration hooks land with version sync against npm.
 - Root `flake.nix` builds `pray-cli` from this workspace. `packaging/aur/pray-cli/PKGBUILD` builds the same binary from the GitHub tag tarball.
 - `packaging/README.md`, `docs/releasing.md`, `scripts/release/README.md`, and README install sections describe the new surfaces and the deferred Linux channels.
+- Later pass 20261026155200: public API JSDoc and no-slow-types dry-run; CI dry-run gate; `.github/workflows/publish-jsr.yml` for OIDC provenance. Description and runtime compatibility still set on jsr.io Settings.
 
 ## Next
 
-- Create `@kiskolabs` and package `pray-cli` on jsr.io; link the GitHub repository; run `scripts/release/jsr.sh --publish` for 1.23.0.
+- On jsr.io package Settings: set description (from npm package description), mark Node.js and Deno compatible (Bun optional), link the GitHub repository `kiskolabs/pray`.
+- Republish after symbol docs and slow-type fixes so the score reflects them; prefer `.github/workflows/publish-jsr.yml` for OIDC provenance (token publish does not create provenance).
 - Submit or adopt an AUR package from `packaging/aur/pray-cli`.
 - Open a nixpkgs PR once the flake derivation is proven on a Nix host (`nix build`, `nix run`).
 - When wanted: Debian or Ubuntu ITP or PPA, Fedora COPR or rpm, Guix; Flatpak and Snap stay low priority for a CLI binary.

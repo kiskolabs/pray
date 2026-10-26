@@ -19,6 +19,7 @@ import {
   type LockSource,
 } from "./types.js";
 
+/** Parse lockfile TOML text into a {@link Lockfile}. */
 export function parseLockfile(text: string): Lockfile {
   try {
     return parseLockfileValue(parse(text));
@@ -31,6 +32,7 @@ export function parseLockfile(text: string): Lockfile {
   }
 }
 
+/** Read and parse a lockfile from disk. */
 export function readLockfile(path: string): Lockfile {
   try {
     const text = readFileSync(path, "utf8");
@@ -44,18 +46,22 @@ export function readLockfile(path: string): Lockfile {
   }
 }
 
+/** True when two lockfiles serialize to the same canonical TOML. */
 export function lockfilesEquivalent(left: Lockfile, right: Lockfile): boolean {
   return serializeLockfile(left) === serializeLockfile(right);
 }
 
+/** Serialize a lockfile to canonical TOML text. */
 export function serializeLockfile(lockfile: Lockfile): string {
   return serializeLockfileText(lockfile);
 }
 
+/** Write a lockfile to disk, always overwriting. */
 export function writeLockfile(path: string, lockfile: Lockfile): void {
   writeProjectFile(path, serializeLockfile(lockfile));
 }
 
+/** Write a lockfile only when the on-disk contents would change. */
 export function writeLockfileIfChanged(path: string, lockfile: Lockfile): void {
   const serialized = serializeLockfile(lockfile);
   if (existsSync(path)) {
@@ -67,10 +73,12 @@ export function writeLockfileIfChanged(path: string, lockfile: Lockfile): void {
   writeProjectFile(path, serialized);
 }
 
+/** SHA-256 hash of the canonical lockfile serialization. */
 export function lockfileHash(lockfile: Lockfile): string {
   return sha256Prefixed(serializeLockfile(lockfile));
 }
 
+/** Build a lockfile from a resolved project and rendered destinations. */
 export function buildLockfile(input: {
   manifestHash: string;
   environment?: string;

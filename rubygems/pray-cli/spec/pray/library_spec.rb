@@ -9,6 +9,23 @@ RSpec.describe "Pray library API" do
     expect(output.strip).to eq("none")
   end
 
+  it "loads CLI when requiring pray-cli" do
+    library_root = File.expand_path("../../lib", __dir__)
+    output = `ruby -I#{library_root} -e 'require "pray-cli"; puts defined?(Pray::CLI)'`
+    expect(output.strip).to eq("constant")
+  end
+
+  it "exposes core workflow methods on Pray" do
+    expect(Pray).to respond_to(
+      :parse_manifest,
+      :resolve_project,
+      :render_project,
+      :materialize_project,
+      :verify_project,
+      :drift_project
+    )
+  end
+
   it "parses lockfile text without reading from disk" do
     lockfile = Pray.parse_lockfile(<<~LOCKFILE)
       prayfile_lock = "1"

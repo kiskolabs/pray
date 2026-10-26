@@ -19,14 +19,14 @@ Publishing is intentional and operator-driven. Scripts default to dry-run / buil
 
 The CLI executable remains `pray`. The crates.io package name is `pray-cli` because `pray` is already taken by an unrelated crate.
 
-First crates.io publish must go in order: `pray-core`, then `pray-transport`, then `pray-cli`. Until `pray-core` exists on crates.io, `cargo publish --dry-run` for the later crates falls back to `cargo check`. A later `--publish` skips a crate whose version is already on crates.io.
+First crates.io publish must go in order: `pray-core`, then `pray-transport`, then `pray-cli`. Until `pray-core` exists on crates.io, `cargo publish --dry-run` for the later crates falls back to `cargo check`. A later `--publish` skips a crate whose version is already on crates.io. The same skip applies to npm (`pray-cli`), jsr.io (`@kiskolabs/pray-cli`), and RubyGems (`pray-cli`) when that version is already published.
 
 ## Prerequisites
 
 - Version alignment across `Cargo.toml`, `npmjs/pray-cli/package.json`, `npmjs/pray-cli/jsr.json`, `npmjs/pray-cli/src/lockfile/types.ts`, and `rubygems/pray-cli/lib/pray/version.rb` for `all.sh`. The next coordinated version is the max of crates, npm, and gem. A one-surface max (patch or minor) is skipped by the other registries. Each language script may publish when that surface is uniquely ahead. JSR version must match npm.
 - `cargo login` / `CARGO_REGISTRY_TOKEN` for crates.io
 - `npm login` for npmjs
-- jsr.io: create `@kiskolabs` / `pray-cli` once; local publish uses browser auth; CI may set `JSR_TOKEN`
+- jsr.io: create `@kiskolabs` / `pray-cli` once; local publish uses browser auth; CI may set `JSR_TOKEN`. Provenance requires GitHub Actions OIDC via `.github/workflows/publish-jsr.yml` after the package is linked to this repository in JSR settings. Set package description and runtime compatibility (Node.js, Deno) on the jsr.io Settings tab for search score.
 - `gem push` credentials (MFA) for RubyGems
 - RubyGems release dependencies are installed under `rubygems/pray-cli/tmp/release-gems/` in a cache keyed by the complete Ruby build and platform. The release helper ignores user-installed gems so native extensions from another Ruby patch release cannot enter the build.
 - A working `pray` binary for distribution-point publish (`PRAY` selects it; after `gem push`, PATH `pray` may be the RubyGems CLI)
@@ -84,7 +84,7 @@ scripts/release/all.sh --publish --root ./prayers --server https://pray.example/
 
 `make release-all` runs the same publish path, then `make clean` (`cargo clean`) so workspace `target/` does not accumulate. The script alone does not clean.
 
-If a full publish stops after one or more registries succeed, resume from the first unpublished surface instead of repeating completed surfaces. For example, after crates.io and npm succeed but RubyGems fails, run `make release-rubygems`.
+If a full publish stops after one or more registries succeed, resume with `make release-all` (or the remaining surface scripts). Completed crates.io, npm, jsr.io, and RubyGems versions are skipped automatically.
 
 Create or edit the GitHub Release for the workspace version:
 

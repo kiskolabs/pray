@@ -43,6 +43,7 @@ import type {
 } from "./types.js";
 import { lockPathUpstream } from "./upstream.js";
 
+/** Resolve packages, locals, and source pins for a Prayfile path. */
 export async function resolveProject(
   manifestPath: string,
   options: ResolveOptions = defaultResolveOptions(),

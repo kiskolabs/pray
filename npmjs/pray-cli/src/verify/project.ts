@@ -15,15 +15,21 @@ import {
 } from "./position.js";
 import { pushProvisionedFindings } from "./provisioned.js";
 
+/** Single finding from inspect, verify, or drift. */
 export interface VerificationFinding {
+  /** Finding kind used for filtering and formatting. */
   kind: string;
+  /** Human-readable description. */
   message: string;
 }
 
+/** Collection of verification findings. */
 export interface VerificationReport {
+  /** Findings in report order. */
   findings: VerificationFinding[];
 }
 
+/** Collect verification findings without throwing. */
 export function inspectProject(
   project: ResolvedProject,
   lockfile: Lockfile,
@@ -31,6 +37,7 @@ export function inspectProject(
   return collectVerificationReport(project, lockfile).report;
 }
 
+/** Verify destinations against the lockfile; throw on errors (or any finding when strict). */
 export function verifyProject(
   project: ResolvedProject,
   lockfile: Lockfile,
@@ -46,6 +53,7 @@ export function verifyProject(
   return report;
 }
 
+/** Compare on-disk destinations to a fresh render and report renderer drift. */
 export function driftProject(
   project: ResolvedProject,
   lockfile: Lockfile,

@@ -15,12 +15,19 @@ export type {
   SourceKind,
 } from "../domain/types.js";
 
+/** Named source declared in a Prayfile. */
 export interface ManifestSource {
+  /** Source name referenced by packages. */
   name: string;
+  /** Source kind. */
   kind: SourceKind;
+  /** Source URL. */
   url: string;
+  /** Optional subdirectory within the source. */
   subdir?: string;
+  /** Optional revision pin. */
   rev?: string;
+  /** Optional tag pin. */
   tag?: string;
 }
 
@@ -32,51 +39,91 @@ export type DestinationEntry =
   | { kind: "package"; name: string }
   | { kind: "local"; path: string };
 
+/** Destination target declared in a Prayfile. */
 export interface ManifestTarget {
+  /** Target name. */
   name: string;
+  /** Output paths to render. */
   outputs: string[];
+  /** Skill export selectors. */
   skills: string[];
+  /** Command export selectors. */
   commands: string[];
+  /** Rule export selectors. */
   rules: string[];
+  /** Maximum rendered byte size when set. */
   maxBytes?: number;
+  /** Destination layout mode. */
   mode?: DestinationMode;
+  /** Whether scoped compose is enabled. */
   scoped?: boolean;
+  /** Explicit destination entry list when using compose entries. */
   entries?: DestinationEntry[];
+  /** Whether to emit destination headers. */
   header?: boolean;
 }
 
+/** Package declaration in a Prayfile. */
 export interface ManifestPackage {
+  /** Package name. */
   name: string;
+  /** Version constraint. */
   constraint: string;
+  /** Named source binding. */
   source?: string;
+  /** Selected export names. */
   exports: string[];
+  /** Target names this package contributes to. */
   targets: string[];
+  /** Feature flags. */
   features: string[];
+  /** Group membership. */
   groups: string[];
+  /** Whether the package may be missing. */
   optional: boolean;
+  /** Local path source. */
   path?: string;
+  /** Inline git URL. */
   git?: string;
+  /** Git tag pin. */
   tag?: string;
+  /** Git revision pin. */
   rev?: string;
+  /** Tarball URL. */
   tarball?: string;
+  /** OCI reference. */
   oci?: string;
+  /** Single-file package path. */
   file?: string;
+  /** Export role overrides. */
   roles?: ExportRole[];
+  /** Whether the declaration is bound to a concrete locator. */
   bound?: boolean;
 }
 
+/** Local file embed declared in a Prayfile. */
 export interface ManifestLocal {
+  /** Path to the local file. */
   path: string;
+  /** Placement position in compose destinations. */
   position: LocalPosition;
+  /** Whether the file may be missing. */
   optional: boolean;
+  /** Whether the declaration is bound. */
   bound?: boolean;
+  /** Alternate file path when set. */
   file?: string;
 }
 
+/** Project-wide render policy from the Prayfile. */
 export interface RenderPolicy {
+  /** Render mode for managed destinations. */
   mode: RenderMode;
+  /** Conflict handling policy. */
   conflict: RenderConflict;
+  /** Churn policy for managed spans. */
   churn: RenderChurn;
+  /** Whether destination headers are enabled by default. */
   header: boolean;
 }
 
@@ -87,14 +134,23 @@ export interface ManifestPublishRemote {
   packages: string[];
 }
 
+/** Parsed Prayfile document. */
 export interface Manifest {
+  /** Prayfile language version. */
   prayfileVersion: string;
+  /** Declared sources. */
   sources: ManifestSource[];
+  /** Declared destination targets. */
   targets: ManifestTarget[];
+  /** Declared packages. */
   packages: ManifestPackage[];
+  /** Local file embeds. */
   local: ManifestLocal[];
+  /** Named publish remotes. */
   publishRemotes?: ManifestPublishRemote[];
+  /** Symbol substitutions. */
   symbols: Record<string, string>;
+  /** Render policy. */
   render: RenderPolicy;
   /** Deprecated Prayfile keywords encountered while parsing (`target`, `output`, `agent`). */
   deprecatedKeywords?: string[];

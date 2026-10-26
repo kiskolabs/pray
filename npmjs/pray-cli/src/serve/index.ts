@@ -24,6 +24,7 @@ import {
 import { rejectSourceSymlinks } from "../source-path.js";
 import { applyByteRange } from "./range.js";
 
+/** Serve a local distribution root over HTTP until the process exits. */
 export function runServer(options: {
   root: string;
   host?: string;

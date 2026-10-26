@@ -23,6 +23,7 @@ import {
 import { renderScopedCompose } from "./scoped.js";
 import type { RenderedTarget } from "./types.js";
 
+/** Render all destination targets for a resolved project in memory. */
 export function renderProject(project: ResolvedProject): RenderedTarget[] {
   const rendered: RenderedTarget[] = [];
   for (const target of project.manifest.targets) {
@@ -40,6 +41,7 @@ export function renderProject(project: ResolvedProject): RenderedTarget[] {
   return rendered;
 }
 
+/** Write rendered destinations and provisioned files under the project root. */
 export function writeRenderedTargets(
   project: ResolvedProject,
   rendered: RenderedTarget[],

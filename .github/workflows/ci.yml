@@ -24,6 +24,8 @@ jobs:
         run: ./scripts/release/versions_test.sh
       - name: Check crates.io already-published skip
         run: ./scripts/release/crates_status_test.sh
+      - name: Check npm RubyGems jsr already-published skip
+        run: ./scripts/release/registry_status_test.sh
       - name: Run Clippy
         run: cargo clippy --workspace --all-targets -- -D warnings
       - name: Check RFC id reservations
@@ -118,3 +120,6 @@ jobs:
       - name: Run npm lint
         working-directory: npmjs/pray-cli
         run: npm run lint
+      - name: Check JSR publish (no slow types)
+        working-directory: npmjs/pray-cli
+        run: npx --yes jsr publish --dry-run --allow-dirty

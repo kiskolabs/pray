@@ -28,6 +28,19 @@ bundle install
 bundle exec pray version
 ```
 
+## Library vs CLI
+
+`require "pray"` loads the core library and does not define `Pray::CLI`.
+
+`require "pray-cli"` (or the `pray` executable) loads the library plus CLI dispatch.
+
+```ruby
+require "pray"
+
+manifest = Pray.parse_manifest(File.read("Prayfile"))
+project = Pray.resolve_project
+```
+
 ## Commands
 
 Core workflow:

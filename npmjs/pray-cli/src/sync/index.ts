@@ -23,6 +23,7 @@ export interface SyncSummary {
   packages: string[];
 }
 
+/** Pull packages from federation peers into a local distribution root. */
 export async function syncDistributionRoot(
   root: string,
   peers: string[],

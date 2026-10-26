@@ -40,6 +40,7 @@ export {
   registryArtifactPath,
 } from "./registry-store.js";
 
+/** Publish resolved packages into a local distribution root. */
 export async function publishToRoot(
   project: ResolvedProject,
   root: string,
@@ -123,6 +124,7 @@ export async function publishToRoot(
   return stats;
 }
 
+/** Publish resolved packages to a remote distribution server URL. */
 export async function publishToServer(
   project: ResolvedProject,
   serverUrl: string,

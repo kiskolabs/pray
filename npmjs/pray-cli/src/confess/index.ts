@@ -17,6 +17,7 @@ export interface ConfessionOptions {
   url?: string;
 }
 
+/** Submit a confession (accepted or rejected managed span) to a distribution server. */
 export async function submitConfession(
   manifestPath: string,
   options: ConfessionOptions,

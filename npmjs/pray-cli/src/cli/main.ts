@@ -55,6 +55,7 @@ function rejectUnknownArguments(
   }
 }
 
+/** Run the `pray` CLI with the given argv-style argument list; returns the process exit code. */
 export async function runCli(argumentsList: string[]): Promise<number> {
   const previousContext = activeInvocationContext();
   try {

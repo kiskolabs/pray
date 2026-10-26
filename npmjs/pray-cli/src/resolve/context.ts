@@ -8,6 +8,7 @@ export interface ResolveOptions {
   environment?: string;
 }
 
+/** Default {@link ResolveOptions} for online, lockfile-respecting resolve. */
 export const defaultResolveOptions = (): ResolveOptions => ({
   offline: false,
   refreshSourceRevisions: false,
