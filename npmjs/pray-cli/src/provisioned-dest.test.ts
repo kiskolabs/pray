@@ -11,24 +11,24 @@ import {
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { describe, it } from "node:test";
-import { provisionedChange } from "./cli/commands/plan.js";
-import { materializeProject } from "./cli/materialize.js";
-import { PrayError } from "./errors.js";
-import { sha256Prefixed } from "./hashing.js";
-import { buildLockfile } from "./lockfile/index.js";
-import { defaultLockfilePath } from "./lockfile/paths.js";
-import type { Lockfile } from "./lockfile/types.js";
+import { PrayError } from "pray-core/errors.js";
+import { sha256Prefixed } from "pray-core/hashing.js";
+import { buildLockfile } from "pray-core/lockfile/index.js";
+import { defaultLockfilePath } from "pray-core/lockfile/paths.js";
+import type { Lockfile } from "pray-core/lockfile/types.js";
 import {
   validateDestinationPath,
   validateProjectRelativePath,
-} from "./manifest/validate.js";
+} from "pray-core/manifest/validate.js";
+import { materializeProject } from "pray-core/materialize.js";
 import {
   materializeProvisionedExports,
   provisionedLockRecords,
-} from "./render/dest.js";
-import { writeRenderedTargets } from "./render/project.js";
-import { plannedProvisionedFiles } from "./render/provisioned.js";
-import { resolveProject } from "./resolve/project.js";
+} from "pray-core/render/dest.js";
+import { writeRenderedTargets } from "pray-core/render/project.js";
+import { plannedProvisionedFiles } from "pray-core/render/provisioned.js";
+import { resolveProject } from "pray-core/resolve/project.js";
+import { provisionedChange } from "./cli/commands/plan.js";
 
 function writeFilePackage(root: string, body: string): void {
   const packageRoot = join(root, "packages/shell");

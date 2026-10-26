@@ -1,11 +1,11 @@
 import { existsSync, mkdirSync, writeFileSync } from "node:fs";
 import { basename, join } from "node:path";
-import { PrayError } from "../../errors.js";
+import { PrayError } from "pray-core/errors.js";
 import {
   DEFAULT_LOCAL_PRAYER_NAME,
   validateLocalPrayerName,
-} from "../../local-prayer.js";
-import { defaultManifestPath } from "../../lockfile/paths.js";
+} from "pray-core/local-prayer.js";
+import { defaultManifestPath } from "pray-core/lockfile/paths.js";
 import { projectRoot } from "../invocation.js";
 import {
   declareLocalPrayer,

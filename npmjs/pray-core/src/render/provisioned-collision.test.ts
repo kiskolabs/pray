@@ -9,8 +9,8 @@ import {
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { afterEach, describe, it } from "node:test";
-import { materializeProject } from "../cli/materialize.js";
 import { PrayError } from "../errors.js";
+import { materializeProject } from "../materialize.js";
 import { writePackage } from "../render-test-package.js";
 import { resolveProject } from "../resolve/project.js";
 import { plannedProvisionedFiles } from "./provisioned.js";

@@ -11,13 +11,19 @@ set -euo pipefail
 release_read_npm_version() {
   local root="$1"
   node -e 'console.log(JSON.parse(require("fs").readFileSync(process.argv[1], "utf8")).version)' \
+    "${root}/npmjs/pray-core/package.json"
+}
+
+release_read_npm_cli_version() {
+  local root="$1"
+  node -e 'console.log(JSON.parse(require("fs").readFileSync(process.argv[1], "utf8")).version)' \
     "${root}/npmjs/pray-cli/package.json"
 }
 
 release_read_typescript_version() {
   local root="$1"
   sed -n 's/^export const PACKAGE_VERSION = "\(.*\)";/\1/p' \
-    "${root}/npmjs/pray-cli/src/lockfile/types.ts" | head -1
+    "${root}/npmjs/pray-core/src/lockfile/types.ts" | head -1
 }
 
 release_version_max() {
@@ -91,14 +97,19 @@ release_next_coordinated_version() {
 release_read_jsr_version() {
   local root="$1"
   node -e 'console.log(JSON.parse(require("fs").readFileSync(process.argv[1], "utf8")).version)' \
-    "${root}/npmjs/pray-cli/jsr.json"
+    "${root}/npmjs/pray-core/jsr.json"
 }
 
 release_assert_npm_typescript_match() {
   local root="$1"
-  local npm typescript
+  local npm cli typescript
   npm="$(release_read_npm_version "${root}")"
+  cli="$(release_read_npm_cli_version "${root}")"
   typescript="$(release_read_typescript_version "${root}")"
+  if [[ "${npm}" != "${cli}" ]]; then
+    echo "npm pray-cli version ${cli} does not match pray-core ${npm}" >&2
+    return 2
+  fi
   if [[ "${npm}" != "${typescript}" ]]; then
     echo "TypeScript PACKAGE_VERSION ${typescript} does not match npm ${npm}" >&2
     return 2
@@ -122,6 +133,7 @@ release_assert_coordinated_changelog() {
   local next file
   for file in \
     "${root}/CHANGELOG.md" \
+    "${root}/npmjs/pray-core/CHANGELOG.md" \
     "${root}/npmjs/pray-cli/CHANGELOG.md" \
     "${root}/rubygems/pray-cli/CHANGELOG.md"; do
     if ! release_changelog_has_version "${file}" "${version}"; then

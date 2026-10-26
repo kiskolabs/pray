@@ -1,4 +1,4 @@
-import { printlnStdout, printlnVerbose } from "../cli/output.js";
+import { printlnStdout, printlnVerbose } from "../output.js";
 import type { ResolvedPackage } from "../resolve/types.js";
 
 export type PublishStats = { published: number; unchanged: number };

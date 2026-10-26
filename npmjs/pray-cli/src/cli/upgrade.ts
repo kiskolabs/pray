@@ -1,5 +1,5 @@
 import { spawnSync } from "node:child_process";
-import { PrayError } from "../errors.js";
+import { PrayError } from "pray-core/errors.js";
 
 export function runUpgradeCommand(): void {
   const result = spawnSync("npm", ["install", "-g", "pray-cli@latest"], {

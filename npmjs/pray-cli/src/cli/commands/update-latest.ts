@@ -2,25 +2,25 @@ import { existsSync, readFileSync } from "node:fs";
 import {
   latestConstraintForPackage,
   versionSatisfies,
-} from "../../constraint.js";
-import { PrayError } from "../../errors.js";
-import { readLockfile } from "../../lockfile/index.js";
-import { parseManifest } from "../../manifest/index.js";
-import { replacePackageDeclaration } from "../../manifest/package-declaration.js";
-import { resolveProject } from "../../resolve/project.js";
+} from "pray-core/constraint.js";
+import { PrayError } from "pray-core/errors.js";
+import { readLockfile } from "pray-core/lockfile/index.js";
+import { parseManifest } from "pray-core/manifest/index.js";
+import { replacePackageDeclaration } from "pray-core/manifest/package-declaration.js";
+import { printlnStdout } from "pray-core/output.js";
+import { resolveProject } from "pray-core/resolve/project.js";
 import {
   applyPathUpstreamLatestConstraints,
   type PathUpstreamLatestConstraint,
   planPathUpstreamLatestConstraints,
-} from "../../resolve/upstream-latest.js";
-import { reportPathUpstreamWouldConflicts } from "../../resolve/upstream-plan.js";
-import { applyPathUpstreamRefreshes } from "../../resolve/upstream-refresh.js";
+} from "pray-core/resolve/upstream-latest.js";
+import { reportPathUpstreamWouldConflicts } from "pray-core/resolve/upstream-plan.js";
+import { applyPathUpstreamRefreshes } from "pray-core/resolve/upstream-refresh.js";
 import {
   lockfilePath,
   manifestPath,
   resolveCurrentProject,
 } from "../invocation.js";
-import { printlnStdout } from "../output.js";
 import { updateResolveOptions, writeUpdate } from "./update-core.js";
 
 export async function updateLatestCommand(

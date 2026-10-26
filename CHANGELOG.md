@@ -2,9 +2,14 @@
 
 ## Unreleased
 
+## 1.24.0 (2026-10-26)
+
+- Split TypeScript into npm `pray-core` / jsr.io `@kiskolabs/pray-core` (library) and npm `pray-cli` (CLI depending on core). Library imports move off `pray-cli` / `@kiskolabs/pray-cli`.
+- Upgrade the Rust `zstd` crate to 0.14.3 (RUSTSEC-2026-0391 context reuse leak).
 - Skip npm, jsr.io, and RubyGems on `make release-all` when that version is already published, matching the crates.io resume path.
-- Keep TypeScript library imports free of CLI dispatch: `runCli` moves to `pray-cli/cli`; the package root and jsr.io `@kiskolabs/pray-cli` stay library-only. Document Ruby `require "pray"` versus `require "pray-cli"`.
-- Improve the jsr.io package for `@kiskolabs/pray-cli`: public API docs, typed exports without slow types, CI dry-run gate, and optional GitHub Actions OIDC publish for provenance. Description and runtime compatibility stay on the jsr.io Settings tab.
+- Document the default two-package rule for every language except Ruby. Host-language ports stay in `pray_compat`; this repository does not hold Elixir or Haskell package trees.
+- Document Ruby `require "pray"` versus `require "pray-cli"` as the unique single-gem exception.
+- Improve the jsr.io package for `@kiskolabs/pray-core`: public API docs, typed exports without slow types, CI dry-run gate, and optional GitHub Actions OIDC publish for provenance. Description and runtime compatibility stay on the jsr.io Settings tab.
 
 ## 1.23.0 (2026-10-26)
 

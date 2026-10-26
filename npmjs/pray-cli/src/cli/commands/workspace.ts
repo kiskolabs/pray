@@ -2,25 +2,25 @@ import { existsSync, readFileSync, writeFileSync } from "node:fs";
 import {
   packageArchivePath,
   writePackageArchive,
-} from "../../archive/praypkg.js";
-import { PrayError } from "../../errors.js";
-import { normalizeLineEndings } from "../../hashing.js";
-import { readLockfile } from "../../lockfile/index.js";
+} from "pray-core/archive/praypkg.js";
+import { PrayError } from "pray-core/errors.js";
+import { normalizeLineEndings } from "pray-core/hashing.js";
+import { readLockfile } from "pray-core/lockfile/index.js";
 import {
   defaultLockfilePath,
   defaultManifestPath,
-} from "../../lockfile/paths.js";
+} from "pray-core/lockfile/paths.js";
 import {
   classifyFormatHints,
   formatRecommended,
   parseManifest,
   readManifestText,
-} from "../../manifest/index.js";
-import { requireReleaseVersion } from "../../package-spec/index.js";
-import { pathOwnedPackageNames } from "../../publish/remote.js";
-import { defaultResolveOptions } from "../../resolve/context.js";
-import { resolveProject } from "../../resolve/project.js";
-import type { ResolvedProject } from "../../resolve/types.js";
+} from "pray-core/manifest/index.js";
+import { requireReleaseVersion } from "pray-core/package-spec/index.js";
+import { pathOwnedPackageNames } from "pray-core/publish/remote.js";
+import { defaultResolveOptions } from "pray-core/resolve/context.js";
+import { resolveProject } from "pray-core/resolve/project.js";
+import type { ResolvedProject } from "pray-core/resolve/types.js";
 
 export async function runFormat(): Promise<void> {
   const manifestPath = defaultManifestPath();

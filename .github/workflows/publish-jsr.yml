@@ -1,4 +1,4 @@
-# Publish @kiskolabs/pray-cli to jsr.io with OIDC provenance.
+# Publish @kiskolabs/pray-core to jsr.io with OIDC provenance.
 # Prerequisites: package linked to this GitHub repository in JSR settings.
 # Trigger manually after version bump; skips when the jsr.json version is already published.
 name: Publish JSR
@@ -18,7 +18,7 @@ jobs:
         with:
           node-version: "22"
           cache: npm
-          cache-dependency-path: npmjs/pray-cli/package-lock.json
+          cache-dependency-path: npmjs/package-lock.json
       - name: Assert npm and jsr versions match
         run: ./scripts/release/versions_test.sh
       - name: Skip when version is already on jsr.io
@@ -30,17 +30,17 @@ jobs:
           # shellcheck source=scripts/release/registry_status.sh
           source ./scripts/release/registry_status.sh
           version="$(release_read_jsr_version "$(pwd)")"
-          if release_jsr_has_version "@kiskolabs/pray-cli" "${version}"; then
+          if release_jsr_has_version "@kiskolabs/pray-core" "${version}"; then
             echo "skip=yes" >> "${GITHUB_OUTPUT}"
-            echo "skip @kiskolabs/pray-cli@${version} (already on jsr.io)"
+            echo "skip @kiskolabs/pray-core@${version} (already on jsr.io)"
           else
             echo "skip=no" >> "${GITHUB_OUTPUT}"
           fi
       - name: Install npm dependencies
         if: steps.registry.outputs.skip != 'yes'
-        working-directory: npmjs/pray-cli
+        working-directory: npmjs
         run: npm ci
       - name: Publish to jsr.io
         if: steps.registry.outputs.skip != 'yes'
-        working-directory: npmjs/pray-cli
+        working-directory: npmjs/pray-core
         run: npx --yes jsr publish

@@ -1,27 +1,27 @@
 import { existsSync } from "node:fs";
-import { PrayError } from "../../errors.js";
+import { PrayError } from "pray-core/errors.js";
 import {
   buildLockfile,
   readLockfile,
   writeLockfile,
   writeLockfileIfChanged,
-} from "../../lockfile/index.js";
-import type { Lockfile } from "../../lockfile/types.js";
-import { provisionedDestinationStatuses } from "../../render/dest.js";
+} from "pray-core/lockfile/index.js";
+import type { Lockfile } from "pray-core/lockfile/types.js";
+import { printlnStdout } from "pray-core/output.js";
+import { provisionedDestinationStatuses } from "pray-core/render/dest.js";
 import {
   layoutRenderedTargets,
   renderProject,
   writeRenderedTargets,
-} from "../../render/project.js";
+} from "pray-core/render/project.js";
 import {
   defaultResolveOptions,
   type ResolveOptions,
-} from "../../resolve/context.js";
-import type { ResolvedProject } from "../../resolve/types.js";
-import { applyPathUpstreamRefreshes } from "../../resolve/upstream-refresh.js";
-import { writeProjectFile } from "../../transaction/index.js";
+} from "pray-core/resolve/context.js";
+import type { ResolvedProject } from "pray-core/resolve/types.js";
+import { applyPathUpstreamRefreshes } from "pray-core/resolve/upstream-refresh.js";
+import { writeProjectFile } from "pray-core/transaction/index.js";
 import { lockfilePath, resolveCurrentProject } from "../invocation.js";
-import { printlnStdout } from "../output.js";
 import {
   buildUpdateSummary,
   constraintBlockedPackagesJson,

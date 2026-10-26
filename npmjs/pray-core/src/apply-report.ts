@@ -1,6 +1,6 @@
-import type { Lockfile } from "../lockfile/types.js";
-import { LOCAL_EMBED_PACKAGE } from "../lockfile/types.js";
-import type { ResolvedProject } from "../resolve/types.js";
+import type { Lockfile } from "./lockfile/types.js";
+import { LOCAL_EMBED_PACKAGE } from "./lockfile/types.js";
+import type { ResolvedProject } from "./resolve/types.js";
 
 export function localSummaryLines(
   previous: Lockfile | undefined,

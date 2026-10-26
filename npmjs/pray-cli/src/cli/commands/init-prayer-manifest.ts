@@ -1,12 +1,12 @@
-import { PrayError } from "../../errors.js";
+import { PrayError } from "pray-core/errors.js";
 import {
   DEFAULT_PATH_SOURCE_DIRECTORY,
   DEFAULT_PATH_SOURCE_NAME,
-} from "../../local-prayer.js";
-import { defaultManifestPath } from "../../lockfile/paths.js";
-import { parseManifest, readManifestText } from "../../manifest/index.js";
-import type { Manifest, ManifestSource } from "../../manifest/types.js";
-import { writeProjectFile } from "../../transaction/index.js";
+} from "pray-core/local-prayer.js";
+import { defaultManifestPath } from "pray-core/lockfile/paths.js";
+import { parseManifest, readManifestText } from "pray-core/manifest/index.js";
+import type { Manifest, ManifestSource } from "pray-core/manifest/types.js";
+import { writeProjectFile } from "pray-core/transaction/index.js";
 
 export function parsePrayerInitArguments(argumentsList: string[]): {
   name?: string;

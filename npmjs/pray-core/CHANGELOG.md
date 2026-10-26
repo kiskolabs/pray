@@ -1,0 +1,202 @@
+# CHANGELOG
+
+## Unreleased
+
+## 1.24.0 (2026-10-26)
+
+- Publish as the TypeScript library package `pray-core` / `@kiskolabs/pray-core`. The CLI moves to the separate `pray-cli` package that depends on this library.
+- Document the public TypeScript library API for jsr.io (module and symbol docs). Require explicit types on exported defaults so JSR publish no longer needs `--allow-slow-types`.
+
+## 1.23.0 (2026-10-26)
+
+- Leave package catalog JSON bytes alone when publish reports a version unchanged. A load and rewrite round trip no longer strips trailing newlines or reorders keys such as `artifact_hash` relative to `yanked`.
+- Publish the TypeScript library to jsr.io as `@kiskolabs/pray-cli` with version synced to npm.
+- Refuse private, parent-relative, and symbolic-link paths from distribution readers. Reject symbolic-link source files and package paths.
+- Treat `~> 1.4` as allowing later 1.x releases and keep `~> 1.4.0` within the 1.4 patch line.
+- Render every legacy target output and enforce `max_bytes`.
+- Require an existing unchanged lock for `install --locked` and `--frozen`. Make frozen install and `render --check` verify current destinations without opening a write transaction.
+- Refuse two packages or exports that claim the same provisioned destination, and name both owners in the error.
+- Return usage errors for covered invalid command arguments and remove URL userinfo from shared HTTP errors.
+- Reduce repeated parser and render scans. The packed npm package is about 43 percent smaller and no longer ships production source maps.
+
+## 1.22.0 (2026-10-22)
+
+- Keep and create catalog `derived_metadata` on publish. Unchanged republishes and version appends no longer strip historical summaries, topics, or embeddings.
+- Ignore leftover project git full clones when resolving a shared bare or stub catalog. Install renames those leftovers so they cannot shadow the locked revision.
+- Print a pray-level recovery hint when a locked git revision is missing from the shared bare or when catalog checkout fails.
+- On path-fork upstream merge conflict, name the reset-then-rebrand workflow and tag the error as `upstream_merge_conflict`. `pray update --help` documents the same steps.
+- Print `published` / `unchanged` lines and a count footer after `pray publish` (same shape as `--dry-run`). Add global `-q`/`--quiet` and `-v`/`--verbose` for non-error status stdout across publish, apply, install, plan, doctor, unlock, update, outdated, and would-conflict. Redact URL userinfo in publish and doctor lines.
+- Conflict when a path fork deleted an upstream file and upstream later changes that file, instead of restoring it silently.
+- Publish shared bare git clones through a temporary directory, `*.lock.d`, and `.pray-ready` marker. Prefer `git show` for lazy catalog fill; set `GIT_NO_LAZY_FETCH` when offline.
+- Bound git catalog archive and `git show` blob fills to the same size ceilings as `.praypkg` unpack; probe sizes before buffering; unpack through the shared tar validators instead of system tar.
+- Publish project git catalogs through staging, an advisory lock, and atomic rename; refuse stub `.pray-git-dir` paths that are not the expected shared bare.
+- Recover stale git cache lock directories after ten minutes; wait up to about one minute for a live lock; name the lock path on timeout.
+- Lock catalog file fill and publish blobs through a partial rename; re-check catalog match under the materialize lock.
+- Refuse absolute federation and torrent artifact URLs; refuse URL-shaped registry and catalog artifact paths; validate prayspec member paths on parse and tree hash.
+- Make `pray update --latest --dry-run` list would-conflict path-fork paths before write.
+
+## 1.21.0 (2026-10-21)
+
+- Read package catalogs whose `published_at` is an RFC 3339 string or JSON null.
+- Keep prayer sources under `prayers/<name>/`, beside `prayers/v1/` when this project publishes. `prayers/v1/packages/` is catalog metadata. A root `packages/` folder is not a pray source convention.
+- Prevent commands from changing the calling repository when a Git hook passes repository variables such as `GIT_DIR` or `GIT_WORK_TREE`. Explicit Git configuration, including CI credentials and URL rewrites, still applies.
+- Refuse a damaged Git cache that resolves to a parent repository before changing its remote.
+
+## 1.20.0 (2026-09-18)
+
+- Fetch a locked git catalog revision during `pray install` when the local cache does not have that commit yet. `pray install --offline` still refuses a missing commit.
+- Refuse `pray install --offline` when a git catalog is not already in the local cache, instead of cloning it. A global cache seed still works.
+- Honour a locked git revision for a local file catalog. Install does not read the origin worktree after that checkout fails.
+- Keep git catalog objects in the shared cache. The project catalog is a file tree without a git directory.
+- When a locked git revision is missing from a shallow cache, fetch the missing history instead of only that one commit.
+- Keep an unchanged published version when a later `pray publish` uses a different publisher label.
+- Keep `pray drift` clean after `pray install` when a compose block adds a local file after a package dest already had.
+
+## 1.19.0 (2026-09-18)
+
+- Declare named `publish` remotes in Prayfile (RFC 0118). `pray publish` uses them when dest flags are omitted, and publishes only path-owned packages.
+
+## 1.18.0 (2026-09-17)
+
+- Clone a git catalog without unused package blobs, and fetch a used package file when install needs it.
+- Skip cloning a git catalog when no package uses that source.
+- Fetch a used git catalog once on `pray update` instead of fetching it twice.
+- Keep packages from two git sources that share a clone URL when each source names a different `subdir`.
+- Share one git object store for those subdirectory checkouts.
+- Import signing keys with `pray trust import-repo` after a catalog was cloned only through `subdir` sources.
+- Reuse registry package metadata during one command so `pray update --latest` does not download the same package JSON twice.
+- Skip a second resolve when `pray update --latest` does not rewrite constraints or upstream pins, and still refresh path-fork files when needed.
+
+## 1.17.0 (2026-09-16)
+
+- Locate local prayers through a path source of any directory name (RFC 0117). `pray prayer init` adds `source "local"` when needed and declares `pray "local/project"` once. Version is optional until `pray package` or `pray publish`. `.agents/project.md` remains a compose shortcut for one local file.
+- Copy upstream files into an empty path-fork tree on `pray install` and `pray update` (RFC 0116). Extra listed overlay files stay. `pray outdated` lists fork files that differ from the locked upstream. An identity-only fork uses empty `spec.files`; refresh lists content paths, not the prayspec file.
+- Refuse a local path with `file:` and a local path inside `tree`. Compose still embeds local fragments. Package `file:` and package `tree` stay.
+- Name dest versus lock on `pray verify`, dest versus a fresh render on `pray drift`, and dest write on `pray render`. Dry-run of a write is `pray plan`. Listed local compose files stay on `pray install`.
+- Write `.praytorrent.json` when `v1/distribution.json` lists `protocols: ["torrent"]` (RFC 0062). `pray repo init` writes empty protocols.
+- Parse `spec.maintainers` as a string array, and accept `spec.pray_version` as an alias for `spec.prayfile_version`.
+- Re-embed a changed local compose source on `pray install`, `pray update`, and `pray plan`, and print its `sha256` as `checked` or `was`. List local checksum drift under `pray outdated`.
+
+## 1.16.0 (2026-09-15)
+
+- Resolve a local `.praypkg` from `tarball:`, including offline when the archive is on disk.
+- Refuse two-package dependency cycles during resolve, matching the Rust CLI.
+- Check dest files against `Prayfile.lock` managed spans without resolving packages (`inspect_locked_destinations`, RFC 0106).
+
+## 1.15.0 (2026-09-15)
+
+- Refresh path-fork trees with `pray update`. Rewrite `spec.upstream` pins with `pray update --latest` when the pin does not admit the latest upstream version. `pray update --latest --dry-run` prints the planned pin and does not write (RFC 0114). A rewritten fork spec keeps homepage, source URIs, prayfile version, and metadata.
+- Keep a listed package spec in `spec.files` when packing; refuse a repeated or aliased content path in the package archive.
+- Use the current project for a later install after an earlier in-process command in another directory.
+
+## 1.14.0 (2026-09-14)
+
+- Keep an unchanged package version's artifact, first-publish time, and yank when `pray publish` runs again (RFC 0061).
+- Write `published_at` as UTC Unix seconds in registry and federation JSON.
+- Emit absent package locators and an absent target `max_bytes` as null in the canonical manifest JSON so `manifest_hash` matches the other CLIs.
+
+## 1.13.0 (2026-09-08)
+
+- Record and verify package upstream pins in `.prayspec` and `Prayfile.lock`. Refuse path-fork updates until this CLI can refresh the path tree safely (RFC 0114).
+
+## 1.12.1 (2026-09-08)
+
+- Refresh a locked git catalog during `pray install` when a newly declared package is missing from the pinned revision, and name that revision with `pray update` if it is still missing.
+
+## 1.12.0 (2026-09-07)
+
+- Restore compose files, provisioned destinations, Prayfile, and lock after failed writes, and recover interrupted writes on the next install, plan, or verification on Unix.
+- Preserve later local edits when recovery encounters changed files, and prevent cooperating Pray commands from writing the same project together.
+- Limit destination reads to 32 MiB, saved transaction payload to 64 MiB across 10,000 writes, and grouped conflict details to 100 entries.
+- Keep Prayfile constraints unchanged when `pray update --latest` cannot write destination files.
+- Apply newer versions with `update --latest --json` even when the existing constraints already allow them, and check destination conflicts during `update --latest --dry-run`.
+- Report conflicting file and tree destinations together before changing compose output, with steps that preserve local edits.
+
+## 1.11.0 (2026-09-04)
+
+- Read the whole eight byte tar checksum field so `.praypkg` archives whose checksum is written as seven octal digits unpack instead of failing integrity.
+- Sort tree hash entries by UTF-8 bytes in the TypeScript CLI so a package hashes the same as where it was published, instead of following the host's locale collation.
+- Share the source-keyed registry cache path with the Rust and Ruby CLIs.
+- Add `pray clean --unused` for lockfile-driven registry cache cleanup.
+- Reject unsafe registry package and version path segments.
+
+## 1.10.0 (2026-09-02)
+
+- Refuse to overwrite exclusive `file:` and `tree:` destinations that already exist with other bytes.
+- Fail when a provisioned or compose destination is a symbolic link.
+- Record provisioned leaves in `Prayfile.lock` and delete a dropped leaf only when on-disk bytes still match the locked hash.
+- Keep the previous lock when a provisioned destination write fails, so retry still has its ownership record.
+- Keep TypeScript lockfiles readable when a generated top-level section is empty.
+- Reject destination paths that start with `~`.
+- Print every provisioned path in `pray plan`.
+- BREAKING: Drop unused `render` fields `section_markers` and `line_endings`; reject them at parse.
+- Inline a UTF-8 `file` export into `compose` as a marked span. Exclusive `file:` stays unmarked.
+- Write the Agent context banner on `AGENTS.md` by default. Other compose destinations opt in with `header: true`.
+- Fail compose of JSON, binary, or an unknown file type and name `file:` as the unmarked path.
+- Warn when Prayfile uses deprecated `skills`, export type `skill`, or `spec.skills`; prefer `tree` / `folder`. These forms will be removed in version 2.
+
+## 1.9.2 (2026-09-01)
+
+- Align package version with the 1.9.2 release.
+- Reject `.praypkg` members that escape the package root or exceed size limits; unpack through staging into cache.
+- Move login sessions to the user Pray home with owner-only permissions and migrate legacy repository sessions.
+- Reject manifest and federation paths outside their roots; require registry hashes and recheck cached package trees.
+- Bound server requests, connections, timeouts, and federation peers; expose readiness and per-request identifiers.
+- Cap registry downloads at 64 MiB; unpack `.praypkg` tar members without system tar; reject absolute artifact URLs and check a present registry signature.
+- Enforce a measured line-coverage floor in CI.
+
+## 1.9.1 (2026-08-29)
+
+- Rewrite every matching `pray` line when `pray update --latest` moves a package constraint, keeping indent and extra keywords.
+- Preview those constraint moves with `pray update --latest --dry-run` without writing Prayfile.
+
+## 1.7.0 (2026-07-29)
+
+- Reshape CLI help around a `Usage` synopsis and `Options` block; cover every listed command; point unknown-command errors at `pray --help`.
+
+## 1.6.0 (2026-07-29)
+
+- Add `login` with passkey and ssh-agent modes; persist sessions in `.pray/session.json`.
+- Add `upgrade` via `npm install -g pray-cli@latest`.
+- Honor `update --major|--latest|--dry-run|--json`, `plan --remote`, and `outdated --remote`.
+- Implement `trust import-repo` and `trust import-registry` for local and http(s) sources.
+
+## 1.5.2 (2026-07-29)
+
+- Put the Prayfile positioning line into the npm package description for registry search.
+
+## 1.5.1 (2026-07-29)
+
+- Sync `PACKAGE_VERSION` with the package version and add `prepublishOnly` build for npm publish.
+- Rework package description and README opener to match Prayfile positioning.
+
+## 1.5.0 (2026-07-27)
+
+- Accept Gemfile-like Ruby surface sugar for Prayfile statements: `{…}` blocks, top-level `;`, and optional call parentheses.
+- Add parser coverage for symbol maps and surface forms alongside substitute tests.
+- Exercise the shared `testdata/shared` Prayfile corpus alongside Rust and Ruby.
+
+## 1.3.0 (2026-07-26)
+
+- Add destination DSL parsing: `compose`, `tree`, and `file:` blocks in `Prayfile` for scoped rendering and exact file bindings, matching `pray-core`.
+- Add role-based export selection (`fragment`, `folder`, `file`) so packages without an explicit `export:` resolve unambiguous exports automatically.
+- Add `format`/`fmt` command to rewrite a legacy `Prayfile` into the recommended destination DSL and normalize marker comments in rendered lockfile outputs.
+- Emit `pray` as the canonical package declaration keyword when formatting or editing manifests, while still accepting `use`, `include`, `agent`, and `package` on read for backward compatibility.
+
+## 1.1.0 (2026-07-14)
+
+- Add environment-aware rendering with `group` blocks and `--env` or `PRAY_ENV`.
+- Add global `--path` and `--file-path` flags with `PRAY_PATH`, `PRAY_FILE_PATH`, and project `.env` support.
+- Record the selected environment in `Prayfile.lock`.
+- Improve CLI help with grouped commands, per-command help, and suggestions for unknown commands.
+- Add `--no-input` to skip interactive prompts.
+- Honor `PRAY_NO_COLOR` and `NO_COLOR` for plain terminal output.
+- Refresh git distribution caches on install when a locked revision is missing locally.
+
+## 1.0.0 (2026-07-13)
+
+- Initial npm release of `pray-cli`.
+- Resolve local path packages and git distribution sources.
+- Publish to local distribution roots and serve over HTTP.
+- Install, update, render, verify, and drift workflows with `Prayfile.lock`.
+- Git distribution integration tests for install, locked revision, and update.

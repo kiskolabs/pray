@@ -1,6 +1,6 @@
 import { existsSync, writeFileSync } from "node:fs";
-import { PrayError } from "../../errors.js";
-import { defaultManifestPath } from "../../lockfile/paths.js";
+import { PrayError } from "pray-core/errors.js";
+import { defaultManifestPath } from "pray-core/lockfile/paths.js";
 
 export { runPrayerInit } from "./init-prayer.js";
 

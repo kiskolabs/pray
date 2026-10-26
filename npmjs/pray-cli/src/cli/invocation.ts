@@ -1,4 +1,4 @@
-import { PrayError } from "../errors.js";
+import { PrayError } from "pray-core/errors.js";
 import {
   activeInvocationContext,
   lockfilePathForContext,
@@ -7,16 +7,16 @@ import {
   projectInvocationContextFromCurrentDirectory,
   projectInvocationContextFromOptions,
   setActiveInvocationContext,
-} from "../project-context/index.js";
+} from "pray-core/project-context/index.js";
 import {
   defaultResolveOptions,
   type ResolveOptions,
-} from "../resolve/context.js";
+} from "pray-core/resolve/context.js";
 import {
   resolveProject,
   resolveProjectWithGitRefreshFallback,
-} from "../resolve/project.js";
-import type { ResolvedProject } from "../resolve/types.js";
+} from "pray-core/resolve/project.js";
+import type { ResolvedProject } from "pray-core/resolve/types.js";
 
 export function initializeInvocation(argumentsList: string[]): string[] {
   const { options, remaining } = parseGlobalOptions(argumentsList);

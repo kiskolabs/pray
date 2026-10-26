@@ -1,18 +1,18 @@
 import { existsSync } from "node:fs";
-import { PrayError } from "../../errors.js";
-import { buildLockfile, readLockfile } from "../../lockfile/index.js";
+import { outdatedLocalLines } from "pray-core/apply-report.js";
+import { PrayError } from "pray-core/errors.js";
+import { buildLockfile, readLockfile } from "pray-core/lockfile/index.js";
 import {
   defaultLockfilePath,
   defaultManifestPath,
-} from "../../lockfile/paths.js";
-import { recordedPackageVersion } from "../../package-spec/index.js";
-import { renderProject } from "../../render/project.js";
-import { defaultResolveOptions } from "../../resolve/context.js";
-import { resolveProject } from "../../resolve/project.js";
-import { pathForkDriftLines } from "../../resolve/upstream-drift.js";
-import { packageSourceSummary } from "../../tree/index.js";
-import { outdatedLocalLines } from "../apply-report.js";
-import { printlnStdout } from "../output.js";
+} from "pray-core/lockfile/paths.js";
+import { printlnStdout } from "pray-core/output.js";
+import { recordedPackageVersion } from "pray-core/package-spec/index.js";
+import { renderProject } from "pray-core/render/project.js";
+import { defaultResolveOptions } from "pray-core/resolve/context.js";
+import { resolveProject } from "pray-core/resolve/project.js";
+import { pathForkDriftLines } from "pray-core/resolve/upstream-drift.js";
+import { packageSourceSummary } from "pray-core/tree/index.js";
 import { previewRemoteUpdates } from "./update.js";
 import {
   printConstraintBlockedPackages,

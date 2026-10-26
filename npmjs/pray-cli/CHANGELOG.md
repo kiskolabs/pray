@@ -2,8 +2,9 @@
 
 ## Unreleased
 
-- Document the public TypeScript library API for jsr.io (module and symbol docs). Require explicit types on exported defaults so JSR publish no longer needs `--allow-slow-types`.
-- Move `runCli` off the package root to `pray-cli/cli`. Library and jsr.io imports stay free of CLI dispatch; `runTrustCommand` is no longer re-exported from the root.
+## 1.24.0 (2026-10-26)
+
+- Depend on `pray-core` for library behavior. This package is the `pray` CLI only; library imports use `pray-core` / `@kiskolabs/pray-core`.
 
 ## 1.23.0 (2026-10-26)
 

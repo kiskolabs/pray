@@ -1,13 +1,13 @@
 #!/usr/bin/env bash
-# Publish TypeScript pray-cli library to jsr.io as @kiskolabs/pray-cli.
+# Publish TypeScript pray-core library to jsr.io as @kiskolabs/pray-core.
 #
 # Usage:
 #   scripts/release/jsr.sh            # publish --dry-run (default)
 #   scripts/release/jsr.sh --publish  # real publish (manual)
 #
-# Prerequisites: @kiskolabs scope and pray-cli package on jsr.io.
+# Prerequisites: @kiskolabs scope and pray-core package on jsr.io.
 # Auth: browser login for local publish, or JSR_TOKEN / --token in CI.
-# Publish skips when @kiskolabs/pray-cli@version is already on jsr.io so release-all can resume.
+# Publish skips when @kiskolabs/pray-core@version is already on jsr.io so release-all can resume.
 set -euo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
@@ -19,8 +19,8 @@ source "${SCRIPT_DIR}/registry_status.sh"
 ROOT="$(release_repo_root)"
 VERSION="$(release_read_npm_version "${ROOT}")"
 MODE="dry-run"
-PACKAGE_DIR="${ROOT}/npmjs/pray-cli"
-JSR_PACKAGE="@kiskolabs/pray-cli"
+PACKAGE_DIR="${ROOT}/npmjs/pray-core"
+JSR_PACKAGE="@kiskolabs/pray-core"
 
 for argument in "$@"; do
   case "${argument}" in

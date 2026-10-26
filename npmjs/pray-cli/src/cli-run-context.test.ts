@@ -9,9 +9,9 @@ import {
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { afterEach, describe, it } from "node:test";
+import { materializeProject } from "pray-core/materialize.js";
+import { activeInvocationContext } from "pray-core/project-context/runtime.js";
 import { runCli } from "./cli/main.js";
-import { materializeProject } from "./cli/materialize.js";
-import { activeInvocationContext } from "./project-context/runtime.js";
 
 function writePathPackage(root: string, body: string): void {
   const packageRoot = join(root, "packages/shell");

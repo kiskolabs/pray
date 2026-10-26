@@ -53,6 +53,10 @@ release_assert_version_alignment() {
 
   npm_version="$(
     node -e 'console.log(JSON.parse(require("fs").readFileSync(process.argv[1], "utf8")).version)' \
+      "${root}/npmjs/pray-core/package.json"
+  )"
+  npm_cli_version="$(
+    node -e 'console.log(JSON.parse(require("fs").readFileSync(process.argv[1], "utf8")).version)' \
       "${root}/npmjs/pray-cli/package.json"
   )"
   gem_version="$(
@@ -60,7 +64,11 @@ release_assert_version_alignment() {
   )"
 
   if [[ "${npm_version}" != "${version}" ]]; then
-    echo "npm package version ${npm_version} does not match workspace ${version}" >&2
+    echo "npm pray-core version ${npm_version} does not match workspace ${version}" >&2
+    exit 2
+  fi
+  if [[ "${npm_cli_version}" != "${version}" ]]; then
+    echo "npm pray-cli version ${npm_cli_version} does not match workspace ${version}" >&2
     exit 2
   fi
   if [[ "${gem_version}" != "${version}" ]]; then
@@ -71,7 +79,7 @@ release_assert_version_alignment() {
   local ts_version
   ts_version="$(
     sed -n 's/^export const PACKAGE_VERSION = "\(.*\)";/\1/p' \
-      "${root}/npmjs/pray-cli/src/lockfile/types.ts" | head -1
+      "${root}/npmjs/pray-core/src/lockfile/types.ts" | head -1
   )"
   if [[ "${ts_version}" != "${version}" ]]; then
     echo "TypeScript PACKAGE_VERSION ${ts_version} does not match workspace ${version}" >&2

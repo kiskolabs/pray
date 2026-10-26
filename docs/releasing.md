@@ -9,23 +9,26 @@ Publishing is not automated in CI. Operators run the scripts under `scripts/rele
 | Surface | Package name | Executable |
 |---------|--------------|------------|
 | [crates.io](https://crates.io/crates/pray-cli) | `pray-core`, `pray-transport`, `pray-cli` | `pray` (from `pray-cli`) |
-| [npm](https://www.npmjs.com/package/pray-cli) | `pray-cli` | `pray` |
-| [jsr.io](https://jsr.io/@kiskolabs/pray-cli) | `@kiskolabs/pray-cli` | library import (CLI stays on npm) |
-| [RubyGems](https://rubygems.org/gems/pray-cli) | `pray-cli` | `pray` |
+| [npm](https://www.npmjs.com/package/pray-cli) | `pray-core`, `pray-cli` (CLI depends on core) | `pray` (from `pray-cli`) |
+| [jsr.io](https://jsr.io/@kiskolabs/pray-core) | `@kiskolabs/pray-core` | library import (CLI stays on npm) |
+| [RubyGems](https://rubygems.org/gems/pray-cli) | `pray-cli` only (Ruby exception: no separate core gem) | `pray` |
 | Nix flake | root `flake.nix` | `pray` (`nix run .#pray-cli`) |
 | AUR recipe | `packaging/aur/pray-cli` | `pray` (after AUR adoption) |
 | pray distribution point | prayers under `prayers/` (see [repository-layouts.md](repository-layouts.md)) | n/a |
 
 The crates.io name `pray` is already taken by an unrelated project, so the Rust CLI publishes as `pray-cli` while keeping the binary name `pray`.
 
+Default packaging for every language except Ruby: publish `pray-core` (library) and `pray-cli` (CLI depending on core). Ruby keeps a single gem with `require "pray"` versus `require "pray-cli"`. Host-language ports (Elixir, Haskell, Python, and others) live in [pray_compat](https://github.com/amkisko/pray_compat), not under this repository. This repo's `make release-all` covers only the reference Rust, TypeScript, and Ruby surfaces above.
+
 ## Version sync
 
 Keep these equal before a full language-registry publish (`make release-all`):
 
 - workspace `Cargo.toml` (`[workspace.package].version`)
+- `npmjs/pray-core/package.json`
 - `npmjs/pray-cli/package.json`
-- `npmjs/pray-cli/jsr.json`
-- `npmjs/pray-cli/src/lockfile/types.ts` (`PACKAGE_VERSION`)
+- `npmjs/pray-core/jsr.json`
+- `npmjs/pray-core/src/lockfile/types.ts` (`PACKAGE_VERSION`)
 - `rubygems/pray-cli/lib/pray/version.rb`
 
 The next version crates.io, npm, and RubyGems may share is the max of those numbers. A max held by one surface only cannot be aligned, whether that cut was a patch or a minor. The other surfaces skip that number and jump to the next patch. 1.18.1 is a Ruby-only example; an npm-only 1.19.0 or a crates-only 1.19.0 would likewise be skipped, with the next shared cut at 1.19.1 or later.
@@ -48,7 +51,7 @@ Publish crates.io (order is handled by the script). A crate whose version is alr
 ./scripts/release/crates.sh --publish
 ```
 
-Publish npm, JSR, and RubyGems. Each script skips when that version is already on the registry so `make release-all` can resume:
+Publish npm (core then CLI), JSR, and RubyGems. Each script skips when that version is already on the registry so `make release-all` can resume:
 
 ```sh
 ./scripts/release/npm.sh --publish
@@ -56,7 +59,7 @@ Publish npm, JSR, and RubyGems. Each script skips when that version is already o
 ./scripts/release/rubygems.sh --publish
 ```
 
-First JSR publish needs the `@kiskolabs` scope and `pray-cli` package created on [jsr.io](https://jsr.io/new). For JSR score and provenance: set the package description and runtime compatibility (Node.js and Deno at minimum) under the package Settings tab; link the GitHub repository; prefer publishing via `.github/workflows/publish-jsr.yml` (OIDC) so the version gets a transparency-log provenance entry. Token publish from `scripts/release/jsr.sh` does not create provenance. Optional OS packaging notes live under [packaging/README.md](../packaging/README.md).
+First JSR publish of `@kiskolabs/pray-core` needs the `@kiskolabs` scope and package created on [jsr.io](https://jsr.io/new). For JSR score and provenance: set the package description and runtime compatibility (Node.js and Deno at minimum) under the package Settings tab; link the GitHub repository; prefer publishing via `.github/workflows/publish-jsr.yml` (OIDC) so the version gets a transparency-log provenance entry. Token publish from `scripts/release/jsr.sh` does not create provenance. Optional OS packaging notes live under [packaging/README.md](../packaging/README.md).
 
 Publish local prayer packages to a distribution point:
 
@@ -92,7 +95,7 @@ Exit codes for operators: `docs/cli-exit-codes.md` (normative table in RFC 0040)
 ```sh
 cargo install pray-cli --locked
 npm install -g pray-cli
-npx jsr add @kiskolabs/pray-cli
+npx jsr add @kiskolabs/pray-core
 gem install pray-cli
 nix run github:kiskolabs/pray
 ```
@@ -107,4 +110,4 @@ Subscribe in a feed reader to watch publishes land:
 | RubyGems | https://rubygems.org/gems/pray-cli/versions.atom | Per-gem Atom (linked as RSS on the gem page) |
 | npmjs | — | No first-party per-package RSS/Atom; registry only exposes a global recent-updates feed at `https://registry.npmjs.org/-/rss` |
 
-For npm, poll package metadata (`https://registry.npmjs.org/pray-cli`) or use a third-party feed if you need per-package notifications.
+For npm, poll package metadata (`https://registry.npmjs.org/pray-core` and `https://registry.npmjs.org/pray-cli`) or use a third-party feed if you need per-package notifications.

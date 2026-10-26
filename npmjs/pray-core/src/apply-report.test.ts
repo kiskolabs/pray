@@ -1,9 +1,9 @@
 import assert from "node:assert/strict";
 import { describe, it } from "node:test";
-import type { Lockfile } from "../lockfile/types.js";
-import { LOCAL_EMBED_PACKAGE } from "../lockfile/types.js";
-import type { ResolvedLocalFile, ResolvedProject } from "../resolve/types.js";
 import { localSummaryLines, outdatedLocalLines } from "./apply-report.js";
+import type { Lockfile } from "./lockfile/types.js";
+import { LOCAL_EMBED_PACKAGE } from "./lockfile/types.js";
+import type { ResolvedLocalFile, ResolvedProject } from "./resolve/types.js";
 
 function localFile(checksum: string): ResolvedLocalFile {
   return {

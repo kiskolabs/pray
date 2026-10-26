@@ -1,7 +1,7 @@
-import { versionIsGreaterThan } from "../../constraint.js";
-import type { Lockfile } from "../../lockfile/types.js";
-import type { ResolvedProject } from "../../resolve/types.js";
-import { printlnStdout } from "../output.js";
+import { versionIsGreaterThan } from "pray-core/constraint.js";
+import type { Lockfile } from "pray-core/lockfile/types.js";
+import { printlnStdout } from "pray-core/output.js";
+import type { ResolvedProject } from "pray-core/resolve/types.js";
 
 export interface UpdatePackageEntry {
   name: string;

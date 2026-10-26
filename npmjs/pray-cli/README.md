@@ -1,8 +1,8 @@
 # pray-cli
 
-TypeScript `pray` CLI and library for [Prayfile](https://pray.kisko.dev): a package manager for the language placed before inference.
+TypeScript `pray` CLI for [Prayfile](https://pray.kisko.dev). Depends on [`pray-core`](https://www.npmjs.com/package/pray-core) for resolve, lock, render, verify, and publish.
 
-Resolve, lock, render, verify, publish, and serve shared instructions, policies, templates, and related input as versioned packages. The installed executable is `pray`.
+Library consumers should depend on `pray-core` (or `@kiskolabs/pray-core` on jsr.io), not this package.
 
 **Website:** [pray.kisko.dev](https://pray.kisko.dev)
 
@@ -11,8 +11,6 @@ Resolve, lock, render, verify, publish, and serve shared instructions, policies,
 **Repository:** [kiskolabs/pray](https://github.com/kiskolabs/pray)
 
 **Package:** [npmjs.com/package/pray-cli](https://www.npmjs.com/package/pray-cli)
-
-**Community docs:** [CHANGELOG.md](CHANGELOG.md) · [LICENSE.md](LICENSE.md) · [SECURITY.md](SECURITY.md)
 
 ## Install
 
@@ -41,32 +39,22 @@ pray serve --root ./prayers --port 7429
 
 ## Library vs CLI
 
-Import the library from the package root (or `@kiskolabs/pray-cli` on jsr.io). That entrypoint does not export CLI dispatch.
-
 ```ts
-import { parseManifest, resolveProject } from "pray-cli";
+import { parseManifest, resolveProject } from "pray-core";
 ```
 
-Programmatic CLI dispatch uses the `pray-cli/cli` subpath (same module the `pray` binary loads):
+Programmatic CLI dispatch:
 
 ```ts
 import { runCli } from "pray-cli/cli";
 ```
 
-## Commands
-
-- `manifest`, `init`, `prayer init`, `repo init`
-- `add`, `remove`, `update`, `unlock`
-- `install`, `apply`, `plan`, `render`, `verify`, `drift`, `format`
-- `package`, `publish`, `serve`, `sync`, `vendor`, `clean`, `tree`
-- `list`, `outdated`, `explain`
-- `trust`, `confess`, `login`, `upgrade`
-
 ## Development
 
 ```sh
-cd npmjs/pray-cli
+cd npmjs
 npm install
+cd pray-cli
 npm test
 npm run build
 node bin/pray.js version
@@ -76,10 +64,4 @@ node bin/pray.js version
 
 - Node.js 20+
 - `git` for git sources
-- `zstd` and `tar` for `.praypkg` archives
-
-## Status
-
-Registry HTTP(S), git sources, local publish/serve/sync, vendor/tree, login (passkey and ssh-agent), upgrade, update/plan/outdated remote flags, and trust import paths are implemented. SSH registry (`pray+ssh://`) and `serve --stdio` remain planned.
-
-See `rfcs/` in the repository for the normative specification.
+- `zstd` and `tar` for `.praypkg` archives (via `pray-core`)

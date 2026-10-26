@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+## 1.24.0 (2026-10-26)
+
 - Document `require "pray"` (library, no `Pray::CLI`) versus `require "pray-cli"` (library plus CLI).
 
 ## 1.23.0 (2026-10-26)

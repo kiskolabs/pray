@@ -3,11 +3,11 @@ import { cpSync, mkdtempSync, readFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join, resolve } from "node:path";
 import { describe, it } from "node:test";
-import { materializeProject } from "./cli/materialize.js";
-import { readLockfile } from "./lockfile/index.js";
-import { defaultLockfilePath } from "./lockfile/paths.js";
-import { resolveProject } from "./resolve/project.js";
-import { verifyProject } from "./verify/project.js";
+import { readLockfile } from "pray-core/lockfile/index.js";
+import { defaultLockfilePath } from "pray-core/lockfile/paths.js";
+import { materializeProject } from "pray-core/materialize.js";
+import { resolveProject } from "pray-core/resolve/project.js";
+import { verifyProject } from "pray-core/verify/project.js";
 
 describe("install integration", () => {
   it("installs and verifies simple-project fixture", async () => {

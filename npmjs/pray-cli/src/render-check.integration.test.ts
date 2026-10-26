@@ -9,10 +9,10 @@ import {
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { describe, it } from "node:test";
+import { renderProject } from "pray-core/render/project.js";
+import { writePackage } from "pray-core/render-test-package.js";
+import { resolveProject } from "pray-core/resolve/project.js";
 import { runCli } from "./cli/main.js";
-import { renderProject } from "./render/project.js";
-import { writePackage } from "./render-test-package.js";
-import { resolveProject } from "./resolve/project.js";
 
 async function writeProject(root: string): Promise<string> {
   writePackage(

@@ -9,8 +9,8 @@ Publishing is intentional and operator-driven. Scripts default to dry-run / buil
 | Script | Target | Default | Publish flag |
 |--------|--------|---------|--------------|
 | `crates.sh` | crates.io (`pray-core`, `pray-transport`, `pray-cli`) | `--dry-run` | `--publish` |
-| `npm.sh` | npmjs (`pray-cli`) | pack dry-run | `--publish` |
-| `jsr.sh` | jsr.io (`@kiskolabs/pray-cli`) | publish dry-run | `--publish` |
+| `npm.sh` | npmjs (`pray-core` then `pray-cli`) | pack dry-run | `--publish` |
+| `jsr.sh` | jsr.io (`@kiskolabs/pray-core`) | publish dry-run | `--publish` |
 | `rubygems.sh` | RubyGems (`pray-cli`) | build gem | `--publish` |
 | `distribution.sh` | pray distribution point | requires `--root` / `--server` | omit `--dry-run` |
 | `all.sh` | all of the above | dry-run registries | `--publish` plus DP args |
@@ -19,11 +19,11 @@ Publishing is intentional and operator-driven. Scripts default to dry-run / buil
 
 The CLI executable remains `pray`. The crates.io package name is `pray-cli` because `pray` is already taken by an unrelated crate.
 
-First crates.io publish must go in order: `pray-core`, then `pray-transport`, then `pray-cli`. Until `pray-core` exists on crates.io, `cargo publish --dry-run` for the later crates falls back to `cargo check`. A later `--publish` skips a crate whose version is already on crates.io. The same skip applies to npm (`pray-cli`), jsr.io (`@kiskolabs/pray-cli`), and RubyGems (`pray-cli`) when that version is already published.
+First crates.io publish must go in order: `pray-core`, then `pray-transport`, then `pray-cli`. Until `pray-core` exists on crates.io, `cargo publish --dry-run` for the later crates falls back to `cargo check`. A later `--publish` skips a crate whose version is already on crates.io. The same skip applies to npm (`pray-core`, then `pray-cli`), jsr.io (`@kiskolabs/pray-core`), and RubyGems (`pray-cli`) when that version is already published.
 
 ## Prerequisites
 
-- Version alignment across `Cargo.toml`, `npmjs/pray-cli/package.json`, `npmjs/pray-cli/jsr.json`, `npmjs/pray-cli/src/lockfile/types.ts`, and `rubygems/pray-cli/lib/pray/version.rb` for `all.sh`. The next coordinated version is the max of crates, npm, and gem. A one-surface max (patch or minor) is skipped by the other registries. Each language script may publish when that surface is uniquely ahead. JSR version must match npm.
+- Version alignment across `Cargo.toml`, `npmjs/pray-core/package.json`, `npmjs/pray-cli/package.json`, `npmjs/pray-core/jsr.json`, `npmjs/pray-core/src/lockfile/types.ts`, and `rubygems/pray-cli/lib/pray/version.rb` for `all.sh`. The next coordinated version is the max of crates, npm, and gem. A one-surface max (patch or minor) is skipped by the other registries. Each language script may publish when that surface is uniquely ahead. JSR version must match npm `pray-core`.
 - `cargo login` / `CARGO_REGISTRY_TOKEN` for crates.io
 - `npm login` for npmjs
 - jsr.io: create `@kiskolabs` / `pray-cli` once; local publish uses browser auth; CI may set `JSR_TOKEN`. Provenance requires GitHub Actions OIDC via `.github/workflows/publish-jsr.yml` after the package is linked to this repository in JSR settings. Set package description and runtime compatibility (Node.js, Deno) on the jsr.io Settings tab for search score.

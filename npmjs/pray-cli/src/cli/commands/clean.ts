@@ -1,4 +1,4 @@
-import { PrayError } from "../../errors.js";
+import { PrayError } from "pray-core/errors.js";
 
 export interface CleanOptions {
   unused: boolean;

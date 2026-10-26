@@ -49,10 +49,10 @@ fi
 [[ "$(release_publish_outcome no 1 release_rubygems_already_exists "${gem_exists}")" == "skip" ]] ||
   fail "gem already-exists publish failure must skip"
 
-jsr_exists='Warning: Skipping, already published @kiskolabs/pray-cli@1.23.0'
+jsr_exists='Warning: Skipping, already published @kiskolabs/pray-core@1.23.0'
 release_jsr_already_exists "${jsr_exists}" || fail "jsr already-published warning must skip"
 
-jsr_duplicate='error: Failed to publish @kiskolabs/pray-cli at 1.23.0: duplicateVersionPublish'
+jsr_duplicate='error: Failed to publish @kiskolabs/pray-core at 1.23.0: duplicateVersionPublish'
 release_jsr_already_exists "${jsr_duplicate}" || fail "jsr duplicateVersionPublish must skip"
 
 jsr_other='error: No means to authenticate. Pass a token to `--token`.'

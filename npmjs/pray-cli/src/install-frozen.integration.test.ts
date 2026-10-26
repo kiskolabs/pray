@@ -10,9 +10,9 @@ import {
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { afterEach, describe, it } from "node:test";
+import { materializeProject } from "pray-core/materialize.js";
+import { writePackage } from "pray-core/render-test-package.js";
 import { runCli } from "./cli/main.js";
-import { materializeProject } from "./cli/materialize.js";
-import { writePackage } from "./render-test-package.js";
 
 describe("locked and frozen installation", () => {
   const originalDirectory = process.cwd();

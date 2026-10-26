@@ -15,8 +15,8 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { afterEach, it } from "node:test";
 import { fileURLToPath } from "node:url";
-import { sha256Prefixed } from "./hashing.js";
-import { readLockfile, writeLockfile } from "./lockfile/index.js";
+import { sha256Prefixed } from "pray-core/hashing.js";
+import { readLockfile, writeLockfile } from "pray-core/lockfile/index.js";
 
 class UpdateFixture {
   readonly root = mkdtempSync(join(tmpdir(), "pray-update-"));

@@ -1,30 +1,37 @@
-import { existsSync, realpathSync } from "node:fs";
+import { existsSync } from "node:fs";
 import { resolve } from "node:path";
-import { PrayError } from "../errors.js";
+import { localSummaryLines } from "./apply-report.js";
+import { PrayError } from "./errors.js";
 import {
   buildLockfile,
   lockfilesEquivalent,
   readLockfile,
   writeLockfileIfChanged,
-} from "../lockfile/index.js";
+} from "./lockfile/index.js";
 import {
   defaultLockfilePath,
   defaultManifestPath,
   projectRootFromManifest,
-} from "../lockfile/paths.js";
-import { manifestToJson } from "../manifest/types.js";
-import { ensureRenderedTargetsCurrent } from "../render/check.js";
-import { renderProject, writeRenderedTargets } from "../render/project.js";
-import { defaultResolveOptions } from "../resolve/context.js";
-import { resolveProject } from "../resolve/project.js";
-import { applyPathUpstreamRefreshes } from "../resolve/upstream-refresh.js";
-import { runTransaction } from "../transaction/index.js";
-import { verifyProject } from "../verify/project.js";
-import { localSummaryLines } from "./apply-report.js";
+} from "./lockfile/paths.js";
+import { manifestToJson } from "./manifest/types.js";
 import {
-  projectRoot,
-  resolveCurrentProjectWithGitRefreshFallback,
-} from "./invocation.js";
+  activeInvocationContext,
+  type ProjectInvocationContext,
+  projectInvocationContextFromCurrentDirectory,
+} from "./project-context/index.js";
+import { ensureRenderedTargetsCurrent } from "./render/check.js";
+import { renderProject, writeRenderedTargets } from "./render/project.js";
+import {
+  defaultResolveOptions,
+  type ResolveOptions,
+} from "./resolve/context.js";
+import {
+  resolveProject,
+  resolveProjectWithGitRefreshFallback,
+} from "./resolve/project.js";
+import { applyPathUpstreamRefreshes } from "./resolve/upstream-refresh.js";
+import { runTransaction } from "./transaction/index.js";
+import { verifyProject } from "./verify/project.js";
 
 /** Options for {@link materializeProject}: resolve, render, and write lockfile. */
 export interface MaterializeOptions {
@@ -40,13 +47,21 @@ export interface MaterializeOptions {
   refreshSourceRevisions?: boolean;
 }
 
+function invocationContext(): ProjectInvocationContext {
+  return (
+    activeInvocationContext() ?? projectInvocationContextFromCurrentDirectory()
+  );
+}
+
 /** Resolve the project, render destinations, and update `Prayfile.lock` when needed. */
 export async function materializeProject(
   options: MaterializeOptions = {},
 ): Promise<void> {
+  // Keep the same path form as resolveProject.projectRoot so nested
+  // writeRenderedTargets transactions join instead of failing on macOS /var vs /private/var.
   const transactionRoot = options.manifestPath
-    ? realpathSync(projectRootFromManifest(resolve(options.manifestPath)))
-    : projectRoot();
+    ? projectRootFromManifest(resolve(options.manifestPath))
+    : invocationContext().projectRoot;
   if (
     (options.locked || options.frozen) &&
     !existsSync(defaultLockfilePath(transactionRoot))
@@ -62,19 +77,22 @@ export async function materializeProject(
 async function materializeWithOptions(
   options: MaterializeOptions,
 ): Promise<void> {
-  const manifestPath = resolve(options.manifestPath ?? defaultManifestPath());
+  const context = invocationContext();
+  const manifestPath = resolve(options.manifestPath ?? context.manifestPath);
   if (!existsSync(manifestPath)) {
     throw PrayError.manifest(
       `missing ${manifestPath}; run pray init to create one`,
     );
   }
 
-  const resolveOptions = {
+  const resolveOptions: ResolveOptions = {
     ...defaultResolveOptions(),
     offline: options.offline ?? false,
     refreshSourceRevisions: options.refreshSourceRevisions ?? false,
+    environment: context.environment,
   };
-  let project = await resolveCurrentProjectWithGitRefreshFallback(
+  let project = await resolveProjectWithGitRefreshFallback(
+    manifestPath,
     resolveOptions,
     !options.locked && !options.frozen,
   );
@@ -91,7 +109,8 @@ async function materializeWithOptions(
         resolveOptions,
       )
     ) {
-      project = await resolveCurrentProjectWithGitRefreshFallback(
+      project = await resolveProjectWithGitRefreshFallback(
+        manifestPath,
         resolveOptions,
         true,
       );
@@ -138,7 +157,7 @@ async function materializeWithOptions(
 }
 
 export async function printManifest(
-  manifestPath = defaultManifestPath(),
+  manifestPath: string = defaultManifestPath(),
 ): Promise<void> {
   const project = await resolveProject(manifestPath, defaultResolveOptions());
   process.stdout.write(

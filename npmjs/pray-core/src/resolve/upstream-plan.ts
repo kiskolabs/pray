@@ -1,8 +1,8 @@
-import { printlnStdout } from "../cli/output.js";
 import { PrayError } from "../errors.js";
 import { prepareGitSources } from "../git/sources.js";
 import type { LockedUpstream, Lockfile } from "../lockfile/types.js";
 import type { ManifestPackage, ManifestSource } from "../manifest/types.js";
+import { printlnStdout } from "../output.js";
 import type { ResolveOptions } from "./context.js";
 import { resolvePackage } from "./project.js";
 import { sourceMap } from "./source-map.js";

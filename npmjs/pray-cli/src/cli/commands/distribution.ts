@@ -1,11 +1,11 @@
-import { submitConfession } from "../../confess/index.js";
-import { PrayError } from "../../errors.js";
-import { defaultManifestPath } from "../../lockfile/paths.js";
-import { optionalPathRemoteRoot } from "../../publish/command.js";
-import { runServer, runStdioRpc } from "../../serve/index.js";
-import { syncDistributionRoot } from "../../sync/index.js";
+import { submitConfession } from "pray-core/confess/index.js";
+import { PrayError } from "pray-core/errors.js";
+import { defaultManifestPath } from "pray-core/lockfile/paths.js";
+import { optionalPathRemoteRoot } from "pray-core/publish/command.js";
+import { runServer, runStdioRpc } from "pray-core/serve/index.js";
+import { syncDistributionRoot } from "pray-core/sync/index.js";
 
-export { runPublish } from "../../publish/command.js";
+export { runPublish } from "pray-core/publish/command.js";
 
 export async function runServe(argumentsList: string[]): Promise<void> {
   let root = ".";

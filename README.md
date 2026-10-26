@@ -1001,7 +1001,7 @@ Start with `rfcs/README.md` for:
 
 ### npm (Node.js)
 
-Install the TypeScript `pray` CLI from [npm](https://www.npmjs.com/package/pray-cli):
+Install the TypeScript `pray` CLI from [npm](https://www.npmjs.com/package/pray-cli) (depends on [`pray-core`](https://www.npmjs.com/package/pray-core)):
 
 ```sh
 npm install -g pray-cli
@@ -1013,21 +1013,22 @@ Or run without a global install:
 npx pray-cli install
 ```
 
-The npm package lives in `npmjs/pray-cli` and implements Prayfile parsing, registry and git resolution, lockfile generation, rendering, verification, publish, and serve.
+The CLI lives in `npmjs/pray-cli`. The library lives in `npmjs/pray-core`.
 
-### JSR (Deno and TypeScript libraries)
-
-Import the TypeScript library from [jsr.io](https://jsr.io/@kiskolabs/pray-cli) after the package is published:
+### TypeScript library (npm / jsr.io)
 
 ```sh
-npx jsr add @kiskolabs/pray-cli
+npm install pray-core
+# or
+npx jsr add @kiskolabs/pray-core
 ```
 
 ```ts
-import { parseManifest } from "@kiskolabs/pray-cli";
+import { parseManifest } from "pray-core";
+// or: import { parseManifest } from "@kiskolabs/pray-core";
 ```
 
-JSR ships TypeScript source. The Node CLI binary remains the npm `pray-cli` package. First publish needs the `@kiskolabs` scope on jsr.io; operators use `scripts/release/jsr.sh`.
+JSR ships TypeScript source for `@kiskolabs/pray-core`. The Node CLI binary remains the npm `pray-cli` package. Operators use `scripts/release/jsr.sh` for the library and `scripts/release/npm.sh` for core then CLI.
 
 ### Nix
 
@@ -1083,7 +1084,8 @@ Confession submission should require explicit verification, signed payloads, rep
 - [GitHub](https://github.com/kiskolabs/pray)
 - [GitLab](https://gitlab.com/amkisko/pray)
 - [crates.io](https://crates.io/crates/pray-cli)
-- [npm](https://www.npmjs.com/package/pray-cli)
+- [npm pray-cli](https://www.npmjs.com/package/pray-cli) · [npm pray-core](https://www.npmjs.com/package/pray-core)
+- [jsr.io @kiskolabs/pray-core](https://jsr.io/@kiskolabs/pray-core)
 - [RubyGems](https://rubygems.org/gems/pray-cli)
 - [libraries.io](https://libraries.io/cargo/pray-cli)
 - [Deps.dev](https://deps.dev/cargo/pray-cli)

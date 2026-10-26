@@ -1,0 +1,8 @@
+{
+  "name": "pray-npmjs",
+  "private": true,
+  "workspaces": [
+    "pray-core",
+    "pray-cli"
+  ]
+}

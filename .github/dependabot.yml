@@ -13,7 +13,7 @@ updates:
         patterns:
           - "*"
   - package-ecosystem: npm
-    directory: /npmjs/pray-cli
+    directory: /npmjs
     open-pull-requests-limit: 10
     schedule:
       interval: weekly
@@ -28,6 +28,7 @@ updates:
       # Keep Node types on the CI runtime (Node 22 in .github/workflows/ci.yml).
       - dependency-name: "@types/node"
         update-types: ["version-update:semver-major"]
+
   - package-ecosystem: bundler
     directory: /rubygems/pray-cli
     open-pull-requests-limit: 10

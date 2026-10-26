@@ -9,6 +9,6 @@
     "dist",
     "src/**/*.test.ts",
     "src/**/*.integration.test.ts",
-    "src/render-test-package.ts"
+    "src/**/*.support.ts"
   ]
 }

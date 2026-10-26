@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import { describe, it } from "node:test";
-import { PrayError } from "../../errors.js";
+import { PrayError } from "pray-core/errors.js";
 import { runConfess, runServe, runSync } from "./distribution.js";
 
 function isUsageError(error: unknown): boolean {

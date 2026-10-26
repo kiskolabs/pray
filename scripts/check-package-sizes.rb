@@ -38,12 +38,12 @@ Dir.mktmpdir("pray-package-sizes-") do |temporary|
   run!("gem", "build", "pray-cli.gemspec", "--output", gem_path, chdir: File.join(ROOT, "rubygems/pray-cli"))
   check!(:ruby_gem, File.size(gem_path))
 
-  npm_root = File.join(ROOT, "npmjs/pray-cli")
-  run!("npm", "run", "--silent", "build", chdir: npm_root)
+  npm_core = File.join(ROOT, "npmjs/pray-core")
+  run!("npm", "run", "--silent", "build", chdir: npm_core)
   packed = JSON.parse(
     run!(
       "npm", "pack", "--dry-run", "--json", "--ignore-scripts",
-      chdir: npm_root,
+      chdir: npm_core,
       env: {"NPM_CONFIG_CACHE" => File.join(temporary, "npm-cache")}
     )
   ).fetch(0)

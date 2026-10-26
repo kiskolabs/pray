@@ -1,21 +1,24 @@
 import { existsSync } from "node:fs";
-import { PrayError } from "../../errors.js";
+import { PrayError } from "pray-core/errors.js";
 import {
   buildLockfile,
   readLockfile,
   writeLockfile,
-} from "../../lockfile/index.js";
+} from "pray-core/lockfile/index.js";
 import {
   defaultLockfilePath,
   defaultManifestPath,
-} from "../../lockfile/paths.js";
+} from "pray-core/lockfile/paths.js";
 import {
   addPackageToManifest,
   removePackageFromManifest,
-} from "../../manifest/edit.js";
-import { renderProject, writeRenderedTargets } from "../../render/project.js";
-import { resolveProject } from "../../resolve/project.js";
-import { materializeProject } from "../materialize.js";
+} from "pray-core/manifest/edit.js";
+import { materializeProject } from "pray-core/materialize.js";
+import {
+  renderProject,
+  writeRenderedTargets,
+} from "pray-core/render/project.js";
+import { resolveProject } from "pray-core/resolve/project.js";
 
 export async function runAdd(argumentsList: string[]): Promise<void> {
   const name = argumentsList[0];

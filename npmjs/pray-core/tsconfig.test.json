@@ -1,0 +1,11 @@
+{
+  "extends": "./tsconfig.json",
+  "compilerOptions": {
+    "outDir": "dist-test"
+  },
+  "include": [
+    "src/**/*.test.ts",
+    "src/**/*.integration.test.ts",
+    "src/render-test-package.ts"
+  ]
+}

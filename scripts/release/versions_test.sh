@@ -40,10 +40,11 @@ release_assert_coordinated_changelog "${ROOT}" "1.20.0" || fail "1.20.0 is coord
 release_assert_coordinated_changelog "${ROOT}" "1.21.0" || fail "1.21.0 is coordinated"
 release_assert_coordinated_changelog "${ROOT}" "1.22.0" || fail "1.22.0 is coordinated"
 release_assert_coordinated_changelog "${ROOT}" "1.23.0" || fail "1.23.0 is coordinated"
+release_assert_coordinated_changelog "${ROOT}" "1.24.0" || fail "1.24.0 is coordinated"
 if release_assert_coordinated_changelog "${ROOT}" "1.18.1" >/dev/null 2>&1; then
   fail "1.18.1 must not be coordinated"
 fi
-[[ "$(release_next_coordinated_version "${ROOT}")" == "1.23.0" ]] ||
-  fail "live next coordinated version is 1.23.0"
+[[ "$(release_next_coordinated_version "${ROOT}")" == "1.24.0" ]] ||
+  fail "live next coordinated version is 1.24.0"
 
 echo "coordinated version tests passed"

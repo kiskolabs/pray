@@ -1,24 +1,26 @@
-import { runLoginCommand } from "../auth/login.js";
-import { PrayError } from "../errors.js";
-import { readLockfile } from "../lockfile/index.js";
-import { PACKAGE_VERSION } from "../lockfile/types.js";
+import { runLoginCommand } from "pray-core/auth/login.js";
+import { PrayError } from "pray-core/errors.js";
+import { readLockfile } from "pray-core/lockfile/index.js";
+import { PACKAGE_VERSION } from "pray-core/lockfile/types.js";
+import { materializeProject, printManifest } from "pray-core/materialize.js";
+import { configureOutput } from "pray-core/output.js";
 import {
   activeInvocationContext,
   setActiveInvocationContext,
-} from "../project-context/runtime.js";
-import { initDistributionRoot } from "../publish/index.js";
-import { maybeDeclarePublishRemote } from "../publish/remote-init.js";
-import { ensureRenderedTargetsCurrent } from "../render/check.js";
-import { renderProject } from "../render/project.js";
-import { runTransaction } from "../transaction/index.js";
-import { renderDependencyTree } from "../tree/index.js";
-import { runTrustCommand } from "../trust/index.js";
+} from "pray-core/project-context/runtime.js";
+import { initDistributionRoot } from "pray-core/publish/index.js";
+import { maybeDeclarePublishRemote } from "pray-core/publish/remote-init.js";
+import { ensureRenderedTargetsCurrent } from "pray-core/render/check.js";
+import { renderProject } from "pray-core/render/project.js";
+import { runTransaction } from "pray-core/transaction/index.js";
+import { renderDependencyTree } from "pray-core/tree/index.js";
+import { runTrustCommand } from "pray-core/trust/index.js";
 import {
   cleanProjectCaches,
   cleanUnusedRegistryCache,
   vendorProject,
-} from "../vendor/index.js";
-import { driftProject, verifyProject } from "../verify/project.js";
+} from "pray-core/vendor/index.js";
+import { driftProject, verifyProject } from "pray-core/verify/project.js";
 import { parseCleanArguments } from "./commands/clean.js";
 import {
   runConfess,
@@ -39,8 +41,6 @@ import {
   projectRoot,
   resolveCurrentProject,
 } from "./invocation.js";
-import { materializeProject, printManifest } from "./materialize.js";
-import { configureOutput } from "./output.js";
 import { unknownCommandMessage } from "./suggest.js";
 import { runUpgradeCommand } from "./upgrade.js";
 

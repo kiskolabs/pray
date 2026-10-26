@@ -1,4 +1,3 @@
-import { printlnStdout } from "../cli/output.js";
 import { PrayError } from "../errors.js";
 import {
   defaultManifestPath,
@@ -6,6 +5,7 @@ import {
 } from "../lockfile/paths.js";
 import { parseManifest, readManifestText } from "../manifest/index.js";
 import type { ManifestPublishRemote } from "../manifest/types.js";
+import { printlnStdout } from "../output.js";
 import { requireReleaseVersion } from "../package-spec/index.js";
 import { resolveProject } from "../resolve/project.js";
 import type { ResolvedPackage, ResolvedProject } from "../resolve/types.js";

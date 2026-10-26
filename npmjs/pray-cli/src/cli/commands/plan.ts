@@ -1,14 +1,14 @@
 import { existsSync } from "node:fs";
-import { PrayError } from "../../errors.js";
-import { buildLockfile, readLockfile } from "../../lockfile/index.js";
+import { localSummaryLines } from "pray-core/apply-report.js";
+import { PrayError } from "pray-core/errors.js";
+import { buildLockfile, readLockfile } from "pray-core/lockfile/index.js";
 import {
   provisionedDestinationStatus,
   provisionedDestinationStatuses,
-} from "../../render/dest.js";
-import { renderProject } from "../../render/project.js";
-import { defaultResolveOptions } from "../../resolve/context.js";
-import type { ResolvedProject } from "../../resolve/types.js";
-import { localSummaryLines } from "../apply-report.js";
+} from "pray-core/render/dest.js";
+import { renderProject } from "pray-core/render/project.js";
+import { defaultResolveOptions } from "pray-core/resolve/context.js";
+import type { ResolvedProject } from "pray-core/resolve/types.js";
 import {
   lockfilePath,
   resolveCurrentProject,

@@ -1,11 +1,11 @@
 /**
  * TypeScript library for Prayfile: resolve, lock, render, verify, publish, and serve.
  *
- * CLI dispatch (`runCli`) lives under `pray-cli/cli`. The `pray` binary uses that path.
+ * CLI dispatch lives in the `pray-cli` package (`pray-cli/cli`). The `pray` binary uses that path.
  *
  * @example
  * ```ts
- * import { parseManifest, resolveProject } from "@kiskolabs/pray-cli";
+ * import { parseManifest, resolveProject } from "@kiskolabs/pray-core";
  *
  * const manifest = parseManifest(`prayfile 1\n`);
  * const project = await resolveProject("./Prayfile");
@@ -14,8 +14,6 @@
  * @module
  */
 
-export type { MaterializeOptions } from "./cli/materialize.js";
-export { materializeProject } from "./cli/materialize.js";
 export { submitConfession } from "./confess/index.js";
 export { PrayError } from "./errors.js";
 export {
@@ -58,6 +56,8 @@ export type {
   ManifestTarget,
   RenderPolicy,
 } from "./manifest/types.js";
+export type { MaterializeOptions } from "./materialize.js";
+export { materializeProject, printManifest } from "./materialize.js";
 export { parsePackageSpec } from "./package-spec/index.js";
 export { publishToRoot, publishToServer } from "./publish/index.js";
 export { renderProject, writeRenderedTargets } from "./render/project.js";
