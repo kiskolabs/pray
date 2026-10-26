@@ -35,12 +35,10 @@ export function parseUpdateArguments(argumentsList: string[]): UpdateFlags {
         break;
       default:
         if (argument.startsWith("--")) {
-          throw PrayError.unsupported(`unknown update flag: ${argument}`);
+          throw PrayError.usage(`unknown update flag: ${argument}`);
         }
         if (packageName) {
-          throw PrayError.unsupported(
-            `unexpected update argument: ${argument}`,
-          );
+          throw PrayError.usage(`unexpected update argument: ${argument}`);
         }
         packageName = argument;
     }
@@ -51,23 +49,21 @@ export function parseUpdateArguments(argumentsList: string[]): UpdateFlags {
 export async function runUpdateCommand(argumentsList: string[]): Promise<void> {
   const flags = parseUpdateArguments(argumentsList);
   if (flags.major && flags.latest) {
-    throw PrayError.unsupported("use either --major or --latest, not both");
+    throw PrayError.usage("use either --major or --latest, not both");
   }
   if (flags.major) {
     if (!flags.packageName) {
-      throw PrayError.unsupported("major updates require a package name");
+      throw PrayError.usage("major updates require a package name");
     }
     if (flags.dryRun) {
-      throw PrayError.unsupported(
-        "major updates are not supported with --dry-run",
-      );
+      throw PrayError.usage("major updates are not supported with --dry-run");
     }
     await updateLatestCommand(flags.packageName, flags.json, false);
     return;
   }
   if (flags.latest) {
     if (flags.dryRun && flags.json) {
-      throw PrayError.unsupported("--json is not supported with --dry-run");
+      throw PrayError.usage("--json is not supported with --dry-run");
     }
     await updateLatestCommand(flags.packageName, flags.json, flags.dryRun);
     return;

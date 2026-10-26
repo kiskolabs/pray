@@ -10,9 +10,9 @@ export function parseCleanArguments(argumentsList: string[]): CleanOptions {
     if (argument === "--unused" && !unused) {
       unused = true;
     } else if (argument.startsWith("--")) {
-      throw PrayError.unsupported(`unknown clean flag: ${argument}`);
+      throw PrayError.usage(`unknown clean flag: ${argument}`);
     } else {
-      throw PrayError.unsupported(`unexpected clean argument: ${argument}`);
+      throw PrayError.usage(`unexpected clean argument: ${argument}`);
     }
   }
   return { unused };

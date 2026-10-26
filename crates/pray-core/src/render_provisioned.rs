@@ -41,7 +41,19 @@ pub fn planned_provisioned_files(
             }
         }
     }
-    planned.sort_by(|left, right| left.path.cmp(&right.path));
+    planned.sort_by(|left, right| {
+        (&left.path, &left.package, &left.export).cmp(&(&right.path, &right.package, &right.export))
+    });
+    for owners in planned.windows(2) {
+        let (left, right) = (&owners[0], &owners[1]);
+        if left.path == right.path && (left.package != right.package || left.export != right.export)
+        {
+            return Err(PrayError::Render(format!(
+                "provisioned destination `{}` has multiple owners: package `{}` export `{}` and package `{}` export `{}`",
+                left.path.display(), left.package, left.export, right.package, right.export
+            )));
+        }
+    }
     planned.dedup_by(|left, right| left.path == right.path);
     Ok(planned)
 }

@@ -79,9 +79,23 @@ export function upsertPackage(
   manifest: Manifest,
   packageEntry: ManifestPackage,
 ): void {
-  const existing = manifest.packages.find(
+  const existingIndex = manifest.packages.findIndex(
     (candidate) => candidate.name === packageEntry.name,
   );
+  upsertPackageAt(
+    manifest,
+    packageEntry,
+    existingIndex < 0 ? undefined : existingIndex,
+  );
+}
+
+export function upsertPackageAt(
+  manifest: Manifest,
+  packageEntry: ManifestPackage,
+  existingIndex: number | undefined,
+): void {
+  const existing =
+    existingIndex === undefined ? undefined : manifest.packages[existingIndex];
   if (!existing) {
     manifest.packages.push(packageEntry);
     return;

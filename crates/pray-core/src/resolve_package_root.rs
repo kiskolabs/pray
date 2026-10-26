@@ -26,14 +26,18 @@ pub(crate) fn resolve_package_root(
 ) -> PrayResult<PackageRootResolution> {
     if let Some(local_path) = user_config.local.package.get(&declaration.name) {
         return Ok(PackageRootResolution {
-            root: project_root.join(local_path),
+            root: crate::source_path::declared_directory(
+                project_root,
+                local_path,
+                "package directory",
+            )?,
             signer_fingerprint: None,
             registry_latest_version: None,
         });
     }
     if let Some(path) = &declaration.path {
         return Ok(PackageRootResolution {
-            root: project_root.join(path),
+            root: crate::source_path::declared_directory(project_root, path, "package directory")?,
             signer_fingerprint: None,
             registry_latest_version: None,
         });
@@ -72,8 +76,13 @@ pub(crate) fn resolve_package_root(
         }
         if source.kind == "path" {
             let directory = path_source_package_directory(&source_name, &declaration.name);
+            let path = Path::new(&source.url).join(directory);
             return Ok(PackageRootResolution {
-                root: project_root.join(&source.url).join(directory),
+                root: crate::source_path::declared_directory(
+                    project_root,
+                    &path.to_string_lossy(),
+                    "package directory",
+                )?,
                 signer_fingerprint: None,
                 registry_latest_version: None,
             });

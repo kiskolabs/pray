@@ -33,13 +33,13 @@ RSpec.describe "pray update --latest" do
     expect(File.read(File.join(consumer, "Prayfile.lock"))).to include("2.0.0")
   end
 
-  it "rewrites a two-component pessimistic constraint to the registry latest minor" do
+  it "keeps a two-component pessimistic constraint for a later minor" do
     consumer = consumer_after_published_version("1.5.0")
 
     expect { Dir.chdir(consumer) { Pray::CLI.run(["update", "--latest"]) } }
-      .to output(/Prayfile: sample\/base constraint ~> 1.4 -> ~> 1.5/).to_stdout
+      .to output(/All package constraints already allow latest versions/).to_stdout
 
-    expect(File.read(File.join(consumer, "Prayfile"))).to include("~> 1.5")
+    expect(File.read(File.join(consumer, "Prayfile"))).to include("~> 1.4")
     expect(File.read(File.join(consumer, "Prayfile.lock"))).to include("1.5.0")
   end
 

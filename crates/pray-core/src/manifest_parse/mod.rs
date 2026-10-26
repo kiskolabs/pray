@@ -3,6 +3,7 @@ use crate::manifest::{DestinationMode, Manifest, ManifestPackage};
 use crate::statement_surface::SurfaceStatementReader;
 use crate::{PrayError, PrayResult};
 use std::borrow::Cow;
+use std::collections::{HashMap, HashSet};
 
 mod blocks;
 mod call;
@@ -27,7 +28,9 @@ struct BlockParser<'a> {
     lines: &'a [Cow<'a, str>],
     cursor: usize,
     group_stack: Vec<Vec<String>>,
+    package_indices: HashMap<String, usize>,
     surface: SurfaceStatementReader,
+    target_package_names: HashMap<usize, HashSet<String>>,
 }
 
 impl<'a> BlockParser<'a> {
@@ -36,7 +39,9 @@ impl<'a> BlockParser<'a> {
             lines,
             cursor: 0,
             group_stack: Vec::new(),
+            package_indices: HashMap::new(),
             surface: SurfaceStatementReader::default(),
+            target_package_names: HashMap::new(),
         }
     }
 
@@ -113,11 +118,13 @@ impl<'a> BlockParser<'a> {
         }
         if let Some(rest) = statement.strip_prefix("agent ") {
             manifest.note_deprecated_keyword(crate::deprecation::DEPRECATED_AGENT);
-            crate::destination::upsert_package(manifest, self.parse_package_with_groups(rest)?)?;
+            let package = self.parse_package_with_groups(rest)?;
+            self.upsert_package(manifest, package)?;
             return Ok(());
         }
         if let Some(rest) = statement.strip_prefix("package ") {
-            crate::destination::upsert_package(manifest, self.parse_package_with_groups(rest)?)?;
+            let package = self.parse_package_with_groups(rest)?;
+            self.upsert_package(manifest, package)?;
             return Ok(());
         }
         if statement == "pray do" || statement == "template do" {
@@ -193,6 +200,37 @@ impl<'a> BlockParser<'a> {
         let mut package = parse_package_decl(rest)?;
         package.groups = self.group_stack.last().cloned().unwrap_or_default();
         Ok(package)
+    }
+
+    fn upsert_package(
+        &mut self,
+        manifest: &mut Manifest,
+        package: ManifestPackage,
+    ) -> PrayResult<()> {
+        let name = package.name.clone();
+        let existing_index = self.package_indices.get(&name).copied();
+        crate::destination::upsert_package_at(manifest, package, existing_index)?;
+        if existing_index.is_none() {
+            self.package_indices
+                .insert(name, manifest.packages.len() - 1);
+        }
+        Ok(())
+    }
+
+    fn bind_package_entry(
+        &mut self,
+        manifest: &mut Manifest,
+        target_index: usize,
+        package_name: &str,
+    ) {
+        let package_names = self.target_package_names.entry(target_index).or_default();
+        if package_names.insert(package_name.to_string()) {
+            manifest.targets[target_index].entries.push(
+                crate::manifest::DestinationEntry::Package {
+                    name: package_name.to_string(),
+                },
+            );
+        }
     }
 
     fn parse_target_block(

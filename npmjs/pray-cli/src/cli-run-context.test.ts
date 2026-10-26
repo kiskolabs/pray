@@ -70,4 +70,18 @@ describe("runCli invocation context", () => {
       rmSync(second, { recursive: true, force: true });
     }
   });
+
+  it("rejects an unknown install flag before writing", async () => {
+    const root = mkdtempSync(join(tmpdir(), "pray-cli-unknown-flag-"));
+    try {
+      writePathPackage(root, "aliases\n");
+      process.chdir(root);
+
+      assert.equal(await runCli(["install", "--unknown"]), 2);
+      assert.throws(() => readFileSync(join(root, ".zshrc"), "utf8"));
+    } finally {
+      process.chdir(previousWorkingDirectory);
+      rmSync(root, { recursive: true, force: true });
+    }
+  });
 });

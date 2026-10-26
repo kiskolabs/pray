@@ -11,6 +11,7 @@ module Pray
 
     def resolve_local_file(project_root, declaration)
       path = File.join(project_root, declaration.path)
+      SourcePath.reject_symlinks!(project_root, declaration.path, "local source")
       unless File.exist?(path)
         if declaration.optional
           return ResolvedLocalFile.new(

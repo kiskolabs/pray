@@ -144,7 +144,12 @@ module Pray
     end
 
     def format_string(value)
-      escaped = value.gsub("\\", "\\\\").gsub("\"", "\\\"")
+      escapes = {8 => "\\b", 9 => "\\t", 10 => "\\n", 12 => "\\f", 13 => "\\r", 34 => "\\\"", 92 => "\\\\"}
+      escaped = value.each_codepoint.map do |codepoint|
+        escapes.fetch(codepoint) do
+          (codepoint < 32 || codepoint == 127) ? format("\\u%04X", codepoint) : codepoint.chr(Encoding::UTF_8)
+        end
+      end.join
       "\"#{escaped}\""
     end
 

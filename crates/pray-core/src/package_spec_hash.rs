@@ -1,6 +1,6 @@
 use super::PackageSpec;
 use crate::hashing::sha256_prefixed;
-use crate::{PrayError, PrayResult};
+use crate::PrayResult;
 use std::collections::BTreeMap;
 
 impl PackageSpec {
@@ -42,21 +42,7 @@ impl PackageSpec {
 
     pub fn tree_hash_for_root(&self, root: &std::path::Path) -> PrayResult<String> {
         self.validate_relative_paths()?;
-        let mut file_bytes = BTreeMap::new();
-        for file in &self.files {
-            let path = root.join(file);
-            if !path.exists() {
-                return Err(PrayError::Integrity(format!(
-                    "package file missing: {file}"
-                )));
-            }
-            if path.is_dir() {
-                return Err(PrayError::Integrity(format!(
-                    "package file is a directory: {file}"
-                )));
-            }
-            file_bytes.insert(file.clone(), std::fs::read(&path)?);
-        }
+        let file_bytes = crate::resolve_exports::load_package_file_bytes(root, self)?;
         Self::tree_hash_from_file_bytes(&file_bytes)
     }
 

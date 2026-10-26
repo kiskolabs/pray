@@ -41,9 +41,15 @@ module Pray
       target
     end
 
-    def upsert_package(manifest, package)
-      existing = manifest.packages.find { |candidate| candidate.name == package.name }
+    def upsert_package(manifest, package, package_indices = nil)
+      existing_index = package_indices&.[](package.name)
+      existing = if existing_index
+        manifest.packages[existing_index]
+      elsif package_indices.nil?
+        manifest.packages.find { |candidate| candidate.name == package.name }
+      end
       unless existing
+        package_indices[package.name] = manifest.packages.length if package_indices
         manifest.packages << package
         return
       end
@@ -93,9 +99,15 @@ module Pray
       end
     end
 
-    def upsert_local(manifest, local)
-      existing = manifest.local.find { |candidate| candidate.path == local.path }
+    def upsert_local(manifest, local, local_indices = nil)
+      existing_index = local_indices&.[](local.path)
+      existing = if existing_index
+        manifest.local[existing_index]
+      elsif local_indices.nil?
+        manifest.local.find { |candidate| candidate.path == local.path }
+      end
       unless existing
+        local_indices[local.path] = manifest.local.length if local_indices
         manifest.local << local
         return
       end
@@ -108,17 +120,25 @@ module Pray
       existing.file ||= local.file
     end
 
-    def bind_package_entry(target, package_name)
+    def bind_package_entry(target, package_name, package_names = nil)
       entry = DestinationEntry.package(package_name)
-      return if target.entries.any? { |candidate| candidate.kind == "package" && candidate.name == package_name }
+      exists = package_names ? package_names.key?(package_name) : target.entries.any? do |candidate|
+        candidate.kind == "package" && candidate.name == package_name
+      end
+      return if exists
 
       target.entries << entry
+      package_names[package_name] = true if package_names
     end
 
-    def bind_local_entry(target, path)
-      return if target.entries.any? { |candidate| candidate.kind == "local" && candidate.path == path }
+    def bind_local_entry(target, path, local_paths = nil)
+      exists = local_paths ? local_paths.key?(path) : target.entries.any? do |candidate|
+        candidate.kind == "local" && candidate.path == path
+      end
+      return if exists
 
       target.entries << DestinationEntry.local(path)
+      local_paths[path] = true if local_paths
     end
 
     def role_for_destination(mode)

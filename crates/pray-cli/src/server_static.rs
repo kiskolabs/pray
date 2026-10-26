@@ -70,23 +70,12 @@ pub(crate) fn artifact_upload_response(
 
 pub(crate) fn static_file_response(root: &Path, request_path: &str) -> PrayResult<Response> {
     let relative = sanitize_request_path(request_path)?;
-    let path = root.join(relative);
-    if path.is_dir() {
-        return Err(PrayError::Resolution(format!(
-            "directory requested as file: {}",
-            request_path
-        )));
-    }
-    let body = match fs::read(&path) {
-        Ok(body) => body,
-        Err(error) if error.kind() == std::io::ErrorKind::NotFound => {
-            return Ok(response_with_status(
-                404,
-                "text/plain",
-                b"not found".to_vec(),
-            ));
-        }
-        Err(error) => return Err(error.into()),
+    let Some((path, body)) = crate::server_public_file::read(root, &relative)? else {
+        return Ok(response_with_status(
+            404,
+            "text/plain",
+            b"not found".to_vec(),
+        ));
     };
     let content_type = content_type_for_path(&path);
     Ok(Response {

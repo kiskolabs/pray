@@ -81,7 +81,7 @@ module Pray
         when "]", "}", ")"
           depth -= 1
         else
-          return index if depth.zero? && input[index..].start_with?(token)
+          return index if depth.zero? && input[index, token.length] == token
         end
         index += 1
       end
@@ -151,6 +151,7 @@ module Pray
     end
 
     def strip_line_comment(line)
+      return line unless line.include?("#")
       quote = nil
       escaped = false
       line.each_char.with_index do |character, index|
@@ -190,7 +191,7 @@ module Pray
         end
       end
 
-      def peek = remaining[0]
+      def peek = @input[@cursor]
 
       def next_character
         character = peek
@@ -370,9 +371,7 @@ module Pray
         LiteralValue.new(kind: :string, value: @input[start...@cursor])
       end
 
-      def identifier_start?(character)
-        character && (character.match?(/[[:alpha:]]/) || character == "_")
-      end
+      def identifier_start?(character) = character && (character.match?(/[[:alpha:]]/) || character == "_")
 
       def identifier_continue?(character)
         character.match?(%r{[[:alnum:]_\-.\\/]})

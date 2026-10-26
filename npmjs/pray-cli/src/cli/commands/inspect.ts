@@ -39,7 +39,7 @@ export function parseOutdatedArguments(argumentsList: string[]): {
       remote = true;
       continue;
     }
-    throw PrayError.unsupported(`unknown outdated flag: ${argument}`);
+    throw PrayError.usage(`unknown outdated flag: ${argument}`);
   }
   return { remote };
 }

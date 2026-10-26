@@ -1,0 +1,42 @@
+# Maintainer: Andrei Makarov <contact@kiskolabs.com>
+# Recipe lives in the pray repository; publish to AUR after adoption.
+pkgname=pray-cli
+pkgver=1.23.0
+pkgrel=1
+pkgdesc='Package manager for the language placed before inference (Prayfile CLI)'
+arch=('x86_64' 'aarch64')
+url='https://pray.kisko.dev'
+license=('MIT')
+depends=('gcc-libs')
+makedepends=('cargo' 'git')
+provides=('pray')
+conflicts=('pray')
+source=("${pkgname}-${pkgver}.tar.gz::https://github.com/kiskolabs/pray/archive/refs/tags/v${pkgver}.tar.gz")
+sha256sums=('SKIP')
+options=('!lto')
+
+prepare() {
+  cd "pray-${pkgver}"
+  export RUSTUP_TOOLCHAIN=stable
+  cargo fetch --locked --target "$(rustc -vV | sed -n 's/host: //p')"
+}
+
+build() {
+  cd "pray-${pkgver}"
+  export RUSTUP_TOOLCHAIN=stable
+  export CARGO_TARGET_DIR=target
+  cargo build --frozen --release -p pray-cli
+}
+
+check() {
+  cd "pray-${pkgver}"
+  export RUSTUP_TOOLCHAIN=stable
+  cargo test --frozen -p pray-cli
+}
+
+package() {
+  cd "pray-${pkgver}"
+  install -Dm755 "target/release/pray" "${pkgdir}/usr/bin/pray"
+  install -Dm644 LICENSE.md "${pkgdir}/usr/share/licenses/${pkgname}/LICENSE"
+  install -Dm644 docs/man/pray.1 "${pkgdir}/usr/share/man/man1/pray.1"
+}

@@ -20,7 +20,7 @@ import { materializeProject } from "../materialize.js";
 export async function runAdd(argumentsList: string[]): Promise<void> {
   const name = argumentsList[0];
   if (!name) {
-    throw PrayError.unsupported("add requires a package name");
+    throw PrayError.usage("add requires a package name");
   }
   let constraint: string | undefined;
   let path: string | undefined;
@@ -41,7 +41,7 @@ export async function runAdd(argumentsList: string[]): Promise<void> {
 
 export async function runRemove(name: string | undefined): Promise<void> {
   if (!name) {
-    throw PrayError.manifest("remove requires a package name");
+    throw PrayError.usage("remove requires a package name");
   }
   removePackageFromManifest(defaultManifestPath(), name);
   await materializeProject();
@@ -49,7 +49,7 @@ export async function runRemove(name: string | undefined): Promise<void> {
 
 export async function runUnlock(name: string | undefined): Promise<void> {
   if (!name) {
-    throw PrayError.manifest("unlock requires a package name");
+    throw PrayError.usage("unlock requires a package name");
   }
   const manifestPath = defaultManifestPath();
   const project = await resolveProject(manifestPath);

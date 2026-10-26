@@ -2,7 +2,19 @@
 
 ## Unreleased
 
+## 1.23.0 (2026-10-26)
+
 - Leave package catalog JSON bytes alone when `pray publish` reports a version unchanged. A load and rewrite round trip no longer strips trailing newlines or reorders keys such as `artifact_hash` relative to `yanked`.
+- Add jsr.io publish for `@kiskolabs/pray-cli` (`scripts/release/jsr.sh`, wired into `all.sh`) with `jsr.json` version synced to npm.
+- Add a root Nix flake for `pray-cli`, an AUR `PKGBUILD` under `packaging/aur/pray-cli`, and deferred Debian/Fedora packaging notes.
+- Refuse private, parent-relative, and symbolic-link paths from Rust, Ruby, and TypeScript distribution readers. Reject symbolic-link source files and package paths in Ruby and TypeScript.
+- Apply dependency constraints when Rust resolves a package declared both directly and transitively. Treat `~> 1.4` as allowing later 1.x releases and keep `~> 1.4.0` within the 1.4 patch line in every implementation.
+- Render every legacy target output and enforce `max_bytes` in the Ruby and TypeScript CLIs.
+- Require an existing unchanged lock for TypeScript `install --locked` and `--frozen`. Make frozen install and `render --check` verify current destinations without opening a write transaction.
+- Refuse two packages or exports that claim the same provisioned destination in Rust, Ruby, and TypeScript, and name both owners in the error.
+- Emit valid TOML and JSON escapes for Ruby lock and manifest values containing control characters.
+- Return usage errors for covered invalid TypeScript command arguments and remove URL userinfo from shared HTTP errors.
+- Reduce repeated parser and render scans in all three implementations, add comparable digest-checked scale benchmarks, and gate release artifact sizes. The npm package is about 43 percent smaller when packed and no longer ships production source maps.
 
 ## 1.22.0 (2026-10-22)
 

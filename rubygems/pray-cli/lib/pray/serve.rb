@@ -118,7 +118,7 @@ module Pray
         return html_response("<h1>Pray distribution</h1>")
       end
 
-      file_path = PathSafety.join_under_root(root, path.delete_prefix("/"))
+      file_path = public_distribution_path(root, path)
       return not_found unless file_path
       return not_found unless File.file?(file_path)
       return payload_too_large if File.size(file_path) > ResourceLimits::MAX_HTTP_RESPONSE_BYTES
@@ -127,6 +127,20 @@ module Pray
       file_body = File.binread(file_path)
       status, ranged_body, content_range = ServeRange.apply(200, file_body, headers["range"])
       ranged_response(status, content_type, ranged_body, content_range)
+    end
+
+    def public_distribution_path(root, request_path)
+      relative = PathSafety.sanitize_relative_path(request_path)
+      exact = %w[v1/index.json v1/distribution.json v1/trust.json]
+      return nil unless exact.include?(relative) || relative.start_with?("v1/packages/", "v1/artifacts/")
+
+      file_path = PathSafety.join_under_root(root, relative)
+      return nil unless file_path
+
+      SourcePath.reject_symlinks!(root, relative, "distribution file")
+      file_path
+    rescue Error
+      nil
     end
 
     def content_type_for(path)

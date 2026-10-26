@@ -19,19 +19,24 @@ export async function runServe(argumentsList: string[]): Promise<void> {
       continue;
     }
     if (argument === "--root") {
-      root = argumentsList[index + 1] ?? root;
+      root = requiredValue(argumentsList, index, "--root");
       index += 1;
     } else if (argument === "--to") {
-      to = argumentsList[index + 1];
+      to = requiredValue(argumentsList, index, "--to");
       index += 1;
     } else if (argument === "--host") {
-      host = argumentsList[index + 1] ?? host;
+      host = requiredValue(argumentsList, index, "--host");
       index += 1;
     } else if (argument === "--port") {
-      port = Number.parseInt(argumentsList[index + 1] ?? String(port), 10);
+      port = Number(requiredValue(argumentsList, index, "--port"));
+      if (!Number.isInteger(port) || port < 0 || port > 65_535) {
+        throw PrayError.usage("--port requires an integer from 0 to 65535");
+      }
       index += 1;
     } else if (argument === "--stdio") {
       stdio = true;
+    } else {
+      throw PrayError.usage(`unknown serve argument: ${argument}`);
     }
   }
   if (stdio) {
@@ -49,18 +54,17 @@ export async function runSync(argumentsList: string[]): Promise<void> {
       continue;
     }
     if (argument === "--root") {
-      root = argumentsList[index + 1] ?? root;
+      root = requiredValue(argumentsList, index, "--root");
       index += 1;
     } else if (argument === "--peer") {
-      const peer = argumentsList[index + 1];
-      if (peer) {
-        peers.push(peer);
-      }
+      peers.push(requiredValue(argumentsList, index, "--peer"));
       index += 1;
+    } else {
+      throw PrayError.usage(`unknown sync argument: ${argument}`);
     }
   }
   if (peers.length === 0) {
-    throw PrayError.unsupported("sync requires at least one --peer URL");
+    throw PrayError.usage("sync requires at least one --peer URL");
   }
   const summary = await syncDistributionRoot(root, peers);
   process.stdout.write(
@@ -84,24 +88,38 @@ export async function runConfess(argumentsList: string[]): Promise<void> {
       continue;
     }
     if (argument === "--from-lock") {
-      options.fromLock = argumentsList[index + 1];
+      options.fromLock = requiredValue(argumentsList, index, "--from-lock");
       index += 1;
     } else if (argument === "--version") {
-      options.version = argumentsList[index + 1];
+      options.version = requiredValue(argumentsList, index, "--version");
       index += 1;
     } else if (argument === "--note") {
-      options.note = argumentsList[index + 1];
+      options.note = requiredValue(argumentsList, index, "--note");
       index += 1;
     } else if (argument === "--url") {
-      options.url = argumentsList[index + 1];
+      options.url = requiredValue(argumentsList, index, "--url");
       index += 1;
     } else if (argument === "--accepted") {
       options.accepted = true;
     } else if (argument === "--rejected") {
       options.rejected = true;
-    } else if (!options.packageName) {
+    } else if (!argument.startsWith("-") && !options.packageName) {
       options.packageName = argument;
+    } else {
+      throw PrayError.usage(`unknown confess argument: ${argument}`);
     }
   }
   await submitConfession(defaultManifestPath(), options);
+}
+
+function requiredValue(
+  argumentsList: string[],
+  index: number,
+  flag: string,
+): string {
+  const value = argumentsList[index + 1];
+  if (!value || value.startsWith("-")) {
+    throw PrayError.usage(`${flag} requires a value`);
+  }
+  return value;
 }

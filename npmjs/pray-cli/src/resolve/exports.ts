@@ -1,5 +1,3 @@
-import { existsSync, readFileSync } from "node:fs";
-import { join } from "node:path";
 import { PrayError } from "../errors.js";
 import { normalizeLineEndings } from "../hashing.js";
 import {
@@ -8,6 +6,7 @@ import {
 } from "../manifest/destination.js";
 import type { ExportRole, ManifestPackage } from "../manifest/types.js";
 import type { PackageSpec } from "../package-spec/types.js";
+import { readSourceFile } from "../source-path.js";
 
 export function selectExports(
   declaration: ManifestPackage,
@@ -74,13 +73,16 @@ export function loadExportBodies(
     if (entry.kind !== "fragment" && entry.kind !== "file") {
       continue;
     }
-    const filePath = join(root, entry.path);
-    if (!existsSync(filePath)) {
+    let bytes: Buffer;
+    try {
+      bytes = readSourceFile(root, entry.path, "package file");
+    } catch (error) {
+      if (error instanceof PrayError) throw error;
       throw PrayError.integrity(
         `package file missing for export ${exportName}: ${entry.path}`,
       );
     }
-    const decoded = utf8Text(readFileSync(filePath));
+    const decoded = utf8Text(bytes);
     if (decoded === undefined) {
       if (entry.kind === "fragment") {
         throw PrayError.integrity(

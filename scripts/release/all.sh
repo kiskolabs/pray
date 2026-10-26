@@ -8,7 +8,7 @@
 #   scripts/release/all.sh
 #   scripts/release/all.sh --publish
 #   scripts/release/all.sh --publish --root ./prayers --server URL
-#   scripts/release/all.sh --skip-crates --skip-npm --skip-rubygems --root ./prayers
+#   scripts/release/all.sh --skip-crates --skip-npm --skip-jsr --skip-rubygems --root ./prayers
 set -euo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
@@ -16,6 +16,7 @@ SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 MODE="dry-run"
 SKIP_CRATES=0
 SKIP_NPM=0
+SKIP_JSR=0
 SKIP_RUBYGEMS=0
 SKIP_DISTRIBUTION=0
 DISTRIBUTION_ARGS=()
@@ -36,6 +37,10 @@ while [[ $# -gt 0 ]]; do
       ;;
     --skip-npm)
       SKIP_NPM=1
+      shift
+      ;;
+    --skip-jsr)
+      SKIP_JSR=1
       shift
       ;;
     --skip-rubygems)
@@ -71,6 +76,9 @@ if [[ "${SKIP_CRATES}" -eq 0 ]]; then
 fi
 if [[ "${SKIP_NPM}" -eq 0 ]]; then
   "${SCRIPT_DIR}/npm.sh" "${REGISTRY_FLAG}"
+fi
+if [[ "${SKIP_JSR}" -eq 0 ]]; then
+  "${SCRIPT_DIR}/jsr.sh" "${REGISTRY_FLAG}"
 fi
 if [[ "${SKIP_RUBYGEMS}" -eq 0 ]]; then
   "${SCRIPT_DIR}/rubygems.sh" "${REGISTRY_FLAG}"

@@ -1,11 +1,13 @@
 # frozen_string_literal: true
 
+require "json"
+
 module Pray
   module ManifestJson
     module_function
 
     def encode_compact(manifest)
-      encode_object(manifest_fields(manifest))
+      JSON.generate(manifest_fields(manifest))
     end
 
     def manifest_fields(manifest)
@@ -108,32 +110,6 @@ module Pray
         "churn" => render.churn,
         "header" => render.header
       }
-    end
-
-    def encode_object(hash)
-      entries = hash.map { |key, value| "#{encode_string(key)}:#{encode_value(value)}" }
-      "{#{entries.join(",")}}"
-    end
-
-    def encode_array(array)
-      "[#{array.map { |value| encode_value(value) }.join(",")}]"
-    end
-
-    def encode_value(value)
-      case value
-      when Hash then encode_object(value)
-      when Array then encode_array(value)
-      when String then encode_string(value)
-      when TrueClass, FalseClass then value.to_s
-      when NilClass then "null"
-      when Integer then value.to_s
-      else
-        raise Error.manifest("unsupported JSON value: #{value.inspect}")
-      end
-    end
-
-    def encode_string(text)
-      "\"#{text.gsub("\\", "\\\\").gsub("\"", "\\\"").gsub("\n", "\\n").gsub("\r", "\\r").gsub("\t", "\\t")}\""
     end
   end
 end

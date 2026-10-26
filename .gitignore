@@ -1,4 +1,5 @@
 /target
+/result
 /.pray/
 /Cargo.lock
 /*.praypkg

@@ -2,7 +2,15 @@
 
 ## Unreleased
 
+## 1.23.0 (2026-10-26)
+
 - Leave package catalog JSON bytes alone when publish reports a version unchanged. A load and rewrite round trip no longer strips trailing newlines or reorders keys such as `artifact_hash` relative to `yanked`.
+- Refuse private, parent-relative, and symbolic-link paths from distribution readers. Reject symbolic-link source files and package paths.
+- Treat `~> 1.4` as allowing later 1.x releases and keep `~> 1.4.0` within the 1.4 patch line.
+- Render every legacy target output and enforce `max_bytes`.
+- Refuse two packages or exports that claim the same provisioned destination, and name both owners in the error.
+- Emit valid TOML and JSON escapes for lock and manifest values containing control characters.
+- Reduce repeated parser and render scans.
 
 ## 1.22.0 (2026-10-22)
 

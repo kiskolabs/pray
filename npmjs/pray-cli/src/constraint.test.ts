@@ -5,8 +5,9 @@ import { latestConstraintForPackage, versionSatisfies } from "./constraint.js";
 describe("constraint", () => {
   it("matches ruby pessimistic constraints", () => {
     assert.equal(versionSatisfies("1.4.3", "~> 1.4"), true);
-    assert.equal(versionSatisfies("1.5.0", "~> 1.4"), false);
-    assert.equal(versionSatisfies("2.4.0", "~> 2.2"), false);
+    assert.equal(versionSatisfies("1.5.0", "~> 1.4"), true);
+    assert.equal(versionSatisfies("2.4.0", "~> 2.2"), true);
+    assert.equal(versionSatisfies("2.0.0", "~> 1.4"), false);
   });
 
   it("derives latest constraints by operator style", () => {

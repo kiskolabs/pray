@@ -107,7 +107,7 @@ function rubyPessimisticToSemver(constraint: string): string {
   }
   const lower = `${first}.${second}.${third}`;
   const upper =
-    parts.length === 1 ? `${first + 1}.0.0` : `${first}.${second + 1}.0`;
+    parts.length <= 2 ? `${first + 1}.0.0` : `${first}.${second + 1}.0`;
   return `>=${lower} <${upper}`;
 }
 

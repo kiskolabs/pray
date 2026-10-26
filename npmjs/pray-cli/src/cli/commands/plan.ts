@@ -83,7 +83,7 @@ function parsePlanArguments(argumentsList: string[]): boolean {
       remote = true;
       continue;
     }
-    throw PrayError.unsupported(`unknown plan flag: ${argument}`);
+    throw PrayError.usage(`unknown plan flag: ${argument}`);
   }
   return remote;
 }

@@ -21,6 +21,7 @@ import {
   MAX_SERVE_HEADER_BYTES,
   SERVE_SOCKET_TIMEOUT_MILLISECONDS,
 } from "../resource-limits.js";
+import { rejectSourceSymlinks } from "../source-path.js";
 import { applyByteRange } from "./range.js";
 
 export function runServer(options: {
@@ -110,7 +111,7 @@ async function handleRequest(
     return;
   }
 
-  const filePath = containedPath(root, path);
+  const filePath = publicDistributionPath(root, path);
   if (!filePath || !existsSync(filePath)) {
     writeResponse(response, 404, "text/plain", "not found", requestId);
     return;
@@ -150,7 +151,7 @@ async function handlePut(
     writeResponse(response, 403, "text/plain", "forbidden", requestId);
     return;
   }
-  const filePath = containedPath(root, path);
+  const filePath = publicDistributionPath(root, path);
   if (!filePath) {
     writeResponse(response, 403, "text/plain", "forbidden", requestId);
     return;
@@ -186,10 +187,40 @@ export async function readRequestBody(request: Readable): Promise<Buffer> {
   return Buffer.concat(chunks, length);
 }
 
-function containedPath(root: string, requestPath: string): string | undefined {
-  const candidate = resolve(root, requestPath.replace(/^\//, ""));
+export function publicDistributionPath(
+  root: string,
+  requestPath: string,
+): string | undefined {
+  const relativePath = requestPath.replace(/^\//, "");
+  if (
+    relativePath.includes("\0") ||
+    relativePath.split(/[\\/]/).some((part) => part === "..")
+  ) {
+    return undefined;
+  }
+  const exact = new Set([
+    "v1/index.json",
+    "v1/distribution.json",
+    "v1/trust.json",
+  ]);
+  if (
+    !exact.has(relativePath) &&
+    !relativePath.startsWith("v1/packages/") &&
+    !relativePath.startsWith("v1/artifacts/")
+  ) {
+    return undefined;
+  }
+  const candidate = resolve(root, relativePath);
   const fromRoot = relative(root, candidate);
   if (fromRoot.startsWith("..") || isAbsolute(fromRoot)) return undefined;
+  try {
+    rejectSourceSymlinks(root, relativePath, "distribution file");
+  } catch (error) {
+    if (error instanceof PrayError && error.kind === "integrity") {
+      return undefined;
+    }
+    throw error;
+  }
   return candidate;
 }
 

@@ -1,4 +1,5 @@
-use super::super::{resolve_package, ResolvedPackage};
+use super::super::one::resolve_package;
+use super::super::ResolvedPackage;
 use crate::lockfile::Lockfile;
 use crate::manifest::ManifestPackage;
 use crate::resolve_context::ResolveOptions;

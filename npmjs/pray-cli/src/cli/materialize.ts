@@ -1,4 +1,4 @@
-import { existsSync } from "node:fs";
+import { existsSync, realpathSync } from "node:fs";
 import { resolve } from "node:path";
 import { PrayError } from "../errors.js";
 import {
@@ -7,13 +7,19 @@ import {
   readLockfile,
   writeLockfileIfChanged,
 } from "../lockfile/index.js";
-import { defaultLockfilePath, defaultManifestPath } from "../lockfile/paths.js";
+import {
+  defaultLockfilePath,
+  defaultManifestPath,
+  projectRootFromManifest,
+} from "../lockfile/paths.js";
 import { manifestToJson } from "../manifest/types.js";
+import { ensureRenderedTargetsCurrent } from "../render/check.js";
 import { renderProject, writeRenderedTargets } from "../render/project.js";
 import { defaultResolveOptions } from "../resolve/context.js";
 import { resolveProject } from "../resolve/project.js";
 import { applyPathUpstreamRefreshes } from "../resolve/upstream-refresh.js";
 import { runTransaction } from "../transaction/index.js";
+import { verifyProject } from "../verify/project.js";
 import { localSummaryLines } from "./apply-report.js";
 import {
   projectRoot,
@@ -31,10 +37,22 @@ export interface MaterializeOptions {
 export async function materializeProject(
   options: MaterializeOptions = {},
 ): Promise<void> {
-  return runTransaction(projectRoot(), () => materializeInTransaction(options));
+  const transactionRoot = options.manifestPath
+    ? realpathSync(projectRootFromManifest(resolve(options.manifestPath)))
+    : projectRoot();
+  if (
+    (options.locked || options.frozen) &&
+    !existsSync(defaultLockfilePath(transactionRoot))
+  ) {
+    throw PrayError.resolution(
+      `Prayfile.lock is required under ${options.frozen ? "--frozen" : "--locked"}. Run pray install to create it.`,
+    );
+  }
+  if (options.frozen) return materializeWithOptions(options);
+  return runTransaction(transactionRoot, () => materializeWithOptions(options));
 }
 
-async function materializeInTransaction(
+async function materializeWithOptions(
   options: MaterializeOptions,
 ): Promise<void> {
   const manifestPath = resolve(options.manifestPath ?? defaultManifestPath());
@@ -86,26 +104,20 @@ async function materializeInTransaction(
     project,
   });
 
-  if (options.frozen || options.locked) {
-    const existing = existsSync(lockfilePath)
-      ? readLockfile(lockfilePath)
-      : undefined;
-    if (options.frozen && existing) {
-      for (const target of rendered) {
-        const outputPath = resolve(project.projectRoot, target.path);
-        if (!existsSync(outputPath)) {
-          throw PrayError.verify(
-            `Rendered file ${target.path} is missing under --frozen`,
-          );
-        }
-      }
+  if (options.locked || options.frozen) {
+    const flag = options.frozen ? "--frozen" : "--locked";
+    if (
+      !previousLockfile ||
+      !lockfilesEquivalent(previousLockfile, nextLockfile)
+    ) {
+      throw PrayError.resolution(
+        `Prayfile.lock would change under ${flag}. Run pray install to update it.`,
+      );
     }
-    if (options.locked && existing) {
-      if (!lockfilesEquivalent(existing, nextLockfile)) {
-        throw PrayError.resolution(
-          "Prayfile.lock would change under --locked. Run without --locked to update.",
-        );
-      }
+    if (options.frozen) {
+      verifyProject(project, previousLockfile, true);
+      ensureRenderedTargetsCurrent(project, rendered);
+      return;
     }
   }
 

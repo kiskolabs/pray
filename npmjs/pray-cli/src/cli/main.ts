@@ -8,6 +8,7 @@ import {
 } from "../project-context/runtime.js";
 import { initDistributionRoot } from "../publish/index.js";
 import { maybeDeclarePublishRemote } from "../publish/remote-init.js";
+import { ensureRenderedTargetsCurrent } from "../render/check.js";
 import { renderProject } from "../render/project.js";
 import { runTransaction } from "../transaction/index.js";
 import { renderDependencyTree } from "../tree/index.js";
@@ -42,6 +43,17 @@ import { materializeProject, printManifest } from "./materialize.js";
 import { configureOutput } from "./output.js";
 import { unknownCommandMessage } from "./suggest.js";
 import { runUpgradeCommand } from "./upgrade.js";
+
+function rejectUnknownArguments(
+  command: string,
+  argumentsList: string[],
+  allowed: string[],
+): void {
+  const unknown = argumentsList.find((argument) => !allowed.includes(argument));
+  if (unknown !== undefined) {
+    throw PrayError.usage(`unknown ${command} argument: ${unknown}`);
+  }
+}
 
 export async function runCli(argumentsList: string[]): Promise<number> {
   const previousContext = activeInvocationContext();
@@ -144,6 +156,11 @@ export async function runCli(argumentsList: string[]): Promise<number> {
           return 0;
         case "install":
         case "apply":
+          rejectUnknownArguments(command, rest, [
+            "--frozen",
+            "--locked",
+            "--offline",
+          ]);
           await materializeProject({
             frozen: rest.includes("--frozen"),
             locked: rest.includes("--locked"),
@@ -154,15 +171,17 @@ export async function runCli(argumentsList: string[]): Promise<number> {
           await runPlanCommand(rest);
           return 0;
         case "render":
+          rejectUnknownArguments(command, rest, ["--check"]);
           if (rest.includes("--check")) {
             const project = await resolveCurrentProject();
-            renderProject(project);
+            ensureRenderedTargetsCurrent(project, renderProject(project));
             process.stdout.write("render check: ok\n");
             return 0;
           }
           await materializeProject();
           return 0;
         case "verify": {
+          rejectUnknownArguments(command, rest, ["--strict"]);
           const project = await resolveCurrentProject();
           const lockfile = readLockfile(lockfilePath());
           verifyProject(project, lockfile, rest.includes("--strict"));
@@ -170,6 +189,7 @@ export async function runCli(argumentsList: string[]): Promise<number> {
           return 0;
         }
         case "drift": {
+          rejectUnknownArguments(command, rest, ["--semantic"]);
           const project = await resolveCurrentProject();
           const lockfile = readLockfile(lockfilePath());
           if (rest.includes("--semantic")) {
@@ -241,8 +261,6 @@ export async function runCli(argumentsList: string[]): Promise<number> {
       }
     };
     return await ([
-      "install",
-      "apply",
       "update",
       "unlock",
       "add",
@@ -251,7 +269,8 @@ export async function runCli(argumentsList: string[]): Promise<number> {
       "plan",
       "verify",
       "drift",
-    ].includes(command ?? "")
+    ].includes(command ?? "") &&
+    !(command === "render" && rest.includes("--check"))
       ? runTransaction(projectRoot(), execute)
       : execute());
   } catch (error) {

@@ -48,6 +48,15 @@ RSpec.describe Pray::LockfileIO do
     expect(restored.target.first.outputs).to eq(["INSTRUCTIONS.md"])
   end
 
+  it "escapes control characters in serialized strings" do
+    original = sample_lockfile
+    original.manifest_hash = "sha256:line\nnext\tvalue\u0001"
+
+    restored = Pray.parse_lockfile(Pray.serialize_lockfile(original))
+
+    expect(restored.manifest_hash).to eq(original.manifest_hash)
+  end
+
   it "round-trips provisioned lock records" do
     lockfile = sample_lockfile
     lockfile.provisioned = [

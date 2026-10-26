@@ -28,6 +28,40 @@ RSpec.describe "destination render" do
     File.write(File.join(package_root, export_path), body)
   end
 
+  it "does not treat a shared string prefix as a folder export" do
+    root = Dir.mktmpdir("pray-folder-component-boundary-")
+    begin
+      FileUtils.mkdir_p(File.join(root, "package/files/x"))
+      File.write(File.join(root, "package/files/x/secret.md"), "undeclared\n")
+      File.write(
+        File.join(root, "package/package.prayspec"),
+        <<~SPEC
+          Package::Specification.new do |spec|
+            spec.name = "sample/package"
+            spec.version = "1.0.0"
+            spec.files = ["filesx/secret.md"]
+            spec.exports = { "files" => { type: "folder", path: "files" } }
+          end
+        SPEC
+      )
+      FileUtils.mkdir_p(File.join(root, "package/filesx"))
+      File.write(File.join(root, "package/filesx/secret.md"), "declared\n")
+      File.write(root + "/Prayfile", <<~PRAYFILE)
+        prayfile "1"
+        tree "out" do
+          pray "sample/package", path: "package"
+        end
+      PRAYFILE
+
+      project = Pray::Resolve.resolve_project(File.join(root, "Prayfile"))
+      expect do
+        Pray::Render.planned_provisioned_files(project)
+      end.to raise_error(Pray::Error, /no indexed files/)
+    ensure
+      FileUtils.rm_rf(root)
+    end
+  end
+
   it "preserves unmanaged text around an existing managed span" do
     root = Dir.mktmpdir("pray-compose-preserve-local-")
     begin

@@ -10,7 +10,10 @@ Publishing is not automated in CI. Operators run the scripts under `scripts/rele
 |---------|--------------|------------|
 | [crates.io](https://crates.io/crates/pray-cli) | `pray-core`, `pray-transport`, `pray-cli` | `pray` (from `pray-cli`) |
 | [npm](https://www.npmjs.com/package/pray-cli) | `pray-cli` | `pray` |
+| [jsr.io](https://jsr.io/@kiskolabs/pray-cli) | `@kiskolabs/pray-cli` | library import (CLI stays on npm) |
 | [RubyGems](https://rubygems.org/gems/pray-cli) | `pray-cli` | `pray` |
+| Nix flake | root `flake.nix` | `pray` (`nix run .#pray-cli`) |
+| AUR recipe | `packaging/aur/pray-cli` | `pray` (after AUR adoption) |
 | pray distribution point | prayers under `prayers/` (see [repository-layouts.md](repository-layouts.md)) | n/a |
 
 The crates.io name `pray` is already taken by an unrelated project, so the Rust CLI publishes as `pray-cli` while keeping the binary name `pray`.
@@ -21,6 +24,7 @@ Keep these equal before a full language-registry publish (`make release-all`):
 
 - workspace `Cargo.toml` (`[workspace.package].version`)
 - `npmjs/pray-cli/package.json`
+- `npmjs/pray-cli/jsr.json`
 - `npmjs/pray-cli/src/lockfile/types.ts` (`PACKAGE_VERSION`)
 - `rubygems/pray-cli/lib/pray/version.rb`
 
@@ -44,12 +48,15 @@ Publish crates.io (order is handled by the script). A crate whose version is alr
 ./scripts/release/crates.sh --publish
 ```
 
-Publish npm and RubyGems:
+Publish npm, JSR, and RubyGems:
 
 ```sh
 ./scripts/release/npm.sh --publish
+./scripts/release/jsr.sh --publish
 ./scripts/release/rubygems.sh --publish
 ```
+
+First JSR publish needs the `@kiskolabs` scope and `pray-cli` package created on [jsr.io](https://jsr.io/new). Optional OS packaging notes live under [packaging/README.md](../packaging/README.md).
 
 Publish local prayer packages to a distribution point:
 
@@ -79,12 +86,15 @@ Exit codes for operators: `docs/cli-exit-codes.md` (normative table in RFC 0040)
 
 1. Create a GitHub Release for `vX.Y.Z` so `pray` upgrade notices can resolve the latest tag. Run `make release-github` (or `./scripts/release/github.sh --publish`). The title is `vX.Y.Z`. Notes are that version's `CHANGELOG.md` heading and bullets only. When the annotated tag already exists, the script uses `gh release create --verify-tag` or `gh release edit` and omits `--target`. `--target` accepts a branch or full commit SHA; a short SHA returns HTTP 422. Creating a version other than the workspace version passes `--latest=false`. Preview notes with `./scripts/release/github.sh --notes-only`. Rewrite every existing GitHub Release from `CHANGELOG.md` with `make release-github-sync`.
 2. Optionally bump Homebrew with `make bump-homebrew` once the tag exists.
-3. Confirm install paths:
+3. Optionally refresh the AUR recipe with `make bump-aur` once the tag exists (does not upload to AUR).
+4. Confirm install paths:
 
 ```sh
 cargo install pray-cli --locked
 npm install -g pray-cli
+npx jsr add @kiskolabs/pray-cli
 gem install pray-cli
+nix run github:kiskolabs/pray
 ```
 
 ## Registry release feeds

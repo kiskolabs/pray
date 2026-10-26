@@ -115,21 +115,21 @@ function parsePublishCli(
     if (argument === "--root") {
       const value = argumentsList[index + 1];
       if (!value) {
-        throw PrayError.unsupported("publish requires a path after --root");
+        throw PrayError.usage("publish requires a path after --root");
       }
       roots.push(value);
       index += 1;
     } else if (argument === "--server") {
       const value = argumentsList[index + 1];
       if (!value) {
-        throw PrayError.unsupported("publish requires a URL after --server");
+        throw PrayError.usage("publish requires a URL after --server");
       }
       servers.push(value);
       index += 1;
     } else if (argument === "--to") {
       const value = argumentsList[index + 1];
       if (!value) {
-        throw PrayError.unsupported("publish requires a name after --to");
+        throw PrayError.usage("publish requires a name after --to");
       }
       to.push(value);
       index += 1;
@@ -138,9 +138,9 @@ function parsePublishCli(
     } else if (argument === "--signing-key") {
       index += 1;
     } else if (argument?.startsWith("--")) {
-      throw PrayError.unsupported(`unknown publish flag: ${argument}`);
+      throw PrayError.usage(`unknown publish flag: ${argument}`);
     } else if (argument) {
-      throw PrayError.unsupported(`unexpected publish argument: ${argument}`);
+      throw PrayError.usage(`unexpected publish argument: ${argument}`);
     }
   }
   return { to, roots, servers, dryRun };

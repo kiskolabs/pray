@@ -1,6 +1,6 @@
-.PHONY: build clean install bench bench-scaling ruby-test loc-check rfc-ids audit audit-rust audit-ruby audit-npm \
-	libyears libyears-rust libyears-ruby libyears-npm bump-homebrew \
-	release-dry-run release-crates release-npm release-rubygems release-distribution release-all \
+.PHONY: build clean install bench bench-compat bench-scaling size-check ruby-test loc-check rfc-ids audit audit-rust audit-ruby audit-npm \
+	libyears libyears-rust libyears-ruby libyears-npm bump-homebrew bump-aur \
+	release-dry-run release-crates release-npm release-jsr release-rubygems release-distribution release-all \
 	release-github release-github-sync \
 	coverage coverage-rust mutants fuzz-build
 
@@ -33,8 +33,16 @@ rfc-ids:
 bench:
 	cargo bench -p pray-bench
 
+bench-compat:
+	cargo run --release -q -p pray-bench --example compat_bench
+	ruby rubygems/pray-cli/benchmarks/compat_bench.rb
+	cd npmjs/pray-cli && npm run --silent build && node scripts/compat-bench.mjs
+
 bench-scaling:
 	cargo test -p pray-bench -- --ignored --nocapture
+
+size-check:
+	ruby scripts/check-package-sizes.rb
 
 coverage: coverage-rust
 
@@ -92,8 +100,15 @@ release-crates:
 release-npm:
 	./scripts/release/npm.sh --publish
 
+release-jsr:
+	./scripts/release/jsr.sh --publish
+
 release-rubygems:
 	./scripts/release/rubygems.sh --publish
+
+# Requires GitHub tag v$(VERSION). Rewrites packaging/aur/pray-cli/PKGBUILD.
+bump-aur:
+	./scripts/release/aur_bump.sh
 
 release-distribution:
 	@args="--root $(ROOT)"; \

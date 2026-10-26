@@ -37,11 +37,19 @@ pub fn new_destination_target(mode: DestinationMode, path: &str) -> ManifestTarg
 }
 
 pub fn upsert_package(manifest: &mut Manifest, package: ManifestPackage) -> PrayResult<()> {
-    if let Some(existing) = manifest
+    let existing_index = manifest
         .packages
-        .iter_mut()
-        .find(|candidate| candidate.name == package.name)
-    {
+        .iter()
+        .position(|candidate| candidate.name == package.name);
+    upsert_package_at(manifest, package, existing_index)
+}
+
+pub(crate) fn upsert_package_at(
+    manifest: &mut Manifest,
+    package: ManifestPackage,
+    existing_index: Option<usize>,
+) -> PrayResult<()> {
+    if let Some(existing) = existing_index.and_then(|index| manifest.packages.get_mut(index)) {
         if existing.constraint != package.constraint
             && existing.constraint != "*"
             && package.constraint != "*"

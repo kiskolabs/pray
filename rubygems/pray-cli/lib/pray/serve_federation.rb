@@ -51,6 +51,7 @@ module Pray
 
     def package_response(root, path)
       name = path.delete_prefix("/v1/sync/package/")
+      PathSafety.validate_registry_cache_identity!(name, "metadata")
       metadata_path = Publish.registry_metadata_path(root, name)
       return Serve.not_found unless File.file?(metadata_path)
 
@@ -61,6 +62,8 @@ module Pray
         "versions" => metadata.versions.map { |version| transport_version(version) }
       }
       Serve.ok_response("application/json", JSON.pretty_generate(body))
+    rescue Error
+      Serve.not_found
     end
 
     def append_confession(root, body)

@@ -127,21 +127,20 @@ impl ResolveQueue {
         sources: &BTreeMap<String, ManifestSource>,
     ) -> PrayResult<()> {
         if self.declarations.contains_key(&dependency.name) {
-            // Prayfile-declared packages keep their manifest constraint.
-            if self.explicit.contains(&dependency.name) {
-                return Ok(());
-            }
-            let merged = merge_constraint(
-                self.constraints
-                    .get(&dependency.name)
-                    .map(String::as_str)
-                    .unwrap_or("*"),
-                &dependency.constraint,
-            )?;
+            let previous = self
+                .constraints
+                .get(&dependency.name)
+                .map(String::as_str)
+                .unwrap_or("*");
+            let merged = merge_constraint(previous, &dependency.constraint)?;
+            let constraint_changed = merged != previous;
             self.constraints
                 .insert(dependency.name.clone(), merged.clone());
             if let Some(existing) = self.declarations.get_mut(&dependency.name) {
                 existing.constraint = merged;
+            }
+            if constraint_changed {
+                self.order.push_back(dependency.name.clone());
             }
             return Ok(());
         }

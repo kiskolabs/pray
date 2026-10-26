@@ -10,10 +10,12 @@ Publishing is intentional and operator-driven. Scripts default to dry-run / buil
 |--------|--------|---------|--------------|
 | `crates.sh` | crates.io (`pray-core`, `pray-transport`, `pray-cli`) | `--dry-run` | `--publish` |
 | `npm.sh` | npmjs (`pray-cli`) | pack dry-run | `--publish` |
+| `jsr.sh` | jsr.io (`@kiskolabs/pray-cli`) | publish dry-run | `--publish` |
 | `rubygems.sh` | RubyGems (`pray-cli`) | build gem | `--publish` |
 | `distribution.sh` | pray distribution point | requires `--root` / `--server` | omit `--dry-run` |
 | `all.sh` | all of the above | dry-run registries | `--publish` plus DP args |
 | `github.sh` | GitHub Release for `vX.Y.Z` | print title and one CHANGELOG section | `--publish` (create or edit); `--all` rewrites existing releases |
+| `aur_bump.sh` | `packaging/aur/pray-cli/PKGBUILD` | rewrite version and sha256 | n/a (no upload) |
 
 The CLI executable remains `pray`. The crates.io package name is `pray-cli` because `pray` is already taken by an unrelated crate.
 
@@ -21,9 +23,10 @@ First crates.io publish must go in order: `pray-core`, then `pray-transport`, th
 
 ## Prerequisites
 
-- Version alignment across `Cargo.toml`, `npmjs/pray-cli/package.json`, `npmjs/pray-cli/src/lockfile/types.ts`, and `rubygems/pray-cli/lib/pray/version.rb` for `all.sh`. The next coordinated version is the max of crates, npm, and gem. A one-surface max (patch or minor) is skipped by the other registries. Each language script may publish when that surface is uniquely ahead.
+- Version alignment across `Cargo.toml`, `npmjs/pray-cli/package.json`, `npmjs/pray-cli/jsr.json`, `npmjs/pray-cli/src/lockfile/types.ts`, and `rubygems/pray-cli/lib/pray/version.rb` for `all.sh`. The next coordinated version is the max of crates, npm, and gem. A one-surface max (patch or minor) is skipped by the other registries. Each language script may publish when that surface is uniquely ahead. JSR version must match npm.
 - `cargo login` / `CARGO_REGISTRY_TOKEN` for crates.io
 - `npm login` for npmjs
+- jsr.io: create `@kiskolabs` / `pray-cli` once; local publish uses browser auth; CI may set `JSR_TOKEN`
 - `gem push` credentials (MFA) for RubyGems
 - RubyGems release dependencies are installed under `rubygems/pray-cli/tmp/release-gems/` in a cache keyed by the complete Ruby build and platform. The release helper ignores user-installed gems so native extensions from another Ruby patch release cannot enter the build.
 - A working `pray` binary for distribution-point publish (`PRAY` selects it; after `gem push`, PATH `pray` may be the RubyGems CLI)
@@ -45,11 +48,20 @@ Publish crates only:
 scripts/release/crates.sh --publish
 ```
 
-Publish npm and RubyGems:
+Publish npm, JSR, and RubyGems:
 
 ```sh
 scripts/release/npm.sh --publish
+scripts/release/jsr.sh --publish
 scripts/release/rubygems.sh --publish
+```
+
+After the GitHub tag exists, refresh the AUR recipe checksum (does not upload to AUR):
+
+```sh
+scripts/release/aur_bump.sh
+# or
+make bump-aur
 ```
 
 Publish local prayers under `prayers/` to a distribution root:
@@ -94,10 +106,12 @@ From the repository root:
 make release-dry-run
 make release-crates
 make release-npm
+make release-jsr
 make release-rubygems
 make release-distribution ROOT=./prayers
 make release-github
 make release-github-sync
+make bump-aur
 ```
 
 `github.sh` reads `CHANGELOG.md`. Title is `vX.Y.Z` so the GitHub name is never empty. Notes stop at the next `##` version heading. `--all` edits releases that already exist; it does not create tags or notify for missing versions.

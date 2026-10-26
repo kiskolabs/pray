@@ -74,7 +74,7 @@ module Pray
       lower = numbers.join(".")
       upper = case parts.length
       when 1 then "#{numbers[0] + 1}.0.0"
-      when 2 then "#{numbers[0]}.#{numbers[1] + 1}.0"
+      when 2 then "#{numbers[0] + 1}.0.0"
       else "#{numbers[0]}.#{numbers[1] + 1}.0"
       end
       ">= #{lower}, < #{upper}"

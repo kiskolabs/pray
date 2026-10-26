@@ -485,6 +485,9 @@ Supported constraints:
 < 2.0
 ```
 
+The pessimistic operator follows Ruby version semantics. `~> X.Y` admits later minor releases below
+`X + 1.0.0`; `~> X.Y.Z` admits later patch releases below `X.Y + 1.0`.
+
 Pre-release versions require explicit opt-in:
 
 ```

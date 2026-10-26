@@ -11,6 +11,13 @@ describe("update flags", () => {
     assert.equal(flags.json, true);
   });
 
+  it("reports unknown flags as usage errors", () => {
+    assert.throws(
+      () => parseUpdateArguments(["--unknown"]),
+      (error: unknown) => error instanceof PrayError && error.exitCode() === 2,
+    );
+  });
+
   it("rejects conflicting major and latest", async () => {
     await assert.rejects(
       () => runUpdateCommand(["demo", "--major", "--latest"]),

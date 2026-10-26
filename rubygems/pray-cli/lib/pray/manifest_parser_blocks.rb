@@ -33,9 +33,9 @@ module Pray
           return if statement == "end"
           if (match = statement.match(/\Aagent (.+)\z/))
             manifest.note_deprecated_keyword("agent")
-            Destination.upsert_package(manifest, parse_package_with_groups(match[1]))
+            upsert_package(manifest, parse_package_with_groups(match[1]))
           elsif (match = statement.match(/\A(?:package|pray|use|include) (.+)\z/))
-            Destination.upsert_package(manifest, parse_package_with_groups(match[1]))
+            upsert_package(manifest, parse_package_with_groups(match[1]))
           elsif /\Agroup (.+)\z/.match?(statement)
             raise Error.parse("manifest", "nested group blocks are not supported")
           else
@@ -95,8 +95,8 @@ module Pray
       def bind_compose_local(manifest, index, rest)
         local = parse_local_decl(rest)
         local.bound = true
-        Destination.bind_local_entry(manifest.targets[index], local.path)
-        Destination.upsert_local(manifest, local)
+        bind_local_entry(manifest.targets[index], local.path)
+        upsert_local(manifest, local)
       end
 
       def parse_file_block(manifest, rest)
@@ -154,7 +154,7 @@ module Pray
         package.file = file_path
         package.bound = true
         package.roles << "file" unless package.roles.include?("file")
-        Destination.upsert_package(manifest, package)
+        upsert_package(manifest, package)
       end
 
       def apply_pray_statement(manifest, rest, destination_index)
@@ -196,9 +196,9 @@ module Pray
           package.bound = true
           role = Destination.role_for_destination(mode)
           package.roles << role if role && !package.roles.include?(role)
-          Destination.bind_package_entry(manifest.targets[destination_index], package.name)
+          bind_package_entry(manifest.targets[destination_index], package.name)
         end
-        Destination.upsert_package(manifest, package)
+        upsert_package(manifest, package)
       end
 
       def parse_target_block(manifest, target_index)

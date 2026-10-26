@@ -13,11 +13,13 @@ fn temporary_directory(prefix: &str) -> PathBuf {
     path
 }
 
-fn write_package(root: &Path, name: &str, version: &str, dependency: Option<&str>) {
+fn write_package(root: &Path, name: &str, version: &str, dependency: Option<(&str, &str)>) {
     let package_root = root.join(format!("packages/{name}"));
     fs::create_dir_all(package_root.join("exports")).expect("package dirs");
     let dependency_line = dependency
-        .map(|dep| format!("  spec.add_dependency \"{dep}\", \"~> 1.0\"\n"))
+        .map(|(dependency_name, constraint)| {
+            format!("  spec.add_dependency \"{dependency_name}\", \"{constraint}\"\n")
+        })
         .unwrap_or_default();
     fs::write(
         package_root.join(format!("{name}.prayspec")),
@@ -51,8 +53,8 @@ Package::Specification.new do |spec|
 #[test]
 fn resolve_rejects_two_package_dependency_cycle() {
     let root = temporary_directory("pray-cycle");
-    write_package(&root, "alpha", "1.0.0", Some("sample/beta"));
-    write_package(&root, "beta", "1.0.0", Some("sample/alpha"));
+    write_package(&root, "alpha", "1.0.0", Some(("sample/beta", "~> 1.0")));
+    write_package(&root, "beta", "1.0.0", Some(("sample/alpha", "~> 1.0")));
     fs::write(
         root.join("Prayfile"),
         r#"
@@ -78,7 +80,7 @@ pray "sample/beta", path: "packages/beta"
 #[test]
 fn resolve_accepts_acyclic_dependency_graph() {
     let root = temporary_directory("pray-acyclic");
-    write_package(&root, "base", "1.0.0", Some("sample/common"));
+    write_package(&root, "base", "1.0.0", Some(("sample/common", "~> 1.0")));
     write_package(&root, "common", "1.0.0", None);
     fs::write(
         root.join("Prayfile"),
@@ -100,7 +102,7 @@ pray "sample/common", path: "packages/common"
 #[test]
 fn resolve_loads_transitive_path_dependency() {
     let root = temporary_directory("pray-transitive-dep");
-    write_package(&root, "base", "1.0.0", Some("sample/common"));
+    write_package(&root, "base", "1.0.0", Some(("sample/common", "~> 1.0")));
     write_package(&root, "common", "1.0.0", None);
     fs::write(
         root.join("Prayfile"),
@@ -129,7 +131,7 @@ pray "sample/base", path: "packages/base"
 #[test]
 fn resolve_rejects_missing_transitive_path_dependency() {
     let root = temporary_directory("pray-missing-transitive");
-    write_package(&root, "base", "1.0.0", Some("sample/missing"));
+    write_package(&root, "base", "1.0.0", Some(("sample/missing", "~> 1.0")));
     fs::write(
         root.join("Prayfile"),
         r#"
@@ -147,5 +149,30 @@ pray "sample/base", path: "packages/base"
     assert!(
         message.contains("sample/missing") || message.contains("packages/missing"),
         "unexpected error: {message}"
+    );
+}
+
+#[test]
+fn resolve_rejects_dependency_constraint_that_conflicts_with_explicit_package() {
+    let root = temporary_directory("pray-explicit-constraint");
+    write_package(&root, "common", "1.0.0", None);
+    write_package(&root, "base", "1.0.0", Some(("sample/common", "~> 2.0")));
+    fs::write(
+        root.join("Prayfile"),
+        r#"
+prayfile "1"
+target :tool_a do
+  output "INSTRUCTIONS.md"
+end
+pray "sample/common", path: "packages/common"
+pray "sample/base", path: "packages/base"
+"#,
+    )
+    .expect("Prayfile");
+
+    let error = resolve_project(&root.join("Prayfile")).expect_err("constraint mismatch");
+    assert!(
+        error.to_string().contains("sample/common"),
+        "unexpected error: {error}"
     );
 }

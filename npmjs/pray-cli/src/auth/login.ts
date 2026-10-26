@@ -24,7 +24,7 @@ export function parseLoginArguments(argumentsList: string[]): LoginOptions {
     const next = (): string => {
       const value = argumentsList[index + 1];
       if (!value) {
-        throw PrayError.unsupported(`login requires a value after ${argument}`);
+        throw PrayError.usage(`login requires a value after ${argument}`);
       }
       index += 1;
       return value;
@@ -50,29 +50,27 @@ export function parseLoginArguments(argumentsList: string[]): LoginOptions {
         break;
       default:
         if (argument.startsWith("--")) {
-          throw PrayError.unsupported(`unknown login flag: ${argument}`);
+          throw PrayError.usage(`unknown login flag: ${argument}`);
         }
-        throw PrayError.unsupported(`unexpected login argument: ${argument}`);
+        throw PrayError.usage(`unexpected login argument: ${argument}`);
     }
   }
 
   if (servers.length === 0) {
-    throw PrayError.unsupported("login requires at least one --server URL");
+    throw PrayError.usage("login requires at least one --server URL");
   }
   if (!email) {
-    throw PrayError.unsupported("login requires --email ADDRESS");
+    throw PrayError.usage("login requires --email ADDRESS");
   }
   const passkeyMode = passkeyKey !== undefined;
   if (passkeyMode === sshAgent || (!passkeyMode && !publicKey && !sshAgent)) {
-    throw PrayError.unsupported(
-      "login requires exactly one authentication mode",
-    );
+    throw PrayError.usage("login requires exactly one authentication mode");
   }
   if (passkeyMode && !credentialId) {
-    throw PrayError.unsupported("passkey login requires --credential-id");
+    throw PrayError.usage("passkey login requires --credential-id");
   }
   if (sshAgent && !publicKey) {
-    throw PrayError.unsupported("ssh-agent login requires --public-key");
+    throw PrayError.usage("ssh-agent login requires --public-key");
   }
 
   return {

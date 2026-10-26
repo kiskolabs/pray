@@ -1,11 +1,25 @@
 import { PrayError } from "../errors.js";
 import { readBoundedHttpBody } from "./body.js";
 
+function redactedUrl(url: string): string {
+  try {
+    const parsed = new URL(url);
+    if (parsed.username.length === 0 && parsed.password.length === 0) {
+      return url;
+    }
+    parsed.username = "***";
+    parsed.password = "";
+    return parsed.toString();
+  } catch {
+    return url;
+  }
+}
+
 export async function httpGet(url: string): Promise<Buffer> {
   const response = await fetch(url);
   if (!response.ok) {
     throw PrayError.resolution(
-      `HTTP request failed for ${url}: ${response.status}`,
+      `HTTP request failed for ${redactedUrl(url)}: ${response.status}`,
     );
   }
   return readBoundedHttpBody(response);
@@ -27,7 +41,7 @@ export async function httpPut(
   });
   if (!response.ok) {
     throw PrayError.resolution(
-      `HTTP upload failed for ${url}: ${response.status}`,
+      `HTTP upload failed for ${redactedUrl(url)}: ${response.status}`,
     );
   }
 }
@@ -53,7 +67,7 @@ export async function httpPostJson(
   const responseBody = await readBoundedHttpBody(response);
   if (!response.ok) {
     throw PrayError.resolution(
-      `HTTP request failed for ${url}: ${response.status}: ${responseBody.toString("utf8")}`,
+      `HTTP request failed for ${redactedUrl(url)}: ${response.status}: ${responseBody.toString("utf8")}`,
     );
   }
   return responseBody;

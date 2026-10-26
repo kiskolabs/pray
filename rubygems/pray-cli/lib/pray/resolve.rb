@@ -154,8 +154,8 @@ module Pray
         project_root, sources, git_sources, user_config, declaration, lockfile, options
       )
       spec_path = find_prayspec_file(root)
-      spec_text = File.read(spec_path)
-      spec = Pray.parse_package_spec(spec_text).canonicalized
+      spec_text = SourcePath.read(root, File.basename(spec_path), "package specification").force_encoding(Encoding::UTF_8)
+      spec = Pray.parse_package_spec(spec_text)
       if spec.name != declaration.name
         raise Error.resolution(
           "package path #{root.inspect} declares #{spec.name.inspect}, expected #{declaration.name.inspect}"
@@ -195,9 +195,11 @@ module Pray
       offline = options.offline
       preferred_version = options.preferred_lock_version(lockfile, declaration.name)
       if (local_path = user_config.local.package[declaration.name])
-        return [File.expand_path(local_path, project_root), nil]
+        return [SourcePath.declared_directory(project_root, local_path, "package directory"), nil]
       end
-      return [File.expand_path(declaration.path, project_root), nil] if declaration.path
+      if declaration.path
+        return [SourcePath.declared_directory(project_root, declaration.path, "package directory"), nil]
+      end
       return [ResolveTarball.package_root(project_root, declaration.tarball, offline: offline), nil] if declaration.tarball
       source_name = ResolveSource.implied_source_name(declaration, sources)
       if source_name
@@ -220,7 +222,8 @@ module Pray
         case source.kind
         when "path"
           directory = LocalPrayer.path_source_package_directory(source_name, declaration.name)
-          return [File.join(project_root, source.url, directory), nil]
+          relative = File.join(source.url, directory)
+          return [SourcePath.declared_directory(project_root, relative, "package directory"), nil]
         when "registry", "static index"
           resolved = Registry.resolve_registry_package_root(
             project_root,
@@ -264,7 +267,8 @@ module Pray
 
       raise Error.unsupported("remote sources are not implemented yet") if declaration.git || declaration.oci
 
-      [File.join(project_root, declaration.name.tr("/", "-")), nil]
+      slug = declaration.name.tr("/", "-")
+      [SourcePath.declared_directory(project_root, slug, "package directory"), nil]
     end
 
     def resolve_package_root(project_root, sources, git_sources, user_config, declaration, lockfile = nil)
@@ -272,9 +276,12 @@ module Pray
     end
 
     def find_prayspec_file(root)
-      files = Dir.children(root).filter_map do |entry|
+      files = []
+      Dir.each_child(root) do |entry|
+        next unless File.extname(entry) == ".prayspec"
+
         path = File.join(root, entry)
-        (File.file?(path) && File.extname(entry) == ".prayspec") ? path : nil
+        files << path if File.file?(path)
       end
       case files.length
       when 1 then files.first
@@ -296,15 +303,7 @@ module Pray
     end
 
     def load_package_file_bytes(root, spec)
-      file_bytes = {}
-      spec.files.each do |file|
-        path = File.join(root, file)
-        raise Error.integrity("package file missing: #{file}") unless File.exist?(path)
-        raise Error.integrity("package file is a directory: #{file}") if File.directory?(path)
-
-        file_bytes[file] = File.binread(path)
-      end
-      file_bytes
+      spec.files.to_h { |file| [file, SourcePath.read(root, file, "package file")] }
     end
 
     def build_skill_file_index(spec)
@@ -331,12 +330,7 @@ module Pray
     end
 
     def skill_relative_file(file, skill_prefix)
-      return nil unless file.start_with?(skill_prefix)
-
-      relative = file.delete_prefix(skill_prefix).delete_prefix("/")
-      return nil if relative.empty? || file == skill_prefix
-
-      relative
+      file.delete_prefix("#{skill_prefix.delete_suffix("/")}/") if file.start_with?("#{skill_prefix.delete_suffix("/")}/")
     end
   end
 end

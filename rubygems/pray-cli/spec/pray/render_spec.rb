@@ -25,6 +25,17 @@ RSpec.describe Pray::Render do
     expect(span.package).to eq("sample/base")
   end
 
+  it "renders every output and enforces the target byte budget" do
+    project = Pray::Resolve.resolve_project(File.join(simple_project, "Prayfile"))
+    target = project.manifest.targets.first
+    target.outputs = ["FIRST.md", "SECOND.md"]
+
+    expect(described_class.render_project(project).map(&:path)).to eq(["FIRST.md", "SECOND.md"])
+
+    target.max_bytes = 1
+    expect { described_class.render_project(project) }.to raise_error(Pray::Error, /max_bytes/)
+  end
+
   it "filters rendered packages by environment groups" do
     manifest = Pray::Manifest.new(
       prayfile_version: "1",

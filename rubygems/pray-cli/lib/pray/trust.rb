@@ -110,10 +110,11 @@ module Pray
     end
 
     def prepare_source_host_keys(sources)
-      policy = load_policy_or_default
-      sources.each_with_object({}) do |source, host_keys|
-        next unless source.kind == "pray_ssh"
+      ssh_sources = sources.select { |source| source.kind == "pray_ssh" }
+      return {} if ssh_sources.empty?
 
+      policy = load_policy_or_default
+      ssh_sources.each_with_object({}) do |source, host_keys|
         rule = best_rule(policy, source.url)
         fingerprint = rule.allowed_host_keys.first
         host_keys[source.name] = fingerprint if fingerprint

@@ -2,7 +2,17 @@
 
 ## Unreleased
 
+## 1.23.0 (2026-10-26)
+
 - Leave package catalog JSON bytes alone when publish reports a version unchanged. A load and rewrite round trip no longer strips trailing newlines or reorders keys such as `artifact_hash` relative to `yanked`.
+- Publish the TypeScript library to jsr.io as `@kiskolabs/pray-cli` with version synced to npm.
+- Refuse private, parent-relative, and symbolic-link paths from distribution readers. Reject symbolic-link source files and package paths.
+- Treat `~> 1.4` as allowing later 1.x releases and keep `~> 1.4.0` within the 1.4 patch line.
+- Render every legacy target output and enforce `max_bytes`.
+- Require an existing unchanged lock for `install --locked` and `--frozen`. Make frozen install and `render --check` verify current destinations without opening a write transaction.
+- Refuse two packages or exports that claim the same provisioned destination, and name both owners in the error.
+- Return usage errors for covered invalid command arguments and remove URL userinfo from shared HTTP errors.
+- Reduce repeated parser and render scans. The packed npm package is about 43 percent smaller and no longer ships production source maps.
 
 ## 1.22.0 (2026-10-22)
 

@@ -44,6 +44,13 @@ describe("login parsing", () => {
     assert.equal(options.credentialId, "cred-1");
     assert.equal(options.sshAgent, false);
   });
+
+  it("reports unknown flags as usage errors", () => {
+    assert.throws(
+      () => parseLoginArguments(["--unknown"]),
+      (error: unknown) => error instanceof PrayError && error.exitCode() === 2,
+    );
+  });
 });
 
 describe("session persistence", () => {

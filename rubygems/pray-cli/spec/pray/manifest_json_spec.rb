@@ -26,4 +26,14 @@ RSpec.describe Pray::ManifestJson do
 
     expect(keys.index("symbols")).to be < keys.index("render")
   end
+
+  it "emits valid canonical JSON for every control character" do
+    value = "\u0000\b\f\n\r\t\"\\é"
+    controlled = Pray::Manifest.new(prayfile_version: "1", symbols: {"value" => value})
+
+    encoded = described_class.encode_compact(controlled.canonicalized)
+
+    expect(JSON.parse(encoded).fetch("symbols").fetch("value")).to eq(value)
+    expect(encoded).to eq(JSON.generate(described_class.manifest_fields(controlled.canonicalized)))
+  end
 end

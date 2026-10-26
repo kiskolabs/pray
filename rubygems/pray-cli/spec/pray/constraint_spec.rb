@@ -22,9 +22,10 @@ RSpec.describe Pray::Constraint do
       expect(described_class.version_satisfies("2.0.0", "~> 1.4")).to be(false)
     end
 
-    it "rejects a later minor for a two-component pessimistic constraint" do
-      expect(described_class.version_satisfies("1.5.0", "~> 1.4")).to be(false)
-      expect(described_class.version_satisfies("2.4.0", "~> 2.2")).to be(false)
+    it "accepts later minors but rejects the next major for a two-component constraint" do
+      expect(described_class.version_satisfies("1.5.0", "~> 1.4")).to be(true)
+      expect(described_class.version_satisfies("2.4.0", "~> 2.2")).to be(true)
+      expect(described_class.version_satisfies("2.0.0", "~> 1.4")).to be(false)
     end
 
     it "accepts any version for wildcard constraints" do

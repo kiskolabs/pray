@@ -1,0 +1,32 @@
+# JSR and Linux OS packaging
+
+## Participants
+
+Andrei Makarov
+
+## Decisions
+
+- Add jsr.io as a language-registry publish surface for the TypeScript library in `npmjs/pray-cli`, scoped as `@kiskolabs/pray-cli`. The npm package remains the Node global CLI install path; JSR publishes TypeScript source for Deno and other JSR consumers.
+- Keep OS packaging recipes in-tree under `packaging/` and a root `flake.nix` for Nix. First concrete Linux targets are AUR (`pray-cli` source package) and Nix (flake plus later nixpkgs PR). Debian, Fedora or COPR, and other channels stay documented until a maintainer path exists.
+- Release helpers stay manual and dry-run by default, matching crates.io, npm, and RubyGems. First real JSR publish needs a created `@kiskolabs` scope and package on jsr.io, then `scripts/release/jsr.sh --publish`.
+- Do not automate AUR or nixpkgs uploads from this repository. Operators bump local recipes; AUR and nixpkgs land through their own maintainer workflows.
+
+## Effects
+
+- `npmjs/pray-cli/jsr.json`, `scripts/release/jsr.sh`, and orchestration hooks land with version sync against npm.
+- Root `flake.nix` builds `pray-cli` from this workspace. `packaging/aur/pray-cli/PKGBUILD` builds the same binary from the GitHub tag tarball.
+- `packaging/README.md`, `docs/releasing.md`, `scripts/release/README.md`, and README install sections describe the new surfaces and the deferred Linux channels.
+
+## Next
+
+- Create `@kiskolabs` and package `pray-cli` on jsr.io; link the GitHub repository; run `scripts/release/jsr.sh --publish` for 1.23.0.
+- Submit or adopt an AUR package from `packaging/aur/pray-cli`.
+- Open a nixpkgs PR once the flake derivation is proven on a Nix host (`nix build`, `nix run`).
+- When wanted: Debian or Ubuntu ITP or PPA, Fedora COPR or rpm, Guix; Flatpak and Snap stay low priority for a CLI binary.
+
+## Source
+
+- docs/releasing.md
+- scripts/release/README.md
+- packaging/README.md
+- https://jsr.io/docs/publishing-packages

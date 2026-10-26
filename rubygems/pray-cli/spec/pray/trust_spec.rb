@@ -47,6 +47,13 @@ RSpec.describe Pray::Trust do
         "team" => "SHA256:abc123"
       )
     end
+
+    it "does not read the trust policy when no source uses pray_ssh" do
+      write_policy("not = [valid toml")
+      sources = [Pray::ManifestSource.new(name: "mirror", kind: "path", url: "./mirror")]
+
+      expect(described_class.prepare_source_host_keys(sources)).to eq({})
+    end
   end
 
   describe ".verify_publisher_fingerprint!" do

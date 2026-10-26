@@ -1,4 +1,4 @@
-.PHONY: release lint test clean
+.PHONY: release lint test bench clean
 
 release:
 	bundle exec rake release
@@ -9,6 +9,9 @@ lint:
 
 test: lint
 	bundle exec polyrun parallel-rspec --workers 5 --merge-failures
+
+bench:
+	ruby benchmarks/compat_bench.rb
 
 clean:
 	rm -rf coverage .pray/cache tmp pkg

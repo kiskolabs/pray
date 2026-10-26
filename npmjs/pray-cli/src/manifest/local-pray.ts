@@ -3,12 +3,59 @@ import { parseCall, stringFromValue } from "../literal/call-parser.js";
 import {
   bindLocalEntry,
   isLocalPathForm,
+  targetEntries,
   targetMode,
   upsertLocal,
+  upsertPackageAt,
 } from "./destination.js";
-import type { Manifest, ManifestLocal } from "./types.js";
+import type {
+  Manifest,
+  ManifestLocal,
+  ManifestPackage,
+  ManifestTarget,
+} from "./types.js";
 
 const PARSE_CONTEXT = "manifest";
+
+export class ParserIndexes {
+  private readonly keysByTarget = new WeakMap<ManifestTarget, Set<string>>();
+  private readonly packageIndices = new Map<string, number>();
+
+  upsertPackage(manifest: Manifest, packageEntry: ManifestPackage): void {
+    const existingIndex = this.packageIndices.get(packageEntry.name);
+    upsertPackageAt(manifest, packageEntry, existingIndex);
+    if (existingIndex === undefined) {
+      this.packageIndices.set(packageEntry.name, manifest.packages.length - 1);
+    }
+  }
+
+  bindPackage(target: ManifestTarget, packageName: string): void {
+    const keys = this.keysFor(target);
+    const key = `package:${packageName}`;
+    if (!keys.has(key)) {
+      const entries = targetEntries(target);
+      entries.push({ kind: "package", name: packageName });
+      target.entries = entries;
+      keys.add(key);
+    }
+  }
+
+  private keysFor(target: ManifestTarget): Set<string> {
+    const existing = this.keysByTarget.get(target);
+    if (existing) {
+      return existing;
+    }
+    const keys = new Set(
+      (target.entries ?? []).map((entry) =>
+        entry.kind === "package"
+          ? `package:${entry.name}`
+          : `local:${entry.path}`,
+      ),
+    );
+    this.keysByTarget.set(target, keys);
+    return keys;
+  }
+}
 
 export function localIsComposeEmbed(
   manifest: Manifest,

@@ -1,13 +1,8 @@
-use crate::lockfile::Lockfile;
 use crate::manifest::{Manifest, ManifestPackage, ManifestSource};
-use crate::package_spec::{parse_package_spec, PackageSpec};
+use crate::package_spec::PackageSpec;
 use crate::resolve_context::ResolveOptions;
-use crate::resolve_exports::{
-    build_skill_file_index, load_export_bodies, load_package_file_bytes, select_exports,
-};
-use crate::resolve_git_sources::{prepare_git_sources, prepare_pray_ssh_host_keys, GitSourceSet};
+use crate::resolve_git_sources::{prepare_git_sources, prepare_pray_ssh_host_keys};
 
-use crate::paths::find_prayspec_file;
 pub use crate::resolve_git::{
     discover_distribution_root, git_source_cache_directory, global_git_cache_ready,
 };
@@ -21,7 +16,6 @@ pub use crate::resolve_git_refresh::{
 pub use crate::resolve_git_sources::refresh_git_sources;
 use crate::{PrayError, PrayResult};
 use std::collections::BTreeMap;
-use std::fs;
 use std::path::{Path, PathBuf};
 
 #[derive(Debug, Clone)]
@@ -153,73 +147,8 @@ pub use resolve_upstream::{
     PathUpstreamConflict,
 };
 
-fn resolve_package(
-    project_root: &Path,
-    sources: &BTreeMap<String, ManifestSource>,
-    git_sources: &GitSourceSet,
-    user_config: &crate::config::PrayConfig,
-    declaration: &ManifestPackage,
-    lockfile: Option<&Lockfile>,
-    options: &ResolveOptions,
-) -> PrayResult<ResolvedPackage> {
-    let PackageRootResolution {
-        root,
-        signer_fingerprint,
-        registry_latest_version,
-    } = resolve_package_root(
-        project_root,
-        sources,
-        git_sources,
-        user_config,
-        declaration,
-        lockfile,
-        options,
-    )?;
-    let spec_path = find_prayspec_file(&root)?;
-    let spec_text = fs::read_to_string(&spec_path)?;
-    let spec = parse_package_spec(&spec_text)?.canonicalized();
-    if spec.name != declaration.name {
-        return Err(PrayError::Resolution(format!(
-            "package path {:?} declares {:?}, expected {:?}",
-            root, spec.name, declaration.name
-        )));
-    }
-    spec.satisfy_constraint(&declaration.constraint)?;
-    let selected_exports = select_exports(declaration, &spec)?;
-    let file_bytes = load_package_file_bytes(&root, &spec)?;
-    let tree_hash = PackageSpec::tree_hash_from_file_bytes(&file_bytes)?;
-    let export_bodies = load_export_bodies(&file_bytes, &spec, &selected_exports)?;
-    let skill_files = build_skill_file_index(&spec);
-    let source_checksum = tree_hash.clone();
-    let upstream_context = resolve_upstream::UpstreamResolutionContext::new(
-        project_root,
-        sources,
-        git_sources,
-        user_config,
-        lockfile,
-        options,
-    );
-    let upstream = resolve_upstream::lock_path_upstream(&upstream_context, declaration, &spec)?;
-    Ok(ResolvedPackage {
-        declaration: declaration.clone(),
-        root,
-        spec: spec.clone(),
-        tree_hash: tree_hash.clone(),
-        artifact_hash: tree_hash.clone(),
-        artifact: format!(
-            "path:{}",
-            spec_path.parent().unwrap_or(&spec_path).to_string_lossy()
-        ),
-        selected_exports,
-        source_checksum,
-        export_bodies,
-        skill_files,
-        signer_fingerprint,
-        registry_latest_version,
-        explicit: false,
-        upstream,
-    })
-}
+#[path = "resolve_one.rs"]
+mod one;
 
 #[path = "resolve_local.rs"]
 mod local;
@@ -234,51 +163,5 @@ fn source_map(sources: &[ManifestSource]) -> BTreeMap<String, ManifestSource> {
 }
 
 #[cfg(test)]
-mod tests {
-    use super::{discover_distribution_root, project_root_from_manifest};
-    use std::fs;
-    use std::path::Path;
-
-    #[test]
-    fn project_root_from_manifest_uses_cwd_for_bare_filename() {
-        let root = project_root_from_manifest(Path::new("Prayfile"));
-        assert_eq!(root, Path::new("."));
-    }
-
-    #[test]
-    fn project_root_from_manifest_uses_parent_directory() {
-        let root = project_root_from_manifest(Path::new("examples/simple-project/Prayfile"));
-        assert_eq!(root, Path::new("examples/simple-project"));
-    }
-
-    #[test]
-    fn discover_distribution_root_finds_root_and_prayers_subdirectory() {
-        let workspace =
-            std::env::temp_dir().join(format!("pray-discover-distribution-{}", std::process::id()));
-        let _ = fs::remove_dir_all(&workspace);
-        let repo_root = workspace.join("repo");
-        let prayers_root = repo_root.join("prayers");
-        fs::create_dir_all(prayers_root.join("v1/packages")).expect("prayers distribution");
-        fs::create_dir_all(repo_root.join("v1/packages")).expect("root distribution");
-
-        assert_eq!(
-            discover_distribution_root(&repo_root),
-            Some(repo_root.clone())
-        );
-
-        fs::remove_dir_all(repo_root.join("v1")).expect("remove root distribution");
-        assert_eq!(discover_distribution_root(&repo_root), Some(prayers_root));
-        let _ = fs::remove_dir_all(&workspace);
-    }
-
-    #[test]
-    fn discover_distribution_root_returns_none_without_registry_layout() {
-        let workspace =
-            std::env::temp_dir().join(format!("pray-discover-missing-{}", std::process::id()));
-        let _ = fs::remove_dir_all(&workspace);
-        let repo_root = workspace.join("repo");
-        fs::create_dir_all(&repo_root).expect("repo root");
-        assert_eq!(discover_distribution_root(&repo_root), None);
-        let _ = fs::remove_dir_all(&workspace);
-    }
-}
+#[path = "resolve_unit.rs"]
+mod tests;

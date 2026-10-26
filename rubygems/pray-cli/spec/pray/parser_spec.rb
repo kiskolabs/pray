@@ -3,6 +3,18 @@
 require "spec_helper"
 
 RSpec.describe "Pray parser" do
+  it "strips comments without changing hashes inside strings" do
+    manifest = Pray.parse_manifest(<<~PRAYFILE)
+      prayfile "1" # format version
+      compose "A#B.md" do # destination
+        pray "sample/base", path: "packages/base" # package
+      end
+    PRAYFILE
+
+    expect(manifest.targets.first.outputs).to eq(["A#B.md"])
+    expect(manifest.packages.first.path).to eq("packages/base")
+  end
+
   it "rejects project paths that escape the repository" do
     expect do
       Pray.parse_manifest(<<~PRAYFILE)

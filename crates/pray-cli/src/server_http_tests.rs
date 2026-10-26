@@ -97,6 +97,72 @@ fn missing_static_file_returns_not_found() {
 }
 
 #[test]
+fn private_server_files_are_not_available_over_http_or_rpc() {
+    let root = temporary_root("private-files");
+    fs::create_dir_all(root.join(".pray")).expect("private directory");
+    fs::write(root.join(".pray/auth.db"), b"private database bytes").expect("private file");
+    let auth = ServeAuth::http("127.0.0.1", false);
+
+    let http =
+        dispatch_http_request(&root, &auth, "GET", "/.pray/auth.db", &[]).expect("http response");
+    assert_eq!(http.status, 404);
+    assert!(!http.body.windows(8).any(|bytes| bytes == b"database"));
+
+    let rpc = handle_rpc(
+        &root,
+        &ServeAuth::stdio(),
+        &RpcRequest::new(
+            "private",
+            "artifact.get",
+            json!({ "path": ".pray/auth.db" }),
+        ),
+    )
+    .expect("rpc response");
+    assert_eq!(rpc.status, 404);
+    assert!(!rpc.body.to_string().contains("database"));
+    let _ = fs::remove_dir_all(&root);
+}
+
+#[test]
+fn distribution_files_remain_available() {
+    let root = temporary_root("public-files");
+    let auth = ServeAuth::http("127.0.0.1", false);
+    let response =
+        dispatch_http_request(&root, &auth, "GET", "/v1/index.json", &[]).expect("public response");
+    assert_eq!(response.status, 200);
+    let body: serde_json::Value = serde_json::from_slice(&response.body).expect("index json");
+    assert_eq!(body["spec"], "prayfile-distribution-1");
+    let _ = fs::remove_dir_all(&root);
+}
+
+#[cfg(unix)]
+#[test]
+fn static_distribution_symlink_is_not_available() {
+    use std::os::unix::fs::symlink;
+
+    let root = temporary_root("static-symlink");
+    let outside = temporary_root("static-symlink-outside");
+    let secret = outside.join("secret.praypkg");
+    fs::write(&secret, b"private artifact target").expect("outside file");
+    let artifact = root.join("v1/artifacts/sample/base/1.0.0/base.praypkg");
+    fs::create_dir_all(artifact.parent().expect("artifact parent")).expect("artifact directory");
+    symlink(&secret, &artifact).expect("artifact symlink");
+
+    let response = dispatch_http_request(
+        &root,
+        &ServeAuth::http("127.0.0.1", false),
+        "GET",
+        "/v1/artifacts/sample/base/1.0.0/base.praypkg",
+        &[],
+    )
+    .expect("symlink response");
+    assert_eq!(response.status, 404);
+    assert!(!response.body.windows(7).any(|bytes| bytes == b"private"));
+    let _ = fs::remove_dir_all(&root);
+    let _ = fs::remove_dir_all(&outside);
+}
+
+#[test]
 fn apply_byte_range_returns_partial_content() {
     let (status, body, range) =
         super::apply_byte_range(200, b"abcdefgh".to_vec(), Some("bytes=2-4")).expect("range");

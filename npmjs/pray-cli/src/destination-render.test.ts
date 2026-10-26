@@ -1,5 +1,11 @@
 import assert from "node:assert/strict";
-import { mkdirSync, mkdtempSync, readFileSync, writeFileSync } from "node:fs";
+import {
+  mkdirSync,
+  mkdtempSync,
+  readFileSync,
+  rmSync,
+  writeFileSync,
+} from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { describe, it } from "node:test";
@@ -11,6 +17,35 @@ import { resolveProject } from "./resolve/project.js";
 import { verifyProject } from "./verify/project.js";
 
 describe("destination render", () => {
+  it("renders every output and enforces the target byte budget", async () => {
+    const root = mkdtempSync(join(tmpdir(), "pray-render-outputs-"));
+    try {
+      writePackage(
+        root,
+        "rules",
+        "sample/rules",
+        "rules",
+        "fragment",
+        "exports/rules.md",
+        "Rules\n",
+      );
+      writeFileSync(
+        join(root, "Prayfile"),
+        'prayfile "1"\ntarget :tool do\n output "FIRST.md"\n output "SECOND.md"\n max_bytes 1\nend\nagent "sample/rules", path: "packages/rules"\n',
+      );
+      const project = await resolveProject(join(root, "Prayfile"));
+
+      assert.throws(() => renderProject(project), /max_bytes/);
+      project.manifest.targets[0]!.maxBytes = undefined;
+      assert.deepEqual(
+        renderProject(project).map((target) => target.path),
+        ["FIRST.md", "SECOND.md"],
+      );
+    } finally {
+      rmSync(root, { recursive: true, force: true });
+    }
+  });
+
   it("still fans out fragments and skills for the legacy shape", async () => {
     const root = mkdtempSync(join(tmpdir(), "pray-legacy-fanout-"));
     mkdirSync(join(root, ".agents"), { recursive: true });

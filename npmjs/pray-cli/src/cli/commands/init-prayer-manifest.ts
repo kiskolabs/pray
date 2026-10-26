@@ -27,11 +27,11 @@ export function parsePrayerInitArguments(argumentsList: string[]): {
       directory = value;
       index += 1;
     } else if (argument.startsWith("-")) {
-      throw PrayError.unsupported(`unexpected prayer argument: ${argument}`);
+      throw PrayError.usage(`unexpected prayer argument: ${argument}`);
     } else if (!name) {
       name = argument;
     } else {
-      throw PrayError.unsupported(`unexpected prayer argument: ${argument}`);
+      throw PrayError.usage(`unexpected prayer argument: ${argument}`);
     }
   }
   return { name, directory };

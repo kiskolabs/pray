@@ -7,6 +7,7 @@ module Pray
     def expand_statement_surface(statement)
       trimmed = statement.strip
       return [] if trimmed.empty?
+      return [normalize_keyword_call(trimmed)] unless trimmed.include?(";") || trimmed.include?("{")
 
       Literal.split_top_level(trimmed, ";").flat_map { |segment| expand_one_surface(segment) }
     end
@@ -15,7 +16,7 @@ module Pray
       trimmed = statement.strip
       return [] if trimmed.empty?
 
-      braced = expand_brace_block(trimmed)
+      braced = expand_brace_block(trimmed) if trimmed.include?("{")
       return braced if braced
 
       [normalize_keyword_call(trimmed)]
@@ -71,6 +72,7 @@ module Pray
     def normalize_keyword_call(statement)
       spaced = normalize_spaced_block_opener(statement)
       return spaced if spaced
+      return statement unless statement.include?("(")
 
       keyword = leading_identifier(statement)
       return statement unless keyword

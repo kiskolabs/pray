@@ -78,4 +78,13 @@ RSpec.describe Pray::ServeFederation do
 
     expect(described_class.send(:transport_version, version)).not_to have_key("published_at")
   end
+
+  it "rejects a package name that escapes the metadata directory" do
+    File.write(File.join(workspace, "secret.json"), JSON.generate("name" => "secret", "versions" => []))
+
+    response = described_class.package_response(workspace, "/v1/sync/package/../../../secret")
+
+    expect(response).to include("404 Not Found")
+    expect(response).not_to include('"name":"secret"')
+  end
 end

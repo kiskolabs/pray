@@ -1,5 +1,6 @@
 import { mkdirSync } from "node:fs";
 import { resolve } from "node:path";
+import { PrayError } from "../errors.js";
 import { normalizeLineEndings } from "../hashing.js";
 import type { Lockfile } from "../lockfile/types.js";
 import { targetMode, targetScoped } from "../manifest/destination.js";
@@ -25,11 +26,16 @@ import type { RenderedTarget } from "./types.js";
 export function renderProject(project: ResolvedProject): RenderedTarget[] {
   const rendered: RenderedTarget[] = [];
   for (const target of project.manifest.targets) {
-    const output = target.outputs[0];
-    if (!output) {
-      continue;
+    for (const output of target.outputs) {
+      const renderedTarget = renderTarget(project, target, output);
+      const size = Buffer.byteLength(renderedTarget.content);
+      if (target.maxBytes !== undefined && size > target.maxBytes) {
+        throw PrayError.render(
+          `target \`${target.name}\` output \`${output}\` is ${size} bytes; max_bytes is ${target.maxBytes}`,
+        );
+      }
+      rendered.push(renderedTarget);
     }
-    rendered.push(renderTarget(project, target, output));
   }
   return rendered;
 }

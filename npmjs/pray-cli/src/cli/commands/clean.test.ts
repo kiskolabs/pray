@@ -11,12 +11,14 @@ describe("clean command arguments", () => {
       () => parseCleanArguments(["--other"]),
       (error: unknown) =>
         error instanceof PrayError &&
+        error.exitCode() === 2 &&
         error.message.includes("unknown clean flag"),
     );
     assert.throws(
       () => parseCleanArguments(["unused"]),
       (error: unknown) =>
         error instanceof PrayError &&
+        error.exitCode() === 2 &&
         error.message.includes("unexpected clean argument"),
     );
   });

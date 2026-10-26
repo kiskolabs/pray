@@ -1,9 +1,9 @@
 use crate::hashing::normalize_line_endings;
 use crate::manifest::ManifestPackage;
 use crate::package_spec::PackageSpec;
+use crate::source_path::{read_declared_file, DeclaredRead};
 use crate::{PrayError, PrayResult};
 use std::collections::BTreeMap;
-use std::fs;
 use std::path::Path;
 
 pub(crate) fn select_exports(
@@ -105,31 +105,21 @@ fn select_fragment_role_exports(package_name: &str, spec: &PackageSpec) -> PrayR
     }
 }
 
-pub(crate) fn read_text(path: &Path) -> PrayResult<String> {
-    let text = fs::read_to_string(path)?;
-    Ok(normalize_line_endings(&text))
-}
-
 pub(crate) fn load_package_file_bytes(
     root: &Path,
     spec: &PackageSpec,
 ) -> PrayResult<BTreeMap<String, Vec<u8>>> {
     let mut file_bytes = BTreeMap::new();
     for file in &spec.files {
-        let path = root.join(file);
-        if !path.exists() {
-            return Err(PrayError::Integrity(format!(
-                "package file missing: {}",
-                file
-            )));
-        }
-        if path.is_dir() {
-            return Err(PrayError::Integrity(format!(
-                "package file is a directory: {}",
-                file
-            )));
-        }
-        file_bytes.insert(file.clone(), fs::read(&path)?);
+        let bytes = match read_declared_file(root, file, "package file")? {
+            DeclaredRead::Missing => {
+                return Err(PrayError::Integrity(format!(
+                    "package file missing: {file}"
+                )));
+            }
+            DeclaredRead::Bytes(bytes) => bytes,
+        };
+        file_bytes.insert(file.clone(), bytes);
     }
     Ok(file_bytes)
 }
@@ -206,10 +196,18 @@ pub(crate) fn indexed_files_under_prefix(files: &[String], prefix: &str) -> Vec<
 }
 
 pub(crate) fn skill_relative_file(file: &str, skill_prefix: &str) -> Option<String> {
-    let relative = file.strip_prefix(skill_prefix)?.trim_start_matches('/');
-    if relative.is_empty() || file == skill_prefix {
-        None
-    } else {
-        Some(relative.to_string())
+    let prefix = format!("{}/", skill_prefix.trim_end_matches('/'));
+    file.strip_prefix(&prefix).map(ToString::to_string)
+}
+
+#[cfg(test)]
+mod tests {
+    use super::indexed_files_under_prefix;
+
+    #[test]
+    fn folder_index_requires_a_path_component_boundary() {
+        let files = vec!["filesx/secret.md".to_string()];
+
+        assert!(indexed_files_under_prefix(&files, "files").is_empty());
     }
 }

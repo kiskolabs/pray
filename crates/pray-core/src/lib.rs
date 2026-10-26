@@ -85,6 +85,7 @@ mod resolve_git_store;
 mod resolve_queue;
 mod resolve_tarball;
 pub mod resource_limits;
+mod source_path;
 pub mod ssh_client;
 pub mod ssh_identity;
 pub mod ssh_publishers;

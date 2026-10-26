@@ -88,6 +88,12 @@ release_next_coordinated_version() {
     "$(release_read_gem_version "${root}")"
 }
 
+release_read_jsr_version() {
+  local root="$1"
+  node -e 'console.log(JSON.parse(require("fs").readFileSync(process.argv[1], "utf8")).version)' \
+    "${root}/npmjs/pray-cli/jsr.json"
+}
+
 release_assert_npm_typescript_match() {
   local root="$1"
   local npm typescript
@@ -95,6 +101,17 @@ release_assert_npm_typescript_match() {
   typescript="$(release_read_typescript_version "${root}")"
   if [[ "${npm}" != "${typescript}" ]]; then
     echo "TypeScript PACKAGE_VERSION ${typescript} does not match npm ${npm}" >&2
+    return 2
+  fi
+}
+
+release_assert_jsr_match() {
+  local root="$1"
+  local npm jsr
+  npm="$(release_read_npm_version "${root}")"
+  jsr="$(release_read_jsr_version "${root}")"
+  if [[ "${npm}" != "${jsr}" ]]; then
+    echo "jsr.json version ${jsr} does not match npm ${npm}" >&2
     return 2
   fi
 }

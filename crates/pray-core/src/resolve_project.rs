@@ -31,7 +31,7 @@ pub fn resolve_manifest_in_context(
     let source_host_keys = prepare_pray_ssh_host_keys(&manifest.sources)?;
     let mut queue = crate::resolve_queue::ResolveQueue::seed(&manifest.packages)?;
     let outcome = queue.resolve_all(&manifest.packages, &sources, |declaration| {
-        resolve_package(
+        super::one::resolve_package(
             project_root,
             &sources,
             &git_sources,

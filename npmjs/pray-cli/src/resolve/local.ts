@@ -3,6 +3,7 @@ import { resolve } from "node:path";
 import { PrayError } from "../errors.js";
 import { normalizeLineEndings, sha256Prefixed } from "../hashing.js";
 import type { ManifestLocal } from "../manifest/types.js";
+import { rejectSourceSymlinks } from "../source-path.js";
 import type { ResolvedLocalFile } from "./types.js";
 
 export function resolveLocalFile(
@@ -10,6 +11,7 @@ export function resolveLocalFile(
   declaration: ManifestLocal,
 ): ResolvedLocalFile {
   const path = resolve(projectRoot, declaration.path);
+  rejectSourceSymlinks(projectRoot, declaration.path, "local source");
   if (!existsSync(path)) {
     if (declaration.optional) {
       return {

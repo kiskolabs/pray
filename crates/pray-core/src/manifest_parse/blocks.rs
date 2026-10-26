@@ -164,7 +164,7 @@ impl BlockParser<'_> {
                 if !package.roles.contains(&ExportRole::File) {
                     package.roles.push(ExportRole::File);
                 }
-                crate::destination::upsert_package(manifest, package)?;
+                self.upsert_package(manifest, package)?;
                 saw_package = true;
                 continue;
             }
@@ -240,9 +240,9 @@ impl BlockParser<'_> {
                     package.roles.push(role);
                 }
             }
-            crate::destination::bind_package_entry(&mut manifest.targets[index], &package.name);
+            self.bind_package_entry(manifest, index, &package.name);
         }
-        crate::destination::upsert_package(manifest, package)?;
+        self.upsert_package(manifest, package)?;
         Ok(())
     }
 
@@ -253,10 +253,8 @@ impl BlockParser<'_> {
             }
             if let Some(rest) = statement.strip_prefix("agent ") {
                 manifest.note_deprecated_keyword(crate::deprecation::DEPRECATED_AGENT);
-                crate::destination::upsert_package(
-                    manifest,
-                    self.parse_package_with_groups(rest)?,
-                )?;
+                let package = self.parse_package_with_groups(rest)?;
+                self.upsert_package(manifest, package)?;
                 continue;
             }
             if let Some(rest) = statement
@@ -264,10 +262,8 @@ impl BlockParser<'_> {
                 .or_else(|| statement.strip_prefix("pray "))
                 .or_else(|| statement.strip_prefix("use "))
             {
-                crate::destination::upsert_package(
-                    manifest,
-                    self.parse_package_with_groups(rest)?,
-                )?;
+                let package = self.parse_package_with_groups(rest)?;
+                self.upsert_package(manifest, package)?;
                 continue;
             }
             return Err(PrayError::Parse {

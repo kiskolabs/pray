@@ -77,7 +77,7 @@ export async function runTrustCommand(
     case "add-key": {
       const fingerprint = rest[0];
       if (!fingerprint) {
-        throw PrayError.unsupported("trust add-key requires a fingerprint");
+        throw PrayError.usage("trust add-key requires a fingerprint");
       }
       addSigningKey(fingerprint);
       return;
@@ -86,7 +86,7 @@ export async function runTrustCommand(
     case "revoke": {
       const fingerprint = rest[0];
       if (!fingerprint) {
-        throw PrayError.unsupported("trust remove-key requires a fingerprint");
+        throw PrayError.usage("trust remove-key requires a fingerprint");
       }
       removeSigningKey(fingerprint);
       return;
@@ -130,7 +130,7 @@ export async function runTrustCommand(
       return;
     }
     default:
-      throw PrayError.unsupported(
+      throw PrayError.usage(
         `unknown trust subcommand: ${subcommand ?? "(none)"}`,
       );
   }
@@ -142,7 +142,7 @@ function parseImportRepoArguments(argumentsList: string[]): {
 } {
   const sourceUrl = argumentsList[0];
   if (!sourceUrl) {
-    throw PrayError.unsupported("trust import-repo requires SOURCE_URL");
+    throw PrayError.usage("trust import-repo requires SOURCE_URL");
   }
   let matchPrefix: string | undefined;
   for (let index = 1; index < argumentsList.length; index += 1) {
@@ -150,15 +150,13 @@ function parseImportRepoArguments(argumentsList: string[]): {
     if (argument === "--match-prefix") {
       const value = argumentsList[index + 1];
       if (!value) {
-        throw PrayError.unsupported("--match-prefix requires VALUE");
+        throw PrayError.usage("--match-prefix requires VALUE");
       }
       matchPrefix = value;
       index += 1;
       continue;
     }
-    throw PrayError.unsupported(
-      `unknown trust import-repo argument: ${argument}`,
-    );
+    throw PrayError.usage(`unknown trust import-repo argument: ${argument}`);
   }
   return { sourceUrl, matchPrefix };
 }
@@ -170,7 +168,7 @@ function parseImportRegistryArguments(argumentsList: string[]): {
 } {
   const sourceUrl = argumentsList[0];
   if (!sourceUrl) {
-    throw PrayError.unsupported("trust import-registry requires SOURCE_URL");
+    throw PrayError.usage("trust import-registry requires SOURCE_URL");
   }
   let matchPrefix: string | undefined;
   let includeHostKey =
@@ -181,7 +179,7 @@ function parseImportRegistryArguments(argumentsList: string[]): {
       case "--match-prefix": {
         const value = argumentsList[index + 1];
         if (!value) {
-          throw PrayError.unsupported("--match-prefix requires VALUE");
+          throw PrayError.usage("--match-prefix requires VALUE");
         }
         matchPrefix = value;
         index += 1;
@@ -194,7 +192,7 @@ function parseImportRegistryArguments(argumentsList: string[]): {
         includeHostKey = false;
         break;
       default:
-        throw PrayError.unsupported(
+        throw PrayError.usage(
           `unknown trust import-registry argument: ${argument}`,
         );
     }

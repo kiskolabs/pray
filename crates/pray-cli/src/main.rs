@@ -55,6 +55,8 @@ mod server_http;
 #[cfg(feature = "auth")]
 mod server_listen;
 #[cfg(feature = "auth")]
+mod server_public_file;
+#[cfg(feature = "auth")]
 mod server_registry;
 #[cfg(feature = "auth")]
 mod server_rpc;

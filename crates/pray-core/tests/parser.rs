@@ -1,4 +1,4 @@
-use pray_core::manifest::parse_manifest;
+use pray_core::manifest::{parse_manifest, DestinationEntry};
 use pray_core::package_spec::parse_package_spec;
 use pray_core::PrayError;
 
@@ -32,6 +32,41 @@ render mode: :managed,
     assert_eq!(manifest.packages[0].name, "sample/base");
     assert_eq!(manifest.local[0].path, ".agents/project.md");
     assert_eq!(manifest.render.mode, "managed");
+}
+
+#[test]
+fn merges_repeated_packages_without_changing_declaration_order() {
+    let manifest = parse_manifest(
+        r#"
+prayfile "1"
+compose "AGENTS.md" do
+  pray "sample/base", "*", export: "first"
+  pray "sample/other", "*"
+  pray "sample/base", "~> 1.0", export: "second"
+end
+"#,
+    )
+    .expect("manifest parses");
+
+    let package_names = manifest
+        .packages
+        .iter()
+        .map(|package| package.name.as_str())
+        .collect::<Vec<_>>();
+    assert_eq!(package_names, vec!["sample/base", "sample/other"]);
+    assert_eq!(manifest.packages[0].constraint, "~> 1.0");
+    assert_eq!(manifest.packages[0].exports, vec!["first", "second"]);
+    assert_eq!(
+        manifest.targets[0].entries,
+        vec![
+            DestinationEntry::Package {
+                name: "sample/base".to_string(),
+            },
+            DestinationEntry::Package {
+                name: "sample/other".to_string(),
+            },
+        ]
+    );
 }
 
 #[test]

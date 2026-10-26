@@ -4,6 +4,7 @@ require "fileutils"
 require "pathname"
 require_relative "render_content"
 require_relative "render_managed"
+require_relative "render_project"
 
 module Pray
   RenderedTarget = Struct.new(:path, :content, :managed_spans) do
@@ -14,16 +15,6 @@ module Pray
 
   module Render
     module_function
-
-    def render_project(project)
-      rendered = []
-      project.manifest.targets.each do |target|
-        output = target.outputs.first
-        next unless output
-        rendered << render_target(project, target, output)
-      end
-      rendered
-    end
 
     def write_rendered_targets(project, rendered, previous_lockfile = nil)
       Transaction.run(project.project_root) { RenderDest.write_rendered_targets(project, rendered, previous_lockfile) }
@@ -56,7 +47,18 @@ module Pray
           end
         end
       end
-      planned.sort_by(&:path).uniq(&:path)
+      planned.sort_by! { |file| [file.path, file.package, file.export] }
+      planned.each_cons(2) do |left, right|
+        next unless left.path == right.path
+        next if left.package == right.package && left.export == right.export
+
+        raise Error.render(
+          "provisioned destination `#{left.path}` has multiple owners: " \
+          "package `#{left.package}` export `#{left.export}` and " \
+          "package `#{right.package}` export `#{right.export}`"
+        )
+      end
+      planned.uniq(&:path)
     end
 
     PlannedProvisionedFile = Struct.new(:path, :source, :package, :export, keyword_init: true)
@@ -74,12 +76,23 @@ module Pray
       append_header(builder, project, target, output)
       symbols = project.manifest.symbols || {}
       managed_spans = []
+      locals_by_path = project.local_files.to_h { |local| [local.manifest_path, local] }
+      packages_by_name = project.packages.to_h { |package| [package.declaration.name, package] }
 
       (target.entries || []).each do |entry|
         if entry.kind == "local"
-          append_scoped_local(builder, managed_spans, project, target, output, entry.path, symbols)
+          local = locals_by_path[entry.path]
+          append_managed_local(builder, managed_spans, local, target, output, symbols) if local
         else
-          append_scoped_package(builder, managed_spans, project, target, output, entry.name, symbols)
+          package = packages_by_name[entry.name]
+          next unless package
+          next unless Environment.package_matches_environment?(package.declaration.groups, project.environment)
+
+          package.selected_exports.each do |export|
+            next unless should_inline_export?(package, export)
+
+            append_managed_export(builder, managed_spans, package, export, target, output, symbols)
+          end
         end
       end
 
@@ -131,25 +144,6 @@ module Pray
 
       builder.append_body(text)
       builder.append_empty_line
-    end
-
-    def append_scoped_local(builder, managed_spans, project, target, output, path, symbols)
-      local = project.local_files.find { |candidate| candidate.manifest_path == path }
-      return unless local
-
-      append_managed_local(builder, managed_spans, local, target, output, symbols)
-    end
-
-    def append_scoped_package(builder, managed_spans, project, target, output, package_name, symbols)
-      package = project.packages.find { |candidate| candidate.declaration.name == package_name }
-      return unless package
-      return unless Environment.package_matches_environment?(package.declaration.groups, project.environment)
-
-      package.selected_exports.each do |export|
-        next unless should_inline_export?(package, export)
-
-        append_managed_export(builder, managed_spans, package, export, target, output, symbols)
-      end
     end
 
     def should_inline_export?(package, export_name)

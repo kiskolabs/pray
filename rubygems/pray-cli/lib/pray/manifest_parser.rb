@@ -12,6 +12,10 @@ module Pray
         @cursor = 0
         @group_stack = []
         @surface = StatementSurface::Reader.new
+        @package_indices = {}
+        @local_indices = {}
+        @target_package_names = {}
+        @target_local_paths = {}
       end
 
       def parse_root
@@ -59,7 +63,7 @@ module Pray
         when /\Aagent (.+)\z/
           apply_agent_package(manifest, Regexp.last_match(1))
         when /\Apackage (.+)\z/
-          Destination.upsert_package(manifest, parse_package_with_groups(Regexp.last_match(1)))
+          upsert_package(manifest, parse_package_with_groups(Regexp.last_match(1)))
         when /\A(?:pray|use|include) (.+)\z/
           apply_pray_statement(manifest, Regexp.last_match(1), nil)
         when /\Alocal (.+)\z/
@@ -113,19 +117,37 @@ module Pray
 
       def apply_agent_package(manifest, rest)
         manifest.note_deprecated_keyword("agent")
-        Destination.upsert_package(manifest, parse_package_with_groups(rest))
+        upsert_package(manifest, parse_package_with_groups(rest))
       end
 
       def apply_unbound_local(manifest, rest)
         local = parse_local_decl(rest)
         local.bound = false
-        Destination.upsert_local(manifest, local)
+        upsert_local(manifest, local)
       end
 
       def parse_package_with_groups(rest)
         package = parse_package_decl(rest)
         package.groups = @group_stack.last&.dup || []
         package
+      end
+
+      def upsert_package(manifest, package)
+        Destination.upsert_package(manifest, package, @package_indices)
+      end
+
+      def upsert_local(manifest, local)
+        Destination.upsert_local(manifest, local, @local_indices)
+      end
+
+      def bind_package_entry(target, name)
+        names = (@target_package_names[target.object_id] ||= {})
+        Destination.bind_package_entry(target, name, names)
+      end
+
+      def bind_local_entry(target, path)
+        paths = (@target_local_paths[target.object_id] ||= {})
+        Destination.bind_local_entry(target, path, paths)
       end
 
       def next_statement

@@ -19,4 +19,14 @@ RSpec.describe Pray::Render::ContentBuilder do
       expect(builder.finish).to eq("body\n")
     end
   end
+
+  it "tracks the next line as content is appended" do
+    builder = described_class.new
+
+    expect(builder.next_line_number).to eq(1)
+    builder.append_line("first")
+    builder.append_body("second\nthird")
+
+    expect(builder.next_line_number).to eq(4)
+  end
 end

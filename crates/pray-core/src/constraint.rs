@@ -110,7 +110,7 @@ fn ruby_pessimistic_to_semver(constraint: &str) -> PrayResult<String> {
     let lower = format!("{}.{}.{}", numbers[0], numbers[1], numbers[2]);
     let upper = match parts.len() {
         1 => format!("{}.0.0", numbers[0] + 1),
-        2 => format!("{}.{}.0", numbers[0], numbers[1] + 1),
+        2 => format!("{}.0.0", numbers[0] + 1),
         _ => format!("{}.{}.0", numbers[0], numbers[1] + 1),
     };
     Ok(format!(">={}, <{}", lower, upper))
@@ -139,8 +139,9 @@ mod tests {
         assert!(version_satisfies("1.0.0", "1.0.0").expect("matches"));
         assert!(!version_satisfies("1.0.1", "1.0.0").expect("does not match"));
         assert!(version_satisfies("1.0.1", "~> 1.0").expect("pessimistic matches"));
-        assert!(!version_satisfies("1.5.0", "~> 1.4").expect("later minor"));
-        assert!(!version_satisfies("2.4.0", "~> 2.2").expect("later minor"));
+        assert!(version_satisfies("1.5.0", "~> 1.4").expect("later minor"));
+        assert!(version_satisfies("2.4.0", "~> 2.2").expect("later minor"));
+        assert!(!version_satisfies("2.0.0", "~> 1.4").expect("next major"));
     }
 
     #[test]

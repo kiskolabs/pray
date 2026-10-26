@@ -1015,6 +1015,33 @@ npx pray-cli install
 
 The npm package lives in `npmjs/pray-cli` and implements Prayfile parsing, registry and git resolution, lockfile generation, rendering, verification, publish, and serve.
 
+### JSR (Deno and TypeScript libraries)
+
+Import the TypeScript library from [jsr.io](https://jsr.io/@kiskolabs/pray-cli) after the package is published:
+
+```sh
+npx jsr add @kiskolabs/pray-cli
+```
+
+```ts
+import { parseManifest } from "@kiskolabs/pray-cli";
+```
+
+JSR ships TypeScript source. The Node CLI binary remains the npm `pray-cli` package. First publish needs the `@kiskolabs` scope on jsr.io; operators use `scripts/release/jsr.sh`.
+
+### Nix
+
+From a checkout or from GitHub once the flake is on the default branch:
+
+```sh
+nix run .#pray-cli -- version
+nix run github:kiskolabs/pray -- version
+```
+
+### AUR (Arch Linux)
+
+The in-tree recipe is `packaging/aur/pray-cli/PKGBUILD`. It is not on the AUR until a maintainer adopts it. After the GitHub tag exists, refresh checksums with `make bump-aur`. Other Linux packaging notes: [packaging/README.md](packaging/README.md).
+
 ### RubyGems (Ruby)
 
 Install the Ruby `pray` CLI from [RubyGems](https://rubygems.org/gems/pray-cli):

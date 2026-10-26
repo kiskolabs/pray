@@ -3,16 +3,16 @@
 module Pray
   module Render
     class ContentBuilder
+      attr_reader :next_line_number
+
       def initialize
         @content = +""
-      end
-
-      def next_line_number
-        @content.count("\n") + 1
+        @next_line_number = 1
       end
 
       def append_line(line)
         @content << line << "\n"
+        @next_line_number += 1
       end
 
       def append_empty_line

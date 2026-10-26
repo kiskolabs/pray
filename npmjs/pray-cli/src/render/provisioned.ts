@@ -5,26 +5,12 @@ import { PrayError } from "../errors.js";
 import { packageBoundToTree } from "../manifest/destination.js";
 import type { ResolvedPackage, ResolvedProject } from "../resolve/types.js";
 import { substitutePraySymbols } from "../substitute.js";
+import {
+  dedupeProvisionedOwners,
+  type PlannedProvisionedFile,
+} from "./provisioned-owner.js";
 
-export interface PlannedProvisionedFile {
-  path: string;
-  source: string;
-  package: string;
-  export: string;
-}
-
-function dedupeByPath(
-  files: PlannedProvisionedFile[],
-): PlannedProvisionedFile[] {
-  const result: PlannedProvisionedFile[] = [];
-  for (const file of files) {
-    if (result.length > 0 && result.at(-1)?.path === file.path) {
-      continue;
-    }
-    result.push(file);
-  }
-  return result;
-}
+export type { PlannedProvisionedFile } from "./provisioned-owner.js";
 
 export function plannedProvisionedFiles(
   project: ResolvedProject,
@@ -64,7 +50,7 @@ export function plannedProvisionedFiles(
   const sorted = planned.sort((left, right) =>
     left.path.localeCompare(right.path),
   );
-  return dedupeByPath(sorted);
+  return dedupeProvisionedOwners(sorted);
 }
 
 export function expectedProvisionedBytes(

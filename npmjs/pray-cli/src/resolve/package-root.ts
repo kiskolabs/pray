@@ -1,5 +1,5 @@
 import { existsSync } from "node:fs";
-import { join, resolve } from "node:path";
+import { join } from "node:path";
 import { PrayError } from "../errors.js";
 import {
   discoverDistributionRoot,
@@ -16,6 +16,7 @@ import {
   resolveRegistryPackageRoot,
 } from "../registry/index.js";
 import { localRegistryRoot } from "../registry/local-root.js";
+import { declaredSourceDirectory } from "../source-path.js";
 import { lockfilePreferredVersion, type ResolveOptions } from "./context.js";
 import { annotateMissingGitCatalog } from "./git-refresh.js";
 import { resolveTarballPackageRoot } from "./tarball.js";
@@ -35,7 +36,13 @@ export async function resolvePackageRoot(
   options: ResolveOptions,
 ): Promise<PackageRootResolution> {
   if (declaration.path) {
-    return { root: resolve(projectRoot, declaration.path) };
+    return {
+      root: declaredSourceDirectory(
+        projectRoot,
+        declaration.path,
+        "package directory",
+      ),
+    };
   }
 
   if (declaration.tarball) {
@@ -70,7 +77,13 @@ export async function resolvePackageRoot(
         sourceName,
         declaration.name,
       );
-      return { root: resolve(projectRoot, source.url, directory) };
+      return {
+        root: declaredSourceDirectory(
+          projectRoot,
+          join(source.url, directory),
+          "package directory",
+        ),
+      };
     }
 
     if (source.kind === "registry" || source.kind === "static index") {
@@ -151,7 +164,9 @@ export async function resolvePackageRoot(
   }
 
   const slug = declaration.name.replaceAll("/", "-");
-  return { root: resolve(projectRoot, slug) };
+  return {
+    root: declaredSourceDirectory(projectRoot, slug, "package directory"),
+  };
 }
 
 function packageNamespace(name: string): string | undefined {

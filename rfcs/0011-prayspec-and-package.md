@@ -284,6 +284,8 @@ Forbidden during install/render:
 - environment-variable interpolation
 - dynamic file discovery
 
+Before reading a declared path package, an implementation MUST inspect every existing component of the declared package path below the selected project root without following it. A symbolic link or reparse-point component MUST fail with an integrity error. The selected project root itself may be a symbolic link; inspection begins below that root.
+
 Packages may contain executable-looking files only as inert assets. Prayfile must not execute them.
 
 ---

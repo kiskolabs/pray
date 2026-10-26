@@ -20,25 +20,31 @@ export function renderScopedCompose(
   appendHeaderIfEnabled(builder, project, target, output);
 
   const managedSpans: RenderedTarget["managedSpans"] = [];
+  const localsByPath = new Map(
+    project.localFiles.map((local) => [local.manifestPath, local]),
+  );
+  const packagesByName = new Map(
+    project.packages.map((packageEntry) => [
+      packageEntry.declaration.name,
+      packageEntry,
+    ]),
+  );
   for (const entry of targetEntries(target)) {
     if (entry.kind === "local") {
-      appendLocalEntry(
-        builder,
-        managedSpans,
-        project,
-        target,
-        output,
-        entry.path,
-      );
+      const local = localsByPath.get(entry.path);
+      if (!local) continue;
+      appendLocalEntry(builder, managedSpans, project, target, output, local);
       continue;
     }
+    const packageEntry = packagesByName.get(entry.name);
+    if (!packageEntry) continue;
     appendPackageEntry(
       builder,
       managedSpans,
       project,
       target,
       output,
-      entry.name,
+      packageEntry,
     );
   }
 
@@ -55,14 +61,8 @@ function appendLocalEntry(
   project: ResolvedProject,
   target: ManifestTarget,
   output: string,
-  path: string,
+  local: ResolvedProject["localFiles"][number],
 ): void {
-  const local = project.localFiles.find(
-    (candidate) => candidate.manifestPath === path,
-  );
-  if (!local) {
-    return;
-  }
   appendManagedLocal(
     builder,
     managedSpans,
@@ -79,14 +79,8 @@ function appendPackageEntry(
   project: ResolvedProject,
   target: ManifestTarget,
   output: string,
-  packageName: string,
+  packageEntry: ResolvedProject["packages"][number],
 ): void {
-  const packageEntry = project.packages.find(
-    (candidate) => candidate.declaration.name === packageName,
-  );
-  if (!packageEntry) {
-    return;
-  }
   if (
     !packageMatchesEnvironment(
       packageEntry.declaration.groups,

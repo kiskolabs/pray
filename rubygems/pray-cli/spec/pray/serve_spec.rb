@@ -67,6 +67,19 @@ RSpec.describe Pray::Serve do
       response = described_class.dispatch_request(root, "GET", "/../../outside/secret.txt")
       expect(response).to include("404 Not Found")
     end
+
+    it "does not serve private files or follow public symlinks" do
+      FileUtils.mkdir_p(File.join(root, ".pray"))
+      File.write(File.join(root, ".pray/auth.db"), "secret")
+      FileUtils.mkdir_p(File.join(root, "v1/artifacts"))
+      File.symlink(File.join(root, ".pray/auth.db"), File.join(root, "v1/artifacts/leak"))
+
+      expect(described_class.dispatch_request(root, "GET", "/.pray/auth.db")).to include("404 Not Found")
+      expect(described_class.dispatch_request(root, "GET", "/v1/artifacts/leak")).to include("404 Not Found")
+      expect(
+        described_class.dispatch_request(root, "GET", "/v1/artifacts/../../.pray/auth.db")
+      ).to include("404 Not Found")
+    end
   end
 
   describe ".service_unavailable" do

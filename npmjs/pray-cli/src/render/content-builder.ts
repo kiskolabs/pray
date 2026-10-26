@@ -1,16 +1,19 @@
 export class ContentBuilder {
   private content = "";
+  private nextLine = 1;
 
   nextLineNumber(): number {
-    return this.content.split("\n").length;
+    return this.nextLine;
   }
 
   appendLine(line: string): void {
     this.content += `${line}\n`;
+    this.nextLine += 1;
   }
 
   appendEmptyLine(): void {
     this.content += "\n";
+    this.nextLine += 1;
   }
 
   appendBody(body: string): void {

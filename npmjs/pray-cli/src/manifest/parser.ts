@@ -17,16 +17,18 @@ import {
 } from "./deprecation.js";
 import {
   bindLocalEntry,
-  bindPackageEntry,
   destinationHeaderKeyword,
   newDestinationTarget,
   packageRoles,
   roleForDestination,
   targetMode,
   upsertLocal,
-  upsertPackage,
 } from "./destination.js";
-import { tryApplyFileBlockPray, tryApplyLocalPray } from "./local-pray.js";
+import {
+  ParserIndexes,
+  tryApplyFileBlockPray,
+  tryApplyLocalPray,
+} from "./local-pray.js";
 import { applyPublishOrUnrecognized } from "./parse-publish.js";
 import {
   applyTargetStatement,
@@ -54,6 +56,7 @@ export function parseManifestText(text: string): Manifest {
 class BlockParser {
   private readonly reader: StatementReader;
   private readonly groupStack: string[][] = [];
+  private readonly indexes = new ParserIndexes();
 
   constructor(lines: string[]) {
     this.reader = new StatementReader(lines);
@@ -146,14 +149,14 @@ class BlockParser {
         manifest.deprecatedKeywords,
         DEPRECATED_AGENT,
       );
-      upsertPackage(
+      this.indexes.upsertPackage(
         manifest,
         this.parsePackageWithGroups(statement.slice("agent ".length)),
       );
       return;
     }
     if (statement.startsWith("package ")) {
-      upsertPackage(
+      this.indexes.upsertPackage(
         manifest,
         this.parsePackageWithGroups(statement.slice("package ".length)),
       );
@@ -387,7 +390,7 @@ class BlockParser {
           roles.push("file");
         }
         packageEntry.roles = roles;
-        upsertPackage(manifest, packageEntry);
+        this.indexes.upsertPackage(manifest, packageEntry);
         sawPackage = true;
         continue;
       }
@@ -466,9 +469,9 @@ class BlockParser {
         }
         packageEntry.roles = roles;
       }
-      bindPackageEntry(target, packageEntry.name);
+      this.indexes.bindPackage(target, packageEntry.name);
     }
-    upsertPackage(manifest, packageEntry);
+    this.indexes.upsertPackage(manifest, packageEntry);
   }
 
   private parseGroupBlock(manifest: Manifest): void {
@@ -485,7 +488,7 @@ class BlockParser {
           manifest.deprecatedKeywords,
           DEPRECATED_AGENT,
         );
-        upsertPackage(
+        this.indexes.upsertPackage(
           manifest,
           this.parsePackageWithGroups(statement.slice("agent ".length)),
         );
@@ -495,7 +498,7 @@ class BlockParser {
         statement.startsWith(candidate),
       );
       if (prefix) {
-        upsertPackage(
+        this.indexes.upsertPackage(
           manifest,
           this.parsePackageWithGroups(statement.slice(prefix.length)),
         );
