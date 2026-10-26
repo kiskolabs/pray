@@ -12,7 +12,7 @@ makedepends=('cargo' 'git')
 provides=('pray')
 conflicts=('pray')
 source=("${pkgname}-${pkgver}.tar.gz::https://github.com/kiskolabs/pray/archive/refs/tags/v${pkgver}.tar.gz")
-sha256sums=('SKIP')
+sha256sums=('52e4cc482775ab2f62db16a35d1f9b180781f015a0dfab544a350449a9cef9ce')
 options=('!lto')
 
 prepare() {
