@@ -12,13 +12,13 @@ TypeScript ships the split on npm and jsr.io. Host-language ports stay in pray_c
 
 ## Effects
 
-npmjs/pray-core holds the TypeScript library and jsr.json as @kiskolabs/pray-core. npmjs/pray-cli is the CLI and depends on pray-core. Release scripts publish npm core then CLI; jsr.sh publishes the core library. CI, dependabot, and package-size checks target the npmjs workspace.
+npmjs/pray-core holds the TypeScript library and jsr.json as @kiskolabs/pray-core. npmjs/pray-cli is the CLI with jsr.json as @kiskolabs/pray-cli and depends on pray-core. Release scripts publish npm and JSR core then CLI. CI, dependabot, and package-size checks target the npmjs workspace.
 
 docs/releasing.md states the reference package map and points other-language ports at pray_compat.
 
 ## Next
 
-First registry publish of npm pray-core and jsr.io @kiskolabs/pray-core on the next version cut.
+First registry publish of npm pray-core / pray-cli and jsr.io @kiskolabs/pray-core / @kiskolabs/pray-cli on the next version cut.
 
 ## Source
 

@@ -1,5 +1,5 @@
-import { isAbsolute, win32 } from "node:path";
 import { PrayError } from "../errors.js";
+import { isAbsoluteFilesystemPath } from "../path-absolute.js";
 import type { Manifest } from "./types.js";
 
 export function validateManifestPaths(manifest: Manifest): void {
@@ -25,7 +25,7 @@ export function validateManifestPaths(manifest: Manifest): void {
 
 export function validateProjectRelativePath(value: string): string {
   const path = value.trim();
-  if (path.length === 0 || isAbsolute(path) || win32.isAbsolute(path)) {
+  if (path.length === 0 || isAbsoluteFilesystemPath(path)) {
     throw PrayError.manifest(
       `project path must be repository-relative: ${value}`,
     );

@@ -100,6 +100,12 @@ release_read_jsr_version() {
     "${root}/npmjs/pray-core/jsr.json"
 }
 
+release_read_jsr_cli_version() {
+  local root="$1"
+  node -e 'console.log(JSON.parse(require("fs").readFileSync(process.argv[1], "utf8")).version)' \
+    "${root}/npmjs/pray-cli/jsr.json"
+}
+
 release_assert_npm_typescript_match() {
   local root="$1"
   local npm cli typescript
@@ -118,11 +124,16 @@ release_assert_npm_typescript_match() {
 
 release_assert_jsr_match() {
   local root="$1"
-  local npm jsr
+  local npm jsr jsr_cli
   npm="$(release_read_npm_version "${root}")"
   jsr="$(release_read_jsr_version "${root}")"
+  jsr_cli="$(release_read_jsr_cli_version "${root}")"
   if [[ "${npm}" != "${jsr}" ]]; then
-    echo "jsr.json version ${jsr} does not match npm ${npm}" >&2
+    echo "pray-core jsr.json version ${jsr} does not match npm ${npm}" >&2
+    return 2
+  fi
+  if [[ "${npm}" != "${jsr_cli}" ]]; then
+    echo "pray-cli jsr.json version ${jsr_cli} does not match npm ${npm}" >&2
     return 2
   fi
 }

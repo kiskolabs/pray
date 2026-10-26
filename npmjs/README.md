@@ -5,7 +5,7 @@ TypeScript packages for the pray project.
 ## Packaging rule
 
 - `pray-core` — library only (npm + jsr.io `@kiskolabs/pray-core`)
-- `pray-cli` — CLI / `pray` executable; depends on `pray-core`
+- `pray-cli` — CLI / `pray` executable; depends on `pray-core` (npm + jsr.io `@kiskolabs/pray-cli`)
 - Core must not depend on CLI
 
 ## Workspace
@@ -17,4 +17,4 @@ npm run test --workspace=pray-core
 npm run test --workspace=pray-cli
 ```
 
-Publish order: `pray-core`, then `pray-cli` (`scripts/release/npm.sh`). JSR publishes `@kiskolabs/pray-core` only (`scripts/release/jsr.sh`).
+Publish order: `pray-core`, then `pray-cli` (`scripts/release/npm.sh` and `scripts/release/jsr.sh`).

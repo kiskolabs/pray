@@ -19,7 +19,10 @@ import { localRegistryRoot } from "../registry/local-root.js";
 import { declaredSourceDirectory } from "../source-path.js";
 import { lockfilePreferredVersion, type ResolveOptions } from "./context.js";
 import { annotateMissingGitCatalog } from "./git-refresh.js";
+import { impliedSourceName } from "./implied-source.js";
 import { resolveTarballPackageRoot } from "./tarball.js";
+
+export { impliedSourceName } from "./implied-source.js";
 
 export interface PackageRootResolution {
   root: string;
@@ -167,41 +170,6 @@ export async function resolvePackageRoot(
   return {
     root: declaredSourceDirectory(projectRoot, slug, "package directory"),
   };
-}
-
-function packageNamespace(name: string): string | undefined {
-  const separator = name.indexOf("/");
-  return separator === -1 ? undefined : name.slice(0, separator);
-}
-
-export function impliedSourceName(
-  declaration: ManifestPackage,
-  sources: Map<string, ManifestSource>,
-): string | undefined {
-  if (declaration.source) {
-    return declaration.source;
-  }
-  const namespace = packageNamespace(declaration.name);
-  if (namespace && sources.has(namespace)) {
-    return namespace;
-  }
-  if (!declaration.name.includes("/")) {
-    const pathSources = [...sources.entries()].filter(
-      ([, source]) => source.kind === "path",
-    );
-    if (pathSources.length === 1) {
-      return pathSources[0]?.[0];
-    }
-  }
-  if (sources.size === 1) {
-    return sources.keys().next()?.value;
-  }
-  if (sources.size > 1) {
-    throw PrayError.resolution(
-      `package ${declaration.name} requires source: when multiple sources are declared and the package namespace does not match a source`,
-    );
-  }
-  return undefined;
 }
 
 export function vendoredPackageRoot(

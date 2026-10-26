@@ -2,7 +2,7 @@
 
 TypeScript `pray` CLI for [Prayfile](https://pray.kisko.dev). Depends on [`pray-core`](https://www.npmjs.com/package/pray-core) for resolve, lock, render, verify, and publish.
 
-Library consumers should depend on `pray-core` (or `@kiskolabs/pray-core` on jsr.io), not this package.
+Library consumers should prefer `pray-core` (or `@kiskolabs/pray-core` on jsr.io). This package exposes the CLI and a parse re-export for runtime parity.
 
 **Website:** [pray.kisko.dev](https://pray.kisko.dev)
 
@@ -10,7 +10,7 @@ Library consumers should depend on `pray-core` (or `@kiskolabs/pray-core` on jsr
 
 **Repository:** [kiskolabs/pray](https://github.com/kiskolabs/pray)
 
-**Package:** [npmjs.com/package/pray-cli](https://www.npmjs.com/package/pray-cli)
+**Packages:** [npmjs.com/package/pray-cli](https://www.npmjs.com/package/pray-cli) · [jsr.io/@kiskolabs/pray-cli](https://jsr.io/@kiskolabs/pray-cli)
 
 ## Install
 
@@ -43,11 +43,22 @@ pray serve --root ./prayers --port 7429
 import { parseManifest, resolveProject } from "pray-core";
 ```
 
-Programmatic CLI dispatch:
+Programmatic CLI dispatch (Node, Deno, or Bun):
 
 ```ts
 import { runCli } from "pray-cli/cli";
 ```
+
+### Cloudflare Workers and browsers (parse only)
+
+`runCli` needs a local filesystem, `git`, and archive tools. Workers and browsers use the parse entry (same surface as `pray-core/parse`):
+
+```ts
+import { parseManifest, parseLockfile } from "pray-cli/parse";
+// jsr: @kiskolabs/pray-cli/parse
+```
+
+Prefer `pray-core/parse` when you only need the library.
 
 ## Development
 
@@ -58,10 +69,14 @@ cd pray-cli
 npm test
 npm run build
 node bin/pray.js version
+npm run test:bun
+npm run test:deno
+npm run test:workers-parse
 ```
 
 ## Requirements
 
-- Node.js 20+
+- Full CLI (`pray` / `runCli`): Node.js 20+, Deno, or Bun
 - `git` for git sources
 - `zstd` and `tar` for `.praypkg` archives (via `pray-core`)
+- Cloudflare Workers and browsers: `pray-cli/parse` only

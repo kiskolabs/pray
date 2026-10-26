@@ -1,7 +1,7 @@
 {
   "name": "pray-core",
   "version": "1.24.0",
-  "description": "Core library for Prayfile — resolve, lock, render, verify, and publish inference input packages",
+  "description": "Prayfile core library — package manager for the language placed before inference",
   "author": "Andrei Makarov <contact@kiskolabs.com>",
   "license": "MIT",
   "homepage": "https://pray.kisko.dev",
@@ -15,6 +15,10 @@
     ".": {
       "types": "./dist/index.d.ts",
       "import": "./dist/index.js"
+    },
+    "./parse": {
+      "types": "./dist/parse.d.ts",
+      "import": "./dist/parse.js"
     },
     "./*": {
       "types": "./dist/*",
@@ -36,10 +40,13 @@
     "prepublishOnly": "npm run build",
     "test": "npm run build && rm -rf dist-test && tsc -p tsconfig.test.json && node --test 'dist-test/**/*.test.js'",
     "test:coverage": "npm run build && rm -rf dist-test && tsc -p tsconfig.test.json && node --test --experimental-test-coverage --test-coverage-lines=60 --test-coverage-include='dist-test/**/*.js' --test-coverage-exclude='dist-test/**/*.test.js' 'dist-test/**/*.test.js'",
+    "test:bun": "npm run build && bun scripts/runtime-smoke.mjs",
+    "test:deno": "npm run build && rm -rf dist-test && tsc -p tsconfig.test.json && deno test --node-modules-dir=auto --allow-all dist-test/parse.test.js dist-test/parse-graph.test.js dist-test/hashing.test.js dist-test/constraint.test.js dist-test/library.test.js dist-test/lockfile.test.js dist-test/parser.test.js && deno run --node-modules-dir=auto --allow-all scripts/runtime-smoke.mjs",
+    "test:workers-parse": "node scripts/workers-parse-smoke.mjs",
     "typecheck": "tsc -p tsconfig.json --noEmit",
     "lint": "biome check . && npm run lint:cycles",
     "libyears": "libyear --dev --quiet",
-    "lint:cycles": "madge --circular --extensions ts --ts-config tsconfig.json src/index.ts",
+    "lint:cycles": "madge --circular --extensions ts --ts-config tsconfig.json src/index.ts src/parse.ts",
     "format": "biome format --write .",
     "format:check": "biome format ."
   },

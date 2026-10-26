@@ -129,3 +129,32 @@ jobs:
       - name: Check JSR publish for pray-core (no slow types)
         working-directory: npmjs/pray-core
         run: npx --yes jsr publish --dry-run --allow-dirty
+      - name: Check JSR publish for pray-cli (no slow types)
+        working-directory: npmjs/pray-cli
+        run: npx --yes jsr publish --dry-run --allow-dirty
+      - name: Setup Bun
+        uses: oven-sh/setup-bun@ecf28ddc73e819eb6fa29df6b34ef8921c743461 # v2.1.3
+        with:
+          bun-version: "1.2.9"
+      - name: Setup Deno
+        uses: denoland/setup-deno@22d081ff2d3a40755e97629de92e3bcbfa7cf2ed # v2.0.5
+        with:
+          deno-version: v2.x
+      - name: Run pray-core Bun runtime smoke
+        working-directory: npmjs/pray-core
+        run: npm run test:bun
+      - name: Run pray-core Deno parse suite and runtime smoke
+        working-directory: npmjs/pray-core
+        run: npm run test:deno
+      - name: Run pray-core Workers parse smoke
+        working-directory: npmjs/pray-core
+        run: npm run test:workers-parse
+      - name: Run pray-cli Bun runtime smoke
+        working-directory: npmjs/pray-cli
+        run: npm run test:bun
+      - name: Run pray-cli Deno runtime smoke
+        working-directory: npmjs/pray-cli
+        run: npm run test:deno
+      - name: Run pray-cli Workers parse smoke
+        working-directory: npmjs/pray-cli
+        run: npm run test:workers-parse

@@ -1,0 +1,24 @@
+{
+  "$schema": "https://jsr.io/schema/config-file.v1.json",
+  "name": "@kiskolabs/pray-cli",
+  "version": "1.24.0",
+  "license": "MIT",
+  "exports": {
+    ".": "./src/cli/main.ts",
+    "./cli": "./src/cli/main.ts",
+    "./parse": "./src/parse.ts"
+  },
+  "publish": {
+    "include": [
+      "LICENSE.md",
+      "README.md",
+      "package.json",
+      "src/**/*.ts"
+    ],
+    "exclude": [
+      "src/**/*.test.ts",
+      "src/**/*.integration.test.ts",
+      "src/**/*.support.ts"
+    ]
+  }
+}

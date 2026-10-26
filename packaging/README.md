@@ -8,7 +8,7 @@ Language registries stay under `scripts/release/`. This tree holds OS package re
 
 | Channel | Status | Location | Upload |
 |---------|--------|----------|--------|
-| jsr.io (`@kiskolabs/pray-core`) | In-tree release script | `npmjs/pray-core/jsr.json`, `scripts/release/jsr.sh` | Manual `jsr publish` after scope exists |
+| jsr.io (`@kiskolabs/pray-core`, `@kiskolabs/pray-cli`) | In-tree release script | `npmjs/pray-core/jsr.json`, `npmjs/pray-cli/jsr.json`, `scripts/release/jsr.sh` | Manual `jsr publish` after scope exists |
 | Nix flake | In-tree | Root `flake.nix` | Consumers: `nix run github:kiskolabs/pray` |
 | nixpkgs | Planned | Submit from flake derivation | PR to NixOS/nixpkgs |
 | AUR (`pray-cli`) | Recipe | `packaging/aur/pray-cli/PKGBUILD` | AUR git after package adoption |
@@ -22,6 +22,6 @@ Homebrew stays in the sibling tap (`make bump-homebrew`), not under `packaging/`
 ## Version source
 
 - Rust binary packages follow the workspace version in root `Cargo.toml`.
-- JSR follows `npmjs/pray-core/jsr.json`, which must match `npmjs/pray-core/package.json`. npm `pray-cli` depends on `pray-core`.
+- JSR follows `npmjs/pray-core/jsr.json` and `npmjs/pray-cli/jsr.json`, which must match the matching npm package versions. npm and JSR `pray-cli` depend on `pray-core`.
 
 Bump AUR with `scripts/release/aur_bump.sh` after the GitHub tag exists. Nix reads the workspace version from `Cargo.toml` and does not need a separate bump file.

@@ -1,21 +1,7 @@
 import { readFileSync } from "node:fs";
 import { PrayError } from "../errors.js";
-import { sha256Prefixed } from "../hashing.js";
-import { validatePublishRemotes } from "../publish/remote.js";
-import { parseManifestText } from "./parser.js";
-import {
-  canonicalManifest,
-  defaultRenderPolicy,
-  type Manifest,
-  type ManifestLocal,
-  type ManifestPackage,
-  type ManifestPublishRemote,
-  type ManifestSource,
-  type ManifestTarget,
-  manifestToJson,
-  type RenderPolicy,
-} from "./types.js";
-import { validateManifestPaths } from "./validate.js";
+
+export { manifestHash, parseManifest } from "./parse-api.js";
 
 /** Read Prayfile text from disk, or throw {@link PrayError} when missing. */
 export function readManifestText(manifestPath: string): string {
@@ -35,20 +21,6 @@ export function readManifestText(manifestPath: string): string {
     const message = error instanceof Error ? error.message : String(error);
     throw PrayError.io(message);
   }
-}
-
-/** Parse and validate Prayfile text into a {@link Manifest}. */
-export function parseManifest(text: string): Manifest {
-  const manifest = parseManifestText(text);
-  validateManifestPaths(manifest);
-  validatePublishRemotes(manifest);
-  return manifest;
-}
-
-/** Canonical hash of a manifest used for lockfile and resolve identity. */
-export function manifestHash(manifest: Manifest): string {
-  const bytes = Buffer.from(JSON.stringify(manifestToJson(manifest)), "utf8");
-  return sha256Prefixed(bytes);
 }
 
 export {
@@ -93,4 +65,4 @@ export {
   type ManifestSource,
   type ManifestTarget,
   type RenderPolicy,
-};
+} from "./types.js";

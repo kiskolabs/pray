@@ -10,7 +10,7 @@ Publishing is not automated in CI. Operators run the scripts under `scripts/rele
 |---------|--------------|------------|
 | [crates.io](https://crates.io/crates/pray-cli) | `pray-core`, `pray-transport`, `pray-cli` | `pray` (from `pray-cli`) |
 | [npm](https://www.npmjs.com/package/pray-cli) | `pray-core`, `pray-cli` (CLI depends on core) | `pray` (from `pray-cli`) |
-| [jsr.io](https://jsr.io/@kiskolabs/pray-core) | `@kiskolabs/pray-core` | library import (CLI stays on npm) |
+| [jsr.io](https://jsr.io/@kiskolabs/pray-core) | `@kiskolabs/pray-core`, `@kiskolabs/pray-cli` | library import; CLI via `@kiskolabs/pray-cli` (global `pray` still from npm) |
 | [RubyGems](https://rubygems.org/gems/pray-cli) | `pray-cli` only (Ruby exception: no separate core gem) | `pray` |
 | Nix flake | root `flake.nix` | `pray` (`nix run .#pray-cli`) |
 | AUR recipe | `packaging/aur/pray-cli` | `pray` (after AUR adoption) |
@@ -28,6 +28,7 @@ Keep these equal before a full language-registry publish (`make release-all`):
 - `npmjs/pray-core/package.json`
 - `npmjs/pray-cli/package.json`
 - `npmjs/pray-core/jsr.json`
+- `npmjs/pray-cli/jsr.json`
 - `npmjs/pray-core/src/lockfile/types.ts` (`PACKAGE_VERSION`)
 - `rubygems/pray-cli/lib/pray/version.rb`
 
@@ -59,7 +60,7 @@ Publish npm (core then CLI), JSR, and RubyGems. Each script skips when that vers
 ./scripts/release/rubygems.sh --publish
 ```
 
-First JSR publish of `@kiskolabs/pray-core` needs the `@kiskolabs` scope and package created on [jsr.io](https://jsr.io/new). For JSR score and provenance: set the package description and runtime compatibility (Node.js and Deno at minimum) under the package Settings tab; link the GitHub repository; prefer publishing via `.github/workflows/publish-jsr.yml` (OIDC) so the version gets a transparency-log provenance entry. Token publish from `scripts/release/jsr.sh` does not create provenance. Optional OS packaging notes live under [packaging/README.md](../packaging/README.md).
+First JSR publish of `@kiskolabs/pray-core` and `@kiskolabs/pray-cli` needs the `@kiskolabs` scope and both packages created on [jsr.io](https://jsr.io/new). For JSR score and provenance: set each package description and runtime compatibility (Node.js and Deno at minimum) under the package Settings tab; link the GitHub repository; prefer publishing via `.github/workflows/publish-jsr.yml` (OIDC) so the version gets a transparency-log provenance entry. Token publish from `scripts/release/jsr.sh` does not create provenance. Optional OS packaging notes live under [packaging/README.md](../packaging/README.md).
 
 Publish local prayer packages to a distribution point:
 
@@ -96,6 +97,7 @@ Exit codes for operators: `docs/cli-exit-codes.md` (normative table in RFC 0040)
 cargo install pray-cli --locked
 npm install -g pray-cli
 npx jsr add @kiskolabs/pray-core
+npx jsr add @kiskolabs/pray-cli
 gem install pray-cli
 nix run github:kiskolabs/pray
 ```

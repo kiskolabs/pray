@@ -1,8 +1,8 @@
 # pray-core
 
-Core library for [Prayfile](https://pray.kisko.dev): parse manifests and package specs, resolve dependencies, write lockfiles, render managed targets, verify drift, and build distribution artifacts.
+Core library for [Prayfile](https://pray.kisko.dev): a package manager for the language placed before inference.
 
-This is the shared engine used by the `pray` CLI (`pray-cli` on crates.io).
+Resolve, lock, render, verify, and publish shared instructions, policies, templates, and related input as versioned packages. This is the shared engine used by the `pray` CLI (`pray-cli` on crates.io).
 
 ## Install
 

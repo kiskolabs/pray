@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+- Publish jsr.io `@kiskolabs/pray-cli` alongside `@kiskolabs/pray-core` at the same version (CLI package; library stays on pray-core).
+- Restore the Prayfile positioning line in `pray-core` registry descriptions and README openers (npm, jsr.io module docs, crates.io) so search matches the pre-split `pray-cli` storefront copy.
 - Stop piping npm publish under `make release-all` (that broke browser/device 2FA). After a failed publish, wait for the npm version so E409 staged conflicts can skip and the run can continue. JSR publish allows a dirty tree on resume.
 - Run `gem push` on the terminal under `make release-all` so the RubyGems MFA prompt is visible. After a failed push, skip when that version is already on RubyGems.
 

@@ -2,6 +2,9 @@
 
 ## Unreleased
 
+- Restore the Prayfile positioning line in the package description, README opener, and jsr.io module docs so registry search matches the pre-split `pray-cli` storefront copy.
+- Support Deno and Bun for the full library entry. Support Cloudflare Workers and browsers through the `pray-core/parse` (jsr `@kiskolabs/pray-core/parse`) parse and validate surface only.
+
 ## 1.24.0 (2026-10-26)
 
 - Publish as the TypeScript library package `pray-core` / `@kiskolabs/pray-core`. The CLI moves to the separate `pray-cli` package that depends on this library.

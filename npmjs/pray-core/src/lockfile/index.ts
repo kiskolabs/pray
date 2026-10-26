@@ -1,7 +1,5 @@
 import { existsSync, readFileSync } from "node:fs";
-import { parse } from "smol-toml";
 import { PrayError } from "../errors.js";
-import { sha256Prefixed } from "../hashing.js";
 import type { ManifestSource, ManifestTarget } from "../manifest/types.js";
 import { recordedPackageVersion } from "../package-spec/index.js";
 import { provisionedLockRecords } from "../render/dest.js";
@@ -9,9 +7,8 @@ import { layoutRenderedTargets } from "../render/project.js";
 import type { RenderedTarget } from "../render/types.js";
 import type { ResolvedPackage, ResolvedProject } from "../resolve/types.js";
 import { writeProjectFile } from "../transaction/index.js";
-import { parseLockfileValue } from "./parse.js";
 import { normalizeLockfileArtifact, relativeLockfilePath } from "./paths.js";
-import { serializeLockfileText } from "./serialize.js";
+import { parseLockfile, serializeLockfile } from "./text.js";
 import {
   canonicalLockfile,
   GENERATED_BY,
@@ -19,18 +16,12 @@ import {
   type LockSource,
 } from "./types.js";
 
-/** Parse lockfile TOML text into a {@link Lockfile}. */
-export function parseLockfile(text: string): Lockfile {
-  try {
-    return parseLockfileValue(parse(text));
-  } catch (error) {
-    if (error instanceof PrayError) {
-      throw error;
-    }
-    const message = error instanceof Error ? error.message : String(error);
-    throw PrayError.parse("lockfile", message);
-  }
-}
+export {
+  lockfileHash,
+  lockfilesEquivalent,
+  parseLockfile,
+  serializeLockfile,
+} from "./text.js";
 
 /** Read and parse a lockfile from disk. */
 export function readLockfile(path: string): Lockfile {
@@ -44,16 +35,6 @@ export function readLockfile(path: string): Lockfile {
     const message = error instanceof Error ? error.message : String(error);
     throw PrayError.parse("lockfile", message);
   }
-}
-
-/** True when two lockfiles serialize to the same canonical TOML. */
-export function lockfilesEquivalent(left: Lockfile, right: Lockfile): boolean {
-  return serializeLockfile(left) === serializeLockfile(right);
-}
-
-/** Serialize a lockfile to canonical TOML text. */
-export function serializeLockfile(lockfile: Lockfile): string {
-  return serializeLockfileText(lockfile);
 }
 
 /** Write a lockfile to disk, always overwriting. */
@@ -71,11 +52,6 @@ export function writeLockfileIfChanged(path: string, lockfile: Lockfile): void {
     }
   }
   writeProjectFile(path, serialized);
-}
-
-/** SHA-256 hash of the canonical lockfile serialization. */
-export function lockfileHash(lockfile: Lockfile): string {
-  return sha256Prefixed(serializeLockfile(lockfile));
 }
 
 /** Build a lockfile from a resolved project and rendered destinations. */

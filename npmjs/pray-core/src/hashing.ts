@@ -1,10 +1,10 @@
-import { createHash } from "node:crypto";
+import { sha256HexBytes } from "./sha256.js";
 
-export function sha256Hex(bytes: Buffer | string): string {
-  return createHash("sha256").update(bytes).digest("hex");
+export function sha256Hex(bytes: Uint8Array | string): string {
+  return sha256HexBytes(bytes);
 }
 
-export function sha256Prefixed(bytes: Buffer | string): string {
+export function sha256Prefixed(bytes: Uint8Array | string): string {
   return `sha256:${sha256Hex(bytes)}`;
 }
 
@@ -23,22 +23,10 @@ export function checksumManagedSpanContent(body: string): string {
 
 export function checksumManagedBodyLineRefs(bodyLines: string[]): string {
   const trimmed = trimTrailingEmptyLines(bodyLines);
-  const hasher = createHash("sha256");
-  for (let index = 0; index < trimmed.length; index += 1) {
-    if (index > 0) {
-      hasher.update("\n");
-    }
-    const line = trimmed[index];
-    if (line === undefined) {
-      continue;
-    }
-    hasher.update(line.includes("\r") ? normalizeLineEndings(line) : line);
-  }
-  return prefixedHexDigest(hasher.digest());
-}
-
-function prefixedHexDigest(digest: Buffer): string {
-  return `sha256:${digest.toString("hex")}`;
+  const normalized = trimmed.map((line) =>
+    line.includes("\r") ? normalizeLineEndings(line) : line,
+  );
+  return sha256Prefixed(normalized.join("\n"));
 }
 
 function trimTrailingEmptyLines(lines: string[]): string[] {

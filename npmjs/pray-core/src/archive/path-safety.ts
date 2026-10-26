@@ -1,9 +1,9 @@
-import { isAbsolute } from "node:path";
 import { PrayError } from "../errors.js";
+import { isAbsoluteFilesystemPath } from "../path-absolute.js";
 
 export function validateArchiveMemberPath(path: string): string {
   const text = path.replaceAll("\\", "/");
-  if (text.length === 0 || isAbsolute(text) || text.startsWith("/")) {
+  if (text.length === 0 || isAbsoluteFilesystemPath(text)) {
     throw PrayError.integrity(`package path must be relative: ${path}`);
   }
 

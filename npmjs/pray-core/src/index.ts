@@ -1,7 +1,10 @@
 /**
- * TypeScript library for Prayfile: resolve, lock, render, verify, publish, and serve.
+ * TypeScript library for Prayfile: a package manager for the language placed before inference.
  *
- * CLI dispatch lives in the `pray-cli` package (`pray-cli/cli`). The `pray` binary uses that path.
+ * Resolve, lock, render, verify, publish, and serve shared instructions, policies,
+ * templates, and related input as versioned packages. Consumes path, git, and
+ * registry distribution points. CLI dispatch lives in the `pray-cli` package
+ * (`pray-cli/cli`). The `pray` binary uses that path.
  *
  * @example
  * ```ts

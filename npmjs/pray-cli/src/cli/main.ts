@@ -1,3 +1,18 @@
+/**
+ * TypeScript `pray` CLI for Prayfile. Depends on `pray-core` / `@kiskolabs/pray-core`
+ * for resolve, lock, render, verify, and publish. Library imports use that package,
+ * not this one.
+ *
+ * @example
+ * ```ts
+ * import { runCli } from "@kiskolabs/pray-cli";
+ *
+ * const code = await runCli(["version"]);
+ * ```
+ *
+ * @module
+ */
+
 import { runLoginCommand } from "pray-core/auth/login.js";
 import { PrayError } from "pray-core/errors.js";
 import { readLockfile } from "pray-core/lockfile/index.js";

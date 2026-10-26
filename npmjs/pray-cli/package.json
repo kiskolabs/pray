@@ -16,6 +16,10 @@
     "./cli": {
       "types": "./dist/cli/main.d.ts",
       "import": "./dist/cli/main.js"
+    },
+    "./parse": {
+      "types": "./dist/parse.d.ts",
+      "import": "./dist/parse.js"
     }
   },
   "files": [
@@ -33,10 +37,13 @@
     "build": "npm run build --prefix ../pray-core && rm -rf dist && tsc -p tsconfig.build.json",
     "prepublishOnly": "npm run build",
     "test": "npm run build && rm -rf dist-test && tsc -p tsconfig.test.json && node --test 'dist-test/**/*.test.js'",
+    "test:bun": "npm run build && bun scripts/runtime-smoke.mjs",
+    "test:deno": "npm run build && deno run --node-modules-dir=auto --allow-all scripts/runtime-smoke.mjs",
+    "test:workers-parse": "node scripts/workers-parse-smoke.mjs",
     "typecheck": "tsc -p tsconfig.json --noEmit",
     "lint": "biome check . && npm run lint:cycles",
     "libyears": "libyear --dev --quiet",
-    "lint:cycles": "madge --circular --extensions ts --ts-config tsconfig.json src/cli/main.ts",
+    "lint:cycles": "madge --circular --extensions ts --ts-config tsconfig.json src/cli/main.ts src/parse.ts",
     "format": "biome format --write .",
     "format:check": "biome format ."
   },
