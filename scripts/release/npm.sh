@@ -5,7 +5,10 @@
 #   scripts/release/npm.sh            # pack dry-run (default)
 #   scripts/release/npm.sh --publish  # real publish (manual)
 #
-# Requires: npm login (or NPM_TOKEN via .npmrc)
+# Requires: npm login (or NPM_TOKEN via .npmrc).
+# For accounts with publish 2FA, set NPM_OTP to an authenticator code for the run.
+# Do not pipe npm publish: that made 2FA fail with EOTP under make release-all.
+# Already-published races are detected with a registry version check after failure.
 # Publish skips a package whose version is already on npmjs so release-all can resume.
 # Order: pray-core, then pray-cli (CLI depends on core).
 set -euo pipefail
@@ -71,20 +74,24 @@ publish_one() {
       echo "skipped ${name} publish"
       return 0
     fi
-    echo "==> npm publish (${name})"
-    publish_log="$(mktemp)"
+    publish_args=(publish)
+    if [[ -n "${NPM_OTP:-}" ]]; then
+      publish_args+=(--otp "${NPM_OTP}")
+    fi
+    echo "==> npm ${publish_args[*]} (${name})"
     set +e
-    npm publish 2>&1 | tee "${publish_log}"
-    publish_status="${PIPESTATUS[0]}"
+    # Same as pre-skip path: attach to the terminal. Piping through tee caused EOTP.
+    npm "${publish_args[@]}"
+    publish_status=$?
     set -e
-    outcome="$(
-      release_publish_outcome no "${publish_status}" release_npm_already_exists \
-        "$(cat "${publish_log}")" || true
-    )"
-    rm -f "${publish_log}"
-    if [[ "${outcome}" == "skip" ]]; then
+    if [[ "${publish_status}" -eq 0 ]]; then
+      :
+    elif release_npm_has_version "${name}" "${VERSION}"; then
       echo "skip ${name}@${VERSION} (already on npmjs)"
-    elif [[ "${publish_status}" -ne 0 ]]; then
+    else
+      if [[ -z "${NPM_OTP:-}" ]]; then
+        echo "npm publish failed. For 2FA, rerun with NPM_OTP=<authenticator-code>." >&2
+      fi
       exit "${publish_status}"
     fi
   )

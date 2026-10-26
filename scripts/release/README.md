@@ -86,6 +86,8 @@ scripts/release/all.sh --publish --root ./prayers --server https://pray.example/
 
 If a full publish stops after one or more registries succeed, resume with `make release-all` (or the remaining surface scripts). Completed crates.io, npm, jsr.io, and RubyGems versions are skipped automatically.
 
+npm publish with account 2FA: set `NPM_OTP` to an authenticator code for that run (`NPM_OTP=123456 make release-npm`). The script does not pipe `npm publish` (that broke 2FA with EOTP). CI should use a granular token that can publish without OTP.
+
 Create or edit the GitHub Release for the workspace version:
 
 ```sh

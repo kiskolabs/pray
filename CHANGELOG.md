@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+- Stop piping npm publish under `make release-all` (that broke account 2FA with EOTP). Accept `NPM_OTP` for an authenticator code; treat already-published races via a registry check after failure.
+
 ## 1.24.0 (2026-10-26)
 
 - Split TypeScript into npm `pray-core` / jsr.io `@kiskolabs/pray-core` (library) and npm `pray-cli` (CLI depending on core). Library imports move off `pray-cli` / `@kiskolabs/pray-cli`.
