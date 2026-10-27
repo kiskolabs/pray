@@ -29,6 +29,9 @@ updates:
       - dependency-name: "@types/node"
         update-types: ["version-update:semver-major"]
 
+  # Ruby version for resolution comes from rubygems/pray-cli/.ruby-version (3.4),
+  # matching .github/workflows/ci.yml. Without that file Dependabot used the gemspec
+  # floor (>= 3.1) and failed to resolve polyrun / bundler-audit / rbs.
   - package-ecosystem: bundler
     directory: /rubygems/pray-cli
     open-pull-requests-limit: 10
@@ -38,6 +41,7 @@ updates:
       bundler:
         patterns:
           - "*"
+
   - package-ecosystem: github-actions
     directory: /
     open-pull-requests-limit: 10
