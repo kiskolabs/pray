@@ -37,7 +37,7 @@ rfcs/0106-host-language-lock-adapter.md
 rfcs/0109-embedder-api.md
 docs/issues/20260915130000_host-language-lock-adapter.md
 docs/issues/20260915133000_render-fixtures-and-lock-adapter-ports.md
-README.md (Ruby and Rails integration planned)
+README.md (RubyGems install section)
 https://hex.pm/packages/langchain
 https://github.com/brainlid/langchain
 https://github.com/svilupp/PromptingTools.jl

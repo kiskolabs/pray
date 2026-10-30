@@ -868,56 +868,6 @@ The specification is about packaging, resolving, locking, caching, rendering, fo
 
 Quality remains a human and project-level concern.
 
-## Ruby and Rails integration (planned)
-
-Prayfile is language-independent, but Ruby and Rails are a natural first host for runtime prayer support.
-
-A planned Ruby gem would let web applications that incorporate inference load and compose prayers at runtime — without reimplementing resolve, lock, or render inside the app process.
-
-### Split of responsibility
-
-| Layer | Owner | Role |
-|-------|-------|------|
-| `pray` CLI | reference implementation | resolve, lock, render, verify, drift, publish, serve |
-| Ruby gem | planned host integration | read lock/cache, assemble inference input, optional Rails hooks |
-| Rails app | application | declare `Prayfile`, commit lock + rendered targets, call inference with composed input |
-
-The gem would not replace `pray`. Development and CI still run `pray plan`, `pray apply`, `pray verify`, and `pray drift`. The gem consumes the artifacts they produce.
-
-### What the gem could provide
-
-* load managed spans from `Prayfile.lock` (ideal checksums, provenance, silenced fragments)
-* resolve prayer bodies from `.pray/cache`, vendored `.praypkg`, or distribution points
-* assemble inference-facing text for a named target (for example `AGENTS.md`, a custom `:rails` target, or an in-memory buffer)
-* expose the same drift semantics as the CLI: custom implementation, removed prayers, position drift, orphan markers
-* Rails integration: initializers, request/job-scoped context builders, generators, and rake tasks that delegate to `pray` where shelling out is appropriate
-
-### Typical Rails workflow
-
-```text
-Prayfile + Prayfile.lock   committed in the app repo
-AGENTS.md / CLAUDE.md      committed rendered targets (today's tool compatibility)
-.pray/                     ignored locally; populated by pray install
-
-CI:  pray verify --strict && pray drift
-App: Prayer::Context.for(:inference).to_s  # example API; not normative yet
-```
-
-### Design constraints
-
-* prayers remain data — no arbitrary package code execution in the gem either
-* lockfile managed span records remain authoritative for verify/drift
-* the gem should not fork marker or checksum rules; it implements the same contracts as `README.md` and `rfcs/`
-* gem name and API are not finalized; `prayer`, `prayfile`, and `prayers` are candidates
-
-## Is the specification final?
-
-Not yet.
-
-The project is under active development. Terminology, formats, package structure, resolver rules, rendering targets, cache behaviour, registry design, distribution APIs, marker syntax, formatting rules, signing policy, confession policy, and implementation details may still evolve as the system is hardened through real-world use.
-
-The current focus is building a production-ready implementation with stable contracts and strong validation.
-
 ## Core model
 
 | Concept                | Role                                                                                   |

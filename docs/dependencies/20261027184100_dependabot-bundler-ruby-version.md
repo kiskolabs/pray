@@ -20,15 +20,25 @@ Weekly Dependabot bundler jobs fail with dependency_file_not_resolvable. The upd
 
 ## Suggested fix
 
-Add rubygems/pray-cli/.ruby-version with 3.4 so Dependabot matches CI. Keep the gemspec runtime floor at >= 3.1.0 unless product support for 3.1 is dropped. Comment the Dependabot bundler entry so the pin is not removed by accident.
+Pin rubygems/pray-cli/.ruby-version to an exact installed patch that matches CI (currently 4.0.7). Keep the gemspec runtime floor at >= 3.1.0 unless product support for 3.1 is dropped. Comment the Dependabot bundler entry so the pin is not removed by accident.
+
+A bare major.minor value such as 3.4 satisfies GitHub Actions ruby/setup-ruby, but local rbenv treats it as a missing version and aborts make release-rubygems / release-all when the package directory is entered.
+
+## Effects
+
+- rubygems/pray-cli/.ruby-version, CI ruby-version, and the Dependabot comment now use 4.0.7.
+- make release-all for 1.26.0 failed at the RubyGems surface with rbenv: version `3.4' is not installed while .ruby-version still held 3.4. Reproduced locally with a temporary .ruby-version containing 3.4.
+- RubyGems later lists pray-cli 1.26.0; resume skips an already-published gem version.
 
 ## Next
 
-Re-run or wait for the next scheduled bundler update and confirm a PR opens. Watch whether Dependabot images ship Ruby 3.4 for .ruby-version 3.4; if resolution still fails, pin an exact patch (for example 3.4.5) that the updater supports.
+Confirm the next Dependabot bundler PR opens against the 4.0.7 pin. Keep .ruby-version as an exact patch whenever CI or local rbenv pins change.
 
 ## Source
 
 - .github/dependabot.yml
-- .github/workflows/ci.yml (ruby-version 3.4)
+- .github/workflows/ci.yml (ruby-version 4.0.7)
+- rubygems/pray-cli/.ruby-version
 - rubygems/pray-cli/Gemfile
 - rubygems/pray-cli/pray-cli.gemspec
+- scripts/release/rubygems.sh
