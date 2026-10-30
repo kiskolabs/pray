@@ -177,7 +177,7 @@ module Pray
 
         VerificationFinding.new(
           kind: "orphan_marker",
-          message: "`#{target_path}` contains marker `#{marker_id}` that is not tracked in `Prayfile.lock`. Remove the marker or run `pray install` to reconcile."
+          message: "`#{target_path}` contains marker `#{marker_id}` that is not tracked in `Prayfile.lock`. Inspect and remove the block explicitly."
         )
       end
     end

@@ -31,6 +31,7 @@ const TRUST_COMMANDS = [
 
 const INSPECT_COMMANDS = [
   "list                                   list declared packages",
+  "search <query> [--source|--root|--url]  find packages in a distribution index",
   "outdated [--remote]                    show constraint vs resolved versions",
   "explain <package>                      show why a package was selected",
   "tree                                   print the dependency tree",
@@ -152,6 +153,11 @@ const COMMAND_HELP: Record<string, string> = {
     "record an acceptance or rejection for a package confession\n\n" +
     "Usage: pray confess <package> | --from-lock SPAN_ID [--accepted|--rejected]",
   list: "list declared packages\n\nUsage: pray list",
+  search:
+    "search a distribution index for package names\n\n" +
+    "Usage: pray search <query> [--source NAME | --root PATH | --url URL]\n\n" +
+    "Matching is case-insensitive and searches package-name substrings.\n" +
+    "Summaries are unverified catalog claims from the latest non-yanked release.",
   explain: "show why a package was selected\n\nUsage: pray explain <package>",
   tree: "print the dependency tree\n\nUsage: pray tree",
   prayer:

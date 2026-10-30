@@ -14,6 +14,7 @@ require_relative "cli/commands/init_prayer"
 require_relative "cli/commands/workflow"
 require_relative "cli/commands/update_latest"
 require_relative "cli/commands/packages"
+require_relative "cli/commands/search"
 require_relative "cli/commands/distribution"
 require_relative "cli/commands/trust"
 require_relative "cli/commands/auth"
@@ -119,6 +120,7 @@ module Pray
       in [:confess, confess_args] then confess_command(**confess_args)
       in [:sync, sync_args] then sync_command(**sync_args)
       in [:list] then list_command
+      in [:search, search_args] then search_command(**search_args)
       in [:outdated, arguments] then outdated_command(arguments)
       in [:explain, name] then explain_command(name)
       in [:vendor] then raise Error.unsupported("vendor is not implemented yet in pray-cli Ruby")

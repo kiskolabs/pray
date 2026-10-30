@@ -210,7 +210,7 @@ function collectVerificationReport(
       if (markerId !== "0" && !trackedIds.has(markerId)) {
         report.findings.push({
           kind: "orphan_marker",
-          message: `\`${targetPath}\` contains marker \`${markerId}\` that is not tracked in \`Prayfile.lock\`. Remove the marker or run \`pray install\` to reconcile.`,
+          message: `\`${targetPath}\` contains marker \`${markerId}\` that is not tracked in \`Prayfile.lock\`. Inspect the block and remove it explicitly if it is no longer needed.`,
         });
       }
     }

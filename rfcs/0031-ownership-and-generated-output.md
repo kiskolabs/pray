@@ -141,10 +141,10 @@ pray remove sample/webapp
 
 1. Remove declaration from Prayfile.
 2. resolve recomputes lock without that package.
-3. render deletes all managed blocks mapped to `sample/webapp`.
+3. render deletes each managed block mapped to `sample/webapp` only when the previous lock owns that marker in the same target and the on-disk body still matches its previous `ideal_checksum`.
 4. render deletes exclusive `file:` and `tree:` leaves for that package only when on-disk hash still matches the locked `content_hash` (RFC 0033). Dest files are not tagged.
 5. Human-owned `.agents/**` files are preserved.
-6. Orphan pray markers after remove are verify errors.
+6. A changed retired block or a marker unknown to the previous lock is preserved. Verification reports it as an orphan so a person can inspect and remove it explicitly.
 
 #### Verify enforcement
 

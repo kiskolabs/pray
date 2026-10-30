@@ -176,6 +176,78 @@ end
 }
 
 #[test]
+fn canonicalizes_related_prayer_references() {
+    let package = parse_package_spec(
+        r#"
+Package::Specification.new do |spec|
+  spec.name = "sample/review"
+  spec.related = ["sample/testing", " ../security ", "/shared/accessibility", "https://prayers.example/incident?view=full#response", "sample/testing"]
+  spec.files = ["README.md"]
+end
+"#,
+    )
+    .expect("related prayers parse");
+
+    assert_eq!(
+        package.related,
+        vec![
+            "../security",
+            "/shared/accessibility",
+            "https://prayers.example/incident?view=full#response",
+            "sample/testing",
+        ]
+    );
+}
+
+#[test]
+fn rejects_ambiguous_related_prayer_references() {
+    for reference in [
+        "testing",
+        "sample/testing?latest",
+        "sample\\testing",
+        "https://user@prayers.example/testing",
+    ] {
+        let text = format!(
+            "Package::Specification.new do |spec|\n  spec.name = \"sample/review\"\n  spec.related = [\"{reference}\"]\n  spec.files = [\"README.md\"]\nend\n"
+        );
+        let error = parse_package_spec(&text).expect_err("invalid related reference should fail");
+        assert!(error.to_string().contains("related prayer"));
+    }
+}
+
+#[test]
+fn does_not_repeat_rejected_related_reference_credentials() {
+    let error = parse_package_spec(
+        r#"
+Package::Specification.new do |spec|
+  spec.name = "sample/review"
+  spec.related = ["https://private-user@prayers.example/testing"]
+  spec.files = ["README.md"]
+end
+"#,
+    )
+    .expect_err("credential-bearing related reference should fail");
+
+    assert!(!error.to_string().contains("private-user"));
+}
+
+#[test]
+fn rejects_legacy_associated_prayers_field() {
+    let error = parse_package_spec(
+        r#"
+Package::Specification.new do |spec|
+  spec.name = "sample/review"
+  spec.associated_prayers = ["sample/testing"]
+  spec.files = ["README.md"]
+end
+"#,
+    )
+    .expect_err("legacy field should fail");
+
+    assert!(error.to_string().contains("unsupported assignment"));
+}
+
+#[test]
 fn rejects_duplicate_package_spec_upstream() {
     let error = parse_package_spec(
         r#"

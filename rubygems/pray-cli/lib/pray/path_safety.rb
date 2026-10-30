@@ -21,8 +21,10 @@ module Pray
     end
 
     def reject_unsafe_package_name!(package_name)
-      if package_name.nil? || package_name.empty? || package_name.include?("\0") || package_name.include?("\\") ||
-          package_name.include?("..")
+      segments = package_name&.split("/", -1)
+      if segments&.length != 2 || segments.any? do |segment|
+        segment.empty? || [".", ".."].include?(segment) || segment.include?("\0") || segment.include?("\\")
+      end
         raise Error.resolution("invalid package name: #{package_name.inspect}")
       end
 

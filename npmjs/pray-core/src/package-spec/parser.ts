@@ -50,6 +50,7 @@ class BlockParser {
       templates: new Map(),
       adapters: new Map(),
       targets: [],
+      related: [],
       dependencies: [],
       metadata: new Map(),
     };
@@ -159,6 +160,9 @@ class BlockParser {
         return;
       case "targets":
         spec.targets = arrayOfStrings(value);
+        return;
+      case "related":
+        spec.related = arrayOfStrings(value);
         return;
       case "exports":
         spec.exports = parseExports(value);

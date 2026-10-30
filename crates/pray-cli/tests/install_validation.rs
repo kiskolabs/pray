@@ -46,6 +46,8 @@ fn verify_warns_on_orphan_markers_and_strict_fails() {
     assert_eq!(strict_verify.status.code(), Some(6));
     let strict_stderr = String::from_utf8_lossy(&strict_verify.stderr);
     assert!(strict_stderr.contains("orphan_marker"));
+    assert!(strict_stderr.contains("Inspect and remove the block explicitly"));
+    assert!(!strict_stderr.contains("run `pray install` to reconcile"));
 }
 
 #[test]

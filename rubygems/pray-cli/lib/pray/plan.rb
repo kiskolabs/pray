@@ -16,7 +16,7 @@ module Pray
         package_lines: ApplyReport.local_summary_lines(previous_lockfile, project) +
           package_summary_lines(previous_lockfile, lockfile, project),
         lockfile: lockfile_change_status(previous_lockfile, lockfile),
-        targets: rendered.map { |target| target_change(project, target) },
+        targets: rendered.map { |target| target_change(project, target, previous_lockfile) },
         provisioned: destinations.map { |file, status| [file.path, status.to_s] },
         warnings: []
       )
@@ -57,11 +57,12 @@ module Pray
       Pray.lockfiles_equivalent?(lockfile, existing) ? "unchanged" : "update"
     end
 
-    def target_change(project, target)
+    def target_change(project, target, previous_lockfile)
       path = File.join(project.project_root, target.path)
+      retired = RenderReconcile.retired_span_checksums(previous_lockfile, target)
       change = if !File.exist?(path)
         "write"
-      elsif RenderDest.read_regular_bytes(path, target.path) == target.content.b
+      elsif RenderReconcile.current?(path, target.path, target.content, retired)
         "unchanged"
       else
         "update"

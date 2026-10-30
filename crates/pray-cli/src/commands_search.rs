@@ -42,11 +42,7 @@ fn search_from_prayfile(
         manifest
             .sources
             .iter()
-            .find(|source| {
-                source.kind == "registry"
-                    || source.kind == "static index"
-                    || source.kind == "pray_ssh"
-            })
+            .find(|source| source.kind == "registry" || source.kind == "static index")
             .or_else(|| manifest.sources.first())
             .ok_or_else(|| {
                 PrayError::Resolution(

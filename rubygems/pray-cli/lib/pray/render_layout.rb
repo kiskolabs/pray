@@ -4,12 +4,13 @@ module Pray
   module Render
     module_function
 
-    def layout_rendered_targets(project, rendered)
+    def layout_rendered_targets(project, rendered, previous_lockfile = project.previous_lockfile)
       rendered.map do |target|
         PathSafety.validate_destination_path!(target.path)
         RenderDest.ensure_safe_destination_ancestors!(project.project_root, target.path, target.path)
         path = File.join(project.project_root, target.path)
-        content = RenderDest.layout_rendered_content(path, target.path, target.content)
+        retired = RenderReconcile.retired_span_checksums(previous_lockfile, target)
+        content = RenderDest.layout_rendered_content(path, target.path, target.content, retired)
         RenderedTarget.new(
           path: target.path,
           content: content,

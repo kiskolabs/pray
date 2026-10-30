@@ -27,6 +27,32 @@ RSpec.describe Pray::CLI do
       )
     end
 
+    it "parses distribution search selectors" do
+      expect(described_class.parse_command(["search", "base", "--source", "default"])).to eq(
+        [:search, {query: "base", source: "default", root: nil, url: nil}]
+      )
+      expect(described_class.parse_command(["search", "base", "--root", "dist"])).to eq(
+        [:search, {query: "base", source: nil, root: "dist", url: nil}]
+      )
+      expect { described_class.parse_command(["search"]) }
+        .to raise_error(Pray::Error, /search requires a query/)
+    end
+
+    %w[--source --root --url].each do |flag|
+      it "requires a search value after #{flag}" do
+        error = nil
+        expect { described_class.parse_command(["search", "base", flag]) }
+          .to raise_error(Pray::Error, /#{Regexp.escape(flag)} requires a value/) { |raised| error = raised }
+        expect(error.category).to eq(:usage)
+      end
+    end
+
+    it "does not consume another flag as a search selector value" do
+      expect do
+        described_class.parse_command(["search", "base", "--root", "--url", "https://example.test"])
+      end.to raise_error(Pray::Error, /--root requires a value/)
+    end
+
     it "strictly parses clean arguments" do
       expect(described_class.parse_command(["clean"])).to eq([:clean, {unused: false}])
       expect(described_class.parse_command(["clean", "--unused"])).to eq([:clean, {unused: true}])

@@ -113,8 +113,7 @@ pub(crate) fn command_help_text(command: &str) -> Option<&'static str> {
             "write dest and Prayfile.lock from current inputs\n\n\
              Usage: pray render [--check]\n\n\
              Without --check, render writes dest and the lock. Use pray plan to preview a write.\n\
-             --check writes nothing. It fails unless dest already matches a fresh render from current inputs.\n\
-             That is a dest identity gate, not a preview.",
+             --check writes nothing. It fails when render would change dest.",
         ),
         "format" | "fmt" => Some(
             "rewrite Prayfile to recommended destination DSL\n\n\
@@ -183,7 +182,7 @@ pub(crate) fn command_help_text(command: &str) -> Option<&'static str> {
             "search a distribution index for package names\n\n\
              Usage: pray search <query> [--source NAME | --root PATH | --url URL]\n\n\
              Matches package names (substring, case-insensitive). Optional summaries come from\n\
-             package metadata when available. No ranking.",
+             package metadata when available and are unverified catalog claims. No ranking.",
         ),
         "login" => Some(
             "authenticate to a registry server\n\n\

@@ -1,6 +1,9 @@
 use std::fs;
 use std::path::{Path, PathBuf};
 use std::process::{Command, Output};
+use std::sync::atomic::{AtomicU64, Ordering};
+
+static NEXT_TEMPORARY_DIRECTORY_SEQUENCE: AtomicU64 = AtomicU64::new(0);
 
 pub struct UpdateFixture {
     pub root: PathBuf,
@@ -13,7 +16,7 @@ impl UpdateFixture {
             .duration_since(std::time::UNIX_EPOCH)
             .unwrap()
             .as_nanos();
-        let root = std::env::temp_dir().join(format!("pray-update-{stamp}"));
+        let root = temporary_root(stamp);
         let consumer = root.join("consumer");
         for directory in ["source/package/exports", "distribution", "consumer/rules"] {
             fs::create_dir_all(root.join(directory)).unwrap();
@@ -157,5 +160,35 @@ end
 impl Drop for UpdateFixture {
     fn drop(&mut self) {
         let _ = fs::remove_dir_all(&self.root);
+    }
+}
+
+fn temporary_root(stamp: u128) -> PathBuf {
+    loop {
+        let sequence = NEXT_TEMPORARY_DIRECTORY_SEQUENCE.fetch_add(1, Ordering::Relaxed);
+        let root = std::env::temp_dir().join(format!(
+            "pray-update-{}-{stamp}-{sequence}",
+            std::process::id()
+        ));
+        match fs::create_dir(&root) {
+            Ok(()) => return root,
+            Err(error) if error.kind() == std::io::ErrorKind::AlreadyExists => continue,
+            Err(error) => panic!("could not reserve update fixture directory: {error}"),
+        }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::temporary_root;
+    use std::fs;
+
+    #[test]
+    fn temporary_roots_are_unique_when_clock_values_match() {
+        let first = temporary_root(1);
+        let second = temporary_root(1);
+        assert_ne!(first, second);
+        fs::remove_dir_all(first).unwrap();
+        fs::remove_dir_all(second).unwrap();
     }
 }

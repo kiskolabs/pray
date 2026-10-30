@@ -18,6 +18,7 @@ describe("help", () => {
     assert.match(text, /--verbose/);
     assert.match(text, /upgrade/);
     assert.match(text, /outdated \[--remote\]/);
+    assert.match(text, /search <query>/);
     assert.doesNotMatch(text, /Documentation:/);
     assert.doesNotMatch(text, /Exit codes:/);
   });
@@ -79,6 +80,7 @@ describe("help", () => {
     for (const command of [
       "remove",
       "list",
+      "search",
       "format",
       "fmt",
       "version",

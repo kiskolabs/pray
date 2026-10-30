@@ -74,6 +74,7 @@ export async function runUnlock(name: string | undefined): Promise<void> {
     sourceRevisions: project.sourceRevisions,
     sourceHostKeys: project.sourceHostKeys,
     project,
+    previousLockfile: previous,
   });
   writeRenderedTargets(project, rendered, previous);
   writeLockfile(lockfilePath, updatedLockfile);

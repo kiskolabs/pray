@@ -164,6 +164,7 @@ function isTopLevelCommand(token: string): boolean {
     "confess",
     "list",
     "outdated",
+    "search",
     "explain",
     "vendor",
     "clean",

@@ -62,6 +62,7 @@ RSpec.describe Pray::PackageSpecRender do
         }
         spec.adapters = { "tool" => "adapter" }
         spec.targets = ["tool_a"]
+        spec.related = ["sample/testing", " ../security ", "/shared/accessibility", "https://prayers.example/incident?view=full#response", "sample/testing"]
         spec.add_optional_dependency "sample/common", "~> 1.0"
         spec.metadata = { "labels" => ["stable", :tool-a], "policy" => { "enabled" => true, "fallback" => nil }, "priority" => 1 }
         spec.upstream "sample/base", "~> 1.4"
@@ -69,7 +70,48 @@ RSpec.describe Pray::PackageSpecRender do
     PRAYSPEC
 
     parsed = Pray.parse_package_spec(described_class.render_package_spec(spec)).canonicalized
+    expect(parsed.related).to eq(
+      ["../security", "/shared/accessibility", "https://prayers.example/incident?view=full#response", "sample/testing"]
+    )
     expect(parsed).to eq(spec)
+  end
+
+  it "rejects ambiguous related prayer references" do
+    ["testing", "sample/testing?latest", "sample\\testing", "https://user@prayers.example/testing"].each do |reference|
+      expect do
+        Pray.parse_package_spec(<<~PRAYSPEC)
+          Package::Specification.new do |spec|
+            spec.name = "sample/review"
+            spec.related = [#{reference.inspect}]
+            spec.files = ["README.md"]
+          end
+        PRAYSPEC
+      end.to raise_error(Pray::Error, /related prayer/)
+    end
+  end
+
+  it "does not repeat rejected related reference credentials" do
+    expect do
+      Pray.parse_package_spec(<<~PRAYSPEC)
+        Package::Specification.new do |spec|
+          spec.name = "sample/review"
+          spec.related = ["https://private-user@prayers.example/testing"]
+          spec.files = ["README.md"]
+        end
+      PRAYSPEC
+    end.to raise_error(Pray::Error) { |error| expect(error.message).not_to include("private-user") }
+  end
+
+  it "rejects the legacy associated_prayers field" do
+    expect do
+      Pray.parse_package_spec(<<~PRAYSPEC)
+        Package::Specification.new do |spec|
+          spec.name = "sample/review"
+          spec.associated_prayers = ["sample/testing"]
+          spec.files = ["README.md"]
+        end
+      PRAYSPEC
+    end.to raise_error(Pray::Error, /unsupported assignment/)
   end
 
   it "keeps local-only content files after a dirty refresh" do

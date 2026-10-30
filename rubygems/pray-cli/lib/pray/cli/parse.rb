@@ -64,6 +64,7 @@ module Pray
       when "serve" then [:serve, parse_serve_arguments(arguments)]
       when "confess" then [:confess, parse_confess_arguments(arguments)]
       when "list" then [:list]
+      when "search" then [:search, parse_search_arguments(arguments)]
       when "outdated" then [:outdated, arguments]
       when "explain" then [:explain, arguments.shift]
       when "vendor" then [:vendor]
@@ -119,6 +120,32 @@ module Pray
         end
       end
       {unused: unused}
+    end
+
+    def parse_search_arguments(arguments)
+      options = {query: nil, source: nil, root: nil, url: nil}
+      while (argument = arguments.shift)
+        case argument
+        when "--source" then options[:source] = search_option_value(arguments, argument)
+        when "--root" then options[:root] = search_option_value(arguments, argument)
+        when "--url" then options[:url] = search_option_value(arguments, argument)
+        when /^--/ then raise Error.usage("unknown search flag: #{argument}")
+        else
+          raise Error.usage("unexpected search argument: #{argument}") if options[:query]
+
+          options[:query] = argument
+        end
+      end
+      raise Error.usage("search requires a query") unless options[:query]
+
+      options
+    end
+
+    def search_option_value(arguments, flag)
+      value = arguments.shift
+      raise Error.usage("#{flag} requires a value") unless value && !value.start_with?("--")
+
+      value
     end
 
     def parse_add_arguments(arguments)

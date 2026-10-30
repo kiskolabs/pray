@@ -71,6 +71,7 @@ export async function runOutdated(argumentsList: string[] = []): Promise<void> {
     sourceRevisions: project.sourceRevisions,
     sourceHostKeys: project.sourceHostKeys,
     project,
+    previousLockfile: previous,
   });
   let reported = printUpdateSummary(
     previous,
@@ -136,14 +137,19 @@ export async function runExplain(name: string | undefined): Promise<void> {
     lines.push(`registry latest: ${packageEntry.registryLatestVersion}`);
   }
   lines.push(`source: ${packageSourceSummary(packageEntry)}`);
-  lines.push(`exports: ${packageEntry.selectedExports.join(", ")}`);
+  lines.push(`exports: ${formatList(packageEntry.selectedExports)}`);
   lines.push(
-    `dependencies: ${packageEntry.spec.dependencies.map((dependency) => dependency.name).join(", ")}`,
+    `dependencies: ${formatList(packageEntry.spec.dependencies.map((dependency) => dependency.name))}`,
   );
+  lines.push(`related prayers: ${formatList(packageEntry.spec.related)}`);
   lines.push(`tree hash: ${packageEntry.treeHash}`);
   if (lockfilePackage) {
     lines.push(`lockfile version: ${lockfilePackage.version}`);
     lines.push(`lockfile path: ${lockfilePackage.path}`);
   }
   process.stdout.write(`${lines.join("\n")}\n`);
+}
+
+function formatList(values: string[]): string {
+  return values.length === 0 ? "none" : values.join(", ");
 }

@@ -9,13 +9,15 @@ module Pray
 
     def write_rendered_targets(project, rendered, previous_lockfile = nil)
       validate_destinations!(project, previous_lockfile)
+      RenderReconcile.reject_managed_span_conflicts!(project, rendered, previous_lockfile) if previous_lockfile
       rendered.each do |target|
         PathSafety.validate_destination_path!(target.path)
         ensure_safe_destination_ancestors!(project.project_root, target.path, target.path)
         path = File.join(project.project_root, target.path)
         FileUtils.mkdir_p(File.dirname(path))
         ensure_safe_destination_ancestors!(project.project_root, target.path, target.path)
-        write_rendered_content(path, target.path, target.content)
+        retired = RenderReconcile.retired_span_checksums(previous_lockfile, target)
+        write_rendered_content(path, target.path, target.content, retired)
       end
       materialize(project, previous_lockfile)
     end
@@ -147,7 +149,7 @@ module Pray
       end
     end
 
-    def layout_rendered_content(path, display, fresh)
+    def layout_rendered_content(path, display, fresh, retired = {})
       kind = destination_kind(path)
       return fresh if kind == :missing
 
@@ -155,15 +157,15 @@ module Pray
       unless kind == :regular
         raise Error.render("refusing to write `#{display}`; destination is not a regular file")
       end
-      RenderPatch.patch_rendered_content(decode_utf8(read_regular_bytes(path, display), display), fresh)
+      RenderPatch.patch_rendered_content(decode_utf8(read_regular_bytes(path, display), display), fresh, retired)
     end
 
-    def write_rendered_content(path, display, fresh)
+    def write_rendered_content(path, display, fresh, retired = {})
       return create_bytes(path, display, fresh) if destination_kind(path) == :missing
 
       open_regular(path, display, File::RDWR) do |file|
         existing = decode_utf8(read_destination_bytes(file, display), display)
-        content = RenderPatch.patch_rendered_content(existing, fresh)
+        content = RenderPatch.patch_rendered_content(existing, fresh, retired)
         return if Transaction.replace(path, existing.b, content.b)
 
         file.rewind

@@ -1,6 +1,6 @@
 {
   "name": "pray-cli",
-  "version": "1.25.0",
+  "version": "1.26.0",
   "description": "Prayfile CLI — resolve, lock, render, and verify inference input packages (depends on pray-core)",
   "author": "Andrei Makarov <contact@kiskolabs.com>",
   "license": "MIT",
@@ -51,7 +51,7 @@
     "access": "public"
   },
   "dependencies": {
-    "pray-core": "1.25.0"
+    "pray-core": "1.26.0"
   },
   "devDependencies": {
     "@biomejs/biome": "^2.0.0",

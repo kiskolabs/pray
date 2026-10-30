@@ -2,6 +2,12 @@
 
 ## Unreleased
 
+## 1.26.0 (2026-10-30)
+
+- Add validated `related` references to prayspec parsing, rendering, and `pray explain`.
+- Make `render --check`, frozen install, and `plan` compare destinations with the bytes the write path would produce. Remove unchanged managed spans retired by the previous lock while preserving edited or unknown spans for explicit review.
+- Add `pray search` parity with the stable distribution-index contract. Search package names by substring through a declared source, local distribution root, or registry URL, and label catalog summaries as unverified claims in help.
+
 ## 1.25.0 (2026-10-26)
 
 - Bump the gem version to 1.25.0 with the coordinated language-registry cut.

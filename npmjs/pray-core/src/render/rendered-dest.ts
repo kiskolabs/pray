@@ -15,6 +15,7 @@ export function layoutRenderedContent(
   path: string,
   display: string,
   fresh: string,
+  retired: ReadonlyMap<string, string> = new Map(),
 ): string {
   const kind = destinationKind(path);
   if (kind === "missing") return fresh;
@@ -31,6 +32,7 @@ export function layoutRenderedContent(
   return patchRenderedContent(
     decodeUtf8(readRegularBytes(path, display)),
     fresh,
+    retired,
   );
 }
 
@@ -38,6 +40,7 @@ export function writeRenderedContent(
   path: string,
   display: string,
   fresh: string,
+  retired: ReadonlyMap<string, string> = new Map(),
 ): void {
   if (destinationKind(path) === "missing") {
     createBytes(path, display, Buffer.from(fresh, "utf8"));
@@ -46,7 +49,10 @@ export function writeRenderedContent(
   const descriptor = openRegular(path, display, constants.O_RDWR);
   try {
     const existing = decodeUtf8(readDestinationBytes(descriptor, display));
-    const bytes = Buffer.from(patchRenderedContent(existing, fresh), "utf8");
+    const bytes = Buffer.from(
+      patchRenderedContent(existing, fresh, retired),
+      "utf8",
+    );
     if (replaceProjectFile(path, Buffer.from(existing, "utf8"), bytes)) return;
     ftruncateSync(descriptor, 0);
     writeAll(descriptor, bytes);

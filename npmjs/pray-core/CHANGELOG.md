@@ -2,6 +2,11 @@
 
 ## Unreleased
 
+## 1.26.0 (2026-10-30)
+
+- Add canonical, validated `related` references to the public package-spec model.
+- Add validated local and HTTP registry search helpers and align destination reconciliation with the previous lock's retired-span ownership records.
+
 ## 1.25.0 (2026-10-26)
 
 - Restore the Prayfile positioning line in the package description, README opener, and jsr.io module docs so registry search matches the pre-split `pray-cli` storefront copy.

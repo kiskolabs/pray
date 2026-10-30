@@ -82,7 +82,7 @@ pub(super) fn find_orphan_marker_findings_from_markers(
             findings.push(VerificationFinding {
                 kind: "orphan_marker".to_string(),
                 message: format!(
-                    "`{target_path}` contains marker `{marker_id}` that is not tracked in `Prayfile.lock`. Remove the marker or run `pray install` to reconcile."
+                    "`{target_path}` contains marker `{marker_id}` that is not tracked in `Prayfile.lock`. Inspect and remove the block explicitly."
                 ),
             });
         }

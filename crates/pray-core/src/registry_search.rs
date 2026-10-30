@@ -12,9 +12,6 @@ pub struct RegistrySearchHit {
 
 pub fn search_registry_index_names(index: &RegistryIndex, query: &str) -> Vec<String> {
     let needle = query.trim().to_ascii_lowercase();
-    if needle.is_empty() {
-        return index.packages.clone();
-    }
     let mut matches: Vec<String> = index
         .packages
         .iter()
@@ -68,6 +65,7 @@ pub fn search_local_registry(
             kind: "registry index",
             message: error.to_string(),
         })?;
+    validate_registry_index(&index)?;
     let names = search_registry_index_names(&index, query);
     let mut hits = Vec::with_capacity(names.len());
     for name in names {
@@ -80,6 +78,7 @@ pub fn search_local_registry(
                         kind: "registry metadata",
                         message: error.to_string(),
                     })?;
+                validate_metadata_name(&name, &metadata)?;
                 latest_non_yanked_summary(&metadata)
             } else {
                 None
@@ -104,6 +103,7 @@ pub fn search_http_registry(
             kind: "registry index",
             message: error.to_string(),
         })?;
+    validate_registry_index(&index)?;
     let names = search_registry_index_names(&index, query);
     let mut hits = Vec::with_capacity(names.len());
     for name in names {
@@ -116,6 +116,7 @@ pub fn search_http_registry(
                             kind: "registry metadata",
                             message: error.to_string(),
                         })?;
+                    validate_metadata_name(&name, &metadata)?;
                     latest_non_yanked_summary(&metadata)
                 }
                 Err(_) => None,
@@ -126,4 +127,26 @@ pub fn search_http_registry(
         hits.push(RegistrySearchHit { name, summary });
     }
     Ok(hits)
+}
+
+fn validate_registry_index(index: &RegistryIndex) -> PrayResult<()> {
+    if index.spec != "prayfile-distribution-1" {
+        return Err(PrayError::Parse {
+            kind: "registry index",
+            message: "expected prayfile-distribution-1".to_string(),
+        });
+    }
+    for name in &index.packages {
+        crate::paths::validate_registry_cache_identity(name, "0")?;
+    }
+    Ok(())
+}
+
+fn validate_metadata_name(name: &str, metadata: &RegistryPackageMetadata) -> PrayResult<()> {
+    if metadata.name != name {
+        return Err(PrayError::Integrity(format!(
+            "registry metadata name mismatch for {name}"
+        )));
+    }
+    Ok(())
 }

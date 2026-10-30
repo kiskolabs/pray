@@ -45,6 +45,7 @@ fn complete_spec() -> PackageSpec {
         )]),
         adapters: BTreeMap::from([("tool".to_string(), "adapter".to_string())]),
         targets: vec!["tool_a".to_string()],
+        related: vec!["../security".to_string(), "sample/testing".to_string()],
         dependencies: vec![PackageDependency {
             name: "sample/common".to_string(),
             constraint: "~> 1.0".to_string(),

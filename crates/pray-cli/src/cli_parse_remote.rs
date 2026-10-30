@@ -2,56 +2,6 @@ use crate::Command;
 use pray_core::{PrayError, PrayResult};
 use std::path::PathBuf;
 
-pub(crate) fn parse_search_command(
-    mut arguments: std::vec::IntoIter<String>,
-) -> PrayResult<Command> {
-    let mut query = None;
-    let mut source = None;
-    let mut root = None;
-    let mut url = None;
-    while let Some(argument) = arguments.next() {
-        match argument.as_str() {
-            "--source" => {
-                source = Some(arguments.next().ok_or_else(|| {
-                    PrayError::Unsupported("search requires a name after --source".into())
-                })?);
-            }
-            "--root" => {
-                root = Some(PathBuf::from(arguments.next().ok_or_else(|| {
-                    PrayError::Unsupported("search requires a path after --root".into())
-                })?));
-            }
-            "--url" => {
-                url = Some(arguments.next().ok_or_else(|| {
-                    PrayError::Unsupported("search requires a URL after --url".into())
-                })?);
-            }
-            other if other.starts_with("--") => {
-                return Err(PrayError::Unsupported(format!(
-                    "unknown search flag: {other}"
-                )))
-            }
-            other => {
-                if query.is_none() {
-                    query = Some(other.to_string());
-                } else {
-                    return Err(PrayError::Unsupported(format!(
-                        "unexpected search argument: {other}"
-                    )));
-                }
-            }
-        }
-    }
-    let query =
-        query.ok_or_else(|| PrayError::Unsupported("search requires a query".to_string()))?;
-    Ok(Command::Search {
-        query,
-        source,
-        root,
-        url,
-    })
-}
-
 pub(crate) fn parse_yank_command(mut arguments: std::vec::IntoIter<String>) -> PrayResult<Command> {
     let mut package = None;
     let mut version = None;

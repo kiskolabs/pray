@@ -169,7 +169,7 @@ module Pray
     end
 
     def build_lockfile(manifest_hash, environment, project_root, manifest_sources, manifest_targets, rendered, packages, source_revisions, source_host_keys, project = nil)
-      rendered = Render.layout_rendered_targets(project, rendered) if project
+      rendered = Render.layout_rendered_targets(project, rendered, project.previous_lockfile) if project
       lockfile = Lockfile.new(
         manifest_hash: manifest_hash,
         environment: environment,

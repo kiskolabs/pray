@@ -1,3 +1,4 @@
+import { existsSync } from "node:fs";
 import { runLoginCommand } from "pray-core/auth/login.js";
 import { PrayError } from "pray-core/errors.js";
 import { readLockfile } from "pray-core/lockfile/index.js";
@@ -26,6 +27,7 @@ import { runInit, runPrayerInit } from "./commands/init.js";
 import { runExplain, runList, runOutdated } from "./commands/inspect.js";
 import { runAdd, runRemove, runUnlock } from "./commands/packages.js";
 import { runPlanCommand } from "./commands/plan.js";
+import { runSearch } from "./commands/search.js";
 import { runUpdateCommand } from "./commands/update.js";
 import { runFormat, runPackage } from "./commands/workspace.js";
 import { conciseHelpText } from "./help.js";
@@ -121,7 +123,10 @@ export async function dispatchCommand(
       rejectUnknownArguments(command, rest, ["--check"]);
       if (rest.includes("--check")) {
         const project = await resolveCurrentProject();
-        ensureRenderedTargetsCurrent(project, renderProject(project));
+        const previous = existsSync(lockfilePath())
+          ? readLockfile(lockfilePath())
+          : undefined;
+        ensureRenderedTargetsCurrent(project, renderProject(project), previous);
         process.stdout.write("render check: ok\n");
         return 0;
       }
@@ -180,6 +185,9 @@ export async function dispatchCommand(
       return 0;
     case "outdated":
       await runOutdated(rest);
+      return 0;
+    case "search":
+      await runSearch(rest);
       return 0;
     case "explain":
       await runExplain(rest[0]);

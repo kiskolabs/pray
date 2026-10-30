@@ -79,7 +79,7 @@ RSpec.describe "pray CLI help" do
   end
 
   it "prints help for listed commands" do
-    %w[remove list format version].each do |command|
+    %w[remove list search format version].each do |command|
       stdout, stderr, status = run_pray("help", command)
       expect(status).to be_success, "help #{command}: #{stderr}"
       expect(stdout).to include("Usage: pray")

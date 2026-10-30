@@ -9,6 +9,7 @@ import { validateDestinationPath } from "../manifest/validate.js";
 import type { ResolvedProject } from "../resolve/types.js";
 import { runTransaction } from "../transaction/index.js";
 import { ensureHtmlCommentComposeDest } from "./compose-dest.js";
+import { rejectManagedSpanConflicts } from "./conflict.js";
 import {
   materializeProvisionedExports,
   provisionedDestinationStatuses,
@@ -16,6 +17,7 @@ import {
 import { renderLegacyCompose } from "./legacy.js";
 import { relocateManagedSpans } from "./patch.js";
 import { ensureSafeDestinationAncestors } from "./path-guard.js";
+import { retiredSpanChecksums } from "./reconcile.js";
 import {
   layoutRenderedContent,
   writeRenderedContent,
@@ -57,6 +59,9 @@ function writeProjectFiles(
   previousLockfile?: Lockfile,
 ): void {
   provisionedDestinationStatuses(project, previousLockfile);
+  if (previousLockfile !== undefined) {
+    rejectManagedSpanConflicts(project, rendered, previousLockfile);
+  }
   for (const target of rendered) {
     validateDestinationPath(target.path);
     ensureSafeDestinationAncestors(
@@ -71,7 +76,12 @@ function writeProjectFiles(
       target.path,
       target.path,
     );
-    writeRenderedContent(path, target.path, target.content);
+    writeRenderedContent(
+      path,
+      target.path,
+      target.content,
+      retiredSpanChecksums(previousLockfile, target),
+    );
   }
   materializeProvisionedExports(project, previousLockfile);
 }
@@ -79,6 +89,7 @@ function writeProjectFiles(
 export function layoutRenderedTargets(
   project: ResolvedProject,
   rendered: RenderedTarget[],
+  previousLockfile?: Lockfile,
 ): RenderedTarget[] {
   return rendered.map((target) => {
     validateDestinationPath(target.path);
@@ -91,6 +102,7 @@ export function layoutRenderedTargets(
       resolve(project.projectRoot, target.path),
       target.path,
       target.content,
+      retiredSpanChecksums(previousLockfile, target),
     );
     return {
       ...target,

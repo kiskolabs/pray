@@ -1,13 +1,28 @@
 use crate::hashing::checksum_managed_body_line_refs;
 use crate::lockfile::{Lockfile, ManagedSpanRecord};
+use crate::render::RenderedTarget;
 use crate::{PrayError, PrayResult};
-use std::collections::BTreeMap;
+use std::collections::{BTreeMap, BTreeSet};
 use std::path::Path;
 
 pub(crate) fn reject_managed_span_conflicts(
     project_root: &Path,
     lockfile: &Lockfile,
+    rendered: &[RenderedTarget],
 ) -> PrayResult<()> {
+    let active_by_target: BTreeMap<&str, BTreeSet<&str>> = rendered
+        .iter()
+        .map(|target| {
+            (
+                target.path.to_str().unwrap_or_default(),
+                target
+                    .managed_spans
+                    .iter()
+                    .map(|span| span.id.as_str())
+                    .collect(),
+            )
+        })
+        .collect();
     let mut target_spans: BTreeMap<&str, Vec<&ManagedSpanRecord>> = BTreeMap::new();
     for span in &lockfile.managed_span {
         target_spans
@@ -16,7 +31,16 @@ pub(crate) fn reject_managed_span_conflicts(
             .push(span);
     }
     for (target_path, spans) in target_spans {
-        let absolute = project_root.join(target_path);
+        let Some(active_ids) = active_by_target.get(target_path) else {
+            continue;
+        };
+        let relative = crate::paths::validate_destination_path(target_path)?;
+        crate::render_path_guard::ensure_safe_destination_ancestors(
+            project_root,
+            relative.as_path(),
+            relative.as_str(),
+        )?;
+        let absolute = relative.join_root(project_root);
         if !absolute.exists() {
             continue;
         }
@@ -24,6 +48,9 @@ pub(crate) fn reject_managed_span_conflicts(
         let lines: Vec<&str> = text.lines().collect();
         let markers = marker_checksums(&lines);
         for span in spans {
+            if !active_ids.contains(span.id.as_str()) {
+                continue;
+            }
             let Some((_, _, checksum)) = markers.get(&span.id) else {
                 continue;
             };

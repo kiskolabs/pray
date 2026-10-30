@@ -33,7 +33,8 @@ pub fn render_project(project: &ResolvedProject) -> PrayResult<Vec<RenderedTarge
 }
 
 pub use crate::render_write::{
-    layout_rendered_targets, write_rendered_targets, write_rendered_targets_with_previous_lockfile,
+    layout_rendered_targets, layout_rendered_targets_with_previous_lockfile,
+    write_rendered_targets, write_rendered_targets_with_previous_lockfile,
 };
 
 pub use crate::render_dest::{
@@ -48,7 +49,8 @@ pub use crate::render_file::read_destination_text;
 
 #[cfg(test)]
 mod patch_tests {
-    use crate::render_patch::patch_rendered_content;
+    use crate::render_patch::{patch_rendered_content, patch_rendered_content_with_retired};
+    use std::collections::BTreeMap;
 
     #[test]
     fn preserves_unmarked_text_and_updates_managed_body() {
@@ -153,5 +155,27 @@ new local body
 <!-- pray:local001 -->
 ";
         assert_eq!(patch_rendered_content(existing, fresh), fresh);
+    }
+
+    #[test]
+    fn drops_unchanged_retired_and_preserves_edited_and_unknown_spans() {
+        let existing = "<!-- pray:retired1 -->\nretired body\n<!-- pray:retired1 -->\n\
+<!-- pray:edited01 -->\nedited body\n<!-- pray:edited01 -->\n\
+<!-- pray:unknown1 -->\nunknown body\n<!-- pray:unknown1 -->\n";
+        let mut retired = BTreeMap::new();
+        retired.insert(
+            "retired1".to_string(),
+            crate::hashing::checksum_managed_span_content("retired body\n"),
+        );
+        retired.insert(
+            "edited01".to_string(),
+            crate::hashing::checksum_managed_span_content("original body\n"),
+        );
+
+        let patched = patch_rendered_content_with_retired(existing, "", &retired);
+
+        assert!(!patched.contains("retired body"));
+        assert!(patched.contains("edited body"));
+        assert!(patched.contains("unknown body"));
     }
 }

@@ -4,11 +4,11 @@ module Pray
   module RenderPatch
     module_function
 
-    def patch_rendered_content(existing, fresh)
-      existing_segments = split_segments(existing)
+    def patch_rendered_content(existing, fresh, retired = {})
       fresh_segments = split_segments(fresh)
       fresh_managed = managed_bodies(fresh_segments)
-      return fresh unless overlapping_managed?(existing_segments, fresh_managed)
+      existing_segments = drop_unchanged_retired(split_segments(existing), fresh_managed, retired)
+      return preserve_unmatched_managed(fresh, existing_segments, fresh_managed) unless overlapping_managed?(existing_segments, fresh_managed)
 
       used = {}
       output = +""
@@ -22,6 +22,28 @@ module Pray
       splice_existing_managed(remaining, fresh_segments, fresh_managed, used, output)
       append_unused_fresh_managed(fresh_segments, used, output)
       output.end_with?("\n") ? output : "#{output}\n"
+    end
+
+    def drop_unchanged_retired(segments, fresh_managed, retired)
+      segments.reject do |segment|
+        next false unless segment[:kind] == :managed
+        next false if fresh_managed.key?(segment[:id])
+
+        expected = retired[segment[:id]]
+        expected && Hashing.checksum_managed_span_content(segment[:body]) == expected
+      end
+    end
+
+    def preserve_unmatched_managed(fresh, segments, fresh_managed)
+      unmatched = segments.select do |segment|
+        segment[:kind] == :managed && !fresh_managed.key?(segment[:id])
+      end
+      return fresh if unmatched.empty?
+
+      output = fresh.dup
+      output << "\n" unless output.empty? || output.end_with?("\n")
+      unmatched.each { |segment| output << managed_segment(segment[:id], segment[:body]) }
+      output
     end
 
     def managed_bodies(segments)

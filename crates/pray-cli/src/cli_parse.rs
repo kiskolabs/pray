@@ -6,9 +6,9 @@ use crate::cli_parse_packages::{
     parse_remove_command, parse_unlock_command, parse_update_command,
 };
 use crate::cli_parse_remote::{
-    parse_confess_command, parse_publish_command, parse_search_command, parse_sync_command,
-    parse_yank_command,
+    parse_confess_command, parse_publish_command, parse_sync_command, parse_yank_command,
 };
+use crate::cli_parse_search::parse_search_command;
 use crate::Command;
 use pray_core::cli_suggest::unknown_command_message;
 use pray_core::{PrayError, PrayResult};

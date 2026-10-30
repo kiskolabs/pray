@@ -36,6 +36,7 @@ module Pray
 
       INSPECT_COMMANDS = [
         "list                                   list declared packages",
+        "search <query> [--source|--root|--url]  find packages in a distribution index",
         "outdated [--remote]                    show constraint vs resolved versions",
         "explain <package>                      show why a package was selected",
         "tree                                   print the dependency tree"
@@ -102,7 +103,7 @@ module Pray
 
           Without --check, render writes dest. It does not write Prayfile.lock.
           Use pray plan to preview a write.
-          --check writes nothing. It fails unless dest already matches a fresh render from current inputs.
+          --check writes nothing. It fails when render would change dest.
         TEXT
         "format" => <<~TEXT.strip,
           rewrite Prayfile to recommended destination DSL
@@ -187,6 +188,7 @@ module Pray
           Subcommands: list, show, add-key, remove-key, set-signed, set-allow, import-repo, import-registry, check
         TEXT
         "list" => "list declared packages\n\nUsage: pray list",
+        "search" => "search a distribution index for package names\n\nUsage: pray search <query> [--source NAME | --root PATH | --url URL]\n\nMatches package names by case-insensitive substring. Summaries are unverified catalog claims.",
         "outdated" => <<~TEXT.strip,
           show constraint vs resolved versions
 

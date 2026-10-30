@@ -2,6 +2,12 @@
 
 ## Unreleased
 
+## 1.26.0 (2026-10-30)
+
+- Show package `related` references in `pray explain` without resolving or fetching them.
+- Add `pray search` for deterministic distribution-index substring search through declared, local, and HTTP sources. Optional latest-version summaries are labeled as unverified catalog claims.
+- Make render checks and planning use the reconciled bytes that writes produce, removing only unchanged retired spans and preserving edited retired or unknown spans for review.
+
 ## 1.25.0 (2026-10-26)
 
 - Publish this CLI package to jsr.io as `@kiskolabs/pray-cli` (version synced with npm). Library imports stay on `pray-core` / `@kiskolabs/pray-core`.

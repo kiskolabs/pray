@@ -1123,7 +1123,7 @@
             "npm:@biomejs/biome@2",
             "npm:@types/node@^22.15.0",
             "npm:madge@8",
-            "npm:pray-core@1.25.0",
+            "npm:pray-core@1.26.0",
             "npm:typescript@~5.9.3"
           ]
         }

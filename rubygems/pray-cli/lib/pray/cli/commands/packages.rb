@@ -85,6 +85,7 @@ module Pray
       lines << "source: #{package_source_summary(package)}"
       lines << "exports: #{format_list(package.selected_exports)}"
       lines << "dependencies: #{format_list(package.spec.dependencies.map(&:name))}"
+      lines << "related prayers: #{format_list(package.spec.related)}"
       lines << "tree hash: #{package.tree_hash}"
       lines << "artifact hash: #{package.artifact_hash}"
       if lockfile_package

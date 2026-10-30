@@ -12,6 +12,7 @@ test: lint
 
 bench:
 	ruby benchmarks/compat_bench.rb
+	ruby benchmarks/reconciliation_search_bench.rb
 
 clean:
 	rm -rf coverage .pray/cache tmp pkg

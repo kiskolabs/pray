@@ -2,6 +2,12 @@
 
 ## Unreleased
 
+## 1.26.0 (2026-10-30)
+
+- Add advisory `related` references to prayspecs and show them in `pray explain` without installing or resolving their targets.
+- Align Rust, Ruby, and TypeScript render checks, planning, and writes around one reconciliation contract. Remove only unchanged managed spans retired by the previous lock; preserve edited retired and unknown spans for explicit review.
+- Add Ruby and TypeScript `pray search` parity with the Rust distribution-index search through declared, local, and HTTP sources. Validate untrusted index names and label optional summaries as catalog claims.
+
 ## 1.25.0 (2026-10-26)
 
 - Publish jsr.io `@kiskolabs/pray-cli` alongside `@kiskolabs/pray-core` at the same version (CLI package; library stays on pray-core).

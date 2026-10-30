@@ -62,6 +62,7 @@ pray remove sample/base
 pray update
 pray unlock sample/base
 pray list
+pray search base --source default
 pray tree
 pray explain sample/base
 pray outdated

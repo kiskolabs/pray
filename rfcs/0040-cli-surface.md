@@ -73,7 +73,7 @@ Also useful: `remove`, `unlock`, `tree`, `list`, `outdated`, `explain`, `manifes
   vendor state, project state, and global caches
 - tree: dependency graph
 - unlock: drop the lock pin for one package
-- search: substring match over a distribution index
+- search: deterministic, case-insensitive package-name substring match over a distribution index; accepts `--source NAME`, `--root PATH`, or `--url URL`
 - login / token: registry identity and scoped publish tokens
 - trust: signature policy, including `set-require-signed-packages`
 - sync: record publish or sync updates through a VCS backend
@@ -82,6 +82,10 @@ Also useful: `remove`, `unlock`, `tree`, `list`, `outdated`, `explain`, `manifes
 - version: print CLI version
 - prayer init [name] [--path DIR]: local prayer under a path source, or a versioned package scaffold without a Prayfile
 - list / outdated / explain: inventory locked packages
+
+`pray search <query>` reads one `v1/index.json`. It validates every package name before using it in a metadata path and prints matching names in lexical order. When package metadata is available, it may append the trimmed summary from the latest non-yanked semantic version. A missing optional metadata document leaves a name-only result. A metadata document whose package name differs from the index entry is an integrity error. Help and other person-facing output MUST identify summaries as unverified catalog claims rather than package identity or a recommendation.
+
+Name-only search has a one-request budget. Summary search has the existing `1 + N` request shape for `N` matches and MUST NOT hide unbounded parallel metadata requests. A richer, paginated, or ranked catalog requires a separately versioned contract.
 
 ---
 

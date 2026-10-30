@@ -12,7 +12,8 @@ use crate::update_report::{
 use pray_core::lockfile::{read_lockfile, write_lockfile, write_lockfile_if_changed};
 use pray_core::manifest::{parse_manifest, read_manifest_text};
 use pray_core::render::{
-    layout_rendered_targets, render_project, write_rendered_targets_with_previous_lockfile,
+    layout_rendered_targets_with_previous_lockfile, render_project,
+    write_rendered_targets_with_previous_lockfile,
 };
 use pray_core::resolve_context::ResolveOptions;
 use pray_core::{PrayError, PrayResult};
@@ -129,7 +130,11 @@ fn write_update(
 ) -> PrayResult<()> {
     let previous_lockfile = read_lockfile(&lockfile_path()).ok();
     let rendered = render_project(&project)?;
-    let laid_out = layout_rendered_targets(&project, &rendered)?;
+    let laid_out = layout_rendered_targets_with_previous_lockfile(
+        &project,
+        &rendered,
+        previous_lockfile.as_ref(),
+    )?;
     let updated_lockfile = build_lockfile(&project, &laid_out)?;
     let merged_lockfile = match (previous_lockfile.as_ref(), package.as_deref()) {
         (Some(previous), Some(name)) => {
@@ -193,7 +198,11 @@ pub(crate) fn unlock_command(package: String) -> PrayResult<()> {
     options.unlocked_packages.insert(package.clone());
     let project = resolve_project_with_options(&manifest_path(), &options)?;
     let rendered = render_project(&project)?;
-    let laid_out = layout_rendered_targets(&project, &rendered)?;
+    let laid_out = layout_rendered_targets_with_previous_lockfile(
+        &project,
+        &rendered,
+        Some(&previous_lockfile),
+    )?;
     let updated_lockfile = build_lockfile(&project, &laid_out)?;
     let merged_lockfile =
         merge_selected_package_update(&previous_lockfile, &updated_lockfile, &package);
@@ -231,7 +240,11 @@ pub(crate) fn preview_remote_updates(selected_package: Option<&str>, json: bool)
         &options,
     )?;
     let rendered = render_project(&project)?;
-    let laid_out = layout_rendered_targets(&project, &rendered)?;
+    let laid_out = layout_rendered_targets_with_previous_lockfile(
+        &project,
+        &rendered,
+        previous_lockfile.as_ref(),
+    )?;
     let updated_lockfile = build_lockfile(&project, &laid_out)?;
     if print_update_summary(
         previous_lockfile.as_ref(),

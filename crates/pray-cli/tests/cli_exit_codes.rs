@@ -51,6 +51,27 @@ fn unknown_command_exits_usage() {
 }
 
 #[test]
+fn missing_search_selector_value_exits_usage() {
+    let repo = temporary_directory("pray-search-usage");
+    let output = run_pray(&repo, &["search", "base", "--root"]);
+    assert_eq!(output.status.code(), Some(2));
+    let stderr = String::from_utf8_lossy(&output.stderr);
+    assert!(stderr.contains("--root requires a value"));
+}
+
+#[test]
+fn search_selector_does_not_consume_the_next_flag_as_its_value() {
+    let repo = temporary_directory("pray-search-adjacent-flag");
+    let output = run_pray(
+        &repo,
+        &["search", "base", "--root", "--url", "https://example.test"],
+    );
+    assert_eq!(output.status.code(), Some(2));
+    let stderr = String::from_utf8_lossy(&output.stderr);
+    assert!(stderr.contains("--root requires a value"));
+}
+
+#[test]
 fn legacy_target_output_agent_emit_deprecation_warnings() {
     let repo = temporary_directory("pray-deprecation-warn");
     fs::create_dir_all(repo.join("packages/base/exports")).expect("dirs");

@@ -39,6 +39,8 @@ pub struct PackageSpec {
     pub templates: BTreeMap<String, PackageTemplate>,
     pub adapters: BTreeMap<String, String>,
     pub targets: Vec<String>,
+    #[serde(default)]
+    pub related: Vec<String>,
     pub dependencies: Vec<PackageDependency>,
     pub metadata: BTreeMap<String, LiteralValue>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
@@ -100,6 +102,7 @@ impl<'a> BlockParser<'a> {
             if statement == "end" {
                 let package = spec.canonicalized();
                 package.validate_relative_paths()?;
+                crate::package_relation::validate(&package.related)?;
                 return Ok(package);
             }
             self.apply_statement(&mut spec, statement)?;
@@ -171,6 +174,7 @@ impl<'a> BlockParser<'a> {
             }
             "files" => spec.files = array_of_strings(value)?,
             "targets" => spec.targets = array_of_strings(value)?,
+            "related" => spec.related = array_of_strings(value)?,
             "exports" => spec.exports = parse_exports(value)?,
             "skills" => spec.skills = parse_skills(value)?,
             "templates" => spec.templates = parse_templates(value)?,

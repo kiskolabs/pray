@@ -109,6 +109,19 @@ RSpec.describe Pray::Registry do
     end
   end
 
+  describe ".http_get" do
+    it "redacts URL userinfo from failures" do
+      allow(described_class).to receive(:bounded_http_exchange) do |_uri, _request, failure_message|
+        raise Pray::Error.resolution(failure_message)
+      end
+
+      expect { described_class.http_get("https://user:secret@example.test/missing") }.to raise_error do |error|
+        expect(error.message).not_to include("secret")
+        expect(error.message).to include("https://***@")
+      end
+    end
+  end
+
   describe ".validate_and_unpack" do
     let(:declaration) { Pray::ManifestPackage.new(name: "sample/demo", constraint: "1.0.0") }
     let(:cache_directory) { File.join(workspace, "cache") }

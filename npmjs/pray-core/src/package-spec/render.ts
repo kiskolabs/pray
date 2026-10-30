@@ -33,6 +33,9 @@ export function renderPackageSpec(spec: PackageSpec): string {
   if (spec.targets.length > 0) {
     pushArray(lines, "targets", spec.targets);
   }
+  if (spec.related.length > 0) {
+    pushArray(lines, "related", spec.related);
+  }
   for (const dependency of spec.dependencies) {
     const method = dependency.optional
       ? "add_optional_dependency"

@@ -48,8 +48,13 @@ pub(crate) fn ensure_lockfile_current(
 pub(crate) fn ensure_rendered_outputs_current(
     project: &pray_core::resolve::ResolvedProject,
     rendered: &[pray_core::render::RenderedTarget],
+    previous_lockfile: Option<&Lockfile>,
 ) -> PrayResult<()> {
-    for target in pray_core::render::layout_rendered_targets(project, rendered)? {
+    for target in pray_core::render::layout_rendered_targets_with_previous_lockfile(
+        project,
+        rendered,
+        previous_lockfile,
+    )? {
         let path = project.project_root.join(&target.path);
         let on_disk = fs::read_to_string(&path).map_err(PrayError::from)?;
         if on_disk != target.content {

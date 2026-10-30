@@ -63,6 +63,12 @@ export type { MaterializeOptions } from "./materialize.js";
 export { materializeProject, printManifest } from "./materialize.js";
 export { parsePackageSpec } from "./package-spec/index.js";
 export { publishToRoot, publishToServer } from "./publish/index.js";
+export type { RegistrySearchHit } from "./registry/search.js";
+export {
+  searchHttpRegistry,
+  searchLocalRegistry,
+  searchRegistryIndexNames,
+} from "./registry/search.js";
 export { renderProject, writeRenderedTargets } from "./render/project.js";
 export type { RenderedTarget } from "./render/types.js";
 export { defaultResolveOptions, resolveProject } from "./resolve/project.js";

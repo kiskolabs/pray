@@ -40,6 +40,9 @@ pub fn render_package_spec(spec: &PackageSpec) -> String {
     if !spec.targets.is_empty() {
         push_array(&mut lines, "targets", &spec.targets);
     }
+    if !spec.related.is_empty() {
+        push_array(&mut lines, "related", &spec.related);
+    }
     for dependency in &spec.dependencies {
         let method = if dependency.optional {
             "add_optional_dependency"

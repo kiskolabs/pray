@@ -8,6 +8,7 @@ import { defaultLockfilePath } from "pray-core/lockfile/paths.js";
 import { materializeProject } from "pray-core/materialize.js";
 import { resolveProject } from "pray-core/resolve/project.js";
 import { verifyProject } from "pray-core/verify/project.js";
+import { runExplain } from "./cli/commands/inspect.js";
 
 describe("install integration", () => {
   it("installs and verifies simple-project fixture", async () => {
@@ -29,5 +30,21 @@ describe("install integration", () => {
     const rendered = readFileSync(join(workspace, "INSTRUCTIONS.md"), "utf8");
     assert.match(rendered, /<!-- pray:/);
     assert.match(rendered, /\.agents\/project\.md/);
+
+    const output: string[] = [];
+    const previousWrite = process.stdout.write.bind(process.stdout);
+    process.stdout.write = ((chunk: string | Uint8Array) => {
+      output.push(String(chunk));
+      return true;
+    }) as typeof process.stdout.write;
+    try {
+      await runExplain("sample/base");
+    } finally {
+      process.stdout.write = previousWrite;
+    }
+    assert.match(
+      output.join(""),
+      /related prayers: \.\.\/security, sample\/testing/,
+    );
   });
 });

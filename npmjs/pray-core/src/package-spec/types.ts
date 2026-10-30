@@ -1,5 +1,6 @@
 import type { PackageExportKind } from "../domain/types.js";
 import type { LiteralValue } from "../literal/types.js";
+import { canonicalRelated } from "./related.js";
 
 export interface PackageExport {
   kind: PackageExportKind;
@@ -49,6 +50,7 @@ export interface PackageSpec {
   templates: Map<string, PackageTemplate>;
   adapters: Map<string, string>;
   targets: string[];
+  related: string[];
   dependencies: PackageDependency[];
   metadata: Map<string, LiteralValue>;
   upstream?: PackageUpstream;
@@ -61,6 +63,7 @@ export function canonicalPackageSpec(spec: PackageSpec): PackageSpec {
     authors: [...spec.authors].sort(),
     maintainers: [...(spec.maintainers ?? [])].sort(),
     targets: [...spec.targets].sort(),
+    related: canonicalRelated(spec.related),
     dependencies: [...spec.dependencies].sort(
       (left, right) =>
         left.name.localeCompare(right.name) ||

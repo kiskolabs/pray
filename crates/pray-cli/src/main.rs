@@ -8,6 +8,7 @@ mod cli_parse;
 mod cli_parse_auth;
 mod cli_parse_packages;
 mod cli_parse_remote;
+mod cli_parse_search;
 mod cli_release;
 mod command;
 mod commands_doctor;

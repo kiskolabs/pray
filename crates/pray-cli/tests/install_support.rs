@@ -57,6 +57,7 @@ Package::Specification.new do |spec|
   spec.name = "sample/base"
   spec.version = "1.4.3"
   spec.summary = "shared guidance"
+  spec.related = ["sample/testing", "../security"]
   spec.files = ["README.md", "exports/testing-basics.md", "exports/security-basics.md"]
   spec.exports = {
     "testing-basics" => {

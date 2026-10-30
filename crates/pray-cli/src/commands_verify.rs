@@ -2,7 +2,8 @@ use crate::lockfile_ops::{build_lockfile, ensure_rendered_outputs_current};
 use crate::project_paths::{lockfile_path, manifest_path, resolve_project};
 use pray_core::lockfile::{read_lockfile, write_lockfile, Lockfile};
 use pray_core::render::{
-    layout_rendered_targets, render_project, write_rendered_targets_with_previous_lockfile,
+    layout_rendered_targets_with_previous_lockfile, render_project,
+    write_rendered_targets_with_previous_lockfile,
 };
 use pray_core::verify::{drift_project, format_verification_report, verify_project};
 use pray_core::{PrayError, PrayResult};
@@ -10,12 +11,16 @@ use pray_core::{PrayError, PrayResult};
 pub(crate) fn render_command(check_only: bool) -> PrayResult<()> {
     let project = resolve_project(&manifest_path())?;
     let rendered = render_project(&project)?;
+    let previous_lockfile = read_lockfile(&lockfile_path()).ok();
     if check_only {
-        ensure_rendered_outputs_current(&project, &rendered)?;
+        ensure_rendered_outputs_current(&project, &rendered, previous_lockfile.as_ref())?;
         return Ok(());
     }
-    let previous_lockfile = read_lockfile(&lockfile_path()).ok();
-    let laid_out = layout_rendered_targets(&project, &rendered)?;
+    let laid_out = layout_rendered_targets_with_previous_lockfile(
+        &project,
+        &rendered,
+        previous_lockfile.as_ref(),
+    )?;
     let lockfile = build_lockfile(&project, &laid_out)?;
     write_rendered_targets_with_previous_lockfile(&project, &rendered, previous_lockfile.as_ref())?;
     write_lockfile(&lockfile_path(), &lockfile)?;

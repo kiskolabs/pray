@@ -128,6 +128,7 @@ async function materializeWithOptions(
     sourceRevisions: project.sourceRevisions,
     sourceHostKeys: project.sourceHostKeys,
     project,
+    previousLockfile,
   });
 
   if (options.locked || options.frozen) {
@@ -142,7 +143,7 @@ async function materializeWithOptions(
     }
     if (options.frozen) {
       verifyProject(project, previousLockfile, true);
-      ensureRenderedTargetsCurrent(project, rendered);
+      ensureRenderedTargetsCurrent(project, rendered, previousLockfile);
       return;
     }
   }

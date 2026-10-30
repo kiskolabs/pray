@@ -56,6 +56,7 @@ export async function previewRemoteUpdates(
     sourceRevisions: project.sourceRevisions,
     sourceHostKeys: project.sourceHostKeys,
     project,
+    previousLockfile: previous,
   });
   if (
     printUpdateSummary(
@@ -150,7 +151,7 @@ export async function writeUpdate(
     ? readLockfile(lockfilePath())
     : undefined;
   const rendered = renderProject(project);
-  const laidOut = layoutRenderedTargets(project, rendered);
+  const laidOut = layoutRenderedTargets(project, rendered, previous);
   const updatedLockfile = buildLockfile({
     manifestHash: project.manifestHash,
     projectRoot: project.projectRoot,
@@ -161,6 +162,7 @@ export async function writeUpdate(
     sourceRevisions: project.sourceRevisions,
     sourceHostKeys: project.sourceHostKeys,
     project,
+    previousLockfile: previous,
   });
   const merged =
     previous && packageName

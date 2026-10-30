@@ -113,6 +113,7 @@ fn explain_reports_package_details_and_lockfile_context() {
     assert!(stdout.contains("testing-basics"));
     assert!(stdout.contains("security-basics"));
     assert!(stdout.contains("dependencies: none"));
+    assert!(stdout.contains("related prayers: ../security, sample/testing"));
     assert!(stdout.contains("lockfile version: 1.4.3"));
 }
 

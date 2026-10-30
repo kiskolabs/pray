@@ -124,7 +124,7 @@ Local file hashes may be stored in `.pray/state.json`, not Prayfile.lock.
 
 The only render mode is `managed`. Generated files are owned by pray. Edits inside markers fail on write when a previous lock exists. Unmarked text is kept.
 
-Dry-run is `pray plan` or `pray render --check`. Those commands are not a `render mode`. Offline copies are `pray vendor` into `.pray/vendor`. A personal dest is an in-root `compose`, `tree`, or `file:` path, not `mode: :local`.
+Dry-run is `pray plan`. `pray render --check` is a read-only gate that computes the same reconciliation as a write and succeeds exactly when the write would leave every destination byte unchanged. Those commands are not a `render mode`. Offline copies are `pray vendor` into `.pray/vendor`. A personal dest is an in-root `compose`, `tree`, or `file:` path, not `mode: :local`.
 
 Parsers MUST reject any `render mode` other than `managed` (RFC 0034).
 
@@ -141,6 +141,17 @@ render conflict: :fail
 Parsers MUST reject any other value.
 
 On write, with a previous lock, checksum on-disk managed marker bodies against lock `ideal_checksum`. A human edit inside markers is a render error. Unmarked text is kept by `render_patch`. Recovery is `pray verify` / `pray drift`, then `pray apply`.
+
+Reconciliation classifies a marker pair against both the previous lock and the fresh render:
+
+- active: present in the fresh render; replace it from current inputs, subject to the conflict check above
+- retired unchanged: absent from the fresh render, present in the previous lock for the same target, and still equal to the previous `ideal_checksum`; remove it
+- retired edited: absent from the fresh render and present in the previous lock, but no longer equal to the previous checksum; preserve it and report it for explicit review
+- unknown: absent from both the fresh render and the previous lock; preserve it and report an orphan marker
+
+Without a previous lock, an implementation cannot prove that an unmatched marker is retired. It MUST preserve the marker. It MUST NOT claim that install will reconcile an unknown marker.
+
+The same classification and resulting bytes apply to `plan`, frozen checks, `render --check`, and writes. A check MUST NOT compare only with the canonical fresh render when the write path preserves layout or unmatched markers.
 
 Package-versus-package compose collision is a different concern. RFC 0031 golden rule 4: there is no three-way merge in v1. Managed blocks are nobody-edits.
 

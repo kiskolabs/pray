@@ -21,6 +21,7 @@ export const TOP_LEVEL_COMMANDS = [
   "remove",
   "render",
   "repo",
+  "search",
   "serve",
   "sync",
   "tree",

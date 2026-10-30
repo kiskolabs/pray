@@ -19,6 +19,7 @@ function spec(version: string): PackageSpec {
     templates: new Map(),
     adapters: new Map(),
     targets: [],
+    related: [],
     dependencies: [],
     metadata: new Map(),
   };

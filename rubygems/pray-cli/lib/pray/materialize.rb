@@ -90,8 +90,8 @@ module Pray
         if frozen
           rendered.each do |target|
             path = File.join(project.project_root, target.path)
-            on_disk = File.read(path)
-            if on_disk != target.content
+            retired = RenderReconcile.retired_span_checksums(existing, target)
+            unless RenderReconcile.current?(path, target.path, target.content, retired)
               raise Error.render(
                 "#{path} is stale; rerun install to regenerate it or plan to inspect the diff"
               )

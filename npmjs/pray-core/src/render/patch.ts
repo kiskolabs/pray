@@ -1,21 +1,34 @@
+import { checksumManagedSpanContent } from "../hashing.js";
 import type { ManagedSpanRecord } from "../lockfile/types.js";
 
 type Segment =
   | { kind: "text"; text: string }
   | { kind: "managed"; id: string; body: string };
 
-export function patchRenderedContent(existing: string, fresh: string): string {
-  const existingSegments = splitSegments(existing);
+export function patchRenderedContent(
+  existing: string,
+  fresh: string,
+  retired: ReadonlyMap<string, string> = new Map(),
+): string {
   const freshSegments = splitSegments(fresh);
   const freshManaged = new Map(
     freshSegments
       .filter((segment) => segment.kind === "managed")
       .map((segment) => [segment.id, segment.body]),
   );
+  const existingSegments = splitSegments(existing).filter((segment) => {
+    if (segment.kind !== "managed" || freshManaged.has(segment.id)) return true;
+    const expected = retired.get(segment.id);
+    return (
+      expected === undefined ||
+      checksumManagedSpanContent(segment.body) !== expected
+    );
+  });
   const overlaps = existingSegments.some(
     (segment) => segment.kind === "managed" && freshManaged.has(segment.id),
   );
-  if (!overlaps) return fresh;
+  if (!overlaps)
+    return preserveUnmatchedManaged(fresh, existingSegments, freshManaged);
 
   const existingIds = new Set(
     existingSegments
@@ -58,6 +71,25 @@ export function patchRenderedContent(existing: string, fresh: string): string {
   }
   output += unusedFreshSuffix(freshSegments, used);
   return output.endsWith("\n") ? output : `${output}\n`;
+}
+
+function preserveUnmatchedManaged(
+  fresh: string,
+  existingSegments: Segment[],
+  freshManaged: ReadonlyMap<string, string>,
+): string {
+  const unmatched = existingSegments.filter(
+    (segment) => segment.kind === "managed" && !freshManaged.has(segment.id),
+  );
+  if (unmatched.length === 0) return fresh;
+  let output = fresh;
+  if (output && !output.endsWith("\n")) output += "\n";
+  for (const segment of unmatched) {
+    if (segment.kind === "managed") {
+      output += managedSegment(segment.id, segment.body);
+    }
+  }
+  return output;
 }
 
 function textBetween(segments: Segment[], left: string, right: string): string {
@@ -120,6 +152,18 @@ export function relocateManagedSpans(
       ? { ...span, open_line: position[0], close_line: position[1] }
       : span;
   });
+}
+
+export function managedSpanChecksums(
+  content: string,
+): ReadonlyMap<string, string> {
+  return new Map(
+    splitSegments(content).flatMap((segment) =>
+      segment.kind === "managed"
+        ? [[segment.id, checksumManagedSpanContent(segment.body)]]
+        : [],
+    ),
+  );
 }
 
 function splitSegments(content: string): Segment[] {

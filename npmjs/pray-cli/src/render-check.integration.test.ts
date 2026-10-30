@@ -70,4 +70,57 @@ describe("render --check", () => {
       rmSync(root, { recursive: true, force: true });
     }
   });
+
+  it("refuses to overwrite an edited active managed span", async () => {
+    const root = mkdtempSync(join(tmpdir(), "pray-render-conflict-"));
+    try {
+      await writeProject(root);
+      assert.equal(await runCli(["--path", root, "install"]), 0);
+      const destination = join(root, "AGENTS.md");
+      const edited = readFileSync(destination, "utf8").replace(
+        "Keep the check read-only.",
+        "Keep this manual edit.",
+      );
+      writeFileSync(destination, edited);
+
+      assert.equal(await runCli(["--path", root, "render"]), 5);
+      assert.equal(readFileSync(destination, "utf8"), edited);
+    } finally {
+      rmSync(root, { recursive: true, force: true });
+    }
+  });
+
+  it("agrees with render while preserving edited retired and unknown spans", async () => {
+    const root = mkdtempSync(join(tmpdir(), "pray-render-check-retired-"));
+    try {
+      await writeProject(root);
+      assert.equal(await runCli(["--path", root, "install"]), 0);
+      const destination = join(root, "AGENTS.md");
+      const edited = readFileSync(destination, "utf8").replace(
+        "Keep the check read-only.",
+        "Edited retired body.",
+      );
+      writeFileSync(
+        destination,
+        `${edited}<!-- pray:unknown1 -->\nUnknown body\n<!-- pray:unknown1 -->\n`,
+      );
+      const manifest = readFileSync(join(root, "Prayfile"), "utf8");
+      writeFileSync(
+        join(root, "Prayfile"),
+        manifest
+          .split("\n")
+          .filter((line) => !line.includes('pray "sample/rules"'))
+          .join("\n"),
+      );
+
+      assert.equal(await runCli(["--path", root, "render", "--check"]), 5);
+      assert.equal(await runCli(["--path", root, "render"]), 0);
+      const reconciled = readFileSync(destination, "utf8");
+      assert.match(reconciled, /Edited retired body/);
+      assert.match(reconciled, /Unknown body/);
+      assert.equal(await runCli(["--path", root, "render", "--check"]), 0);
+    } finally {
+      rmSync(root, { recursive: true, force: true });
+    }
+  });
 });

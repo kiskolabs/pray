@@ -276,7 +276,7 @@ module Pray
 
     def http_get(url)
       uri = URI(url)
-      bounded_http_exchange(uri, Net::HTTP::Get.new(uri), "HTTP request failed for #{url}")
+      bounded_http_exchange(uri, Net::HTTP::Get.new(uri), "HTTP request failed for #{UrlRedaction.redact_userinfo(url)}")
     end
 
     def http_put(url, content_type, body)
@@ -284,7 +284,7 @@ module Pray
       request = Net::HTTP::Put.new(uri)
       request["Content-Type"] = content_type
       request.body = body
-      bounded_http_exchange(uri, request, "HTTP upload failed for #{url}")
+      bounded_http_exchange(uri, request, "HTTP upload failed for #{UrlRedaction.redact_userinfo(url)}")
     end
 
     def http_post(url, content_type, body)
@@ -292,7 +292,7 @@ module Pray
       request = Net::HTTP::Post.new(uri)
       request["Content-Type"] = content_type
       request.body = body
-      bounded_http_exchange(uri, request, "HTTP request failed for #{url}")
+      bounded_http_exchange(uri, request, "HTTP request failed for #{UrlRedaction.redact_userinfo(url)}")
     end
 
     def bounded_http_exchange(uri, request, failure_message)

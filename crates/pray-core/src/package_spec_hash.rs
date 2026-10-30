@@ -10,6 +10,7 @@ impl PackageSpec {
         package.authors.sort();
         package.maintainers.sort();
         package.targets.sort();
+        package.related = crate::package_relation::canonicalize(&package.related);
         package.dependencies.sort_by(|left, right| {
             left.name
                 .cmp(&right.name)

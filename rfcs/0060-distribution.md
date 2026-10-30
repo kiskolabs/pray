@@ -103,6 +103,10 @@ Package metadata:
 ```
 
 No server API is required for v1. Static hosting must be enough.
+
+Index package names are untrusted path input. A client MUST require the two-segment `namespace/name` registry identity before constructing `v1/packages/<name>.json`; absolute paths, empty segments, `.` or `..`, backslashes, and additional segments are invalid.
+
+Search is client-side, case-insensitive substring matching over the package names in `v1/index.json`. Results are ordered lexically. An optional result summary comes from the latest non-yanked semantic version in the matching package metadata. That summary is derived metadata and remains an unverified catalog claim. Fetching summaries uses one index request plus at most one metadata request per match; the v1 static index has no pagination or summary-row contract.
 ### 28. Sources
 
 Supported source kinds: registry, static index, git, local path, tarball, OCI artifact, pray SSH

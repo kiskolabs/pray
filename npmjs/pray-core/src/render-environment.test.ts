@@ -40,6 +40,7 @@ function resolvedPackage(
     templates: new Map(),
     adapters: new Map(),
     targets: [],
+    related: [],
     dependencies: [],
     metadata: new Map(),
   };

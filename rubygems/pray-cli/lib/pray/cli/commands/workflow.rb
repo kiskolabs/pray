@@ -29,7 +29,7 @@ module Pray
       if flags[:check]
         ensure_rendered_outputs_current(project, rendered)
       else
-        Render.write_rendered_targets(project, rendered)
+        Render.write_rendered_targets(project, rendered, project.previous_lockfile)
       end
     end
 

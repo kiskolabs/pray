@@ -51,6 +51,9 @@ module Pray
       push_named_paths(lines, "templates", spec.templates)
       push_string_map(lines, "adapters", spec.adapters)
       push_array(lines, "targets", spec.targets) unless spec.targets.nil? || spec.targets.empty?
+      unless spec.related.nil? || spec.related.empty?
+        push_array(lines, "related", spec.related)
+      end
     end
 
     def push_relation_fields(lines, spec)

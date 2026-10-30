@@ -1,4 +1,4 @@
-use crate::hashing::checksum_managed_body_line_refs;
+use crate::hashing::{checksum_managed_body_line_refs, checksum_managed_span_content};
 use std::collections::BTreeMap;
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -9,18 +9,35 @@ enum Segment {
 
 /// Preserve unmarked text from `existing` while replacing managed spans from `fresh`.
 ///
-/// When `existing` has no managed spans that overlap `fresh`, return `fresh` wholesale
-/// so corrupted or empty destinations can be repaired by a full rewrite.
+/// When `existing` has no managed spans that overlap `fresh`, use `fresh` as the
+/// new layout and retain unmatched spans whose ownership cannot be retired safely.
 /// When `fresh` introduces managed spans before the first shared id, take that
 /// leading region from `fresh` so local compose sources can gain markers and update.
+#[cfg(test)]
 pub fn patch_rendered_content(existing: &str, fresh: &str) -> String {
-    let existing_segments = split_segments(existing);
+    patch_rendered_content_with_retired(existing, fresh, &BTreeMap::new())
+}
+
+pub fn patch_rendered_content_with_retired(
+    existing: &str,
+    fresh: &str,
+    retired: &BTreeMap<String, String>,
+) -> String {
     let fresh_segments = split_segments(fresh);
     let fresh_managed: BTreeMap<String, String> = fresh_segments
         .iter()
         .filter_map(|segment| match segment {
             Segment::Managed { id, body } => Some((id.clone(), body.clone())),
             Segment::Text(_) => None,
+        })
+        .collect();
+    let existing_segments: Vec<Segment> = split_segments(existing)
+        .into_iter()
+        .filter(|segment| match segment {
+            Segment::Managed { id, body } if !fresh_managed.contains_key(id) => retired
+                .get(id)
+                .is_none_or(|expected| checksum_managed_span_content(body) != *expected),
+            _ => true,
         })
         .collect();
     let existing_ids: std::collections::BTreeSet<&str> = existing_segments
@@ -35,7 +52,7 @@ pub fn patch_rendered_content(existing: &str, fresh: &str) -> String {
         Segment::Text(_) => false,
     });
     if !existing_overlap {
-        return fresh.to_string();
+        return preserve_unmatched_managed(fresh, &existing_segments, &fresh_managed);
     }
     let mut used = std::collections::BTreeSet::new();
     let mut output = String::new();
@@ -84,6 +101,31 @@ pub fn patch_rendered_content(existing: &str, fresh: &str) -> String {
     append_unused_fresh_spans(&fresh_segments, &used, &mut output);
     if !output.ends_with('\n') {
         output.push('\n');
+    }
+    output
+}
+
+fn preserve_unmatched_managed(
+    fresh: &str,
+    existing_segments: &[Segment],
+    fresh_managed: &BTreeMap<String, String>,
+) -> String {
+    let unmatched: Vec<_> = existing_segments
+        .iter()
+        .filter_map(|segment| match segment {
+            Segment::Managed { id, body } if !fresh_managed.contains_key(id) => Some((id, body)),
+            _ => None,
+        })
+        .collect();
+    if unmatched.is_empty() {
+        return fresh.to_string();
+    }
+    let mut output = fresh.to_string();
+    if !output.is_empty() && !output.ends_with('\n') {
+        output.push('\n');
+    }
+    for (id, body) in unmatched {
+        push_managed_span(&mut output, id, body);
     }
     output
 }

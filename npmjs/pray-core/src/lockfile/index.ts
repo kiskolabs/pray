@@ -66,11 +66,16 @@ export function buildLockfile(input: {
   sourceRevisions?: Map<string, string>;
   sourceHostKeys?: Map<string, string>;
   project?: ResolvedProject;
+  previousLockfile?: Lockfile;
 }): Lockfile {
   const sourceRevisions = input.sourceRevisions ?? new Map();
   const sourceHostKeys = input.sourceHostKeys ?? new Map();
   const rendered = input.project
-    ? layoutRenderedTargets(input.project, input.rendered)
+    ? layoutRenderedTargets(
+        input.project,
+        input.rendered,
+        input.previousLockfile,
+      )
     : input.rendered;
   return canonicalLockfile({
     prayfile_lock: "1",

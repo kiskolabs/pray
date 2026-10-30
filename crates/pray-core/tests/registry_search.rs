@@ -91,6 +91,22 @@ fn names_only_search_does_not_require_package_metadata() {
     let _ = fs::remove_dir_all(&root);
 }
 
+#[test]
+fn local_search_rejects_unsafe_names_from_the_index() {
+    let root = temporary_root("registry-search-unsafe");
+    fs::create_dir_all(root.join("v1/packages")).expect("dirs");
+    fs::write(
+        root.join("v1/index.json"),
+        r#"{"spec":"prayfile-distribution-1","packages":["../outside"]}"#,
+    )
+    .expect("index");
+
+    let error = search_local_registry(&root, "", false).expect_err("unsafe name");
+
+    assert!(error.to_string().contains("invalid registry package name"));
+    let _ = fs::remove_dir_all(&root);
+}
+
 fn temporary_root(prefix: &str) -> PathBuf {
     let path = std::env::temp_dir().join(format!(
         "pray-{prefix}-{}-{}",

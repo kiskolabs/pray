@@ -42,9 +42,12 @@ spec/pray/provisioned_dest_spec.rb
 spec/pray/provisioned_owner_conflict_spec.rb
 spec/pray/publish_remote_spec.rb
 spec/pray/publish_spec.rb
+spec/pray/registry_search_spec.rb
 spec/pray/registry_spec.rb
+spec/pray/related_prayers_spec.rb
 spec/pray/render_content_spec.rb
 spec/pray/render_patch_spec.rb
+spec/pray/render_reconciliation_spec.rb
 spec/pray/render_spec.rb
 spec/pray/resolve_context_spec.rb
 spec/pray/resolve_source_spec.rb

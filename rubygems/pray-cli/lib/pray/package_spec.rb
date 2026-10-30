@@ -14,13 +14,13 @@ module Pray
   PackageSpec = Struct.new(
     :name, :version, :summary, :description, :authors, :maintainers, :license, :homepage,
     :source_code_uri, :changelog_uri, :prayfile_version, :files, :exports,
-    :skills, :templates, :adapters, :targets, :dependencies, :metadata, :upstream
+    :skills, :templates, :adapters, :targets, :related, :dependencies, :metadata, :upstream
   ) do
     def initialize(
       name: "", version: "", summary: nil, description: nil, authors: [], maintainers: [], license: nil,
       homepage: nil, source_code_uri: nil, changelog_uri: nil, prayfile_version: nil,
       files: [], exports: {}, skills: {}, templates: {}, adapters: {}, targets: [],
-      dependencies: [], metadata: {}, upstream: nil
+      related: [], dependencies: [], metadata: {}, upstream: nil
     )
       super
     end
@@ -50,6 +50,7 @@ module Pray
         copy.authors = Array(authors).sort
         copy.maintainers = Array(maintainers).sort
         copy.targets = Array(targets).sort
+        copy.related = PackageRelation.canonicalize(related)
         copy.dependencies = dependencies.sort_by { |dependency| [dependency.name, dependency.constraint, dependency.optional] }
       end
     end
@@ -258,6 +259,7 @@ module Pray
         when "maintainers" then spec.maintainers = array_of_strings(value)
         when "files" then spec.files = array_of_strings(value)
         when "targets" then spec.targets = array_of_strings(value)
+        when "related" then spec.related = array_of_strings(value)
         when "exports" then spec.exports = parse_exports(value)
         when "skills" then spec.skills = parse_skills(value)
         when "templates" then spec.templates = parse_templates(value)

@@ -35,6 +35,7 @@ Package::Specification.new do |spec|
   }
   spec.adapters = { "tool" => "adapter" }
   spec.targets = ["tool_a"]
+  spec.related = ["sample/testing", "../security", "/shared/accessibility", "https://prayers.example/incident?view=full#response"]
   spec.add_optional_dependency "sample/common", "~> 1.0"
   spec.metadata = { "labels" => ["stable", :tool-a], "policy" => { "enabled" => true, "fallback" => nil }, "priority" => 1 }
   spec.upstream "sample/base", "~> 1.4"
@@ -94,9 +95,65 @@ end
     assert.equal(parsed.skills.get("review")?.path, "skills/review");
     assert.equal(parsed.templates.get("note")?.path, "templates/note.md");
     assert.equal(parsed.adapters.get("tool"), "adapter");
+    assert.deepEqual(parsed.related, [
+      "../security",
+      "/shared/accessibility",
+      "https://prayers.example/incident?view=full#response",
+      "sample/testing",
+    ]);
     assert.equal(parsed.dependencies[0]?.optional, true);
     assert.equal(parsed.metadata.get("priority")?.kind, "integer");
     assert.deepEqual(parsed, expected);
+  });
+
+  it("rejects ambiguous related prayer references", () => {
+    for (const reference of [
+      "testing",
+      "sample/testing?latest",
+      "sample\\\\testing",
+      "https://user@prayers.example/testing",
+    ]) {
+      assert.throws(
+        () =>
+          parsePackageSpec(`
+Package::Specification.new do |spec|
+  spec.name = "sample/review"
+  spec.related = ["${reference}"]
+  spec.files = ["README.md"]
+end
+`),
+        /related prayer/,
+      );
+    }
+  });
+
+  it("does not repeat rejected related reference credentials", () => {
+    assert.throws(
+      () =>
+        parsePackageSpec(`
+Package::Specification.new do |spec|
+  spec.name = "sample/review"
+  spec.related = ["https://private-user@prayers.example/testing"]
+  spec.files = ["README.md"]
+end
+`),
+      (error: unknown) =>
+        error instanceof Error && !error.message.includes("private-user"),
+    );
+  });
+
+  it("rejects the legacy associated_prayers field", () => {
+    assert.throws(
+      () =>
+        parsePackageSpec(`
+Package::Specification.new do |spec|
+  spec.name = "sample/review"
+  spec.associated_prayers = ["sample/testing"]
+  spec.files = ["README.md"]
+end
+`),
+      /unsupported assignment/,
+    );
   });
 
   it("omits an empty version", () => {

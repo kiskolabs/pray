@@ -23,4 +23,5 @@ Package::Specification.new do |spec|
     }
   }
   spec.targets = ["tool_a"]
+  spec.related = ["../security", "sample/testing"]
 end

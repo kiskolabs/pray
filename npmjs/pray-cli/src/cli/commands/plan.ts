@@ -28,6 +28,9 @@ export async function runPlanCommand(argumentsList: string[]): Promise<void> {
         true,
       );
   const rendered = renderProject(project);
+  const previous = existsSync(lockfilePath())
+    ? readLockfile(lockfilePath())
+    : undefined;
   const nextLockfile = buildLockfile({
     manifestHash: project.manifestHash,
     projectRoot: project.projectRoot,
@@ -38,10 +41,8 @@ export async function runPlanCommand(argumentsList: string[]): Promise<void> {
     sourceRevisions: project.sourceRevisions,
     sourceHostKeys: project.sourceHostKeys,
     project,
+    previousLockfile: previous,
   });
-  const previous = existsSync(lockfilePath())
-    ? readLockfile(lockfilePath())
-    : undefined;
   const destinations = provisionedDestinationStatuses(project, previous);
   process.stdout.write("Plan\n");
   for (const line of localSummaryLines(previous, project)) {
