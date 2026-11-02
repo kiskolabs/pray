@@ -9,7 +9,7 @@ import {
   readDestinationBytes,
   readRegularBytes,
 } from "./destination-io.js";
-import { patchRenderedContent } from "./patch.js";
+import { reconcileRenderedContent } from "./reconcile.js";
 
 export function layoutRenderedContent(
   path: string,
@@ -29,7 +29,7 @@ export function layoutRenderedContent(
       `refusing to write \`${display}\`; destination is not a regular file`,
     );
   }
-  return patchRenderedContent(
+  return reconcileRenderedContent(
     decodeUtf8(readRegularBytes(path, display)),
     fresh,
     retired,
@@ -50,7 +50,7 @@ export function writeRenderedContent(
   try {
     const existing = decodeUtf8(readDestinationBytes(descriptor, display));
     const bytes = Buffer.from(
-      patchRenderedContent(existing, fresh, retired),
+      reconcileRenderedContent(existing, fresh, retired),
       "utf8",
     );
     if (replaceProjectFile(path, Buffer.from(existing, "utf8"), bytes)) return;

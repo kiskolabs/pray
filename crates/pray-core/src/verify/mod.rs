@@ -6,7 +6,8 @@ mod provisioned;
 
 use crate::hashing::normalize_line_endings;
 use crate::lockfile::{Lockfile, ManagedSpanRecord};
-use crate::render::render_project;
+use crate::render::{render_project, RenderedTarget};
+use crate::render_reconcile::{reconcile_rendered_content, retired_span_checksums};
 use crate::resolve::ResolvedProject;
 use crate::{PrayError, PrayResult};
 use format::format_drift_report;
@@ -80,7 +81,7 @@ pub fn verify_project(
 type CollectedVerification = (
     VerificationReport,
     BTreeMap<String, String>,
-    BTreeMap<String, String>,
+    BTreeMap<String, RenderedTarget>,
 );
 
 fn collect_verification_report(
@@ -89,9 +90,9 @@ fn collect_verification_report(
 ) -> PrayResult<CollectedVerification> {
     let mut report = VerificationReport::default();
     let mut rendered_targets = BTreeMap::new();
-    let fresh_targets: BTreeMap<String, String> = render_project(project)?
+    let fresh_targets: BTreeMap<String, RenderedTarget> = render_project(project)?
         .into_iter()
-        .map(|target| (target.path.to_string_lossy().to_string(), target.content))
+        .map(|target| (target.path.to_string_lossy().to_string(), target))
         .collect();
     if project.manifest_hash != lockfile.manifest_hash {
         report.findings.push(VerificationFinding {
@@ -110,6 +111,9 @@ fn collect_verification_report(
             .entry(span.target.clone())
             .or_default()
             .push(span);
+    }
+    for target_path in fresh_targets.keys() {
+        target_spans.entry(target_path.clone()).or_default();
     }
 
     for (target_path, spans) in target_spans {
@@ -152,7 +156,7 @@ fn collect_verification_report(
         }
         let fresh_lines: Vec<&str> = fresh_targets
             .get(&target_path)
-            .map(|fresh| fresh.lines().collect())
+            .map(|fresh| fresh.content.lines().collect())
             .unwrap_or_default();
         if let Some(summary) = summarize_position_drift(
             &target_path,
@@ -187,12 +191,21 @@ pub fn drift_project(
         collect_verification_report(project, lockfile)?;
 
     let lock_targets = lockfile_targets(lockfile);
-    for (path, fresh_content) in &fresh_targets {
-        let normalized_fresh = normalize_line_endings(fresh_content);
-        let on_disk = rendered_targets
-            .get(path)
-            .map(|text| normalize_line_endings(text));
-        let matches = on_disk.as_ref() == Some(&normalized_fresh);
+    for (path, fresh_target) in &fresh_targets {
+        let retired = retired_span_checksums(Some(lockfile), fresh_target);
+        let on_disk = rendered_targets.get(path);
+        let normalized_expected = on_disk.map_or_else(
+            || normalize_line_endings(&fresh_target.content),
+            |text| {
+                normalize_line_endings(&reconcile_rendered_content(
+                    text,
+                    &fresh_target.content,
+                    &retired,
+                ))
+            },
+        );
+        let normalized_on_disk = on_disk.map(|text| normalize_line_endings(text));
+        let matches = normalized_on_disk.as_ref() == Some(&normalized_expected);
         if !matches {
             report.findings.push(VerificationFinding {
                 kind: "renderer_drift".to_string(),

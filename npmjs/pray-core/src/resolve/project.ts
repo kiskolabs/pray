@@ -27,7 +27,7 @@ import {
 import type { PackageSpec } from "../package-spec/types.js";
 import { activeInvocationContext } from "../project-context/runtime.js";
 import { defaultResolveOptions, type ResolveOptions } from "./context.js";
-import { rejectDependencyCycles } from "./deps.js";
+import { rejectDependencyCycles, validateOptionalReferrals } from "./deps.js";
 import { loadExportBodies, selectExports } from "./exports.js";
 import {
   annotateFailedGitRefresh,
@@ -115,6 +115,7 @@ export async function resolveProject(
     throw PrayError.resolution(localErrors.join("\n"));
   }
   rejectDependencyCycles(packages);
+  validateOptionalReferrals(packages);
   const sourceRevisions = new Map<string, string>();
   for (const [name, checkout] of gitSources.entries()) {
     if (checkout.revision) {

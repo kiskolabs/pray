@@ -34,6 +34,7 @@ RSpec.describe "render reconciliation" do
     stdout, stderr, status = run_pray("plan")
     expect(status).to be_success, stderr
     expect(stdout).to include("Target INSTRUCTIONS.md: unchanged")
+    expect(run_pray("drift")[2]).to be_success
 
     _stdout, stderr, status = run_pray("install", "--frozen")
     expect(status).to be_success, stderr
@@ -53,6 +54,19 @@ RSpec.describe "render reconciliation" do
     expect(destination).not_to include("pray:#{retired_id}")
     expect(destination).to include("Two body")
     expect(run_pray("verify", "--strict")[2]).to be_success
+  end
+
+  it "keeps drift clean for a current target without managed spans" do
+    File.write(File.join(workspace, "Prayfile"), <<~PRAYFILE)
+      prayfile "1"
+      compose "AGENTS.md" do
+      end
+    PRAYFILE
+
+    _stdout, stderr, status = run_pray("install")
+    expect(status).to be_success, stderr
+    expect(run_pray("plan")[2]).to be_success
+    expect(run_pray("drift")[2]).to be_success
   end
 
   it "refuses to overwrite an edited active managed span" do

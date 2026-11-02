@@ -6,6 +6,11 @@ import type { Lockfile, ManagedSpanRecord } from "../lockfile/types.js";
 import { recordedPackageVersion } from "../package-spec/index.js";
 import { readRegularBytes } from "../render/destination-io.js";
 import { renderProject } from "../render/project.js";
+import {
+  reconcileRenderedContent,
+  retiredSpanChecksums,
+} from "../render/reconcile.js";
+import type { RenderedTarget } from "../render/types.js";
 import { missingLocalEmbedGuidance } from "../resolve/local.js";
 import type { ResolvedProject } from "../resolve/types.js";
 import { markerPositions } from "./markers.js";
@@ -66,10 +71,20 @@ export function driftProject(
     lockfile.target.flatMap((target) => target.outputs),
   );
 
-  for (const [path, freshContent] of freshTargets.entries()) {
-    const normalizedFresh = normalizeLineEndings(freshContent);
+  for (const [path, freshTarget] of freshTargets.entries()) {
     const onDisk = renderedTargets.get(path);
-    if (!onDisk || normalizeLineEndings(onDisk) !== normalizedFresh) {
+    const expected =
+      onDisk !== undefined
+        ? reconcileRenderedContent(
+            onDisk,
+            freshTarget.content,
+            retiredSpanChecksums(lockfile, freshTarget),
+          )
+        : freshTarget.content;
+    if (
+      onDisk === undefined ||
+      normalizeLineEndings(onDisk) !== normalizeLineEndings(expected)
+    ) {
       report.findings.push({
         kind: "renderer_drift",
         message: `${path} differs from fresh render`,
@@ -105,12 +120,12 @@ function collectVerificationReport(
 ): {
   report: VerificationReport;
   renderedTargets: Map<string, string>;
-  freshTargets: Map<string, string>;
+  freshTargets: Map<string, RenderedTarget>;
 } {
   const report: VerificationReport = { findings: [] };
   const renderedTargets = new Map<string, string>();
   const freshTargets = new Map(
-    renderProject(project).map((target) => [target.path, target.content]),
+    renderProject(project).map((target) => [target.path, target]),
   );
 
   if (project.manifestHash !== lockfile.manifest_hash) {
@@ -160,6 +175,11 @@ function collectVerificationReport(
     spans.push(span);
     targetSpans.set(span.target, spans);
   }
+  for (const targetPath of freshTargets.keys()) {
+    if (!targetSpans.has(targetPath)) {
+      targetSpans.set(targetPath, []);
+    }
+  }
 
   for (const [targetPath, spans] of targetSpans.entries()) {
     const absolutePath = resolve(project.projectRoot, targetPath);
@@ -196,7 +216,7 @@ function collectVerificationReport(
       spans,
       markers,
       lines,
-      fresh?.split("\n"),
+      fresh?.content.split("\n"),
       project.localFiles,
     );
     if (summary) {

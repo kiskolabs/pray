@@ -1,7 +1,6 @@
 # frozen_string_literal: true
 
 require "fileutils"
-require "pathname"
 
 module Pray
   module RenderDest
@@ -157,7 +156,7 @@ module Pray
       unless kind == :regular
         raise Error.render("refusing to write `#{display}`; destination is not a regular file")
       end
-      RenderPatch.patch_rendered_content(decode_utf8(read_regular_bytes(path, display), display), fresh, retired)
+      RenderReconcile.reconcile_content(decode_utf8(read_regular_bytes(path, display), display), fresh, retired)
     end
 
     def write_rendered_content(path, display, fresh, retired = {})
@@ -165,7 +164,7 @@ module Pray
 
       open_regular(path, display, File::RDWR) do |file|
         existing = decode_utf8(read_destination_bytes(file, display), display)
-        content = RenderPatch.patch_rendered_content(existing, fresh, retired)
+        content = RenderReconcile.reconcile_content(existing, fresh, retired)
         return if Transaction.replace(path, existing.b, content.b)
 
         file.rewind

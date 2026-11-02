@@ -100,6 +100,7 @@ module Pray
       raise Error.resolution(local_errors.join("\n")) unless local_errors.empty?
 
       ResolveDeps.reject_dependency_cycles(packages)
+      ResolveDeps.validate_optional_referrals(packages)
       source_revisions = git_sources.revisions
 
       ResolvedProject.new(

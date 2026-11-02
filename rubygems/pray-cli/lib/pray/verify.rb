@@ -36,11 +36,16 @@ module Pray
 
     def drift_project(project, lockfile)
       report, rendered_targets, fresh_targets = collect_verification_report(project, lockfile)
-      fresh_targets.each do |path, fresh_content|
-        normalized_fresh = Hashing.normalize_line_endings(fresh_content)
+      fresh_targets.each do |path, fresh_target|
         on_disk = rendered_targets[path]
-        on_disk = Hashing.normalize_line_endings(on_disk) if on_disk
-        unless on_disk == normalized_fresh
+        retired = RenderReconcile.retired_span_checksums(lockfile, fresh_target)
+        expected = if on_disk
+          RenderReconcile.reconcile_content(on_disk, fresh_target.content, retired)
+        else
+          fresh_target.content
+        end
+        normalized_on_disk = Hashing.normalize_line_endings(on_disk) if on_disk
+        unless normalized_on_disk == Hashing.normalize_line_endings(expected)
           report.findings << VerificationFinding.new(
             kind: "renderer_drift",
             message: "#{path} differs from fresh render"
@@ -64,7 +69,7 @@ module Pray
     def collect_verification_report(project, lockfile)
       report = VerificationReport.new
       rendered_targets = {}
-      fresh_targets = Render.render_project(project).to_h { |target| [target.path, target.content] }
+      fresh_targets = Render.render_project(project).to_h { |target| [target.path, target] }
 
       if project.manifest_hash != lockfile.manifest_hash
         report.findings << VerificationFinding.new(
@@ -104,6 +109,7 @@ module Pray
       end
 
       target_spans = lockfile.managed_span.group_by(&:target)
+      fresh_targets.each_key { |target_path| target_spans[target_path] ||= [] }
       target_spans.each do |target_path, spans|
         absolute_path = File.join(project.project_root, target_path)
         unless File.exist?(absolute_path)
@@ -135,7 +141,7 @@ module Pray
             end
           end
         end
-        fresh_lines = fresh_targets[target_path]&.lines(chomp: true)
+        fresh_lines = fresh_targets[target_path]&.content&.lines(chomp: true)
         summary = VerifyPosition.summarize_position_drift(
           target_path,
           spans,

@@ -1,5 +1,5 @@
 import assert from "node:assert/strict";
-import { cpSync, mkdtempSync, readFileSync } from "node:fs";
+import { cpSync, mkdtempSync, readFileSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join, resolve } from "node:path";
 import { describe, it } from "node:test";
@@ -18,6 +18,17 @@ describe("install integration", () => {
     );
     const workspace = mkdtempSync(join(tmpdir(), "pray-cli-install-"));
     cpSync(fixtureRoot, workspace, { recursive: true });
+    const specificationPath = join(
+      workspace,
+      "prayers/base/sample-base.prayspec",
+    );
+    writeFileSync(
+      specificationPath,
+      readFileSync(specificationPath, "utf8").replace(
+        '  spec.related = ["../security", "sample/testing"]',
+        '  spec.related = ["../security", "sample/testing"]\n  spec.add_optional_dependency "sample/common", "~> 1.0"',
+      ),
+    );
 
     const manifestPath = join(workspace, "Prayfile");
     process.chdir(workspace);
@@ -45,6 +56,10 @@ describe("install integration", () => {
     assert.match(
       output.join(""),
       /related prayers: \.\.\/security, sample\/testing/,
+    );
+    assert.match(
+      output.join(""),
+      /optional referrals: sample\/common \(~> 1\.0\)/,
     );
   });
 });

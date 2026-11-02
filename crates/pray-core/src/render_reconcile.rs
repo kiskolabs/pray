@@ -17,15 +17,21 @@ pub(crate) fn layout_rendered_content(
             let bytes = read_regular_bytes(path, display)?;
             let existing =
                 String::from_utf8(bytes).map_err(|error| PrayError::Render(error.to_string()))?;
-            Ok(crate::render_patch::patch_rendered_content_with_retired(
-                &existing, rendered, retired,
-            ))
+            Ok(reconcile_rendered_content(&existing, rendered, retired))
         }
         DestinationKind::Symlink => Err(symlink_error(display)),
         DestinationKind::Other => Err(PrayError::Render(format!(
             "refusing to write `{display}`; destination is not a regular file"
         ))),
     }
+}
+
+pub(crate) fn reconcile_rendered_content(
+    existing: &str,
+    rendered: &str,
+    retired: &BTreeMap<String, String>,
+) -> String {
+    crate::render_patch::patch_rendered_content_with_retired(existing, rendered, retired)
 }
 
 pub(crate) fn retired_span_checksums(

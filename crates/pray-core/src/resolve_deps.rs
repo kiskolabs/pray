@@ -11,6 +11,7 @@ pub(crate) fn reject_dependency_cycles(packages: &[ResolvedPackage]) -> PrayResu
                 .spec
                 .dependencies
                 .iter()
+                .filter(|dependency| !dependency.optional)
                 .map(|dependency| dependency.name.clone())
                 .collect(),
         );
@@ -20,6 +21,39 @@ pub(crate) fn reject_dependency_cycles(packages: &[ResolvedPackage]) -> PrayResu
             "dependency cycle detected: {}",
             cycle.join(" -> ")
         )));
+    }
+    Ok(())
+}
+
+pub(crate) fn validate_optional_referrals(packages: &[ResolvedPackage]) -> PrayResult<()> {
+    let packages_by_name: BTreeMap<_, _> = packages
+        .iter()
+        .map(|package| (package.declaration.name.as_str(), package))
+        .collect();
+    for package in packages {
+        for dependency in package
+            .spec
+            .dependencies
+            .iter()
+            .filter(|dependency| dependency.optional)
+        {
+            let Some(target) = packages_by_name.get(dependency.name.as_str()) else {
+                continue;
+            };
+            if target
+                .spec
+                .satisfy_constraint(&dependency.constraint)
+                .is_err()
+            {
+                return Err(PrayError::Resolution(format!(
+                    "optional referral {} -> {} requires {}, but selected version is {}",
+                    package.declaration.name,
+                    dependency.name,
+                    dependency.constraint,
+                    target.spec.recorded_version()
+                )));
+            }
+        }
     }
     Ok(())
 }

@@ -6,7 +6,9 @@ use crate::render_file::{
     DestinationKind,
 };
 use crate::render_path_guard::ensure_safe_destination_ancestors;
-use crate::render_reconcile::{layout_rendered_content, retired_span_checksums};
+use crate::render_reconcile::{
+    layout_rendered_content, reconcile_rendered_content, retired_span_checksums,
+};
 use crate::resolve::ResolvedProject;
 use crate::{PrayError, PrayResult};
 use std::fs;
@@ -25,9 +27,7 @@ fn write_rendered_content(
             let mut file = open_regular(path, display, true)?;
             let existing = String::from_utf8(read_destination_bytes(&mut file, display)?)
                 .map_err(|error| PrayError::Render(error.to_string()))?;
-            let content = crate::render_patch::patch_rendered_content_with_retired(
-                &existing, rendered, retired,
-            );
+            let content = reconcile_rendered_content(&existing, rendered, retired);
             if crate::transaction::replace(
                 path,
                 Some(existing.as_bytes()),

@@ -4,6 +4,10 @@ module Pray
   module RenderReconcile
     module_function
 
+    def reconcile_content(existing, fresh, retired = {})
+      RenderPatch.patch_rendered_content(existing, fresh, retired)
+    end
+
     def current?(path, display, fresh, retired = {})
       kind = RenderDest.destination_kind(path)
       return false if kind == :missing
@@ -13,7 +17,7 @@ module Pray
         raise Error.render("refusing to read `#{display}`; destination is not a regular file")
       end
       existing = RenderDest.decode_utf8(RenderDest.read_regular_bytes(path, display), display)
-      existing == RenderPatch.patch_rendered_content(existing, fresh, retired)
+      existing == reconcile_content(existing, fresh, retired)
     end
 
     def retired_span_checksums(previous_lockfile, target)

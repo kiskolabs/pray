@@ -1,5 +1,9 @@
 # pray-cli render consistency and retired markers
 
+## Participants
+
+Andrei Makarov (@amkisko)
+
 ## Dependency
 
 pray-cli 1.22.0. Before the unreleased changes recorded in Resolution, the relevant behavior remained unchanged in 1.25.0 and in the implementation inspected on 2026-10-30.
@@ -79,10 +83,13 @@ Add regression coverage before changing behavior:
 
 ## Next
 
-- Review the unreleased implementation and benchmark evidence before release.
+- Ship the follow-up drift correction in the next coordinated CLI release.
+- Keep the one-scan reconciliation benchmark as a release check.
 
 ## Resolution
 
-The unreleased Rust, Ruby, and TypeScript implementations now compare `render --check`, frozen install, and plan output with the reconciled bytes the write path would produce. Plain drift retains its existing ideal-render contract.
+Pray 1.26.0 aligned `render --check`, frozen install, and plan with the reconciled bytes the write path would produce. It retained the direct fresh-render comparison in plain drift. A later consumer fixture proved that this still allowed a clean plan and apply to disagree with plain drift when the destination contained preserved unmarked text. A target without managed spans exposed the same gap because verification read only targets represented by a managed-span lock record.
+
+The follow-up Rust, Ruby, and TypeScript implementations reconcile the fresh managed content with the already-read destination before normalizing and comparing it. The comparison uses the same pure operation as plan and write, preserves unmarked text, handles targets with no managed spans, and scans each destination once.
 
 Reconciliation in all three implementations removes a retired managed span only when the previous lock tracked it and its current managed content still matches the previous ideal checksum. It preserves edited retired spans and unknown spans. An edited active span fails before write. Strict verification now tells the operator to inspect and remove an unknown block explicitly.

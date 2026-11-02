@@ -19,6 +19,7 @@ RSpec.describe "related prayer references" do
         Package::Specification.new do |spec|
           spec.name = "sample/base"
           spec.related = ["sample/testing", " ../security "]
+          spec.add_optional_dependency "sample/common", "~> 1.0"
           spec.files = ["README.md"]
         end
       PRAYSPEC
@@ -28,6 +29,8 @@ RSpec.describe "related prayer references" do
     stdout, stderr, status = Open3.capture3("ruby", executable, "explain", "sample/base", chdir: root)
 
     expect(status).to be_success, stderr
+    expect(stdout).to include("dependencies: none")
+    expect(stdout).to include("optional referrals: sample/common (~> 1.0)")
     expect(stdout).to include("related prayers: ../security, sample/testing")
   ensure
     FileUtils.rm_rf(root) if root

@@ -152,7 +152,7 @@ module Pray
       lines << "#{indent}#{package.declaration.name} #{package.spec.recorded_version}"
       return unless ancestry.add?(package.declaration.name)
 
-      package.spec.dependencies.each do |dependency|
+      package.spec.dependencies.reject(&:optional).each do |dependency|
         resolved = package_map[dependency.name]
         if resolved
           if ancestry.include?(resolved.declaration.name)

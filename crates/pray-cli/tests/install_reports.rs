@@ -113,6 +113,7 @@ fn explain_reports_package_details_and_lockfile_context() {
     assert!(stdout.contains("testing-basics"));
     assert!(stdout.contains("security-basics"));
     assert!(stdout.contains("dependencies: none"));
+    assert!(stdout.contains("optional referrals: sample/common (~> 1.0)"));
     assert!(stdout.contains("related prayers: ../security, sample/testing"));
     assert!(stdout.contains("lockfile version: 1.4.3"));
 }
@@ -134,6 +135,7 @@ fn tree_reports_dependency_graph() {
     assert!(stdout.contains("sample/base 1.4.3"));
     assert!(stdout.contains("sample/common 1.0.0"));
     assert!(stdout.contains("  sample/common 1.0.0"));
+    assert!(!stdout.contains("sample/peer"));
 }
 
 #[test]

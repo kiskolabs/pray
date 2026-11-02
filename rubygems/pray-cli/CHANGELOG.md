@@ -2,6 +2,11 @@
 
 ## Unreleased
 
+## 1.26.1 (2026-11-02)
+
+- Show optional package referrals separately in `pray explain`, exclude them from dependency cycles and trees, and validate their constraints when another declaration selects the target.
+- Keep drift, render checks, planning, and writes consistent for managed files that contain local content.
+
 ## 1.26.0 (2026-10-30)
 
 - Add validated `related` references to prayspec parsing, rendering, and `pray explain`.

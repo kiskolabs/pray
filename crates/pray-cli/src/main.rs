@@ -16,6 +16,7 @@ mod commands_init;
 mod commands_init_prayer;
 mod commands_init_prayer_manifest;
 mod commands_inspect;
+mod commands_inspect_dependencies;
 mod commands_manifest_edit;
 mod commands_materialize;
 mod commands_package;

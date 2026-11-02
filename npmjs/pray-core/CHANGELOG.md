@@ -2,6 +2,11 @@
 
 ## Unreleased
 
+## 1.26.1 (2026-11-02)
+
+- Treat optional package declarations as versioned referrals: do not select their targets or show them as dependency-tree edges, exclude them from dependency cycles, and validate their constraints when another declaration selects the target.
+- Compare destination drift with the same reconciled render used by writes, including managed files that contain local content.
+
 ## 1.26.0 (2026-10-30)
 
 - Add canonical, validated `related` references to the public package-spec model.

@@ -84,7 +84,12 @@ module Pray
       end
       lines << "source: #{package_source_summary(package)}"
       lines << "exports: #{format_list(package.selected_exports)}"
-      lines << "dependencies: #{format_list(package.spec.dependencies.map(&:name))}"
+      required_dependencies = package.spec.dependencies.reject(&:optional).map(&:name)
+      optional_referrals = package.spec.dependencies.select(&:optional).map do |dependency|
+        "#{dependency.name} (#{dependency.constraint})"
+      end
+      lines << "dependencies: #{format_list(required_dependencies)}"
+      lines << "optional referrals: #{format_list(optional_referrals)}"
       lines << "related prayers: #{format_list(package.spec.related)}"
       lines << "tree hash: #{package.tree_hash}"
       lines << "artifact hash: #{package.artifact_hash}"

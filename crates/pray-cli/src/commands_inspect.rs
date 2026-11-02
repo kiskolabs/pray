@@ -184,17 +184,7 @@ pub(crate) fn explain_command(package_name: String) -> PrayResult<()> {
         "exports: {}",
         format_list(&package.selected_exports)
     ));
-    lines.push(format!(
-        "dependencies: {}",
-        format_list(
-            &package
-                .spec
-                .dependencies
-                .iter()
-                .map(|dependency| dependency.name.clone())
-                .collect::<Vec<_>>()
-        )
-    ));
+    lines.extend(crate::commands_inspect_dependencies::package_dependency_lines(&package.spec));
     lines.push(format!(
         "related prayers: {}",
         format_list(&package.spec.related)
@@ -235,7 +225,12 @@ fn render_tree_node(
         return;
     }
 
-    for dependency in &package.spec.dependencies {
+    for dependency in package
+        .spec
+        .dependencies
+        .iter()
+        .filter(|dependency| !dependency.optional)
+    {
         if let Some(resolved) = package_map.get(&dependency.name) {
             if ancestry.contains(&resolved.declaration.name) {
                 lines.push(format!(

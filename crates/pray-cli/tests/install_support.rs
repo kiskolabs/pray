@@ -58,6 +58,7 @@ Package::Specification.new do |spec|
   spec.version = "1.4.3"
   spec.summary = "shared guidance"
   spec.related = ["sample/testing", "../security"]
+  spec.add_optional_dependency "sample/common", "~> 1.0"
   spec.files = ["README.md", "exports/testing-basics.md", "exports/security-basics.md"]
   spec.exports = {
     "testing-basics" => {
@@ -296,6 +297,7 @@ Package::Specification.new do |spec|
     }
   }
   spec.add_dependency "sample/common", "~> 1.0"
+  spec.add_optional_dependency "sample/peer", "~> 1.0"
 end
 "#,
     )

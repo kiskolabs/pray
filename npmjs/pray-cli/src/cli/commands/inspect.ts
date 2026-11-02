@@ -13,6 +13,7 @@ import { defaultResolveOptions } from "pray-core/resolve/context.js";
 import { resolveProject } from "pray-core/resolve/project.js";
 import { pathForkDriftLines } from "pray-core/resolve/upstream-drift.js";
 import { packageSourceSummary } from "pray-core/tree/index.js";
+import { packageDetailLines } from "./explain-lines.js";
 import { previewRemoteUpdates } from "./update.js";
 import {
   printConstraintBlockedPackages,
@@ -137,19 +138,11 @@ export async function runExplain(name: string | undefined): Promise<void> {
     lines.push(`registry latest: ${packageEntry.registryLatestVersion}`);
   }
   lines.push(`source: ${packageSourceSummary(packageEntry)}`);
-  lines.push(`exports: ${formatList(packageEntry.selectedExports)}`);
-  lines.push(
-    `dependencies: ${formatList(packageEntry.spec.dependencies.map((dependency) => dependency.name))}`,
-  );
-  lines.push(`related prayers: ${formatList(packageEntry.spec.related)}`);
+  lines.push(...packageDetailLines(packageEntry));
   lines.push(`tree hash: ${packageEntry.treeHash}`);
   if (lockfilePackage) {
     lines.push(`lockfile version: ${lockfilePackage.version}`);
     lines.push(`lockfile path: ${lockfilePackage.path}`);
   }
   process.stdout.write(`${lines.join("\n")}\n`);
-}
-
-function formatList(values: string[]): string {
-  return values.length === 0 ? "none" : values.join(", ");
 }

@@ -32,6 +32,7 @@ function renderTreeNode(
   }
   ancestry.add(packageEntry.declaration.name);
   for (const dependency of packageEntry.spec.dependencies) {
+    if (dependency.optional) continue;
     const resolved = packageMap.get(dependency.name);
     if (resolved) {
       renderTreeNode(resolved, packageMap, depth + 1, ancestry, lines);

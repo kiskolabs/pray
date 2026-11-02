@@ -65,6 +65,7 @@ pub fn resolve_manifest_in_context(
         return Err(PrayError::Resolution(local_errors.join("\n")));
     }
     crate::resolve_deps::reject_dependency_cycles(&packages)?;
+    crate::resolve_deps::validate_optional_referrals(&packages)?;
     Ok(ResolvedProject {
         manifest_path: manifest_path.to_path_buf(),
         project_root: project_root.to_path_buf(),

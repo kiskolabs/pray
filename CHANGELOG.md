@@ -2,6 +2,11 @@
 
 ## Unreleased
 
+## 1.26.1 (2026-11-02)
+
+- Separate required dependencies, optional versioned referrals, and advisory related prayers. Do not install an optional referral or count it as a dependency-cycle edge; validate its constraint when another declaration selects the target.
+- Keep `pray drift` consistent with planning, verification, and writes by comparing destinations with the same reconciled render, including managed files that contain local content.
+
 ## 1.26.0 (2026-10-30)
 
 - Add advisory `related` references to prayspecs and show them in `pray explain` without installing or resolving their targets.

@@ -45,6 +45,7 @@ spec/pray/publish_spec.rb
 spec/pray/registry_search_spec.rb
 spec/pray/registry_spec.rb
 spec/pray/related_prayers_spec.rb
+spec/pray/optional_dependencies_spec.rb
 spec/pray/render_content_spec.rb
 spec/pray/render_patch_spec.rb
 spec/pray/render_reconciliation_spec.rb

@@ -26,6 +26,50 @@ fn drift_reports_renderer_changes_in_sections() {
 }
 
 #[test]
+fn drift_accepts_unmarked_content_that_plan_preserves() {
+    let repo = temporary_directory("pray-drift-unmarked");
+    create_fixture(&repo);
+    assert!(run_pray(&repo, &["install"]).status.success());
+
+    let rendered_path = repo.join("INSTRUCTIONS.md");
+    let rendered = fs::read_to_string(&rendered_path).expect("rendered file exists");
+    let rendered = rendered.replace(
+        "## Additional instructions\n",
+        "## Additional instructions\n\nExtra unmarked line\n",
+    );
+    fs::write(&rendered_path, rendered).expect("rendered file rewritten");
+    assert!(run_pray(&repo, &["apply"]).status.success());
+    assert!(run_pray(&repo, &["plan"]).status.success());
+
+    let drift = run_pray(&repo, &["drift"]);
+    assert!(
+        drift.status.success(),
+        "drift failed after a clean plan:\n{}",
+        String::from_utf8_lossy(&drift.stderr)
+    );
+}
+
+#[test]
+fn drift_accepts_a_current_target_without_managed_spans() {
+    let repo = temporary_directory("pray-drift-empty-compose");
+    fs::write(
+        repo.join("Prayfile"),
+        "prayfile \"1\"\ncompose \"AGENTS.md\" do\nend\n",
+    )
+    .expect("write Prayfile");
+
+    assert!(run_pray(&repo, &["install"]).status.success());
+    assert!(run_pray(&repo, &["plan"]).status.success());
+
+    let drift = run_pray(&repo, &["drift"]);
+    assert!(
+        drift.status.success(),
+        "drift failed for current empty compose target:\n{}",
+        String::from_utf8_lossy(&drift.stderr)
+    );
+}
+
+#[test]
 fn drift_reports_position_changes_in_sections() {
     let repo = temporary_directory("pray-drift-position");
     create_fixture(&repo);

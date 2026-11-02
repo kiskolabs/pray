@@ -71,6 +71,42 @@ describe("render --check", () => {
     }
   });
 
+  it("accepts unmarked content that plan preserves", async () => {
+    const root = mkdtempSync(join(tmpdir(), "pray-drift-unmarked-"));
+    try {
+      await writeProject(root);
+      assert.equal(await runCli(["--path", root, "install"]), 0);
+      const destination = join(root, "AGENTS.md");
+      const withLocalContent = readFileSync(destination, "utf8").replace(
+        "# Agent context\n\n",
+        "# Agent context\n\nLocal note.\n\n",
+      );
+      writeFileSync(destination, withLocalContent);
+
+      assert.equal(await runCli(["--path", root, "apply"]), 0);
+      assert.equal(await runCli(["--path", root, "plan"]), 0);
+      assert.equal(await runCli(["--path", root, "drift"]), 0);
+    } finally {
+      rmSync(root, { recursive: true, force: true });
+    }
+  });
+
+  it("keeps drift clean for a current target without managed spans", async () => {
+    const root = mkdtempSync(join(tmpdir(), "pray-drift-empty-compose-"));
+    try {
+      writeFileSync(
+        join(root, "Prayfile"),
+        'prayfile "1"\ncompose "AGENTS.md" do\nend\n',
+      );
+
+      assert.equal(await runCli(["--path", root, "install"]), 0);
+      assert.equal(await runCli(["--path", root, "plan"]), 0);
+      assert.equal(await runCli(["--path", root, "drift"]), 0);
+    } finally {
+      rmSync(root, { recursive: true, force: true });
+    }
+  });
+
   it("refuses to overwrite an edited active managed span", async () => {
     const root = mkdtempSync(join(tmpdir(), "pray-render-conflict-"));
     try {

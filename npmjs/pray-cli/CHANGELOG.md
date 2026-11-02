@@ -2,6 +2,11 @@
 
 ## Unreleased
 
+## 1.26.1 (2026-11-02)
+
+- Show required dependencies and optional versioned referrals separately in `pray explain`.
+- Keep render checks consistent with planning and writes for managed files that contain local content.
+
 ## 1.26.0 (2026-10-30)
 
 - Show package `related` references in `pray explain` without resolving or fetching them.
