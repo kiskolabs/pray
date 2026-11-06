@@ -1,3 +1,4 @@
+pub mod error;
 pub mod federation;
 pub mod http;
 pub mod p2p;
@@ -6,6 +7,7 @@ pub mod ssh;
 pub mod torrent;
 pub mod types;
 
+pub use error::{Result, TransportError};
 pub use federation::{FederationConfig, FederationTransport, FederationTransportFactory};
 pub use http::{HttpConfig, HttpTransport};
 pub use p2p::{P2PConfig, P2PTransport, P2PTransportFactory};

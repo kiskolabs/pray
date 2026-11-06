@@ -43,7 +43,7 @@
     "typecheck": "tsc -p tsconfig.json --noEmit",
     "lint": "biome check . && npm run lint:cycles",
     "libyears": "libyear --dev --quiet",
-    "lint:cycles": "madge --circular --extensions ts --ts-config tsconfig.json src/cli/main.ts src/parse.ts",
+    "lint:cycles": "node ../scripts/check-import-cycles.mjs src src/cli/main.ts src/parse.ts",
     "format": "biome format --write .",
     "format:check": "biome format ."
   },
@@ -54,9 +54,8 @@
     "pray-core": "1.26.1"
   },
   "devDependencies": {
-    "@biomejs/biome": "^2.0.0",
+    "@biomejs/biome": "^2.6.5",
     "@types/node": "^22.15.0",
-    "madge": "^8.0.0",
     "typescript": "~5.9.3"
   },
   "keywords": [

@@ -44,5 +44,5 @@ Gem::Specification.new do |spec|
 
   spec.add_development_dependency "rspec", "~> 3.13"
   spec.add_development_dependency "polyrun", "~> 2.2"
-  spec.add_development_dependency "rbs", "~> 3.9"
+  spec.add_development_dependency "rbs", "~> 4.0"
 end
