@@ -54,7 +54,7 @@
     "pray-core": "1.26.1"
   },
   "devDependencies": {
-    "@biomejs/biome": "^2.6.4",
+    "@biomejs/biome": "^2.6.5",
     "@types/node": "^22.15.0",
     "madge": "^8.0.0",
     "typescript": "~5.9.3"
