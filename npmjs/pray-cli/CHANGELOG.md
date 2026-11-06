@@ -2,6 +2,10 @@
 
 ## Unreleased
 
+## 1.26.2 (2026-11-06)
+
+- Reduce wall and CPU time for resolve and tree hashing through the shared `pray-core` path without changing install results.
+
 ## 1.26.1 (2026-11-02)
 
 - Show required dependencies and optional versioned referrals separately in `pray explain`.

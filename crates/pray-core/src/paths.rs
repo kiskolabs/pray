@@ -68,25 +68,21 @@ pub fn validate_destination_path(value: &str) -> PrayResult<ProjectRelativePath>
 }
 
 pub fn find_prayspec_file(root: &Path) -> PrayResult<PathBuf> {
-    let mut prayspec_files = Vec::new();
+    let mut found: Option<PathBuf> = None;
     for entry in fs::read_dir(root)? {
-        let entry = entry?;
-        let path = entry.path();
-        if path.extension().and_then(|value| value.to_str()) == Some("prayspec") {
-            prayspec_files.push(path);
+        let path = entry?.path();
+        if path.extension().and_then(|value| value.to_str()) != Some("prayspec") {
+            continue;
         }
+        if found.is_some() {
+            return Err(PrayError::Resolution(format!(
+                "multiple prayspec files found in {:?}",
+                root
+            )));
+        }
+        found = Some(path);
     }
-    match prayspec_files.len() {
-        1 => Ok(prayspec_files.remove(0)),
-        0 => Err(PrayError::Resolution(format!(
-            "no prayspec file found in {:?}",
-            root
-        ))),
-        _ => Err(PrayError::Resolution(format!(
-            "multiple prayspec files found in {:?}",
-            root
-        ))),
-    }
+    found.ok_or_else(|| PrayError::Resolution(format!("no prayspec file found in {:?}", root)))
 }
 
 pub fn validate_package_relative_path(path: &Path) -> PrayResult<()> {

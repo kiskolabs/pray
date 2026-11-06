@@ -36,6 +36,21 @@ Enforce with `make loc-check` (warn >=150, fail >300 unless ratcheted in `script
 
 Test coverage must follow `spec/README.md` guidelines.
 
+## Pressure benchmarking binding
+
+Consumer binding for `amkisko/pressure-benchmarking`:
+
+- measure: `make pressure-bench` (Rust, Ruby, and npm compat harnesses)
+- self-test: `ruby scripts/pressure-bench.rb --self-test` (distinct parse/resolve/render/lock p95)
+- ceilings: `scripts/pressure-ceilings.json` (version 2 under `implementations`)
+- load axis: package count via `PRAY_PRESSURE_LOADS` (default `1,10,100`)
+- implementations: `PRAY_PRESSURE_IMPLS` (default `rust,ruby,npm`)
+- samples-per-load: `PRAY_PRESSURE_SAMPLES` (use `>= 3` before gate, propose, or write)
+- min episode iterations: 10 optimize/prove cycles at the stressed load
+- propose-basis: timing series `max * headroom`; RSS `median * headroom`; headroom default `1.15`
+- Memory probe class: `process_lifetime` (compat harness peak RSS)
+- flags: `--gate`, `--propose`, `--write`, `--include-ship`
+
 ## Shared instructions
 <!-- pray:ae5d334a -->
 
@@ -320,3 +335,68 @@ Claim `rfcs/ids/NNNN` before writing `rfcs/NNNN-slug.md`. Copy `rfcs/0000-templa
 - use the lightest trace that preserves context; design-only work needs no branch unless implementation starts; put that exploration under `docs/plans`;
 - follow docs-conventions for `docs/` and `usr/`; when encoding how this tree writes, use infer-conventions.
 <!-- pray:48e8a6b3 -->
+
+<!-- pray:ad13bd27 -->
+- test coverage must follow @spec/README.md guidelines;
+- use ruby and Rails features according to the codebase versions;
+- follow ruby and Rails coding conventions, principles, and best practices;
+- schema DDL in `db/migrate`; row backfills in `db/data_migrations`; keep `up` and `change` as schema DDL;
+- page large backfills with an id cursor or `offset`/`limit`; pass `total_records` and `processed_count`; `enqueue` the next page; when `enqueue` is absent (console `new.perform`), drain remaining pages in the same `perform`;
+- log progress as `processed_count/total_records` or `print "."`;
+- unpublished in-repo gem: gemspec next to the library, Gemfile `path:` link, version 0.x, metadata `allowed_push_host` empty so gem push fails;
+- development and test isolation: declare the path gem in `group :development, :test` so production never requires it;
+- generate the public path from the slug column when present, otherwise the primary key; lookup uuid-shaped text as primary key, then slug, then integer primary key only when the schema holds integers; do not put display names in HTTP paths;
+- do not override `Model.find` or enable global FriendlyId finders; a `belongs_to` finder must exist on the relation;
+- `path(record)` uses `to_param`; path of a raw id string does not;
+- person-facing date and datetime fields are text (or a widget bound to the product form), not native `date` or `datetime-local`, when the product locale is not the browser locale;
+- ActiveRecord `TimeZoneConverter` converts strings through `in_time_zone` before DateTime cast; a parse prepend on Date or DateTime does not see those strings unless the converter is also prepended; ISO JSON and params stay on the default caster;
+- association pickers reuse the existing admin list API with a bounded page; they do not pluck the full table into the form;
+- local app host for development, system and request specs, `default_url_options`, OAuth callbacks, Capybara app host, and curl against the running app: `https://<app>.rails.fi` or `http://rails.fi` (`rails.fi` and wildcard `*.rails.fi` resolve to `127.0.0.1`); prefer project `HOST` / `RAILS_HOST`;
+- do not use `example.com`, `example.org`, or `example.net` in fixtures, stubs, mocks, allowlists, documentation hosts, or fake email; those names resolve on the public Internet;
+- fictional remote host, external-service mock, or fake email that must not hit the local app: `<title>.<hash>` (product label plus short hex, for example `demo.7c3e9a1b` / `user@demo.7c3e9a1b`); keep house fake mail on `@rails.fi` when the address is local-app shaped;
+- keep `config.hosts`, Capybara, and mailer host on `*.rails.fi`; remove leftover `example.com` names from local allowlists;
+
+Related: `docs-conventions` names `usr/scripts` for maintainer scripts run from a checkout or CI, `usr/reports` for read-only investigation scripts, `usr/support` for support console scripts that mutate, and `usr/migrate` for schema and data migration scripts for manual running.
+<!-- pray:ad13bd27 -->
+
+<!-- pray:6978f200 -->
+## Keep the work
+
+- after a refusal, stay on the place they used until they choose the next step: URL, document, screen, command, or query
+- the refusal they see must match what the platform reports; HTTP status when the place is a URL
+- an error document is internal; show the error on the requested place
+- unknown identifiers keep a real refusal; the status that leaves must match
+- leave that place only when it is no longer the identifier of the failed attempt: a moved resource (301/308 to the replacement), an auth gate with a return, a successful submit that earned a new place, or a canonical host or scheme
+- a successful GET with an alternate identifier for the same record is a moved resource; redirect show to the canonical identifier; leave POST, PATCH, and live frames on the requested place
+- keep the failed command or query visible
+- redisplay a failed form on the same place; keep passing and failing answers
+- a typed value the widget rewrote is a failed answer; redisplay the string the person typed
+- a confirm that cannot run is not consent; nested destroy must ask on that place, then stay on that place after cancel or success unless the person earned a new place
+- a catalog picker that failed to load still shows the query the person typed
+- on an acknowledged forbidden, stay and offer the next human step the product supports; rewrite to sign-in only when credentials are missing
+- warn before a session timeout and give time to extend; restore in-progress answers after re-auth
+- restore in-progress answers after a process restart the same way as after re-auth
+- a live refresh or reconnect must not wipe the work still on the place
+
+Related: `preferred-stack` states the humane design preference; `engineering-audit` asks whether a person can still operate on the place they used after a refusal.
+<!-- pray:6978f200 -->
+
+<!-- pray:c3a7a60e -->
+## Delivery budgets
+
+Every product that ships a byte-bearing artifact keeps a named size budget and a sibling build-timing signal for the same ship path. Size is delivery burden. Timing is delivery-path cost. Do not mix them in one metric series.
+
+- name each shipped artifact (store upload, container image, path inside an image, gem, wasm, static bundle);
+- fail CI when size exceeds an absolute ceiling, or (when a baseline exists) grows beyond the allowed growth over that baseline;
+- gate the metric the recipient pays for (installed or on-disk bytes versus transfer or compressed bytes); keep those as distinct series;
+- measure wall-clock build or push time for that same ship path; keep timings in a separate report kind;
+- every size or timing sample records when and where so samples compare across runners: start and finish timestamps, repository, run identity or URL, workflow, job, step, and runner class;
+- name the metric and tool explicitly (file bytes, local image size, registry or manifest compressed size, path disk usage, wall seconds);
+- update the baseline in the same change when growth is intentional; a missing baseline may skip the growth check until the first real sample, but the absolute ceiling still applies;
+- prefer one gate tool and one budget file shape across artifacts in a repository;
+- ingest (dashboard or webhook) is optional infrastructure; the local CI gate is not optional when the product ships.
+
+Skip only for trees that never become shipped bytes (pure specification or prose), and state that reason.
+
+Related: `engineering-audit` resource and budget mode audits utilization during a review; this fragment requires continuous CI budgets on the ship path. `dependency-policy` upgrade resource compare produces before/after deltas on dependency upgrades and may cite the same artifact series. `pressure-benchmarking` owns load ladders, ceiling ratchet, and pressure-cooker optimize/prove episodes. `ci-review` studies run health after the fact. `publish-checks` covers review hygiene, not byte ceilings.
+<!-- pray:c3a7a60e -->

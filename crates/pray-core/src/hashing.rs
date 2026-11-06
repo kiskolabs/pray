@@ -32,6 +32,9 @@ pub fn marker_id(seed: &str) -> String {
 }
 
 pub fn normalize_line_endings(text: &str) -> String {
+    if !text.contains('\r') {
+        return text.to_string();
+    }
     text.replace("\r\n", "\n").replace('\r', "\n")
 }
 

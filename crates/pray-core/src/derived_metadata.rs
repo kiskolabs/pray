@@ -53,7 +53,7 @@ pub fn derive_registry_derived_metadata_from_root(
 ) -> PrayResult<RegistryDerivedMetadata> {
     let spec_path = find_prayspec_file(root)?;
     let spec_text = fs::read_to_string(&spec_path)?;
-    let spec = parse_package_spec(&normalize_line_endings(&spec_text))?.canonicalized();
+    let spec = parse_package_spec(&normalize_line_endings(&spec_text))?;
     derive_registry_derived_metadata_from_spec(root, &spec)
 }
 

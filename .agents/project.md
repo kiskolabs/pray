@@ -28,4 +28,19 @@ Enforce with `make loc-check` (warn >=150, fail >300 unless ratcheted in `script
 
 Test coverage must follow `spec/README.md` guidelines.
 
+## Pressure benchmarking binding
+
+Consumer binding for `amkisko/pressure-benchmarking`:
+
+- measure: `make pressure-bench` (Rust, Ruby, and npm compat harnesses)
+- self-test: `ruby scripts/pressure-bench.rb --self-test` (distinct parse/resolve/render/lock p95)
+- ceilings: `scripts/pressure-ceilings.json` (version 2 under `implementations`)
+- load axis: package count via `PRAY_PRESSURE_LOADS` (default `1,10,100`)
+- implementations: `PRAY_PRESSURE_IMPLS` (default `rust,ruby,npm`)
+- samples-per-load: `PRAY_PRESSURE_SAMPLES` (use `>= 3` before gate, propose, or write)
+- min episode iterations: 10 optimize/prove cycles at the stressed load
+- propose-basis: timing series `max * headroom`; RSS `median * headroom`; headroom default `1.15`
+- Memory probe class: `process_lifetime` (compat harness peak RSS)
+- flags: `--gate`, `--propose`, `--write`, `--include-ship`
+
 ## Shared instructions

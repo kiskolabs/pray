@@ -277,18 +277,17 @@ module Pray
     end
 
     def find_prayspec_file(root)
-      files = []
+      found = nil
       Dir.each_child(root) do |entry|
         next unless File.extname(entry) == ".prayspec"
 
         path = File.join(root, entry)
-        files << path if File.file?(path)
+        next unless File.file?(path)
+        raise Error.resolution("multiple prayspec files found in #{root.inspect}") if found
+
+        found = path
       end
-      case files.length
-      when 1 then files.first
-      when 0 then raise Error.resolution("no prayspec file found in #{root.inspect}")
-      else raise Error.resolution("multiple prayspec files found in #{root.inspect}")
-      end
+      found || raise(Error.resolution("no prayspec file found in #{root.inspect}"))
     end
 
     def source_map(sources)

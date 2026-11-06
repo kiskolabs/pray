@@ -2,7 +2,7 @@ use crate::manifest::{ManifestPackage, ManifestSource};
 use crate::package_spec::PackageDependency;
 use crate::resolve::ResolvedPackage;
 use crate::{PrayError, PrayResult};
-use std::collections::{BTreeMap, BTreeSet, VecDeque};
+use std::collections::{BTreeMap, HashMap, HashSet, VecDeque};
 
 pub(crate) struct ResolveAllOutcome {
     pub packages: Vec<ResolvedPackage>,
@@ -13,9 +13,9 @@ pub(crate) struct ResolveAllOutcome {
 #[derive(Debug, Default)]
 pub(crate) struct ResolveQueue {
     pub order: VecDeque<String>,
-    pub declarations: BTreeMap<String, ManifestPackage>,
-    pub explicit: BTreeSet<String>,
-    pub constraints: BTreeMap<String, String>,
+    pub declarations: HashMap<String, ManifestPackage>,
+    pub explicit: HashSet<String>,
+    pub constraints: HashMap<String, String>,
 }
 
 impl ResolveQueue {
@@ -32,31 +32,35 @@ impl ResolveQueue {
         declaration: ManifestPackage,
         explicit: bool,
     ) -> PrayResult<()> {
-        let name = declaration.name.clone();
         let constraint = merge_constraint(
             self.constraints
-                .get(&name)
+                .get(&declaration.name)
                 .map(String::as_str)
                 .unwrap_or("*"),
             &declaration.constraint,
         )?;
-        self.constraints.insert(name.clone(), constraint.clone());
+        self.constraints
+            .insert(declaration.name.clone(), constraint.clone());
         if explicit {
-            self.explicit.insert(name.clone());
+            self.explicit.insert(declaration.name.clone());
         }
-        if let Some(existing) = self.declarations.get_mut(&name) {
-            existing.constraint = constraint;
-            if existing.source.is_none() {
-                existing.source = declaration.source;
+        match self.declarations.get_mut(&declaration.name) {
+            Some(existing) => {
+                existing.constraint = constraint;
+                if existing.source.is_none() {
+                    existing.source = declaration.source;
+                }
+                if existing.path.is_none() {
+                    existing.path = declaration.path;
+                }
             }
-            if existing.path.is_none() {
-                existing.path = declaration.path;
+            None => {
+                let name = declaration.name.clone();
+                let mut declaration = declaration;
+                declaration.constraint = constraint;
+                self.declarations.insert(name.clone(), declaration);
+                self.order.push_back(name);
             }
-        } else {
-            let mut declaration = declaration;
-            declaration.constraint = constraint;
-            self.declarations.insert(name.clone(), declaration);
-            self.order.push_back(name);
         }
         Ok(())
     }
@@ -67,11 +71,11 @@ impl ResolveQueue {
         sources: &BTreeMap<String, ManifestSource>,
         mut resolve_one: impl FnMut(&ManifestPackage) -> PrayResult<ResolvedPackage>,
     ) -> ResolveAllOutcome {
-        let mut resolved_by_name = BTreeMap::new();
+        let mut resolved_by_name = HashMap::new();
         let mut errors = Vec::new();
         let mut saw_network_error = false;
         while let Some(name) = self.order.pop_front() {
-            let Some(declaration) = self.declarations.get(&name).cloned() else {
+            let Some(declaration) = self.declarations.get(&name) else {
                 continue;
             };
             if let Some(existing) = resolved_by_name.get(&name) {
@@ -82,7 +86,7 @@ impl ResolveQueue {
                 }
                 continue;
             }
-            match resolve_one(&declaration) {
+            match resolve_one(declaration) {
                 Ok(mut package) => {
                     package.explicit = self.explicit.contains(&name);
                     if let Err(error) = self.enqueue_required_dependencies(&package, sources) {
@@ -153,7 +157,7 @@ impl ResolveQueue {
 
 fn order_packages(
     manifest_packages: &[ManifestPackage],
-    mut resolved_by_name: BTreeMap<String, ResolvedPackage>,
+    mut resolved_by_name: HashMap<String, ResolvedPackage>,
 ) -> Vec<ResolvedPackage> {
     let mut packages = Vec::with_capacity(resolved_by_name.len());
     for declaration in manifest_packages {

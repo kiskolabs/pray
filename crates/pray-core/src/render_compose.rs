@@ -6,8 +6,9 @@ use crate::render::RenderedTarget;
 use crate::render_span::{
     append_managed_export, append_managed_local, should_inline_export, ContentBuilder,
 };
-use crate::resolve::ResolvedProject;
+use crate::resolve::{ResolvedPackage, ResolvedProject};
 use crate::PrayResult;
+use std::collections::HashMap;
 use std::path::Path;
 
 pub(crate) fn render_target(
@@ -27,10 +28,16 @@ fn render_scoped_compose(
     target: &crate::manifest::ManifestTarget,
     output: &Path,
 ) -> PrayResult<RenderedTarget> {
-    let mut builder = ContentBuilder::with_capacity(8_192);
+    let estimated_bytes = 256usize.saturating_mul(target.entries.len().max(1));
+    let mut builder = ContentBuilder::with_capacity(estimated_bytes.max(8_192));
     append_compose_header(&mut builder, project, target, output);
 
-    let mut managed_spans = Vec::new();
+    let packages_by_name: HashMap<&str, &ResolvedPackage> = project
+        .packages
+        .iter()
+        .map(|package| (package.declaration.name.as_str(), package))
+        .collect();
+    let mut managed_spans = Vec::with_capacity(target.entries.len());
     for entry in &target.entries {
         match entry {
             DestinationEntry::Local { path } => {
@@ -51,11 +58,7 @@ fn render_scoped_compose(
                 )?;
             }
             DestinationEntry::Package { name } => {
-                let Some(package) = project
-                    .packages
-                    .iter()
-                    .find(|package| package.declaration.name == *name)
-                else {
+                let Some(package) = packages_by_name.get(name.as_str()) else {
                     continue;
                 };
                 if !package_matches_environment(
@@ -94,7 +97,14 @@ fn render_legacy_compose(
     target: &crate::manifest::ManifestTarget,
     output: &Path,
 ) -> PrayResult<RenderedTarget> {
-    let mut builder = ContentBuilder::with_capacity(8_192);
+    let estimated_bytes = 256usize.saturating_mul(
+        project
+            .packages
+            .len()
+            .saturating_add(project.local_files.len())
+            .max(1),
+    );
+    let mut builder = ContentBuilder::with_capacity(estimated_bytes.max(8_192));
     append_compose_header(&mut builder, project, target, output);
 
     let unbound_locals: Vec<_> = project
@@ -114,7 +124,14 @@ fn render_legacy_compose(
         builder.append_line("## Additional instructions");
         builder.append_empty_line();
     }
-    let mut managed_spans = Vec::new();
+    let mut managed_spans = Vec::with_capacity(
+        project
+            .packages
+            .iter()
+            .map(|package| package.selected_exports.len())
+            .sum::<usize>()
+            .saturating_add(unbound_locals.len()),
+    );
     for local in unbound_locals {
         if local.content.is_empty() && local.optional {
             continue;

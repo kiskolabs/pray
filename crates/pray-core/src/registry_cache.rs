@@ -57,7 +57,7 @@ pub(crate) fn registry_cache_matches_selected(
     })?;
     let spec_path = find_prayspec_file(cache_directory)?;
     let spec_text = fs::read_to_string(&spec_path)?;
-    let spec = parse_package_spec(&spec_text)?.canonicalized();
+    let spec = parse_package_spec(&spec_text)?;
     if spec.version != selected.version {
         return Ok(false);
     }
@@ -111,7 +111,7 @@ pub(crate) fn validate_and_unpack_registry_package(
 
     let spec_path = find_prayspec_file(cache_directory)?;
     let spec_text = fs::read_to_string(&spec_path)?;
-    let spec = parse_package_spec(&spec_text)?.canonicalized();
+    let spec = parse_package_spec(&spec_text)?;
 
     if spec.name != declaration.name {
         return Err(PrayError::Resolution(format!(
@@ -186,7 +186,7 @@ pub(crate) fn try_vendored_package_root(
     })?;
     let spec_path = find_prayspec_file(&vendored)?;
     let spec_text = fs::read_to_string(&spec_path)?;
-    let spec = parse_package_spec(&spec_text)?.canonicalized();
+    let spec = parse_package_spec(&spec_text)?;
     if spec.name != package_name {
         return Err(PrayError::Integrity(format!(
             "vendored package declares {:?}, expected {package_name}",

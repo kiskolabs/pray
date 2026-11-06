@@ -67,6 +67,11 @@ pub(crate) fn read_declared_file(
     }
     for (index, part) in parts.iter().enumerate() {
         current.push(part);
+        let last = index + 1 == parts.len();
+        // Final leaf: open with O_NOFOLLOW instead of a separate metadata probe.
+        if last {
+            return read_without_following(&current, label, relative);
+        }
         let metadata = match fs::symlink_metadata(&current) {
             Ok(metadata) => metadata,
             Err(error) if error.kind() == ErrorKind::NotFound => return Ok(DeclaredRead::Missing),
@@ -77,25 +82,11 @@ pub(crate) fn read_declared_file(
                 "{label} is a symbolic link: {relative}"
             )));
         }
-        let last = index + 1 == parts.len();
-        if metadata.is_dir() {
-            if last {
-                return Err(PrayError::Integrity(format!(
-                    "{label} is a directory: {relative}"
-                )));
-            }
-            continue;
-        }
-        if !last || !metadata.is_file() {
-            if last {
-                return Err(PrayError::Integrity(format!(
-                    "{label} is not a regular file: {relative}"
-                )));
-            }
+        if !metadata.is_dir() {
             return Ok(DeclaredRead::Missing);
         }
     }
-    read_without_following(&current, label, relative)
+    Ok(DeclaredRead::Missing)
 }
 
 fn read_without_following(path: &Path, label: &str, relative: &str) -> PrayResult<DeclaredRead> {

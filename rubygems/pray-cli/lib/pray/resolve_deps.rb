@@ -5,6 +5,8 @@ module Pray
     module_function
 
     def reject_dependency_cycles(packages)
+      return if packages.all? { |package| package.spec.dependencies.all?(&:optional) }
+
       edges = {}
       packages.each do |package|
         edges[package.declaration.name] = package.spec.dependencies.reject(&:optional).map(&:name)
@@ -16,6 +18,8 @@ module Pray
     end
 
     def validate_optional_referrals(packages)
+      return if packages.all? { |package| package.spec.dependencies.none?(&:optional) }
+
       packages_by_name = packages.to_h { |package| [package.declaration.name, package] }
       packages.each do |package|
         package.spec.dependencies.select(&:optional).each do |dependency|

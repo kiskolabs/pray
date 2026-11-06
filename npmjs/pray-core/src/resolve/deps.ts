@@ -7,6 +7,13 @@ import { findDependencyCycle } from "./dependency-graph.js";
 import type { ResolvedPackage } from "./types.js";
 
 export function rejectDependencyCycles(packages: ResolvedPackage[]): void {
+  if (
+    packages.every((packageEntry) =>
+      packageEntry.spec.dependencies.every((dependency) => dependency.optional),
+    )
+  ) {
+    return;
+  }
   const edges = new Map<string, string[]>();
   for (const packageEntry of packages) {
     edges.set(
@@ -26,6 +33,15 @@ export function rejectDependencyCycles(packages: ResolvedPackage[]): void {
 }
 
 export function validateOptionalReferrals(packages: ResolvedPackage[]): void {
+  if (
+    packages.every((packageEntry) =>
+      packageEntry.spec.dependencies.every(
+        (dependency) => !dependency.optional,
+      ),
+    )
+  ) {
+    return;
+  }
   const packagesByName = new Map(
     packages.map((packageEntry) => [
       packageEntry.declaration.name,

@@ -1,7 +1,7 @@
 PATH
   remote: .
   specs:
-    pray-cli (1.26.1)
+    pray-cli (1.26.2)
       base64 (~> 0.2)
       perfect_toml (~> 0.9, >= 0.9.1)
 
@@ -127,7 +127,7 @@ CHECKSUMS
   parser (3.3.13.0) sha256=e02f9b63c2fe05b0c68f692ba4df89b3cb113b663964f75d988fbebfd6c3deca
   perfect_toml (0.9.1) sha256=f494a27922eda2ad848f23d4087470261e75cf0045cbbdbcc74a16fd156bbf87
   polyrun (2.2.8) sha256=4ba0deb6b0b859aed7e1185a28a50c5aec7ee0a5eb19d28fc1b943766646d976
-  pray-cli (1.26.1)
+  pray-cli (1.26.2)
   prism (1.9.0) sha256=7b530c6a9f92c24300014919c9dcbc055bf4cdf51ec30aed099b06cd6674ef85
   racc (1.8.1) sha256=4a7f6929691dbec8b5209a0b373bc2614882b55fc5d2e447a21aaa691303d62f
   rainbow (3.1.1) sha256=039491aa3a89f42efa1d6dec2fc4e62ede96eb6acd95e52f1ad581182b79bc6a

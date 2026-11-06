@@ -2,6 +2,10 @@
 
 ## Unreleased
 
+## 1.26.2 (2026-11-06)
+
+- Reduce wall and CPU time for package resolve, tree hashing, and related install helpers without changing results.
+
 ## 1.26.1 (2026-11-02)
 
 - Treat optional package declarations as versioned referrals: do not select their targets or show them as dependency-tree edges, exclude them from dependency cycles, and validate their constraints when another declaration selects the target.

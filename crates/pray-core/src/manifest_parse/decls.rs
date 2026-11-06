@@ -111,6 +111,13 @@ pub(super) fn parse_group_header(rest: &str) -> PrayResult<(Vec<String>, bool)> 
 
 pub(super) fn parse_package_decl(rest: &str) -> PrayResult<ManifestPackage> {
     let (values, keywords) = parse_call(rest)?;
+    package_from_call(values, keywords)
+}
+
+pub(super) fn package_from_call(
+    values: Vec<crate::literal::LiteralValue>,
+    keywords: std::collections::BTreeMap<String, crate::literal::LiteralValue>,
+) -> PrayResult<ManifestPackage> {
     if values.is_empty() {
         return Err(PrayError::Parse {
             kind: "manifest",

@@ -96,11 +96,8 @@ pub fn find_top_level(input: &str, token: &str) -> Option<usize> {
     let mut depth = 0i32;
     let mut quote: Option<char> = None;
     let mut escaped = false;
-    let characters: Vec<(usize, char)> = input.char_indices().collect();
 
-    let mut index = 0usize;
-    while index < characters.len() {
-        let (byte_index, character) = characters[index];
+    for (byte_index, character) in input.char_indices() {
         if let Some(quote_char) = quote {
             if escaped {
                 escaped = false;
@@ -109,7 +106,6 @@ pub fn find_top_level(input: &str, token: &str) -> Option<usize> {
             } else if character == quote_char {
                 quote = None;
             }
-            index += 1;
             continue;
         }
 
@@ -120,7 +116,6 @@ pub fn find_top_level(input: &str, token: &str) -> Option<usize> {
             _ if depth == 0 && input[byte_index..].starts_with(token) => return Some(byte_index),
             _ => {}
         }
-        index += 1;
     }
     None
 }

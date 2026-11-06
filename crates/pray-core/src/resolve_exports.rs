@@ -161,6 +161,13 @@ pub(crate) fn load_export_bodies(
 }
 
 pub(crate) fn build_skill_file_index(spec: &PackageSpec) -> BTreeMap<String, Vec<String>> {
+    let has_folder_export = spec
+        .exports
+        .values()
+        .any(|export| matches!(export.kind.as_str(), "folder" | "skill"));
+    if !has_folder_export && spec.skills.is_empty() {
+        return BTreeMap::new();
+    }
     let mut index = BTreeMap::new();
     for (export_name, export) in &spec.exports {
         if !matches!(export.kind.as_str(), "folder" | "skill") {
@@ -196,8 +203,12 @@ pub(crate) fn indexed_files_under_prefix(files: &[String], prefix: &str) -> Vec<
 }
 
 pub(crate) fn skill_relative_file(file: &str, skill_prefix: &str) -> Option<String> {
-    let prefix = format!("{}/", skill_prefix.trim_end_matches('/'));
-    file.strip_prefix(&prefix).map(ToString::to_string)
+    let skill_prefix = skill_prefix.trim_end_matches('/');
+    let relative = file.strip_prefix(skill_prefix)?.strip_prefix('/')?;
+    if relative.is_empty() {
+        return None;
+    }
+    Some(relative.to_string())
 }
 
 #[cfg(test)]

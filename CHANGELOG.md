@@ -2,6 +2,10 @@
 
 ## Unreleased
 
+## 1.26.2 (2026-11-06)
+
+- Reduce wall and CPU time for package resolve, tree hashing, and related install work in the Rust, Ruby, and TypeScript CLIs without changing install results.
+
 ## 1.26.1 (2026-11-02)
 
 - Separate required dependencies, optional versioned referrals, and advisory related prayers. Do not install an optional referral or count it as a dependency-cycle edge; validate its constraint when another declaration selects the target.

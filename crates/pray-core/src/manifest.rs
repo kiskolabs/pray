@@ -176,31 +176,29 @@ impl Default for RenderPolicy {
 }
 
 impl Manifest {
-    pub fn canonicalized(&self) -> Self {
-        let mut manifest = self.clone();
-        manifest
-            .sources
+    pub fn into_canonicalized(mut self) -> Self {
+        self.sources
             .sort_by(|left, right| left.name.cmp(&right.name));
-        manifest
-            .targets
+        self.targets
             .sort_by(|left, right| left.name.cmp(&right.name));
-        manifest.packages.sort_by(|left, right| {
+        self.packages.sort_by(|left, right| {
             left.name
                 .cmp(&right.name)
                 .then(left.source.cmp(&right.source))
                 .then(left.constraint.cmp(&right.constraint))
         });
-        manifest
-            .local
-            .sort_by(|left, right| left.path.cmp(&right.path));
-        manifest
-            .publish_remotes
+        self.local.sort_by(|left, right| left.path.cmp(&right.path));
+        self.publish_remotes
             .sort_by(|left, right| left.name.cmp(&right.name));
-        manifest
+        self
+    }
+
+    pub fn canonicalized(&self) -> Self {
+        self.clone().into_canonicalized()
     }
 
     pub fn manifest_hash(&self) -> PrayResult<String> {
-        let canonical = self.canonicalized();
+        let canonical = self.clone().into_canonicalized();
         let bytes = serde_json::to_vec(&canonical)
             .map_err(|error| PrayError::Manifest(error.to_string()))?;
         Ok(sha256_prefixed(&bytes))

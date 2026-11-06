@@ -24,6 +24,8 @@ module Pray
     end
 
     def normalize_line_endings(text)
+      return text unless text.include?("\r")
+
       text.gsub("\r\n", "\n").tr("\r", "\n")
     end
 

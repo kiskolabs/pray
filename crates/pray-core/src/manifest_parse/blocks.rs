@@ -1,5 +1,5 @@
 use super::call::{parse_call, string_from_literal, string_from_value};
-use super::decls::{parse_local_decl, parse_package_decl};
+use super::decls::{package_from_call, parse_local_decl};
 use super::policy::destination_header_keyword;
 use super::BlockParser;
 use crate::manifest::{DestinationMode, ExportRole, Manifest};
@@ -218,7 +218,7 @@ impl BlockParser<'_> {
             return Ok(());
         }
 
-        let mut package = parse_package_decl(rest)?;
+        let mut package = package_from_call(values, keywords)?;
         package.groups = self.group_stack.last().cloned().unwrap_or_default();
         if package.file.is_some() {
             if destination_index.is_some() {

@@ -1,4 +1,4 @@
-.PHONY: build clean install bench bench-compat bench-scaling size-check ruby-test loc-check rfc-ids audit audit-rust audit-ruby audit-npm \
+.PHONY: build clean install bench bench-compat bench-scaling pressure-bench size-check ruby-test loc-check rfc-ids audit audit-rust audit-ruby audit-npm \
 	libyears libyears-rust libyears-ruby libyears-npm bump-homebrew bump-aur \
 	release-dry-run release-crates release-npm release-jsr release-rubygems release-distribution release-all \
 	release-github release-github-sync \
@@ -40,6 +40,13 @@ bench-compat:
 
 bench-scaling:
 	cargo test -p pray-bench -- --ignored --nocapture
+
+# Load ladder across rust/ruby/npm + optional ceiling gate.
+# Example: make pressure-bench PRESSURE_ARGS='--gate'
+# Subset: PRAY_PRESSURE_IMPLS=rust make pressure-bench
+PRESSURE_ARGS ?=
+pressure-bench:
+	ruby scripts/pressure-bench.rb $(PRESSURE_ARGS)
 
 size-check:
 	ruby scripts/check-package-sizes.rb

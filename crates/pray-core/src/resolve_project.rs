@@ -18,7 +18,11 @@ pub fn resolve_manifest_in_context(
 ) -> PrayResult<ResolvedProject> {
     let user_config = crate::config::load_user_config()?;
     let lockfile_path = project_root.join("Prayfile.lock");
-    let lockfile_hints = crate::lockfile::read_lockfile(&lockfile_path).ok();
+    let lockfile_hints = if lockfile_path.is_file() {
+        crate::lockfile::read_lockfile(&lockfile_path).ok()
+    } else {
+        None
+    };
     crate::environment::validate_environment(&manifest, options.environment.as_deref())?;
     let manifest_hash = manifest.manifest_hash()?;
     let sources = source_map(&manifest.sources);

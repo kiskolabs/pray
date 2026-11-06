@@ -3,6 +3,15 @@ use crate::{PrayError, PrayResult};
 use std::collections::BTreeMap;
 
 pub(crate) fn reject_dependency_cycles(packages: &[ResolvedPackage]) -> PrayResult<()> {
+    if packages.iter().all(|package| {
+        package
+            .spec
+            .dependencies
+            .iter()
+            .all(|dependency| dependency.optional)
+    }) {
+        return Ok(());
+    }
     let mut edges = BTreeMap::new();
     for package in packages {
         edges.insert(
@@ -26,6 +35,15 @@ pub(crate) fn reject_dependency_cycles(packages: &[ResolvedPackage]) -> PrayResu
 }
 
 pub(crate) fn validate_optional_referrals(packages: &[ResolvedPackage]) -> PrayResult<()> {
+    if packages.iter().all(|package| {
+        package
+            .spec
+            .dependencies
+            .iter()
+            .all(|dependency| !dependency.optional)
+    }) {
+        return Ok(());
+    }
     let packages_by_name: BTreeMap<_, _> = packages
         .iter()
         .map(|package| (package.declaration.name.as_str(), package))

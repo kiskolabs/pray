@@ -13,6 +13,9 @@ export function markerId(seed: string): string {
 }
 
 export function normalizeLineEndings(text: string): string {
+  if (!text.includes("\r")) {
+    return text;
+  }
   return text.replace(/\r\n/g, "\n").replace(/\r/g, "\n");
 }
 

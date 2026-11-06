@@ -1,0 +1,60 @@
+{
+  "version": 2,
+  "headroom": 1.15,
+  "implementations": {
+    "rust": {
+      "version": 1,
+      "headroom": 1.15,
+      "loads": {
+        "1": {
+          "wall_ms": 3,
+          "cpu_ms": 3,
+          "peak_rss_bytes": 4371252,
+          "resolve_p95_us": 114
+        },
+        "10": {
+          "wall_ms": 13,
+          "cpu_ms": 13,
+          "peak_rss_bytes": 5143757,
+          "resolve_p95_us": 807
+        }
+      }
+    },
+    "ruby": {
+      "version": 1,
+      "headroom": 1.15,
+      "loads": {
+        "1": {
+          "wall_ms": 16,
+          "cpu_ms": 16,
+          "peak_rss_bytes": 37513626,
+          "resolve_p95_us": 2038
+        },
+        "10": {
+          "wall_ms": 84,
+          "cpu_ms": 84,
+          "peak_rss_bytes": 38097716,
+          "resolve_p95_us": 4672
+        }
+      }
+    },
+    "npm": {
+      "version": 1,
+      "headroom": 1.15,
+      "loads": {
+        "1": {
+          "wall_ms": 17,
+          "cpu_ms": 30,
+          "peak_rss_bytes": 81791386,
+          "resolve_p95_us": 1320
+        },
+        "10": {
+          "wall_ms": 42,
+          "cpu_ms": 71,
+          "peak_rss_bytes": 87801856,
+          "resolve_p95_us": 3039
+        }
+      }
+    }
+  }
+}

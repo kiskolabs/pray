@@ -5,16 +5,17 @@ import type { PackageSpec } from "./types.js";
 import { validateRelativePaths } from "./validate-paths.js";
 
 export function treeHashFromFileBytes(fileBytes: Map<string, Buffer>): string {
-  const entries = [...fileBytes.entries()]
-    .map(
-      ([path, bytes]) =>
-        [Buffer.from(path, "utf8"), path, sha256Prefixed(bytes)] as const,
-    )
-    .sort(([left], [right]) => Buffer.compare(left, right));
-
+  // Sort UTF-8 path bytes the same way as the prior Buffer.compare path.
+  const paths = [...fileBytes.keys()].sort((left, right) =>
+    Buffer.compare(Buffer.from(left, "utf8"), Buffer.from(right, "utf8")),
+  );
   let serialized = "";
-  for (const [, path, hash] of entries) {
-    serialized += `file\0regular\0${path}\0${hash}\n`;
+  for (const path of paths) {
+    const bytes = fileBytes.get(path);
+    if (bytes === undefined) {
+      throw PrayError.integrity(`package file missing: ${path}`);
+    }
+    serialized += `file\0regular\0${path}\0${sha256Prefixed(bytes)}\n`;
   }
   return sha256Prefixed(serialized);
 }

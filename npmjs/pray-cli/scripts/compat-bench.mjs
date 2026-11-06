@@ -7,8 +7,8 @@ import {
   renderProject,
   resolveProject,
   serializeLockfile,
-} from "../dist/index.js";
-import { sha256Prefixed } from "../dist/hashing.js";
+} from "../../pray-core/dist/index.js";
+import { sha256Prefixed } from "../../pray-core/dist/hashing.js";
 
 const ITERATIONS = Number(process.env.PRAY_BENCH_ITERATIONS ?? "500");
 const WARMUP = Number(process.env.PRAY_BENCH_WARMUP ?? "20");

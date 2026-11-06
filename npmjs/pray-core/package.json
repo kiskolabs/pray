@@ -1,6 +1,6 @@
 {
   "name": "pray-core",
-  "version": "1.26.1",
+  "version": "1.26.2",
   "description": "Prayfile core library — package manager for the language placed before inference",
   "author": "Andrei Makarov <contact@kiskolabs.com>",
   "license": "MIT",

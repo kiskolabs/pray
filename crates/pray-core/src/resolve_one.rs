@@ -51,7 +51,7 @@ pub(in crate::resolve) fn resolve_package(
             )));
         }
     };
-    let spec = parse_package_spec(&spec_text)?.canonicalized();
+    let spec = parse_package_spec(&spec_text)?;
     if spec.name != declaration.name {
         return Err(PrayError::Resolution(format!(
             "package path {:?} declares {:?}, expected {:?}",
@@ -64,7 +64,6 @@ pub(in crate::resolve) fn resolve_package(
     let tree_hash = PackageSpec::tree_hash_from_file_bytes(&file_bytes)?;
     let export_bodies = load_export_bodies(&file_bytes, &spec, &selected_exports)?;
     let skill_files = build_skill_file_index(&spec);
-    let source_checksum = tree_hash.clone();
     let upstream_context = super::resolve_upstream::UpstreamResolutionContext::new(
         project_root,
         sources,
@@ -75,18 +74,19 @@ pub(in crate::resolve) fn resolve_package(
     );
     let upstream =
         super::resolve_upstream::lock_path_upstream(&upstream_context, declaration, &spec)?;
+    let artifact = format!(
+        "path:{}",
+        spec_path.parent().unwrap_or(&spec_path).to_string_lossy()
+    );
     Ok(ResolvedPackage {
         declaration: declaration.clone(),
         root,
-        spec: spec.clone(),
+        spec,
         tree_hash: tree_hash.clone(),
         artifact_hash: tree_hash.clone(),
-        artifact: format!(
-            "path:{}",
-            spec_path.parent().unwrap_or(&spec_path).to_string_lossy()
-        ),
+        artifact,
         selected_exports,
-        source_checksum,
+        source_checksum: tree_hash,
         export_bodies,
         skill_files,
         signer_fingerprint,

@@ -100,7 +100,7 @@ impl<'a> BlockParser<'a> {
         let mut spec = PackageSpec::default();
         while let Some(statement) = self.next_statement()? {
             if statement == "end" {
-                let package = spec.canonicalized();
+                let package = spec.into_canonicalized();
                 package.validate_relative_paths()?;
                 crate::package_relation::validate(&package.related)?;
                 return Ok(package);

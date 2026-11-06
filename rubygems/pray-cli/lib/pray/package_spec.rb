@@ -54,27 +54,6 @@ module Pray
         copy.dependencies = dependencies.sort_by { |dependency| [dependency.name, dependency.constraint, dependency.optional] }
       end
     end
-
-    def tree_hash_for_root(root)
-      validate_relative_paths!
-      file_bytes = {}
-      files.each do |file|
-        path = File.join(root, file)
-        raise Error.integrity("package file missing: #{file}") unless File.exist?(path)
-        raise Error.integrity("package file is a directory: #{file}") if File.directory?(path)
-
-        file_bytes[file] = File.binread(path)
-      end
-      self.class.tree_hash_from_file_bytes(file_bytes)
-    end
-
-    def self.tree_hash_from_file_bytes(file_bytes)
-      entries = file_bytes.map { |path, bytes| [path, Hashing.sha256_prefixed(bytes)] }.sort_by(&:first)
-      serialized = entries.map do |path, hash|
-        "file\0regular\0#{path}\0#{hash}\n"
-      end.join
-      Hashing.sha256_prefixed(serialized)
-    end
   end
 
   module PackageSpecParser
