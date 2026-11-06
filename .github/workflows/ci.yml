@@ -50,13 +50,13 @@ jobs:
             *) echo "::error::pray drift could not run (exit $status) - infrastructure, not drift."; exit 1 ;;
           esac
       - name: Install cargo-llvm-cov
-        uses: taiki-e/install-action@68a389c788b2cd04016ce8c80ee23b80d2ab3d68 # v2
+        uses: taiki-e/install-action@b80e2bb2635f28eb98b9fce1e2f0887e1535c6b2 # v2
         with:
           tool: cargo-llvm-cov
       - name: Rust coverage floor
         run: cargo llvm-cov --workspace --lcov --output-path lcov.info --fail-under-lines 65
       - name: Install cargo-mutants
-        uses: taiki-e/install-action@68a389c788b2cd04016ce8c80ee23b80d2ab3d68 # v2
+        uses: taiki-e/install-action@b80e2bb2635f28eb98b9fce1e2f0887e1535c6b2 # v2
         with:
           tool: cargo-mutants
       - name: Mutation smoke on manifest and archive boundaries
@@ -64,7 +64,7 @@ jobs:
           cargo mutants -p pray-core --timeout 60 --jobs 2
           -f 'manifest_validate.rs' -f 'package_archive.rs'
           -F '(manifest_validate.rs.*replace != with ==|package_archive.rs:12:36: replace > with ==)'
-      - uses: SonarSource/sonarqube-scan-action@4d1dc0c91ee400dcf8a6dddf2f705ac36542e304 # v8.4.0
+      - uses: SonarSource/sonarqube-scan-action@e805d875275f728fac1885b413934be6d7c63f65 # v8.4.1
         continue-on-error: true
         env:
           SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
