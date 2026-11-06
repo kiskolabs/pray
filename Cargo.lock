@@ -53,12 +53,6 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "940b3a0ca603d1eade50a4846a2afffd5ef57a9feac2c0e2ec2e14f9ead76000"
 
 [[package]]
-name = "anyhow"
-version = "1.0.104"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "330a5ed07fa54e4702c9d6c4174f74427fc0ef6e214bbd677ae50a5099946470"
-
-[[package]]
 name = "async-trait"
 version = "0.1.92"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -1475,14 +1469,12 @@ dependencies = [
 name = "pray-transport"
 version = "1.26.1"
 dependencies = [
- "anyhow",
  "async-trait",
  "pray-core",
  "reqwest",
  "serde",
  "serde_json",
  "sha2",
- "thiserror",
  "tokio",
  "tokio-test",
 ]

@@ -72,7 +72,7 @@ impl HttpTransport {
         builder = builder.default_headers(headers);
 
         let client = builder.build().map_err(|e| {
-            TransportError::Other(anyhow::anyhow!("Failed to create HTTP client: {}", e))
+            TransportError::Other(format!("Failed to create HTTP client: {e}"))
         })?;
 
         Ok(Self { client })

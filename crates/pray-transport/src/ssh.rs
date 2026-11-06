@@ -80,7 +80,7 @@ impl TransportAdapter for SshTransport {
             })
         })
         .await
-        .map_err(|error| TransportError::Other(anyhow::anyhow!("ssh task failed: {error}")))?
+        .map_err(|error| TransportError::Other(format!("ssh task failed: {error}")))?
     }
 
     async fn fetch_index(&self, peer: &PeerConfig, since: Option<i64>) -> Result<IndexResponse> {
@@ -98,7 +98,7 @@ impl TransportAdapter for SshTransport {
             })
         })
         .await
-        .map_err(|error| TransportError::Other(anyhow::anyhow!("ssh task failed: {error}")))?
+        .map_err(|error| TransportError::Other(format!("ssh task failed: {error}")))?
     }
 
     async fn fetch_package(&self, peer: &PeerConfig, name: &str) -> Result<PackageMetadata> {
@@ -114,7 +114,7 @@ impl TransportAdapter for SshTransport {
             })
         })
         .await
-        .map_err(|error| TransportError::Other(anyhow::anyhow!("ssh task failed: {error}")))?
+        .map_err(|error| TransportError::Other(format!("ssh task failed: {error}")))?
     }
 
     async fn fetch_artifact(&self, peer: &PeerConfig, artifact: &ArtifactRef) -> Result<Vec<u8>> {
@@ -130,7 +130,7 @@ impl TransportAdapter for SshTransport {
             })
         })
         .await
-        .map_err(|error| TransportError::Other(anyhow::anyhow!("ssh task failed: {error}")))?
+        .map_err(|error| TransportError::Other(format!("ssh task failed: {error}")))?
     }
 
     async fn push_package(&self, peer: &PeerConfig, metadata: &PackageMetadata) -> Result<()> {
@@ -143,7 +143,7 @@ impl TransportAdapter for SshTransport {
             })
         })
         .await
-        .map_err(|error| TransportError::Other(anyhow::anyhow!("ssh task failed: {error}")))?
+        .map_err(|error| TransportError::Other(format!("ssh task failed: {error}")))?
     }
 }
 

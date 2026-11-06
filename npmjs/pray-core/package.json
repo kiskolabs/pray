@@ -46,7 +46,7 @@
     "typecheck": "tsc -p tsconfig.json --noEmit",
     "lint": "biome check . && npm run lint:cycles",
     "libyears": "libyear --dev --quiet",
-    "lint:cycles": "madge --circular --extensions ts --ts-config tsconfig.json src/index.ts src/parse.ts",
+    "lint:cycles": "node ../scripts/check-import-cycles.mjs src src/index.ts src/parse.ts",
     "format": "biome format --write .",
     "format:check": "biome format ."
   },
@@ -62,7 +62,6 @@
     "@types/node": "^22.15.0",
     "@types/semver": "^7.8.0",
     "libyear": "^0.9.3",
-    "madge": "^8.0.0",
     "typescript": "~5.9.3"
   },
   "overrides": {

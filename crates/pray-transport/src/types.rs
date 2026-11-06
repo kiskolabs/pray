@@ -1,40 +1,9 @@
 use async_trait::async_trait;
+
+pub use crate::error::{Result, TransportError};
 use pray_core::derived_metadata::RegistryDerivedMetadata;
 use serde::{Deserialize, Serialize};
 use std::fmt;
-
-/// Core error type for transport operations
-#[derive(Debug, thiserror::Error)]
-pub enum TransportError {
-    #[error("Network error: {0}")]
-    Network(String),
-
-    #[error("Timeout: {0}")]
-    Timeout(String),
-
-    #[error("Authentication failed: {0}")]
-    Authentication(String),
-
-    #[error("Not found: {0}")]
-    NotFound(String),
-
-    #[error("Invalid response: {0}")]
-    InvalidResponse(String),
-
-    #[error("Transport not capable: {0}")]
-    NotCapable(String),
-
-    #[error("IO error: {0}")]
-    Io(#[from] std::io::Error),
-
-    #[error("JSON error: {0}")]
-    Json(#[from] serde_json::Error),
-
-    #[error(transparent)]
-    Other(#[from] anyhow::Error),
-}
-
-pub type Result<T> = std::result::Result<T, TransportError>;
 
 /// Transport capabilities declaration
 #[derive(Debug, Clone, Serialize, Deserialize)]
