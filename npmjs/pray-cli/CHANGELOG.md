@@ -2,6 +2,10 @@
 
 ## Unreleased
 
+## 1.26.3 (2026-11-12)
+
+- Allow `pray install` to refresh the lock when a managed span already matches the fresh render but the lock ideal is stale. Keep failing when the on-disk body matches neither, and name move-aside recovery instead of a force flag.
+
 ## 1.26.2 (2026-11-06)
 
 - Reduce wall and CPU time for resolve and tree hashing through the shared `pray-core` path without changing install results.

@@ -10,6 +10,15 @@ pub(crate) fn reject_managed_span_conflicts(
     lockfile: &Lockfile,
     rendered: &[RenderedTarget],
 ) -> PrayResult<()> {
+    let fresh_ideals: BTreeMap<&str, &str> = rendered
+        .iter()
+        .flat_map(|target| {
+            target
+                .managed_spans
+                .iter()
+                .map(|span| (span.id.as_str(), span.ideal_checksum.as_str()))
+        })
+        .collect();
     let active_by_target: BTreeMap<&str, BTreeSet<&str>> = rendered
         .iter()
         .map(|target| {
@@ -54,12 +63,20 @@ pub(crate) fn reject_managed_span_conflicts(
             let Some((_, _, checksum)) = markers.get(&span.id) else {
                 continue;
             };
-            if checksum != &span.ideal_checksum {
-                return Err(PrayError::Render(format!(
-                    "conflict: managed span `{}` in `{}` was edited (`{}::{}`)",
-                    span.id, target_path, span.package, span.export
-                )));
+            if checksum == &span.ideal_checksum {
+                continue;
             }
+            if fresh_ideals
+                .get(span.id.as_str())
+                .is_some_and(|fresh| checksum == *fresh)
+            {
+                continue;
+            }
+            return Err(PrayError::Render(format!(
+                "conflict: managed span `{}` in `{}` differs from lock and from fresh render (`{}::{}`).\n\
+                 Move the destination aside and rerun `pray install`, or restore the managed block to the locked bytes.",
+                span.id, target_path, span.package, span.export
+            )));
         }
     }
     Ok(())

@@ -1,6 +1,7 @@
 import assert from "node:assert/strict";
 import {
   existsSync,
+  mkdirSync,
   mkdtempSync,
   readFileSync,
   rmSync,
@@ -121,6 +122,48 @@ describe("render --check", () => {
 
       assert.equal(await runCli(["--path", root, "render"]), 5);
       assert.equal(readFileSync(destination, "utf8"), edited);
+    } finally {
+      rmSync(root, { recursive: true, force: true });
+    }
+  });
+
+  it("adopts when dest matches fresh despite a stale lock", async () => {
+    const root = mkdtempSync(join(tmpdir(), "pray-render-adopt-"));
+    try {
+      const agentsDir = join(root, ".agents");
+      mkdirSync(agentsDir, { recursive: true });
+      writeFileSync(
+        join(root, "Prayfile"),
+        `
+prayfile "1"
+compose "AGENTS.md" do
+  pray ".agents/project.md"
+end
+`,
+      );
+      writeFileSync(join(agentsDir, "project.md"), "Local guidance\n");
+
+      assert.equal(await runCli(["--path", root, "install"]), 0);
+      const lockPath = join(root, "Prayfile.lock");
+      const staleLock = readFileSync(lockPath, "utf8");
+      const destination = join(root, "AGENTS.md");
+
+      writeFileSync(
+        join(agentsDir, "project.md"),
+        "Local guidance\nAdopted local guidance\n",
+      );
+      writeFileSync(
+        destination,
+        readFileSync(destination, "utf8").replace(
+          "Local guidance\n",
+          "Local guidance\nAdopted local guidance\n",
+        ),
+      );
+      writeFileSync(lockPath, staleLock);
+
+      assert.equal(await runCli(["--path", root, "install"]), 0);
+      assert.notEqual(readFileSync(lockPath, "utf8"), staleLock);
+      assert.match(readFileSync(destination, "utf8"), /Adopted local guidance/);
     } finally {
       rmSync(root, { recursive: true, force: true });
     }

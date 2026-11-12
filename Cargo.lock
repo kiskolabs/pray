@@ -1419,7 +1419,7 @@ dependencies = [
 
 [[package]]
 name = "pray-bench"
-version = "1.26.2"
+version = "1.26.3"
 dependencies = [
  "criterion",
  "libc",
@@ -1430,7 +1430,7 @@ dependencies = [
 
 [[package]]
 name = "pray-cli"
-version = "1.26.2"
+version = "1.26.3"
 dependencies = [
  "base64",
  "ed25519-dalek",
@@ -1446,7 +1446,7 @@ dependencies = [
 
 [[package]]
 name = "pray-core"
-version = "1.26.2"
+version = "1.26.3"
 dependencies = [
  "base64",
  "ed25519-dalek",
@@ -1467,7 +1467,7 @@ dependencies = [
 
 [[package]]
 name = "pray-transport"
-version = "1.26.2"
+version = "1.26.3"
 dependencies = [
  "async-trait",
  "pray-core",

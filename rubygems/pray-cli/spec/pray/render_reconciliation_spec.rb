@@ -77,9 +77,33 @@ RSpec.describe "render reconciliation" do
     edited = File.read(destination).sub("One body", "Manual one body")
     File.write(destination, edited)
 
-    _stdout, _stderr, status = run_pray("render")
+    _stdout, stderr, status = run_pray("render")
     expect(status).not_to be_success
+    expect(stderr).to include("differs from lock and from fresh render")
+    expect(stderr).to include("Move the destination aside and rerun `pray install`")
+    expect(stderr).not_to include("--force")
     expect(File.read(destination)).to eq(edited)
+  end
+
+  it "adopts when dest matches fresh despite a stale lock" do
+    write_local_compose_project
+    _stdout, stderr, status = run_pray("install")
+    expect(status).to be_success, stderr
+    lock_path = File.join(workspace, "Prayfile.lock")
+    stale_lock = File.read(lock_path)
+    destination = File.join(workspace, "AGENTS.md")
+
+    File.write(File.join(workspace, ".agents/project.md"), "Local guidance\nAdopted local guidance\n")
+    File.write(
+      destination,
+      File.read(destination).sub("Local guidance\n", "Local guidance\nAdopted local guidance\n")
+    )
+    File.write(lock_path, stale_lock)
+
+    _stdout, stderr, status = run_pray("install")
+    expect(status).to be_success, stderr
+    expect(File.read(lock_path)).not_to eq(stale_lock)
+    expect(File.read(destination)).to include("Adopted local guidance")
   end
 
   it "preserves an edited span retired by the previous lock" do
@@ -138,6 +162,17 @@ RSpec.describe "render reconciliation" do
     PRAYFILE
     write_package("one", "One body")
     write_package("two", "Two body")
+  end
+
+  def write_local_compose_project
+    FileUtils.mkdir_p(File.join(workspace, ".agents"))
+    File.write(File.join(workspace, "Prayfile"), <<~PRAYFILE)
+      prayfile "1"
+      compose "AGENTS.md" do
+        pray ".agents/project.md"
+      end
+    PRAYFILE
+    File.write(File.join(workspace, ".agents/project.md"), "Local guidance\n")
   end
 
   def write_package(name, body)

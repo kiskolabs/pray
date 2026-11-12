@@ -31,6 +31,9 @@ module Pray
     end
 
     def reject_managed_span_conflicts!(project, rendered, previous_lockfile)
+      fresh_ideals = rendered.each_with_object({}) do |target, ideals|
+        target.managed_spans.each { |span| ideals[span.id] = span.ideal_checksum }
+      end
       active_by_target = rendered.to_h do |target|
         [target.path, target.managed_spans.to_h { |span| [span.id, true] }]
       end
@@ -47,11 +50,16 @@ module Pray
         bodies = RenderPatch.managed_bodies(RenderPatch.split_segments(content))
         spans.each do |span|
           next unless active[span.id] && bodies.key?(span.id)
-          next if Hashing.checksum_managed_span_content(bodies[span.id]) == span.ideal_checksum
+
+          checksum = Hashing.checksum_managed_span_content(bodies[span.id])
+          next if checksum == span.ideal_checksum
+          next if checksum == fresh_ideals[span.id]
 
           raise Error.render(
-            "conflict: managed span `#{span.id}` in `#{target_path}` was edited " \
-            "(`#{span.package}::#{span.export}`)"
+            "conflict: managed span `#{span.id}` in `#{target_path}` differs from lock and from " \
+            "fresh render (`#{span.package}::#{span.export}`).\n" \
+            "Move the destination aside and rerun `pray install`, or restore the managed block " \
+            "to the locked bytes."
           )
         end
       end

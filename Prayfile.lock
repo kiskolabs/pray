@@ -1,6 +1,6 @@
 prayfile_lock = "1"
 spec = "0.1"
-generated_by = "pray 1.26.2"
+generated_by = "pray 1.26.3"
 manifest_hash = "sha256:b3cd91427f086b86e3ab45919d3865a545c9a08b025b7d325ad70435b0445b6c"
 
 [[source]]

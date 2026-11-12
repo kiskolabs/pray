@@ -14,6 +14,12 @@ export function rejectManagedSpanConflicts(
   rendered: RenderedTarget[],
   previousLockfile: Lockfile,
 ): void {
+  const freshIdeals = new Map<string, string>();
+  for (const target of rendered) {
+    for (const span of target.managedSpans) {
+      freshIdeals.set(span.id, span.ideal_checksum);
+    }
+  }
   const activeByTarget = new Map(
     rendered.map((target) => [
       target.path,
@@ -39,10 +45,15 @@ export function rejectManagedSpanConflicts(
       checksumsByTarget.set(span.target, checksums);
     }
     const actual = checksums.get(span.id);
-    if (actual !== undefined && actual !== span.ideal_checksum) {
-      throw PrayError.render(
-        `conflict: managed span \`${span.id}\` in \`${span.target}\` was edited (\`${span.package}::${span.export}\`)`,
-      );
+    if (actual === undefined || actual === span.ideal_checksum) {
+      continue;
     }
+    if (actual === freshIdeals.get(span.id)) {
+      continue;
+    }
+    throw PrayError.render(
+      `conflict: managed span \`${span.id}\` in \`${span.target}\` differs from lock and from fresh render (\`${span.package}::${span.export}\`).\n` +
+        "Move the destination aside and rerun `pray install`, or restore the managed block to the locked bytes.",
+    );
   }
 }

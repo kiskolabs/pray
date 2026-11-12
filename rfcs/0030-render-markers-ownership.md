@@ -142,9 +142,11 @@ Parsers MUST reject any other value.
 
 On write, with a previous lock, checksum on-disk managed marker bodies against lock `ideal_checksum`. A human edit inside markers is a render error. Unmarked text is kept by `render_patch`. Recovery is `pray verify` / `pray drift`, then `pray apply`.
 
+RFC 0121 amends the active-span check: when the on-disk body checksum differs from the previous lock `ideal_checksum` but equals the fresh render `ideal_checksum` for that span id, the conflict check MUST succeed (adopt). When the body equals neither, the check MUST still fail. Implementations MUST NOT offer a general force flag to overwrite divergent managed bodies.
+
 Reconciliation classifies a marker pair against both the previous lock and the fresh render:
 
-- active: present in the fresh render; replace it from current inputs, subject to the conflict check above
+- active: present in the fresh render; replace it from current inputs, subject to the conflict check above (including RFC 0121 adopt)
 - retired unchanged: absent from the fresh render, present in the previous lock for the same target, and still equal to the previous `ideal_checksum`; remove it
 - retired edited: absent from the fresh render and present in the previous lock, but no longer equal to the previous checksum; preserve it and report it for explicit review
 - unknown: absent from both the fresh render and the previous lock; preserve it and report an orphan marker

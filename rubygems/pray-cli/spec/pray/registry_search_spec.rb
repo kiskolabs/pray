@@ -57,7 +57,7 @@ RSpec.describe Pray::RegistrySearch do
     stdout, stderr, status = Open3.capture3("ruby", executable, "search", "base", "--root", root)
 
     expect(status).to be_success, stderr
-    expect(stdout).to eq("sample/base — shared guidance\n")
+    expect(stdout.b).to eq("sample/base — shared guidance\n".b)
   end
 
   it "searches an HTTP index and includes available summaries" do
