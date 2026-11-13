@@ -16,7 +16,7 @@ Language registries stay under `scripts/release/`. This tree holds OS package re
 | Fedora / COPR | Deferred | `packaging/fedora/` | COPR project or Fedora package review |
 | Guix | Deferred | not started | Guix package definition |
 | Flatpak / Snap | Deferred | not started | Low priority for a CLI |
-| GitHub Actions CLI archives | In-tree workflow | `.github/workflows/build-cli-release.yml` | Unsigned macOS / Linux / Windows artifacts; create GitHub Release from CHANGELOG when missing, otherwise upload assets onto that release. Signing stays optional and is not required for a green run. |
+| GitHub Actions CLI archives | In-tree workflow | `.github/workflows/build-cli-release.yml` | Unsigned macOS / Linux / Windows artifacts with `SIGNING` sidecar (`sign_path=local`); create GitHub Release from CHANGELOG when missing, otherwise upload assets onto that release. Operator signs and notarizes locally; Actions holds no signing secrets. |
 
 Homebrew stays in the sibling tap (`make bump-homebrew`), not under `packaging/`.
 
@@ -28,9 +28,9 @@ The Build CLI release workflow produces:
 - `pray-<version>-x86_64-unknown-linux-gnu.tar.gz`
 - `pray-<version>-x86_64-pc-windows-msvc.zip`
 
-Each archive includes the binary, `VERSION`, `SOURCE_COMMIT`, `SIGNING` (status and note), and a per-binary sha256 sidecar. Matching `*.sha256` files are uploaded beside the archives.
+Each archive includes the binary, `VERSION`, `SOURCE_COMMIT`, `SIGNING` (`status=unsigned`, `sign_path=local`, platform, public identity anchor, note), and a per-binary sha256 sidecar. Identity fields come from repository variables: macOS `team_id` (`MACOS_TEAM_ID`), Linux `cosign_identity` (`LINUX_COSIGN_IDENTITY`), Windows `signer_subject` (`WINDOWS_SIGNER_SUBJECT`). Matching `*.sha256` files are uploaded beside the archives.
 
-Unsigned downloads may hit macOS Gatekeeper or Windows SmartScreen. Production verify policy and `pray.kisko.dev` publish remain tracked in `docs/issues/20261027144200_signed-platform-binaries-on-tag.md`.
+Unsigned downloads may hit macOS Gatekeeper or Windows SmartScreen. Sign and notarize locally from these CI archives on macOS, Windows, or Linux as the platform tools allow. Production verify policy and `pray.kisko.dev` publish remain tracked in `docs/issues/20261027144200_signed-platform-binaries-on-tag.md`.
 
 ## Version source
 

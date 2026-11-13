@@ -12,6 +12,7 @@ Added `.github/workflows/build-cli-release.yml` for macOS universal, Linux x86_6
 
 - Push annotated tag `v1.26.3` and run Build CLI release (or `make release-github` then the workflow) so notes and assets land together.
 - Continue R2 index/RSS, local optional sign scripts, and `pray upgrade` preference work from that issue.
+- Later pass (2026-11-13): dropped CI signing secrets; see `docs/changelogs/20261113075658_cli-release-local-signing-only.md`.
 
 ## Source
 

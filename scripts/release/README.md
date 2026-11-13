@@ -96,7 +96,7 @@ Create or edit the GitHub Release for the workspace version:
 scripts/release/github.sh --publish
 ```
 
-Platform CLI archives (unsigned by default) are built by `.github/workflows/build-cli-release.yml` after the tag exists. The attach job creates the GitHub Release from CHANGELOG when missing, or uploads assets onto the existing release. `github.sh` / `make release-github` only writes notes and does not remove assets. Signing credentials are optional; see `docs/releasing.md` and `packaging/README.md`.
+Platform CLI archives (always unsigned in CI) are built by `.github/workflows/build-cli-release.yml` after the tag exists. The attach job creates the GitHub Release from CHANGELOG when missing, or uploads assets onto the existing release. `github.sh` / `make release-github` only writes notes and does not remove assets. Operator codesign, notarize, Trusted Signing, and cosign stay local against those archives; see `docs/releasing.md` and `packaging/README.md`.
 
 Rewrite notes on every GitHub Release that already exists:
 

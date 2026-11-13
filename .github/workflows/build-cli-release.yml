@@ -1,5 +1,7 @@
 # Build unsigned pray CLI binaries for macOS, Linux, and Windows.
-# Signing is optional and never required: without credentials the job stays unsigned.
+# Codesign, notarize, Trusted Signing, and cosign stay on the operator host.
+# Each archive carries a SIGNING sidecar (status=unsigned, sign_path=local, platform
+# identity from repo vars) as the local-sign anchor. Secrets stay off Actions.
 # Attach job: if GitHub Release vX.Y.Z exists, upload assets; if missing, create it from
 # CHANGELOG.md (same notes contract as make release-github) then upload. Tag must exist.
 # Binary install origin for pray upgrade remains language registries / future pray.kisko.dev.
@@ -12,10 +14,6 @@ on:
         description: Ensure GitHub Release for this version (create if missing) and upload archives
         type: boolean
         default: true
-      attempt_sign:
-        description: Attempt signing when platform credentials exist (otherwise stay unsigned)
-        type: boolean
-        default: false
   push:
     tags:
       - "v*"
@@ -40,11 +38,7 @@ jobs:
           shared-key: cli-release-macos
       - name: Build unsigned universal CLI
         env:
-          ATTEMPT_SIGN: ${{ github.event_name == 'workflow_dispatch' && inputs.attempt_sign || false }}
           MACOS_TEAM_ID: ${{ vars.MACOS_TEAM_ID }}
-          MACOS_CERTIFICATE_BASE64: ${{ secrets.MACOS_CERTIFICATE_BASE64 }}
-          MACOS_CERTIFICATE_PASSWORD: ${{ secrets.MACOS_CERTIFICATE_PASSWORD }}
-          MACOS_NOTARY_PROFILE: ${{ secrets.MACOS_NOTARY_PROFILE }}
         run: |
           set -euo pipefail
           cargo build --release --locked -p pray-cli --target x86_64-apple-darwin
@@ -60,20 +54,16 @@ jobs:
           version="$(awk -F '"' '/^version = / { print $2; exit }' Cargo.toml)"
           printf '%s\n' "${version}" > "${stage}/VERSION"
           printf '%s\n' "${GITHUB_SHA}" > "${stage}/SOURCE_COMMIT"
-          signing_status=unsigned
-          signing_note="CI left this binary unsigned. Local optional signing is documented in docs/issues/20261027144200_signed-platform-binaries-on-tag.md."
-          if [[ "${ATTEMPT_SIGN}" == "true" ]]; then
-            if [[ -n "${MACOS_CERTIFICATE_BASE64:-}" && -n "${MACOS_CERTIFICATE_PASSWORD:-}" && -n "${MACOS_TEAM_ID:-}" ]]; then
-              echo "::warning::macOS signing credentials are present, but CI codesign/notarize is not wired yet; leaving unsigned."
-              signing_note="attempt_sign requested; credentials detected; CI signing path not implemented; left unsigned."
-            else
-              signing_note="attempt_sign requested; macOS signing credentials missing; left unsigned."
-            fi
+          team_id="${MACOS_TEAM_ID:-}"
+          if [[ -z "${team_id}" ]]; then
+            echo "::warning::vars.MACOS_TEAM_ID is empty; SIGNING.team_id anchor left blank."
           fi
           {
-            echo "status=${signing_status}"
+            echo "status=unsigned"
             echo "platform=${platform}"
-            echo "note=${signing_note}"
+            echo "sign_path=local"
+            echo "team_id=${team_id}"
+            echo "note=CI left this binary unsigned. Operator codesign and notarize locally from this archive."
           } > "${stage}/SIGNING"
           shasum -a 256 "${stage}/pray" | awk '{print $1}' > "${stage}/pray.sha256"
           archive="pray-${version}-${platform}.tar.gz"
@@ -100,7 +90,6 @@ jobs:
           shared-key: cli-release-linux
       - name: Build unsigned Linux CLI
         env:
-          ATTEMPT_SIGN: ${{ github.event_name == 'workflow_dispatch' && inputs.attempt_sign || false }}
           LINUX_COSIGN_IDENTITY: ${{ vars.LINUX_COSIGN_IDENTITY }}
         run: |
           set -euo pipefail
@@ -113,20 +102,16 @@ jobs:
           version="$(awk -F '"' '/^version = / { print $2; exit }' Cargo.toml)"
           printf '%s\n' "${version}" > "${stage}/VERSION"
           printf '%s\n' "${GITHUB_SHA}" > "${stage}/SOURCE_COMMIT"
-          signing_status=unsigned
-          signing_note="CI left this binary unsigned. Local optional signing is documented in docs/issues/20261027144200_signed-platform-binaries-on-tag.md."
-          if [[ "${ATTEMPT_SIGN}" == "true" ]]; then
-            if [[ -n "${LINUX_COSIGN_IDENTITY:-}" ]]; then
-              echo "::warning::Linux cosign identity is set, but CI cosign is not wired yet; leaving unsigned."
-              signing_note="attempt_sign requested; cosign identity detected; CI signing path not implemented; left unsigned."
-            else
-              signing_note="attempt_sign requested; Linux cosign identity missing; left unsigned."
-            fi
+          cosign_identity="${LINUX_COSIGN_IDENTITY:-}"
+          if [[ -z "${cosign_identity}" ]]; then
+            echo "::warning::vars.LINUX_COSIGN_IDENTITY is empty; SIGNING.cosign_identity anchor left blank."
           fi
           {
-            echo "status=${signing_status}"
+            echo "status=unsigned"
             echo "platform=${platform}"
-            echo "note=${signing_note}"
+            echo "sign_path=local"
+            echo "cosign_identity=${cosign_identity}"
+            echo "note=CI left this binary unsigned. Operator cosign locally from this archive."
           } > "${stage}/SIGNING"
           sha256sum "${stage}/pray" | awk '{print $1}' > "${stage}/pray.sha256"
           archive="pray-${version}-${platform}.tar.gz"
@@ -154,7 +139,6 @@ jobs:
       - name: Build unsigned Windows CLI
         shell: pwsh
         env:
-          ATTEMPT_SIGN: ${{ github.event_name == 'workflow_dispatch' && inputs.attempt_sign || false }}
           WINDOWS_SIGNER_SUBJECT: ${{ vars.WINDOWS_SIGNER_SUBJECT }}
         run: |
           $ErrorActionPreference = "Stop"
@@ -166,20 +150,16 @@ jobs:
           $version = (Select-String -Path Cargo.toml -Pattern '^version = "([^"]+)"').Matches.Groups[1].Value
           Set-Content -NoNewline -Path "$stage/VERSION" -Value $version
           Set-Content -NoNewline -Path "$stage/SOURCE_COMMIT" -Value $env:GITHUB_SHA
-          $signingStatus = "unsigned"
-          $signingNote = "CI left this binary unsigned. Local optional signing is documented in docs/issues/20261027144200_signed-platform-binaries-on-tag.md."
-          if ($env:ATTEMPT_SIGN -eq "true") {
-            if (-not [string]::IsNullOrWhiteSpace($env:WINDOWS_SIGNER_SUBJECT)) {
-              Write-Host "::warning::Windows signer subject is set, but CI Trusted Signing is not wired yet; leaving unsigned."
-              $signingNote = "attempt_sign requested; signer subject detected; CI signing path not implemented; left unsigned."
-            } else {
-              $signingNote = "attempt_sign requested; Windows signing credentials missing; left unsigned."
-            }
+          $signerSubject = if ($null -eq $env:WINDOWS_SIGNER_SUBJECT) { "" } else { $env:WINDOWS_SIGNER_SUBJECT }
+          if ([string]::IsNullOrWhiteSpace($signerSubject)) {
+            Write-Host "::warning::vars.WINDOWS_SIGNER_SUBJECT is empty; SIGNING.signer_subject anchor left blank."
           }
           @(
-            "status=$signingStatus"
+            "status=unsigned"
             "platform=$platform"
-            "note=$signingNote"
+            "sign_path=local"
+            "signer_subject=$signerSubject"
+            "note=CI left this binary unsigned. Operator Trusted Signing locally from this archive."
           ) | Set-Content -Path "$stage/SIGNING"
           (Get-FileHash "$stage/pray.exe" -Algorithm SHA256).Hash.ToLowerInvariant() |
             Set-Content -NoNewline -Path "$stage/pray.exe.sha256"
