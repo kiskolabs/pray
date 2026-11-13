@@ -1,0 +1,269 @@
+# Build unsigned pray CLI binaries for macOS, Linux, and Windows.
+# Signing is optional and never required: without credentials the job stays unsigned.
+# Attach job: if GitHub Release vX.Y.Z exists, upload assets; if missing, create it from
+# CHANGELOG.md (same notes contract as make release-github) then upload. Tag must exist.
+# Binary install origin for pray upgrade remains language registries / future pray.kisko.dev.
+name: Build CLI release
+
+on:
+  workflow_dispatch:
+    inputs:
+      attach_to_release:
+        description: Ensure GitHub Release for this version (create if missing) and upload archives
+        type: boolean
+        default: true
+      attempt_sign:
+        description: Attempt signing when platform credentials exist (otherwise stay unsigned)
+        type: boolean
+        default: false
+  push:
+    tags:
+      - "v*"
+
+permissions:
+  contents: read
+
+env:
+  CARGO_TERM_COLOR: always
+
+jobs:
+  macos:
+    runs-on: macos-15
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - name: Install the Rust toolchain from rust-toolchain.toml
+        run: rustup toolchain install
+      - run: rustup target add x86_64-apple-darwin aarch64-apple-darwin
+      - uses: Swatinem/rust-cache@d1527c8f67ef9af357290475d4af4b0fab8f12e0 # v2.9.3
+        with:
+          shared-key: cli-release-macos
+      - name: Build unsigned universal CLI
+        env:
+          ATTEMPT_SIGN: ${{ github.event_name == 'workflow_dispatch' && inputs.attempt_sign || false }}
+          MACOS_TEAM_ID: ${{ vars.MACOS_TEAM_ID }}
+          MACOS_CERTIFICATE_BASE64: ${{ secrets.MACOS_CERTIFICATE_BASE64 }}
+          MACOS_CERTIFICATE_PASSWORD: ${{ secrets.MACOS_CERTIFICATE_PASSWORD }}
+          MACOS_NOTARY_PROFILE: ${{ secrets.MACOS_NOTARY_PROFILE }}
+        run: |
+          set -euo pipefail
+          cargo build --release --locked -p pray-cli --target x86_64-apple-darwin
+          cargo build --release --locked -p pray-cli --target aarch64-apple-darwin
+          platform=universal-apple-darwin
+          stage="dist/${platform}"
+          mkdir -p "${stage}"
+          lipo -create \
+            target/x86_64-apple-darwin/release/pray \
+            target/aarch64-apple-darwin/release/pray \
+            -output "${stage}/pray"
+          chmod +x "${stage}/pray"
+          version="$(awk -F '"' '/^version = / { print $2; exit }' Cargo.toml)"
+          printf '%s\n' "${version}" > "${stage}/VERSION"
+          printf '%s\n' "${GITHUB_SHA}" > "${stage}/SOURCE_COMMIT"
+          signing_status=unsigned
+          signing_note="CI left this binary unsigned. Local optional signing is documented in docs/issues/20261027144200_signed-platform-binaries-on-tag.md."
+          if [[ "${ATTEMPT_SIGN}" == "true" ]]; then
+            if [[ -n "${MACOS_CERTIFICATE_BASE64:-}" && -n "${MACOS_CERTIFICATE_PASSWORD:-}" && -n "${MACOS_TEAM_ID:-}" ]]; then
+              echo "::warning::macOS signing credentials are present, but CI codesign/notarize is not wired yet; leaving unsigned."
+              signing_note="attempt_sign requested; credentials detected; CI signing path not implemented; left unsigned."
+            else
+              signing_note="attempt_sign requested; macOS signing credentials missing; left unsigned."
+            fi
+          fi
+          {
+            echo "status=${signing_status}"
+            echo "platform=${platform}"
+            echo "note=${signing_note}"
+          } > "${stage}/SIGNING"
+          shasum -a 256 "${stage}/pray" | awk '{print $1}' > "${stage}/pray.sha256"
+          archive="pray-${version}-${platform}.tar.gz"
+          tar -C "${stage}" -czf "dist/${archive}" pray VERSION SOURCE_COMMIT SIGNING pray.sha256
+          shasum -a 256 "dist/${archive}" > "dist/${archive}.sha256"
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: pray-cli-unsigned-universal-apple-darwin
+          path: |
+            dist/*.tar.gz
+            dist/*.sha256
+          if-no-files-found: error
+          retention-days: 14
+
+  linux:
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - name: Install the Rust toolchain from rust-toolchain.toml
+        run: rustup toolchain install
+      - uses: Swatinem/rust-cache@d1527c8f67ef9af357290475d4af4b0fab8f12e0 # v2.9.3
+        with:
+          shared-key: cli-release-linux
+      - name: Build unsigned Linux CLI
+        env:
+          ATTEMPT_SIGN: ${{ github.event_name == 'workflow_dispatch' && inputs.attempt_sign || false }}
+          LINUX_COSIGN_IDENTITY: ${{ vars.LINUX_COSIGN_IDENTITY }}
+        run: |
+          set -euo pipefail
+          cargo build --release --locked -p pray-cli --target x86_64-unknown-linux-gnu
+          platform=x86_64-unknown-linux-gnu
+          stage="dist/${platform}"
+          mkdir -p "${stage}"
+          cp target/x86_64-unknown-linux-gnu/release/pray "${stage}/pray"
+          chmod +x "${stage}/pray"
+          version="$(awk -F '"' '/^version = / { print $2; exit }' Cargo.toml)"
+          printf '%s\n' "${version}" > "${stage}/VERSION"
+          printf '%s\n' "${GITHUB_SHA}" > "${stage}/SOURCE_COMMIT"
+          signing_status=unsigned
+          signing_note="CI left this binary unsigned. Local optional signing is documented in docs/issues/20261027144200_signed-platform-binaries-on-tag.md."
+          if [[ "${ATTEMPT_SIGN}" == "true" ]]; then
+            if [[ -n "${LINUX_COSIGN_IDENTITY:-}" ]]; then
+              echo "::warning::Linux cosign identity is set, but CI cosign is not wired yet; leaving unsigned."
+              signing_note="attempt_sign requested; cosign identity detected; CI signing path not implemented; left unsigned."
+            else
+              signing_note="attempt_sign requested; Linux cosign identity missing; left unsigned."
+            fi
+          fi
+          {
+            echo "status=${signing_status}"
+            echo "platform=${platform}"
+            echo "note=${signing_note}"
+          } > "${stage}/SIGNING"
+          sha256sum "${stage}/pray" | awk '{print $1}' > "${stage}/pray.sha256"
+          archive="pray-${version}-${platform}.tar.gz"
+          tar -C "${stage}" -czf "dist/${archive}" pray VERSION SOURCE_COMMIT SIGNING pray.sha256
+          sha256sum "dist/${archive}" > "dist/${archive}.sha256"
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: pray-cli-unsigned-x86_64-unknown-linux-gnu
+          path: |
+            dist/*.tar.gz
+            dist/*.sha256
+          if-no-files-found: error
+          retention-days: 14
+
+  windows:
+    runs-on: windows-latest
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - name: Install the Rust toolchain from rust-toolchain.toml
+        run: rustup toolchain install
+      - uses: Swatinem/rust-cache@d1527c8f67ef9af357290475d4af4b0fab8f12e0 # v2.9.3
+        with:
+          shared-key: cli-release-windows
+      - name: Build unsigned Windows CLI
+        shell: pwsh
+        env:
+          ATTEMPT_SIGN: ${{ github.event_name == 'workflow_dispatch' && inputs.attempt_sign || false }}
+          WINDOWS_SIGNER_SUBJECT: ${{ vars.WINDOWS_SIGNER_SUBJECT }}
+        run: |
+          $ErrorActionPreference = "Stop"
+          cargo build --release --locked -p pray-cli --target x86_64-pc-windows-msvc
+          $platform = "x86_64-pc-windows-msvc"
+          $stage = "dist/$platform"
+          New-Item -ItemType Directory -Force $stage | Out-Null
+          Copy-Item target/x86_64-pc-windows-msvc/release/pray.exe "$stage/pray.exe"
+          $version = (Select-String -Path Cargo.toml -Pattern '^version = "([^"]+)"').Matches.Groups[1].Value
+          Set-Content -NoNewline -Path "$stage/VERSION" -Value $version
+          Set-Content -NoNewline -Path "$stage/SOURCE_COMMIT" -Value $env:GITHUB_SHA
+          $signingStatus = "unsigned"
+          $signingNote = "CI left this binary unsigned. Local optional signing is documented in docs/issues/20261027144200_signed-platform-binaries-on-tag.md."
+          if ($env:ATTEMPT_SIGN -eq "true") {
+            if (-not [string]::IsNullOrWhiteSpace($env:WINDOWS_SIGNER_SUBJECT)) {
+              Write-Host "::warning::Windows signer subject is set, but CI Trusted Signing is not wired yet; leaving unsigned."
+              $signingNote = "attempt_sign requested; signer subject detected; CI signing path not implemented; left unsigned."
+            } else {
+              $signingNote = "attempt_sign requested; Windows signing credentials missing; left unsigned."
+            }
+          }
+          @(
+            "status=$signingStatus"
+            "platform=$platform"
+            "note=$signingNote"
+          ) | Set-Content -Path "$stage/SIGNING"
+          (Get-FileHash "$stage/pray.exe" -Algorithm SHA256).Hash.ToLowerInvariant() |
+            Set-Content -NoNewline -Path "$stage/pray.exe.sha256"
+          $archive = "pray-$version-$platform.zip"
+          Compress-Archive -Path "$stage/pray.exe","$stage/VERSION","$stage/SOURCE_COMMIT","$stage/SIGNING","$stage/pray.exe.sha256" `
+            -DestinationPath "dist/$archive" -Force
+          (Get-FileHash "dist/$archive" -Algorithm SHA256).Hash.ToLowerInvariant() + "  $archive" |
+            Set-Content -Path "dist/$archive.sha256"
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: pray-cli-unsigned-x86_64-pc-windows-msvc
+          path: |
+            dist/*.zip
+            dist/*.sha256
+          if-no-files-found: error
+          retention-days: 14
+
+  attach-release:
+    needs: [macos, linux, windows]
+    if: >
+      github.event_name == 'push' ||
+      (github.event_name == 'workflow_dispatch' && inputs.attach_to_release)
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - name: Resolve version tag
+        id: meta
+        run: |
+          set -euo pipefail
+          version="$(awk -F '"' '/^version = / { print $2; exit }' Cargo.toml)"
+          if [[ "${GITHUB_REF_TYPE}" == "tag" ]]; then
+            tag="${GITHUB_REF_NAME}"
+          else
+            tag="v${version}"
+          fi
+          echo "version=${version}" >> "${GITHUB_OUTPUT}"
+          echo "tag=${tag}" >> "${GITHUB_OUTPUT}"
+      - uses: actions/download-artifact@37930b1c2abaa49bbe596cd826c3c89aef350131 # v7.0.0
+        with:
+          path: artifacts
+          pattern: pray-cli-unsigned-*
+          merge-multiple: true
+      - name: Ensure GitHub Release and upload archives
+        env:
+          GH_TOKEN: ${{ github.token }}
+          TAG: ${{ steps.meta.outputs.tag }}
+          VERSION: ${{ steps.meta.outputs.version }}
+        run: |
+          set -euo pipefail
+          # shellcheck source=scripts/release/changelog.sh
+          source ./scripts/release/changelog.sh
+
+          if [[ "${TAG}" != "v${VERSION}" ]]; then
+            echo "::warning::Tag ${TAG} does not match workspace version v${VERSION}; still using ${TAG} for release asset upload."
+          fi
+
+          mapfile -t files < <(find artifacts -type f \( -name 'pray-*.tar.gz' -o -name 'pray-*.zip' -o -name 'pray-*.sha256' \) | sort)
+          if [[ "${#files[@]}" -eq 0 ]]; then
+            echo "::error::No CLI archives found in downloaded artifacts"
+            exit 1
+          fi
+
+          notes_file="$(mktemp)"
+          cleanup() { rm -f "${notes_file}"; }
+          trap cleanup EXIT
+          release_changelog_section CHANGELOG.md "${VERSION}" >"${notes_file}"
+
+          if gh release view "${TAG}" >/dev/null 2>&1; then
+            echo "GitHub Release ${TAG} exists; uploading assets"
+          else
+            echo "==> gh release create ${TAG} (CHANGELOG notes)"
+            workspace="$(awk -F '"' '/^version = / { print $2; exit }' Cargo.toml)"
+            create_args=(--title "${TAG}" --notes-file "${notes_file}" --verify-tag)
+            if [[ "${VERSION}" != "${workspace}" ]]; then
+              create_args+=(--latest=false)
+            fi
+            if ! gh release create "${TAG}" "${create_args[@]}"; then
+              echo "::error::Could not create ${TAG}. Push annotated tag ${TAG} first (same contract as make release-github), then re-run."
+              exit 1
+            fi
+          fi
+
+          gh release upload "${TAG}" "${files[@]}" --clobber
+          echo "Uploaded ${#files[@]} asset(s) to ${TAG}"

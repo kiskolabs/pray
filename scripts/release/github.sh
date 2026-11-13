@@ -10,6 +10,9 @@
 # Title is vX.Y.Z so Discord and GitHub never show an empty name.
 # Notes are the matching CHANGELOG heading and its bullets only.
 # --all edits existing releases. It does not create missing tags or releases.
+# This script writes notes only; it does not upload or remove CLI archives.
+# .github/workflows/build-cli-release.yml creates the same release when missing
+# (CHANGELOG notes + --verify-tag) or uploads assets onto an existing release.
 set -euo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"

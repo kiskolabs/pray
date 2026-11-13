@@ -16,8 +16,21 @@ Language registries stay under `scripts/release/`. This tree holds OS package re
 | Fedora / COPR | Deferred | `packaging/fedora/` | COPR project or Fedora package review |
 | Guix | Deferred | not started | Guix package definition |
 | Flatpak / Snap | Deferred | not started | Low priority for a CLI |
+| GitHub Actions CLI archives | In-tree workflow | `.github/workflows/build-cli-release.yml` | Unsigned macOS / Linux / Windows artifacts; create GitHub Release from CHANGELOG when missing, otherwise upload assets onto that release. Signing stays optional and is not required for a green run. |
 
 Homebrew stays in the sibling tap (`make bump-homebrew`), not under `packaging/`.
+
+## Prebuilt CLI archives
+
+The Build CLI release workflow produces:
+
+- `pray-<version>-universal-apple-darwin.tar.gz`
+- `pray-<version>-x86_64-unknown-linux-gnu.tar.gz`
+- `pray-<version>-x86_64-pc-windows-msvc.zip`
+
+Each archive includes the binary, `VERSION`, `SOURCE_COMMIT`, `SIGNING` (status and note), and a per-binary sha256 sidecar. Matching `*.sha256` files are uploaded beside the archives.
+
+Unsigned downloads may hit macOS Gatekeeper or Windows SmartScreen. Production verify policy and `pray.kisko.dev` publish remain tracked in `docs/issues/20261027144200_signed-platform-binaries-on-tag.md`.
 
 ## Version source
 

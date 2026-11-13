@@ -44,14 +44,16 @@ macOS:
 
 ## Effects
 
-- None in tree yet. This note records the gap and the acceptance contract only. Operator flow (Actions unsigned build → local script download / optional sign / upload / index+RSS update → users consume), binary origin on `pray.kisko.dev` with last-10 retention, R2-preferred object storage, upgrade preference, and single macOS signing host were locked in Decisions above; implementation has not started. Findings above close the earlier open question that cosign keyless could only run in Actions.
+- Added `.github/workflows/build-cli-release.yml`: builds unsigned macOS universal, Linux x86_64, and Windows x86_64 CLI archives on `v*` tag push or `workflow_dispatch`; uploads workflow artifacts; ensures the GitHub Release for that tag (create from CHANGELOG when missing, otherwise upload only); never fails for missing signing credentials. Optional `attempt_sign` only records credential presence and leaves binaries unsigned until CI signing is implemented.
+- Documented the operator order and asset contract in `docs/releasing.md` and `packaging/README.md`.
+- Operator flow toward `pray.kisko.dev` (local optional sign, R2 index/RSS, `pray upgrade` preference) is still unimplemented. GitHub Release assets are a download convenience only; they are not the locked install origin.
 
 ## Next
 
 - Freeze the HTTP contract under `pray.kisko.dev`: versioned binary paths, checksum and signature sidecars, index document shape, RSS feed shape and URL, and prune of versions beyond the last 10 (candidate: `releases/v{VERSION}/`, `releases/index.json`, `releases/feed.xml`).
 - Provision Cloudflare R2 (and Worker or `releases` subdomain if path split is chosen) for binary objects; keep landing on the existing Pages site; decide whether index and RSS are written into Pages, into R2, or both.
-- Add GitHub Actions workflow that only builds and uploads unsigned platform artifacts for the operator to fetch; do not sign in CI.
-- Add local-first release scripts (and Makefile targets) that download those artifacts, optionally sign/notarize, checksum, upload objects, rewrite index and RSS, and prune older than the last 10 versions; dry-run by default; document credentials and publish flag in `docs/releasing.md`, `scripts/release/README.md`, and `packaging/README.md`.
+- Add local-first release scripts (and Makefile targets) that download those Actions artifacts, optionally sign/notarize, checksum, upload objects, rewrite index and RSS, and prune older than the last 10 versions; dry-run by default; document credentials and publish flag in `docs/releasing.md`, `scripts/release/README.md`, and `packaging/README.md`.
+- Optionally wire CI codesign/notarize, Trusted Signing, and cosign behind `attempt_sign` once credentials exist; keep unsigned success as the default path.
 - Choose the Windows-on-macOS client (default lean: Jsign) under dependency-policy; smoke-test Artifact Signing of a PE from Darwin; smoke-test cosign sign-blob keyless of a Linux artifact from the same Mac; freeze production verify policy (signed-required versus allow unsigned) and identity strings for `pray upgrade`.
 - Provision Apple Developer ID plus notarization API credentials and an Azure Artifact Signing account plus Certificate Profile Signer role; document the cosign identity consumers must verify.
 - Implement `pray upgrade` to read the `pray.kisko.dev` index, select the matching asset, verify per policy, install, and only then fall back to `cargo install` or source.
@@ -59,6 +61,7 @@ macOS:
 
 ## Source
 
+- .github/workflows/build-cli-release.yml
 - docs/releasing.md
 - scripts/release/README.md
 - scripts/release/github.sh
