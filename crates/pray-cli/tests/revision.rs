@@ -22,7 +22,9 @@ fn run_command(
     for (key, value) in environment {
         command.env(key, value);
     }
-    command.output().expect("run command")
+    command.output().unwrap_or_else(|error| {
+        panic!("run command `{program}`: {error}");
+    })
 }
 
 fn assert_success(output: &Output, label: &str) {
