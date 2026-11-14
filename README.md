@@ -1,16 +1,16 @@
 # pray & Prayfile
 
-**A package manager for the language placed before inference.**
+A package manager for the language placed before inference.
 
 Prayfile is an open specification for reproducible inference input composition.
 
 It lets projects declare shared instructions, policies, memories, templates, review checklists, formatting rules, and workflows in one place; resolve them deterministically; lock exact versions and hashes; preserve original source fragments; and render tool-specific outputs with compact provenance markers.
 
-The goal is simple: treat pre-inference input as a dependency.
+The goal is to treat pre-inference input as a dependency.
 
 The specification and the `pray` reference CLI evolve together. Numbered RFCs under `rfcs/` define the current contracts (RFC 0001, RFC 0111).
 
-**Website:** [pray.kisko.dev](https://pray.kisko.dev)
+Website: [pray.kisko.dev](https://pray.kisko.dev)
 
 ## Install `pray`
 
@@ -54,13 +54,7 @@ These files shape input conditions and output behaviour, but they are often dist
 
 As shared input libraries grow, repositories accumulate stale instructions, hidden drift, inconsistent updates, and difficult rollbacks. The material placed before inference becomes harder to audit, review, restore, and maintain.
 
-Prayfile provides a reproducible way to package, version, distribute, compose, render, and preserve inference input material.
-
-Instead of manually copying files between repositories, teams declare input dependencies, resolve them deterministically, lock exact versions and content hashes, and render reproducible outputs for supported tools.
-
-The lockfile records the resolved state, including checksums of original source fragments. A local compressed cache may preserve the exact original pieces fetched from their sources. Together, the lockfile and cache make input consistency, verification, rollback, and backup possible without relying on mutable upstream state.
-
-Rendered files contain only the material intended to affect inference, plus compact citation markers that point back to `Prayfile.lock`.
+Prayfile treats that shared material as a dependency graph. Projects can inspect the selected input, review updates, and recover resolved material from a local cache when upstream sources change or disappear.
 
 ## Why use this with Git, Mercurial, Subversion, or CVS?
 
@@ -74,33 +68,7 @@ Prayfile resolves a version range across packages, composes named exports into o
 
 That is the same split Bundler and Cargo already make with Git. A gem or crate can live in a Git repository; `Gemfile.lock` still records `revision`, and `Cargo.lock` still records the git commit, so later installs fetch that revision even if the branch moved. `Prayfile.lock` plays that role for inference input. Git remains a source and a history store. `Prayfile.lock` is the resolver record.
 
-Commit `Prayfile`, `Prayfile.lock`, and usually the rendered target files in this project's VCS. The VCS reviews those diffs. `pray plan`, `pray apply`, and `pray verify` decide the rendered bytes.
-
 `pray publish` and `pray sync` can record updates through Git, Mercurial, or a configured command backend. Git and Mercurial working trees are auto-detected for that recording. Subversion and CVS record through the command backend when a team needs it.
-
-## What problem does Prayfile solve?
-
-Prayfile solves reproducible composition and synchronization of shared inference input material across repositories, teams, and tools.
-
-Its main concern is input drift: the gradual divergence of instructions, policies, templates, memories, formatting rules, and workflow assumptions between projects.
-
-Prayfile also addresses preservation. Resolved input material should remain verifiable and recoverable even if an upstream source changes, disappears, or becomes temporarily unavailable.
-
-## Is this a prompt framework?
-
-No.
-
-Prompts, templates, memories, workflows, policies, review rules, formatting rules, and instruction sets may all be packaged using Prayfile, but the durable problem is not prompt design itself.
-
-The durable problem is packaging and distributing the material that gets placed before inference.
-
-Prayfile focuses on dependency management, version locking, deterministic resolution, reproducible rendering, provenance, verification, preservation, planning, publishing, signed feedback, and drift detection.
-
-Pray is zero trust: package metadata, summaries, scores, confessions, and derived annotations are claims unless verified against hashes, signatures, or exact rendered-byte digests. Any client or server may use manual review, hardcoded logic, heuristics, local inference, cloud inference, or generative models to produce annotations.
-
-It does not define an inference runtime. It does not require a specific model provider. It does not prescribe one correct format for intelligence, collaboration, review, or automation.
-
-It manages pre-inference material as data.
 
 ## What does the tool do?
 
@@ -126,13 +94,7 @@ Prayfile:
 
 ## Operating model
 
-Prayfile combines two familiar models.
-
-From Bundler, it takes dependency declaration, resolution, version constraints, lockfiles, checksums, package sources, updates, and deterministic installation.
-
-From Terraform, it takes planning, materialization, drift detection, and reviewable changes.
-
-Prayfile resolves input packages like Bundler and materializes inference-facing files with Terraform-style planning, verification, and drift detection.
+Prayfile combines Bundler-style dependency declaration, resolution, and locking with Terraform-style planning, materialization, and drift detection. The [core model](#core-model) names the artifacts used at each step.
 
 ```text
 Prayfile        declares desired input dependencies
@@ -142,13 +104,11 @@ renderer        formats target-specific files
 target files    affect inference when loaded by tools
 ```
 
-The lockfile is for truth.
-The cache is for recovery.
-The rendered file is for influence.
+The lockfile is the authoritative record of accepted input. The cache preserves material for recovery, and rendered files carry the selected input to consuming tools.
 
 ## Repository model
 
-Pray packages do not need to live expanded in the repository.
+Projects can consume Pray packages through the manifest, lockfile, and rendered target files.
 
 The usual repository layout is:
 
@@ -169,113 +129,59 @@ A project that authors or publishes prayers uses `prayers/` as described in [rep
 
 `Prayfile.lock` is committed because it records the exact resolved state.
 
-Rendered target files are usually committed because current inference tools commonly read repository-visible files, not `Prayfile` directly.
+Rendered target files are usually committed so consuming tools can read the selected input from the repository.
 
 `examples/` contains small, self-contained project trees that show different Prayfile layouts and rendering styles.
 
 The local `.pray/` directory is ignored by default. Vendor copies under `.pray/vendor/` may be committed in hermetic, regulated, air-gapped, or long-term preservation modes.
 
-Expanded packages are not committed by default. They are dependencies, like gems.
+Expanded packages remain in the local dependency cache by default.
 
 ## Materialization and effect
 
-Prayfile distinguishes between references and loaded input.
-
-A package reference, bookmark, source path, import marker, or lockfile entry is not equivalent to full rendered text.
-
 Only material that is rendered, expanded, or otherwise loaded into the inference input should be assumed to affect inference directly.
 
-A bookmark may still affect discovery, routing, retrieval, or attention if the consuming tool reads it. But a bookmark is not the same as the material it points to.
-
-Therefore:
-
-```text
-Prayfile        does not affect inference unless read by a tool
-Prayfile.lock   does not affect inference unless read by a tool
-cache           does not affect inference unless read by a tool
-rendered files  affect inference when loaded by the target tool
-```
+A package reference, bookmark, source path, import marker, or lockfile entry may affect discovery, routing, retrieval, or attention if the consuming tool reads it. The referenced content affects inference directly when the tool loads that content.
 
 Prayfile’s default assumption is conservative: rendered target files are the primary inference-facing artifacts.
 
 ## Prayer and silence
 
-Prayfile manages both prayer and silence.
+Prayer is the selected language rendered before inference. Silence is the deliberate exclusion of resolved material from rendered input.
 
-Prayer is the selected language rendered before inference.
+Authors select words, rules, and formatting for each target. Silence lets them exclude irrelevant fragments and source metadata from that target's input.
 
-Silence is the deliberate exclusion of resolved material from rendered input.
-
-This matters because inference is shaped by both presence and absence. Extra words affect output. Repeated rules affect output. Formatting affects output. But silence also affects output: not rendering a fragment, not including verbose provenance, not loading irrelevant package parts, not leaking source metadata, and not letting every dependency speak into every target.
+Words, repetition, formatting, and deliberate omissions all form part of the input presented to a model. Authors choose which dependencies contribute to each target and which stay out of it. This makes silence an explicit part of composition.
 
 Silence must be explicit and reproducible. If a package contains fragments that are resolved but excluded from a target, that exclusion should be recorded in `Prayfile.lock`.
 
-```text
-Prayfile        declares what may speak and what must stay silent
-Prayfile.lock   records selected, rendered, and silenced fragments
-cache           preserves original fragments
-target files    contain only what is meant to affect inference
-```
-
-The rendered file should contain influence, not bookkeeping.
-
 ## Philosophy
 
-Inference input is not passive documentation.
-
-It is the language placed before inference: the surrounding material that affects what a model notices, ignores, repeats, refuses, prioritizes, imitates, formats, or treats as important.
+Inference input is the language placed before inference: the surrounding material that affects what a model notices, ignores, repeats, refuses, prioritizes, imitates, formats, or treats as important.
 
 This includes explicit instructions, examples, checklists, project policies, workflow notes, style guides, tool descriptions, memories, conventions, file names, headings, ordering, repetition, and local vocabulary.
 
-Some of this input is declarative. Some of it is procedural. Some of it is stylistic. Some of it is inherited accidentally from previous work. In all cases, it becomes part of the conditions under which inference happens.
-
-That makes input operational.
+Input can be declarative, procedural, stylistic, or inherited from previous work. Each form becomes part of the conditions under which inference happens, which makes input operational.
 
 If input can shape output, then input should be inspectable. If it can drift, then it should be locked. If it can be shared, then it should have provenance. If it can disappear upstream, then it should be recoverable. If formatting can change behaviour, then rendered output should be reproducible.
 
 Prayfile exists because the language around an inference engine is already infrastructure.
 
-Most teams treat this infrastructure as loose text. They copy files between repositories, paste fragments into new tools, modify local instructions without traceability, and slowly lose the relationship between source material and rendered output.
-
-Prayfile treats that material as a dependency graph.
-
-Not because inference becomes fully deterministic. It does not. Output remains probabilistic, provider-specific, model-specific, tool-specific, and situation-sensitive.
-
-The point is narrower and more practical: the pre-inference input should not be the least reproducible part of the system.
+Prayfile treats that material as a dependency graph so projects can reproduce the selected input. Inference output remains probabilistic and depends on the provider, model, tool, and situation.
 
 ## Why the name Prayfile?
 
-The name is intentional.
+The name uses prayer as an analogy for language placed before an uncertain response, intended to shape attention and action. In this project, the analogy refers to how authors select, order, format, repeat, and omit input.
 
-`Agentfile` is too narrow. It suggests the file belongs to an agent runtime, while the specification is about input packages that may be consumed by many tools: coding assistants, chat systems, review bots, documentation generators, local inference wrappers, automation tools, and future interfaces that may not call themselves agents.
+The alternatives emphasize different parts of the design:
 
-`Cookfile` suggests recipes and execution. That is close to dependency composition, but misleading for this project. Prayfile does not cook, run, orchestrate, or execute package code. It resolves and renders input data.
+* `Agentfile` suggests ownership by an agent runtime. Prayfile packages input for coding assistants, chat systems, review tools, documentation generators, local inference wrappers, automation tools, and future consumers.
+* `Cookfile` suggests recipes and execution. Prayfile's operations are dependency resolution and rendering of input data.
+* `Mantrafile` emphasizes repetition and stable phrasing. Prayfile also needs to express version locking, provenance, recovery, formatting, and composition from multiple sources.
 
-`Mantrafile` is also close. Inference input often works through repetition, phrasing, remembered instruction patterns, and stable verbal forms. But mantra points too strongly toward repeated prompt text and too weakly toward dependency management, version locking, provenance, recovery, formatting, and multi-source composition.
+For this project, the prayer analogy includes language used for orientation: asking, praising, confessing, remembering, surrendering, repeating, listening, and preparing for a response. It draws attention to form as well as semantic content, including rhythm, silence, shared context, expectation, and attention.
 
-`Prayfile` describes a broader mechanism.
-
-In religious practice, prayer is not only information transfer. A prayer is language used as orientation. It may ask, praise, confess, remember, surrender, repeat, listen, or prepare the believer for a different relation to experience.
-
-For true believers, prayer is often effective not merely because of the words as semantic content, but because of the whole form: repetition, breath, posture, rhythm, silence, community, memory, expectation, and attention. The same words repeated in a structured setting can alter perception, emotion, judgment, and state of mind.
-
-Prayfile uses this analogy carefully.
-
-Inference engines are not gods. Prompting is not worship. The specification does not make mystical claims.
-
-The useful point is structural: repeated, formatted language placed before action can prepare a system toward certain behaviour.
-
-Modern inference engines are affected by prior input. Instructions, examples, policies, memories, formatting, headings, order, repetition, and local conventions all influence output. Before the model produces output, the surrounding input asks it to behave in a certain way. That request may be explicit, implicit, procedural, stylistic, or structural, but it is still part of the computation.
-
-In that limited sense, pre-inference material behaves like a technical prayer: language placed before uncertain response, intended to shape attention, judgment, refusal, style, formatting, and action.
-
-Prayfile does not make this mystical. It makes it auditable.
-
-If input has power, then it should have checksums. If instructions affect output, then they should be versioned. If formatting changes behaviour, then rendered output should be reproducible. If teams share input material, then provenance, rollback, and backup should exist.
-
-The name keeps the philosophical point visible without changing the technical scope.
-
-Prayfile is a package manager for the language placed before inference.
+The technical purpose is to make the selected language, its form, and its provenance auditable. The intended influence includes judgment, refusal, style, formatting, and action.
 
 ## Does Prayfile execute package code?
 
@@ -299,6 +205,8 @@ An example public or private distribution point could be:
 https://prayers.kisko.dev
 ```
 
+The static registry layout and metadata fields are defined in [RFC 0060](rfcs/0060-distribution.md#29-static-registry-protocol).
+
 A distribution point should expose a minimal API for:
 
 * package lookup
@@ -313,17 +221,13 @@ A distribution point should expose a minimal API for:
 * package acceptance and rejection statistics
 * optional human-readable package pages
 
-The distribution point is not part of inference. It is part of package discovery, publishing, verification, feedback, and preservation.
-
 Prayfile should also support direct sources such as local paths, git repositories, archive URLs, and vendored `.praypkg` files. A centralized distribution point is useful, but not required.
 
-Pray packages can be minimal text packages: a package may consist only of editable text files plus the required `*.prayspec`. The distribution point may compute derived metadata such as language, encoding, origin, summary, categories, topics, file counts, character counts, token counts, possible effects, possible side effects, and embeddings.
+Pray packages may consist only of editable text files and the required `*.prayspec`. Distribution points may compute annotations such as summaries, topics, counts, and embeddings while leaving the artifact hash, tree hash, and version identity unchanged.
 
-Derived metadata is an annotation layer, not package identity. It does not change the artifact hash, tree hash, or version identity.
+Package metadata, summaries, scores, confessions, and derived annotations remain claims until verified. Any participant may produce them through manual review, hardcoded logic, deterministic heuristics, local inference, cloud inference, or generative models. Their method of production leaves the verification requirements unchanged.
 
-Pray packages and rendered target bytes are verified separately. Packages are verified by hashes and signatures; the injected output is verified by exact render digests or equivalent deterministic byte checks. Prayfile.lock can also store canonical verification records that bind package claims, render plans, final injected bytes, and confessions to stable hashes and provenance.
-
-Confessions are signed usage feedback records. Publishers and trusted servers may collect, mirror, and aggregate them across direct publication and server-to-server synchronization.
+Packages and rendered bytes are verified separately: package hashes and signatures cover the accepted artifact, while render digests or equivalent deterministic checks cover the final injected bytes. Lockfile verification records can bind package claims, render plans, rendered bytes, and confessions to hashes and provenance. [RFC 0060](rfcs/0060-distribution.md#294-zero-trust-verification-and-engine-agnostic-annotations) defines these boundaries and annotation provenance.
 
 Prayfile should also leave room for peer-to-peer distribution transport: torrent-style seeding and collective-network discovery through a DHT, inspired by systems like BitTorrent, Freenet, and GNUnet. That transport should preserve the same hash verification, signature checking, and provenance guarantees as static hosting.
 
@@ -333,50 +237,31 @@ Distribution points may also form federated networks through server-to-server (S
 
 Publishing changes the shared material placed before inference, so publishing must be treated as a high-trust operation.
 
-A hardened distribution point should require strong authentication for publishing.
-
-Recommended publishing requirements:
+A hardened distribution point should require:
 
 * account authentication
 * two-factor authentication
-* passkey support
-* explicit passkey check on publishing
-* package signature on publish
-* SSH signing key support
+* passkey support and an explicit passkey check on publishing
+* a package signature on publish, with SSH signing key support
 * publisher identity recorded in package metadata
 * immutable package archives after publish
 * yanking or deprecation instead of silent replacement
-* append-only audit log for publish events
+* an append-only audit log for publish events
 * checksum verification before and after upload
 
-Package archives should be signed.
-
-Signatures may be produced with supported signing methods such as passkeys, SSH signing keys, or other configured project keys.
+The security baseline and signature format are defined in [RFC 0050](rfcs/0050-security-and-trust.md). [RFC 0061](rfcs/0061-publish-version-preservation.md) defines version preservation, including the handling of prior yanks.
 
 `pray publish` should create the package archive, compute content hashes, sign the package, and upload the package plus metadata to the selected distribution point.
 
 `pray install`, `pray update`, and `pray verify` should verify package hashes and signatures according to policy.
 
-`Prayfile.lock` should record enough information to verify that the resolved package still matches the expected archive, source fragments, recorded publisher claim, and signature policy.
+The package archive is the object being distributed. `Prayfile.lock` records what the project accepted, including the expected archive, source fragments, publisher claim, and signature policy.
 
-The package archive is the object being distributed. The lockfile is the local record of what was accepted.
+Ed25519 signatures verify that a key signed the package hashes. Identifying a publisher also requires a trusted binding to that key.
 
 ## Confession feedback
 
-Prayfile may support signed usage feedback through `pray confess`.
-
-A confession is feedback from a user, project, team, or automation about a specific prayer package, version, fragment, rendered span, or resolved lockfile entry.
-
-The basic confession result is binary:
-
-```text
-accepted
-rejected
-```
-
-A confession may include an optional free-form note.
-
-Examples:
+A confession is signed acceptance or rejection feedback about a specific prayer package, version, fragment, rendered span, or resolved lockfile entry. `pray confess` submits that feedback with an optional free-form note:
 
 ```sh
 pray confess amkisko/engineering-audit --version 2.11.0 --accepted
@@ -384,11 +269,9 @@ pray confess amkisko/engineering-audit --version 2.11.0 --rejected --note "Too b
 pray confess --from-lock p7f3k9m2 --accepted --note "Useful authorization checklist."
 ```
 
-A confession is not an inference result, benchmark, review score, or package rating by default. It is a signed signal that a specific resolved prayer was accepted or rejected in a specific usage context.
+The record attests to acceptance or rejection in a specific usage context. Inference results, benchmark results, review scores, and package ratings need their own evidence.
 
 Distribution points may aggregate confessions to show package usefulness, rejection patterns, compatibility issues, version regressions, or fragment-level feedback.
-
-Confession submission should be hardened.
 
 Recommended confession requirements:
 
@@ -426,15 +309,11 @@ A confession should be rejected by the distribution point when:
 * the payload has been replayed
 * the distribution point policy rejects the note or metadata
 
-Confessions should be append-only. Corrections should be submitted as new confessions, not by silently editing old ones.
+Confessions should be append-only. Submit corrections as new confessions and preserve the original records.
 
 ## `pray serve`
 
-The reference CLI may include a `serve` command.
-
-`pray serve` can expose a local or self-hosted distribution point using the same package format, metadata format, verification rules, and feedback rules as public distribution points.
-
-This keeps the reference tool useful on both sides:
+`pray serve` runs a local or self-hosted distribution point using the same package, metadata, verification, and feedback contracts described above.
 
 ```text
 consumer side     resolve, install, render, verify, confess
@@ -506,17 +385,11 @@ Keep publish and moderation routes behind Cloudflare Access or another stronger 
 
 Cloudflare Access in front of GET `/v1/` is a browser login. `pray install` does not send Access service-token headers or complete an identity-provider redirect. For a private registry on the public internet, use an overlay (Tailscale Serve or WireGuard) or `pray+ssh`. Do not expect Access IdP login to unlock install.
 
-The server should provide API endpoints for package metadata, archive retrieval, signature retrieval, and confession submission. It may also provide simple human-readable HTML pages.
-
-The server is a distribution and feedback mechanism, not an inference runtime.
-
 ## Bundled assets
 
 The Rust reference implementation should not bundle binary assets.
 
 No fonts, images, icons, databases, compressed binary blobs, or opaque static bundles should be embedded into the executable.
-
-Plain text assets are acceptable when needed for the built-in server or help output.
 
 Allowed embedded assets:
 
@@ -530,36 +403,21 @@ Avoiding bundled binary assets keeps the executable inspectable, reproducible, p
 
 The built-in web interface, if provided, should be minimal and text-first.
 
-HTML and CSS are enough.
-
 ## How does Prayfile keep input consistent?
 
-`Prayfile.lock` records the exact resolved dependency graph, selected versions, source references, content hashes, silenced fragments, render targets, renderer versions, formatting options, signature metadata, distribution point metadata, confession references, provenance metadata, and **managed span records**.
+`Prayfile.lock` records the exact resolved dependency graph, selected versions, source references, content hashes, silenced fragments, render targets, renderer versions, formatting options, signature metadata, distribution point metadata, confession references, provenance metadata, and managed span records.
 
-Each managed span (a **prayer** rendered between pray markers) has a lockfile entry that stores:
+Each managed span (a prayer rendered between pray markers) has a lockfile entry that stores:
 
 * marker ID
 * target file path
-* **ideal checksum** — semantic hash of the expected managed body (content between markers, excluding pray comment lines)
-* **line positions** — opening and closing marker line numbers in the target file
-* provenance — package, export, source fragment checksum, silenced flag, and related metadata
+* ideal checksum : semantic hash of the expected managed body (content between markers, excluding pray comment lines)
+* line positions : opening and closing marker line numbers in the target file
+* provenance : package, export, source fragment checksum, silenced flag, and related metadata
 
-The lockfile is the authoritative record of what should appear in each managed span and where it should live.
-
-This allows projects to verify that rendered files still match the resolved state.
+The lockfile is the authoritative record of what should appear in each managed span and where it should live. These records let projects verify that rendered files still match the resolved state and trace each managed span to its source fragments.
 
 A local compressed cache may store the original source fragments used during resolution. This gives the project a recoverable copy of the resolved input material, independent of mutable upstream repositories, registries, or URLs.
-
-In short:
-
-* the lockfile verifies what was resolved and where each prayer should appear
-* ideal checksums detect custom edits to managed content
-* line positions detect marker movement and missing spans
-* the cache preserves what was resolved
-* Ed25519 signatures verify that a key signed the package hashes; identifying a publisher also requires a trusted binding to that key
-* confessions record signed acceptance or rejection feedback
-* rendered outputs contain what was selected to speak
-* silenced fragments remain out of inference-facing files
 
 ## What is preserved?
 
@@ -584,15 +442,11 @@ Prayfile should make the following recoverable:
 * which target file received each fragment
 * which formatting rules affected the rendered output
 
-The rendered output is not just a blob. It is a traceable composition.
-
 ## Render markers
 
 Rendered target files should not duplicate the dependency graph, package list, source URLs, source hashes, or provenance records already stored in `Prayfile.lock`.
 
-Rendered files use compact citation markers, not provenance blocks.
-
-A marker is an opaque reference into `Prayfile.lock`. It identifies a managed rendered span but does not explain it.
+Rendered files use compact citation markers to identify managed spans and look up their provenance records in `Prayfile.lock`.
 
 Markdown targets use this canonical marker form:
 
@@ -604,29 +458,15 @@ Markdown targets use this canonical marker form:
 <!-- pray:p7f3k9m2 -->
 ```
 
-The same marker appears exactly twice for one managed block.
-
-The first occurrence opens the block.
-
-The second occurrence closes the block.
-
-Nested pray blocks are invalid.
-
-Unmatched markers are invalid.
+The same marker appears exactly twice on its own lines: first to open the block, then to close it. Nested blocks and unmatched markers are invalid.
 
 A marker ID must be opaque. It must not encode package names, topic names, versions, hashes, source paths, or semantic labels.
 
 Marker IDs must use only lowercase ASCII letters and digits.
 
-Marker IDs should be 8–16 characters.
-
-Marker comments must appear on their own lines.
+Marker IDs should be 8-16 characters.
 
 The purpose of a marker is region identity, drift detection, and lockfile lookup.
-
-Rendered output cites.
-Lockfile explains.
-Cache preserves.
 
 ## Ignore marker
 
@@ -651,10 +491,6 @@ semantic hash  = rendered content without pray markers
 file hash      = exact target file bytes including pray markers
 ```
 
-The semantic hash answers: did the meaningful rendered input change?
-
-The file hash answers: did the physical target file change?
-
 ## Formatting rendered files
 
 `pray format` normalizes render markers in target files.
@@ -671,21 +507,11 @@ It should:
 * reject duplicate marker IDs in the same target unless explicitly allowed by the lockfile
 * preserve non-managed content outside pray blocks
 
-Canonical Markdown form:
-
-```md
-<!-- pray:p7f3k9m2 -->
-
-...rendered content...
-
-<!-- pray:p7f3k9m2 -->
-```
-
-Invalid forms include inline markers, markers with special characters, markers with whitespace inside the ID, unmatched markers, and manually nested managed blocks.
+The [render markers](#render-markers) section shows the canonical Markdown form and ID restrictions.
 
 ## Planning, verifying, applying, and drift
 
-Prayfile separates **detection** from **materialization**.
+Prayfile separates detection from materialization.
 
 ### `pray plan`
 
@@ -695,7 +521,7 @@ Computes the changes that would happen to resolved packages, lockfile entries, c
 
 Materializes the planned changes.
 
-After render, `pray apply` **refreshes** `Prayfile.lock`:
+After render, `pray apply` refreshes `Prayfile.lock`:
 
 * updates ideal checksums for each managed span
 * updates opening and closing marker line positions
@@ -709,29 +535,18 @@ Read-only consistency check against the current lockfile and on-disk target file
 
 For every managed span record, `pray verify` locates the marker pair in the target file and checks:
 
-* the span exists (both opening and closing markers are present)
-* the managed body checksum matches the lockfile **ideal checksum**
-* the marker **line positions** match the lockfile positions
+* the marker pair is present; a missing pair reports a removed prayer
+* the managed body matches the lockfile ideal checksum; changed content reports a custom implementation
+* the marker line positions match the lockfile positions; moved markers report position drift even when the content checksum matches
 
-`pray verify` reports mismatches. It does **not** modify `Prayfile.lock` or target files.
-
-Position-only changes are still reported: if the ideal checksum still matches but marker lines moved, verify reports **position drift**.
-
-Content changes are reported when the ideal checksum does not match: the on-disk prayer body differs from the locked ideal even though markers may still be present. This catches custom implementation edits inside a managed span.
-
-Missing spans are reported when a lockfile record exists but the marker pair is absent — the prayer was removed from the target file.
+`pray verify` reports mismatches without modifying `Prayfile.lock` or target files.
 
 ### `pray drift`
 
-Drift detection is a superset of verify.
+`pray drift` reports everything [`pray verify`](#pray-verify) reports, plus:
 
-`pray drift` reports everything `pray verify` reports, plus drift against the **current renderer output**:
-
-* **custom implementation** — markers remain, but the managed body no longer matches the locked ideal checksum (hand-edited replacement text)
-* **removed prayer** — lockfile still records a managed span, but the marker pair is gone from the target file
-* **position drift** — content checksum still matches the ideal, but marker line positions changed
-* **renderer drift** — on-disk file matches the lock, but a fresh render from current packages and `Prayfile` would produce different ideal checksums or different prayers
-* **orphan marker** — a pray marker pair exists in a target file with no matching lockfile managed span record
+* renderer drift : on-disk file matches the lock, but a fresh render from current packages and `Prayfile` would produce different ideal checksums or different prayers
+* orphan marker : a pray marker pair exists in a target file with no matching lockfile managed span record
 
 `pray drift` is for review and CI. It does not refresh the lockfile.
 
@@ -742,12 +557,6 @@ To accept intentional changes after plan review, run `pray apply`.
 Writes dest and `Prayfile.lock` from current inputs. `--check` writes nothing and fails unless dest already matches that fresh render. The dry-run of a write is `pray plan`.
 
 ### Other commands
-
-`pray publish` packages, signs, and uploads a package to a distribution point.
-
-`pray confess` signs and submits acceptance or rejection feedback to a distribution point.
-
-`pray serve` runs a local or self-hosted distribution point.
 
 Example command set:
 
@@ -789,24 +598,13 @@ pray --path "$HOME" install
 
 `Prayfile.lock` and `.pray` live in that root. Exclusive `file: ".zshrc"` writes unmarked bytes. Do not write `file: "~/.zshrc"`; a leading tilde is rejected as a destination string, not expanded as home. Compose uses HTML comments, so compose of `.zshrc` or `.json` fails and names `file:` as the unmarked path. Prefer a native include of the unmarked file. Prefer `pray trust set-require-signed-packages` for remote packages. The CLI does not walk parent directories for a Prayfile.
 
-`--path /` with `/Prayfile` is allowed. It is not recommended: every declared destination is relative to filesystem root.
+`--path /` with `/Prayfile` is allowed. Choose a narrower root to limit writes: every declared destination is relative to the selected root.
 
 Group blocks in `Prayfile` assign environment names to packages. Ungrouped packages always render. With no environment selected, only ungrouped packages render. With `--env development`, ungrouped packages plus packages in the `development` group render. Resolution and locking still include every declared package.
 
 ## Package storage modes
 
-Prayfile supports several storage modes.
-
-Default mode:
-
-```text
-Prayfile
-Prayfile.lock
-AGENTS.md
-.gitignore: .pray/
-```
-
-Use this for most repositories. Packages are fetched from sources and cached locally. Rendered files are committed for current tool compatibility.
+Most repositories use the default [repository model](#repository-model), with packages fetched from sources and cached locally.
 
 Hermetic mode:
 
@@ -820,14 +618,7 @@ AGENTS.md
 
 Use this for air-gapped repositories, regulated work, long-term archival, or cases where upstream availability cannot be trusted.
 
-Generated-only mode:
-
-```text
-Prayfile
-Prayfile.lock
-```
-
-Use this only when every developer, CI worker, and inference tool reliably runs `pray render` before use. This mode is cleaner, but less safe with current inference tooling.
+Generated-only mode commits the manifest and lockfile while generating target files on demand. Use it only when every developer, CI worker, and inference tool reliably runs `pray render` before use.
 
 Served mode:
 
@@ -856,41 +647,37 @@ feedback:
 
 Use this when package consumers want to send signed acceptance or rejection feedback to a distribution point.
 
-## What is not a goal?
+## Scope and responsibility
 
-Prayfile is not a prompt engineering doctrine.
+Prayfile manages pre-inference material as data across model providers and consuming tools. Maintainers choose and review instructions and evaluate their effects in each project. Inference execution remains the consuming project's responsibility.
 
-It does not decide what a good instruction is. It does not claim that shared input material is always beneficial. It does not replace human review. It does not remove responsibility from maintainers. It does not guarantee better model behaviour.
-
-It also does not attempt to turn input material into executable software.
-
-The specification is about packaging, resolving, locking, caching, rendering, formatting, planning, applying, verifying, publishing, signing, serving, confessing, silencing, and tracing files and fragments that shape inference input and output formatting.
-
-Quality remains a human and project-level concern.
+Packaging and verification establish input integrity; they do not guarantee better model behaviour. Package execution is prohibited as described [above](#does-prayfile-execute-package-code).
 
 ## Core model
 
-| Concept                | Role                                                                                   |
-| ---------------------- | -------------------------------------------------------------------------------------- |
-| `Prayfile`             | Human-authored input dependency manifest                                               |
+| Concept                | Role                                                                                                  |
+| ---------------------- | ----------------------------------------------------------------------------------------------------- |
+| `Prayfile`             | Human-authored input dependency manifest                                                              |
 | `Prayfile.lock`        | Machine-authored resolved state, including ideal checksums and marker line positions per managed span |
-| managed span           | Lockfile record for one prayer between pray markers in a target file                                 |
-| ideal checksum         | Semantic hash of expected managed span body stored in `Prayfile.lock`                                |
-| `*.prayspec`           | Package definition                                                                     |
-| `*.praypkg`            | Package archive                                                                        |
-| distribution point     | Registry-like source for packages, metadata, checksums, signatures, feedback, and docs |
-| package signature      | Proof that a signing key approved package hashes; publisher identity needs a separate trust binding |
-| confession             | Signed acceptance or rejection feedback for a resolved prayer                          |
-| network fingerprint    | Additional verification signal attached to a signed confession                         |
-| local cache            | Compressed storage for original resolved source fragments                              |
-| local vendor directory | Optional committed package cache                                                       |
-| rendered target file   | Inference-facing materialized output                                                   |
-| pray marker            | Compact citation into the lockfile                                                     |
-| silenced fragment      | Resolved fragment intentionally excluded from target output                            |
-| `pray`                 | Reference CLI                                                                          |
-| `pray serve`           | Built-in distribution point server                                                     |
+| managed span           | Rendered region between matching pray markers, tracked by a lockfile record                           |
+| ideal checksum         | Semantic hash of expected managed span body stored in `Prayfile.lock`                                 |
+| `*.prayspec`           | Package definition                                                                                    |
+| `*.praypkg`            | Package archive                                                                                       |
+| distribution point     | Registry-like source for packages, metadata, checksums, signatures, feedback, and docs                |
+| package signature      | Proof that a signing key approved package hashes; publisher identity needs a separate trust binding   |
+| confession             | Signed acceptance or rejection feedback for a resolved prayer                                         |
+| network fingerprint    | Additional verification signal attached to a signed confession                                        |
+| local cache            | Compressed storage for original resolved source fragments                                             |
+| local vendor directory | Optional committed package cache                                                                      |
+| rendered target file   | Inference-facing materialized output                                                                  |
+| pray marker            | Compact citation into the lockfile                                                                    |
+| silenced fragment      | Resolved fragment intentionally excluded from target output                                           |
+| `pray`                 | Reference CLI                                                                                         |
+| `pray serve`           | Built-in distribution point server                                                                    |
 
 ## Design principles
+
+These principles summarize the project for readers of this overview. [RFC 0002](rfcs/0002-problem-and-positioning.md#2-core-positioning) records them in the specification.
 
 ```text
 Declare input.
@@ -926,26 +713,16 @@ Avoid bundled binary assets.
 
 ## Read the specification
 
-Start with `rfcs/README.md` for:
+Start with the [RFC index](rfcs/README.md). The main contracts are:
 
-* file formats (RFC 0010, RFC 0011)
-* resolver and lockfile behaviour (RFC 0020)
-* checksum verification (RFC 0050)
-* local `.pray/` layout and ignore policy (RFC 0071)
-* local cache behaviour (RFC 0070)
-* package structure (RFC 0011)
-* distribution point API (RFC 0060)
-* publishing and signing policy (RFC 0050)
-* confession feedback policy (RFC 0050)
-* built-in serving behaviour (RFC 0060)
-* registry design (RFC 0060)
-* rendering targets and markers (RFC 0030)
-* formatting behaviour (RFC 0040)
-* managed span records (RFC 0020, RFC 0030)
-* plan/apply behaviour (RFC 0030, RFC 0040)
-* verify and drift detection (RFC 0030)
-* CLI commands (RFC 0040)
-* ownership of generated output (RFC 0031)
+* positioning and design principles: [RFC 0002](rfcs/0002-problem-and-positioning.md)
+* manifest and package formats: [RFC 0010](rfcs/0010-core-formats.md), [RFC 0011](rfcs/0011-prayspec-and-package.md)
+* resolution, lockfiles, and managed span records: [RFC 0020](rfcs/0020-resolve-and-lock.md)
+* rendering, markers, verification, and output ownership: [RFC 0030](rfcs/0030-render-markers-ownership.md), [RFC 0031](rfcs/0031-ownership-and-generated-output.md)
+* CLI commands, formatting, and plan/apply: [RFC 0040](rfcs/0040-cli-surface.md)
+* checksums, publishing, signing, and feedback policy: [RFC 0050](rfcs/0050-security-and-trust.md)
+* distribution points and registry metadata: [RFC 0060](rfcs/0060-distribution.md)
+* cache layout and project-local storage: [RFC 0070](rfcs/0070-reference-implementation.md), [RFC 0071](rfcs/0071-project-local-pray-directory.md)
 
 ## Additional packaging
 
@@ -1024,10 +801,6 @@ The specification is currently the primary area of development and feedback.
 Please do not disclose security vulnerabilities through public issues.
 
 See `SECURITY.md` for responsible disclosure instructions.
-
-Publishing should require strong authentication, explicit publish-time verification, and signed package archives.
-
-Confession submission should require explicit verification, signed payloads, replay protection, and privacy-aware handling of network fingerprints.
 
 ## Links
 

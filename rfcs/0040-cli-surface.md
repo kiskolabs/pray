@@ -10,7 +10,7 @@
 
 ## Summary
 
-This RFC inventories the `pray` command set as implemented in the Rust reference CLI, and notes the Ruby and TypeScript ports. The registrar list is the contract.
+This RFC inventories the `pray` command set as implemented in the Rust reference CLI, and notes the Ruby and TypeScript ports. Section 50 defines the command set.
 
 ## Motivation
 
@@ -28,19 +28,7 @@ Unknown commands MUST fail toward `pray --help` (exit 2). `pray help <command>` 
 
 This section is the product contract for this concern. Where it disagrees with Implementation notes, Implementation notes record what the reference CLI does today. A follow-on RFC records the gap.
 
-The registrar verb list in this RFC is the contract. The former snapshot command list omitted unlock, upgrade, login, token, search, yank, trust, sync, and completion; those verbs remain.
-
-Exit codes from `PrayError::exit_code`:
-
-- 0 success
-- 1 general error (I/O, missing or invalid manifest context); also `Io` and `Manifest`
-- 2 parse error or usage/CLI argument error
-- 3 resolution error
-- 4 integrity error
-- 5 render/check failed
-- 6 verify failed (also when `pray drift` finds drift)
-- 7 network/fetch error
-- 8 unsupported feature
+The former snapshot command list omitted unlock, upgrade, login, token, search, yank, trust, sync, and completion; those verbs remain. Exit codes are defined in Section 66.
 
 ### 50. CLI command set
 
@@ -59,7 +47,7 @@ Also useful: `remove`, `unlock`, `tree`, `list`, `outdated`, `explain`, `manifes
 - plan: compute lock/cache/render changes
 - apply: materialize plan; refresh managed span checksums and lines
 - render: regenerate or check targets; does not replace apply for lock refresh unless documented
-- format / fmt: rewrite Prayfile to `compose` / `tree` / `pray …, file:`; normalize markers in lock targets
+- format / fmt: rewrite Prayfile to `compose` / `tree` / `pray ..., file:`; normalize markers in lock targets
 - verify: read-only managed-span, integrity, cache, signature checks
 - drift: custom implementation, removed prayers, position/renderer drift, orphan markers
 - package / publish: build `.praypkg`; sign and upload. `publish` uses Prayfile remotes when dest flags are omitted (RFC 0118). `--to NAME` selects a remote. `--dry-run` prints dests and writes nothing. Path-owned packages only.
@@ -83,9 +71,9 @@ Also useful: `remove`, `unlock`, `tree`, `list`, `outdated`, `explain`, `manifes
 - prayer init [name] [--path DIR]: local prayer under a path source, or a versioned package scaffold without a Prayfile
 - list / outdated / explain: inventory locked packages
 
-`pray search <query>` reads one `v1/index.json`. It validates every package name before using it in a metadata path and prints matching names in lexical order. When package metadata is available, it may append the trimmed summary from the latest non-yanked semantic version. A missing optional metadata document leaves a name-only result. A metadata document whose package name differs from the index entry is an integrity error. Help and other person-facing output MUST identify summaries as unverified catalog claims rather than package identity or a recommendation.
+`pray search <query>` follows RFC 0060 section 29 for index validation, matching, ordering, and optional summary retrieval. Help and other person-facing output MUST identify summaries as unverified catalog claims rather than package identity or a recommendation.
 
-Name-only search has a one-request budget. Summary search has the existing `1 + N` request shape for `N` matches and MUST NOT hide unbounded parallel metadata requests. A richer, paginated, or ranked catalog requires a separately versioned contract.
+Summary search MUST NOT hide unbounded parallel metadata requests. A richer, paginated, or ranked catalog requires a separately versioned contract.
 
 ---
 
@@ -114,21 +102,17 @@ May detect installed tools, but discovery must not change lockfile resolution un
 
 ### 63. Formatting policy
 
-Formatting is not the product.
+`pray format` (alias `pray fmt`) rewrites Prayfile to the recommended destination DSL:
 
-Still, a formatter exists: `pray format` (alias `pray fmt`)
-
-`pray format` rewrites Prayfile to the recommended destination DSL:
-
-- `compose "path" do … end` for fragment outputs and local embeds
-- `tree "path" do … end` for folder roots
-- `pray "owner/name", …, file: "path"` for whole-file exports
+- `compose "path" do ... end` for fragment outputs and local embeds
+- `tree "path" do ... end` for folder roots
+- `pray "owner/name", ..., file: "path"` for whole-file exports
 - `pray` instead of legacy `agent` / `package`
 - drop empty legacy `target` wrappers that only declared `output` / `folder`
 - keep `target` blocks that still carry `commands`, `rules`, or `max_bytes`
 - keep `group` membership via `group` blocks
 
-Legacy migration classifies packages from resolved export kinds (fragment → compose, folder → tree, file → `file:` using `default_path` when present). Format may resolve packages (offline first) to classify. The deprecated `skill` kind classifies as folder.
+Legacy migration classifies packages from resolved export kinds (fragment -> compose, folder -> tree, file -> `file:` using `default_path` when present). Format may resolve packages (offline first) to classify. The deprecated `skill` kind classifies as folder.
 
 Rules:
 
@@ -169,7 +153,7 @@ Global config must not inject packages into a repository. The repository depende
 
 Allowed implementation variables:
 
-```
+```text
 PRAY_HOME
 PRAY_CACHE
 PRAY_CONFIG
@@ -198,22 +182,22 @@ Errors must be precise.
 
 Good:
 
-```
+```text
 Prayfile:14: package "sample/webapp" requests export "testing2", but available exports are: "testing", "data-layer", "webapp-review".
 ```
 
 Bad:
 
-```
+```text
 Resolution failed.
 ```
 
 Error categories: `parse_error`, `manifest_error`, `resolution_error`, `fetch_error`, `integrity_error`, `render_error`, `verify_error`, `target_error`
 
-Exit codes (reference CLI):
+Exit codes from `PrayError::exit_code` in the reference CLI:
 
 - 0: success
-- 1: general error (I/O, missing or invalid manifest context)
+- 1: general error (I/O, missing or invalid manifest context); includes `Io` and `Manifest`
 - 2: parse error or usage/CLI argument error
 - 3: resolution error
 - 4: integrity error
@@ -232,7 +216,7 @@ Rust binary: `crates/pray-cli`. Ports: `rubygems/pray-cli`, `npmjs/pray-cli`. Ea
 
 ## Registrar
 
-CLI verbs in the reference `Command` enum: manifest, init, prayer-init, repo-init, install, add, remove, update, unlock, render, plan, apply, verify, drift, format, package, publish, yank, token, search, login, serve, confess, list, outdated, explain, vendor, clean, tree, sync, trust, upgrade, version, completion.
+Section 50 registers the CLI verbs and aliases represented by the reference `Command` enum. `prayer init` and `repo init` are the two-word command forms.
 
 ## Unresolved questions
 

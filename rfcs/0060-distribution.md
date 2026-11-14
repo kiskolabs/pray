@@ -36,7 +36,7 @@ The registry may be a static file tree.
 
 Recommended layout:
 
-```
+```text
 /v1/index.json
 /v1/distribution.json
 /v1/trust.json
@@ -47,7 +47,7 @@ Recommended layout:
 
 `v1/distribution.json` is protocol policy (RFC 0062). `v1/trust.json` is authentication. Protocol descriptor files such as `.praytorrent.json` are not part of this layout unless that policy lists them.
 
-index.json:
+`index.json`:
 
 ```json
 {
@@ -106,14 +106,15 @@ No server API is required for v1. Static hosting must be enough.
 
 Index package names are untrusted path input. A client MUST require the two-segment `namespace/name` registry identity before constructing `v1/packages/<name>.json`; absolute paths, empty segments, `.` or `..`, backslashes, and additional segments are invalid.
 
-Search is client-side, case-insensitive substring matching over the package names in `v1/index.json`. Results are ordered lexically. An optional result summary comes from the latest non-yanked semantic version in the matching package metadata. That summary is derived metadata and remains an unverified catalog claim. Fetching summaries uses one index request plus at most one metadata request per match; the v1 static index has no pagination or summary-row contract.
+Search is client-side, case-insensitive substring matching over the package names in `v1/index.json`. Results are ordered lexically. An optional result summary comes from the latest non-yanked semantic version in the matching package metadata and is trimmed before display. That summary is derived metadata and remains an unverified catalog claim. A missing optional metadata document leaves a name-only result. A metadata document whose package name differs from the index entry is an integrity error. Name-only search reads one index; fetching summaries adds at most one metadata request per match. The v1 static index has no pagination or summary-row contract.
+
 ### 28. Sources
 
 Supported source kinds: registry, static index, git, local path, tarball, OCI artifact, pray SSH
 
 Examples:
 
-```
+```manifest
 source "default", "https://agents.example.com"
 source "sample", "git+ssh://git@example.com/agent-context/index.git"
 source "team", "pray+ssh://pray@prayers.internal"
@@ -122,7 +123,7 @@ source "local", path: "../agent-packages"
 
 Direct package sources:
 
-```
+```manifest
 agent "sample/base", git: "git+ssh://git@example.com/base.git", tag: "v1.4.3"
 agent "local/base", path: "../base"
 agent "public/base", tarball: "https://example.com/base-1.4.3.praypkg"
@@ -144,11 +145,9 @@ RFC 0061 defines `published_at` as an optional JSON integer containing whole UTC
 To reduce churn and privacy leakage, project lockfiles should not copy unnecessary registry metadata.
 
 ---
-#### 29.3 Derived metadata and confessions
+### 29.3 Derived metadata and confessions
 
-Distribution points may compute and publish derived metadata for each package version. Derived metadata is an annotation layer, not package identity. It does not change the artifact hash, tree hash, or version identity.
-
-Derived metadata may be computed locally, through cloud inference, or by combining both. Implementations may use language detection, encoding detection, summary generation, topic extraction, embedding generation, and similar analysis tools.
+Distribution points may compute and publish derived metadata for each package version. Derived metadata annotates a package version. The artifact hash, tree hash, and version identity remain unchanged.
 
 Derived metadata may include:
 
@@ -165,14 +164,14 @@ Derived metadata may include:
 - possible side effects
 - embeddings
 
-A package may consist only of minimal editable text files intended for alteration. The distribution point may enrich that package with derived metadata without requiring the package itself to carry those annotations.
+The distribution point may attach these annotations without requiring the package itself to carry them. Package payload rules are defined in RFC 0011 section 25.
 
 Confessions are signed usage feedback records. A confession may be produced by a publisher, a distribution point, or a client that has received a package. Confessions may be collected, mirrored, and aggregated by publishers and trusted servers.
 
 Federated servers may share known peer and server lists, along with confessions they are authorized to relay. Publishers may use confessions to collect usage feedback across direct publication and server-to-server synchronization.
 
 Confessions do not alter package identity. They are feedback data attached to a package version, tree hash, or artifact hash.
-#### 29.4 Zero-trust verification and engine-agnostic annotations
+### 29.4 Zero-trust verification and engine-agnostic annotations
 
 Pray assumes zero trust. Any client, server, publisher, or federation peer may provide incorrect, partial, stale, or malicious data. All metadata, summaries, scores, confessions, and derived annotations are claims unless independently verified or explicitly accepted under local policy.
 
@@ -190,7 +189,7 @@ Any participant may generate annotations using any method, including manual revi
 If conflicting claims are received, local policy decides which claims to trust for discovery or display. Verification of the final injected bytes remains mandatory.
 
 Clients remain unaware of federation. A client queries a single distribution point, which may serve from local mirror, proxy to a peer, or return metadata with origin URLs.
-#### 29.6 Client git source trust policy
+### 29.6 Client git source trust policy
 
 A conforming client implementation may enforce optional trust policy for remote `git` sources before resolving packages from a cloned distribution repository.
 

@@ -30,18 +30,7 @@ This section is the product contract for this concern. Where it disagrees with I
 
 Prayfile is an open specification for reproducible pre-inference input composition: declare shared instructions and related input, resolve deterministically, lock versions and hashes, preserve source fragments, and render tool-specific outputs with compact pray markers that cite `Prayfile.lock`.
 
-Core model:
-
-- Prayfile: human-authored input dependency manifest
-- Prayfile.lock: machine-authored resolved state
-- *.prayspec: package definition
-- *.praypkg: package archive
-- distribution point: packages, metadata, checksums, signatures, feedback, docs
-- pray: reference CLI
-
-Static declarations only. No host-language execution. Parseable by any implementation.
-
-Not a prompt framework or agent runtime. The durable problem is packaging and distributing material placed before inference. RFCs and the reference CLI evolve together; formats may still change.
+Declarations must be parseable by any implementation. Section 8 defines the core terminology.
 
 ---
 
@@ -65,7 +54,7 @@ Core values (normative indicators):
 
 - Auditable traces: compact pray markers on managed spans; lockfile holds resolved state, ideal checksums, marker lines, source checksums, silence, provenance
 - Temporal clarity: lock and drift show what changed; markers enable blame and rollback
-- Measurable effects: manifest → lock → rendered bytes → diff; inference quality stays human-validated
+- Measurable effects: manifest -> lock -> rendered bytes -> diff; inference quality stays human-validated
 - Security: static packages, hash-verified, path-safe, explicitly updated, optionally signed
 
 Inference-input packaging will keep changing. Prayfile stays useful by pinning lock state, markers, diffs, integrity checks, and signed feedback as contracts.
@@ -84,12 +73,7 @@ Inference input shapes model behavior. Treat it as a dependency.
 
 Priorities: human-readable files; small diffs; minimal generated output; deterministic install and render; explicit updates; lockfile reproducibility; cross-platform; any-language implementations; public/private/local/P2P distribution; no code execution; recovery, vendoring, CI validation; clear ownership; tool-neutral packages with tool-specific adapters; auditable provenance; supply-chain security for context packages.
 
-```
-less formatting religion
-more stable meaning
-less generated sludge
-more readable reviewable context
-```
+Keep meaning stable and generated context readable and reviewable.
 
 ---
 
@@ -103,12 +87,7 @@ Self-recovery: reconstruct from Prayfile.lock. Self-update: explicit `pray updat
 
 ### 6. Naming
 
-- manifest / lockfile: Prayfile, Prayfile.lock
-- package: *.prayspec, *.praypkg
-- distribution point: registry-like source
-- CLI / project / crate: pray
-
-The names Prayfile, Prayfile.lock, prayspec, and pray are fixed. In a consumer project, local prayers live under a path source directory of the author's choosing (RFC 0117). `prayers/` is the default init directory. Distribution checkout root inside a larger tree is `prayers/v1/` (`pray repo init`). The folder name `v1` is reserved as a prayer name. A project that publishes keeps named prayers beside that `v1/` tree. Resolve and render may be internal phases, not CLI aliases.
+The names Prayfile, Prayfile.lock, prayspec, and pray are fixed. RFC 0117 defines local prayer directories, the distribution layout, and reserved names. Resolve and render may be internal phases, not CLI aliases.
 
 ---
 
@@ -116,10 +95,10 @@ The names Prayfile, Prayfile.lock, prayspec, and pray are fixed. In a consumer p
 
 Closest reference: dependency manifest/lockfile ecosystems.
 
-- Prayfile / Prayfile.lock ↔ manifest / lockfile
-- *.prayspec / *.praypkg ↔ package spec / archive
-- resolve / render ↔ lock step / materialize merged context (no direct code-dep equivalent)
-- `pray verify` / `pray drift` ↔ integrity checks / lock+render diff
+- `Prayfile` / `Prayfile.lock` corresponds to manifest / lockfile
+- `*.prayspec` / `*.praypkg` corresponds to package spec / archive
+- resolve / render corresponds to lock step / materialize merged context (no direct code-dep equivalent)
+- `pray verify` / `pray drift` corresponds to integrity checks / lock+render diff
 
 Difference: legacy registries may execute host code; Prayfile parses declarations only. Same supply-chain baseline (checksums, optional signing, vendoring) plus compact markers in rendered files.
 
@@ -129,17 +108,20 @@ Prayfile does not replace language package managers. RFC 0106 may load from `Pra
 
 ### 8. Terminology
 
-- Prayfile: human-authored dependency manifest
-- Prayfile.lock: machine-authored resolved state
-- prayspec: package definition file
+- `Prayfile`: human-authored dependency manifest
+- `Prayfile.lock`: machine-authored resolved state
+- `*.prayspec`: package definition file
+- `*.praypkg`: package archive
+- distribution point: packages, metadata, checksums, signatures, feedback, docs
+- `pray`: reference CLI
 - agent package: versioned bundle of agent-context content
 - export: named unit from a package (e.g. `webapp-review`, `testing-guidance`)
-- target: agent tool or output environment (`tool_a` … `generic`)
+- target: agent tool or output environment (`tool_a` ... `generic`)
 - adapter: maps exports to target-specific files
 - render: create target files from locked state
 - managed file: generated file owned by pray
 - local file: human-owned project file embedded into rendered output
-- source: registry, static index, git, path, tarball, OCI, file share, …
+- source: registry, static index, git, path, tarball, OCI, file share, ...
 - frozen install: refuses lockfile or generated-file updates
 - annotation / claim: untrusted derived metadata, confession, score, or analysis
 - render digest: hash of final injected bytes after render and normalization
@@ -148,16 +130,7 @@ Prayfile does not replace language package managers. RFC 0106 may load from `Pra
 
 ### 81. Final principle
 
-Do not make inference smarter with magic. Make inference input boring enough to trust.
-
-```
-declared input
-locked input
-verified input
-rendered input with compact citations
-recoverable source fragments
-explicit silence
-```
+Keep inference input declared, locked, verifiable, and recoverable.
 
 ## Implementation notes
 
@@ -173,4 +146,4 @@ Bundler declare/lock. Terraform plan/apply/drift. Cargo.lock and npm lockfiles. 
 
 ## Unresolved questions
 
-Whether “agent package” remains the right noun now that destination DSL uses `pray` declarations (RFC 0102).
+Whether "agent package" remains the right noun now that destination DSL uses `pray` declarations (RFC 0102).

@@ -2,14 +2,7 @@
 
 `pray serve` is a self-hosted distribution-point server. The specification defines the server behavior, but not a single hosted platform.
 
-Use the deployment guides below for concrete templates:
-
-- managed hosting
-- general-purpose hosted app platform
-- dedicated server
-- [SSH-only distribution](deployments/ssh.md) (no HTTP listener)
-- edge proxy or tunnel in front of another host
-- self-managed app server
+Choose a deployment shape from the [options below](#suggested-deployment-choice), or use the [SSH-only guide](deployments/ssh.md) when no HTTP listener is needed.
 
 ## Common requirements
 
@@ -21,32 +14,13 @@ A `pray serve` deployment should be treated as a stateful web service:
 - put TLS and authentication in front of publish/admin paths when exposed publicly
 - do not rely on an ephemeral filesystem for package storage
 
-The specification allows `pray serve` to expose package lookup, downloads, checksums, signatures, publisher identity, publishing, yanking or deprecation metadata, signed usage feedback, and optional human-readable package pages.
-
 ## Protections
 
-The specification describes a zero-trust supply-chain model.
-
-Recommended protections for a hardened distribution point:
-
-- account authentication for publishing
-- two-factor authentication
-- passkey support
-- explicit passkey check before publishing
-- package signatures on publish
-- SSH signing key support
-- immutable package archives after publish
-- yanking or deprecation instead of silent replacement
-- append-only audit logs for publish events
-- checksum verification before and after upload
-
-Consumers should also verify package hashes, signatures, and render digests or equivalent deterministic byte checks.
+Apply the [publishing and signing policy](../README.md#publishing-and-signatures) and [confession submission requirements](../README.md#confession-feedback) to exposed write paths. [RFC 0050](../rfcs/0050-security-and-trust.md) defines the security baseline; [RFC 0060](../rfcs/0060-distribution.md#294-zero-trust-verification-and-engine-agnostic-annotations) defines package and rendered-byte verification.
 
 ## Admin UI
 
-The specification does not define a formal admin UI.
-
-It does allow optional human-readable package pages and confession review or moderation workflows, so an admin console is an implementation choice, not a standardized part of `pray serve`.
+The specification allows optional human-readable package pages and confession review or moderation workflows. Implementers choose whether to provide an admin console and how it works.
 
 A practical admin UI would usually include:
 

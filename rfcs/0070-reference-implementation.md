@@ -10,7 +10,7 @@
 
 ## Summary
 
-The workspace has four crates. This RFC records what the tree contains and what “reference implementation” means until RFC 0100 ships a fixture matrix.
+The workspace has four crates. This RFC records what the tree contains and what "reference implementation" means until RFC 0100 ships a fixture matrix.
 
 ## Motivation
 
@@ -28,13 +28,11 @@ Until RFC 0100 says otherwise, the Rust CLI is the reference when runtimes disag
 
 This section is the product contract for this concern. Where it disagrees with Implementation notes, Implementation notes record what the reference CLI does today. A follow-on RFC records the gap.
 
-The former snapshot suggested crate names that do not exist. RFC 0101 is the workspace map: pray-core, pray-cli, pray-transport, pray-bench.
-
 ### 9. Repository layout
 
 Project-local `.pray/` directory, gitignore, commit policy, state file, and vendor copies are RFC 0071.
 
-Rendered target files stay outside `.pray/`. Depending on repository policy they may be committed or ignored. They are usually committed because current inference tools commonly read repository-visible files, not `Prayfile` directly.
+Rendered target files stay outside `.pray/`. Depending on repository policy they may be committed or ignored. They are usually committed so consuming tools can read the selected input from the repository.
 
 ---
 
@@ -48,7 +46,7 @@ See RFC 0071. Default: commit Prayfile, Prayfile.lock, and rendered targets when
 
 Recommended CI:
 
-```
+```sh
 pray install --frozen
 pray verify --strict
 pray drift
@@ -80,7 +78,7 @@ If `PRAY_HOME` is unset:
 
 Recommended cache structure:
 
-```
+```text
 cache/
   blobs/
     sha256/
@@ -96,7 +94,7 @@ Cache must be safely deletable.
 
 Registry packages use a project-local cache beside other project state:
 
-```
+```text
 .pray/cache/registry/<namespace>/<name>/<version>/<source-hash>
 ```
 
@@ -142,7 +140,7 @@ spec.changelog_uri = "https://example.com/sample/webapp/CHANGELOG.md"
 
 ### 69. Package author best practices
 
-Small topic-specific exports; skills for long procedures; templates for reusable forms; no vague/generic advice, private data, secrets, or conflicting instructions; document when to use each export and target compatibility; changelog + semver. Prefer `sample/base`, `sample/security`, … over `sample/everything`.
+Small topic-specific exports; skills for long procedures; templates for reusable forms; no vague/generic advice, private data, secrets, or conflicting instructions; document when to use each export and target compatibility; changelog + semver. Prefer `sample/base`, `sample/security`, ... over `sample/everything`.
 
 ---
 
@@ -198,9 +196,17 @@ Do not implement in v1:
 
 ### 75. Suggested reference implementation architecture
 
-Modules: `pray-cli`, `pray-core`, `pray-parser`, `pray-resolve`, `pray-lock`, `pray-render`, `pray-package`, `pray-distribution`, `pray-verify`.
+RFC 0101 defines the crate boundaries. Parser, resolver, lock, render, package, distribution, and verify are modules within `pray-core`.
 
-Layers: CLI → core orchestration → parser (Prayfile/prayspec DSL) → model (manifest, package, lock, render plan) → resolve (semver, sources, graph, lock writes) → render (fetch, hash/signature verify, adapters, markers, churn-minimal write) → doctor (drift, conflicts).
+Layers:
+
+```text
+CLI -> core orchestration -> parser (Prayfile/prayspec DSL)
+    -> model (manifest, package, lock, render plan)
+    -> resolve (semver, sources, graph, lock writes)
+    -> render (fetch, hash/signature verify, adapters, markers, churn-minimal write)
+    -> doctor (drift, conflicts)
+```
 
 Deps: CLI args, codecs, lock/adapter formats, version constraints, hashing, UTF-8 paths, archives, compression, fs walk, text diff, structured errors.
 
@@ -210,7 +216,7 @@ Parser: strict hand-written or combinators. No host-language embed. No eval.
 
 ### 76. Open specification repository layout
 
-```
+```text
 prayfile-spec/
   README.md CHANGELOG.md LICENSE
   schema/   # manifest, lockfile, registry, package JSON schemas
@@ -221,7 +227,7 @@ prayfile-spec/
 
 The specification repository in this tree uses `rfcs/` at the repository root (not a nested `prayfile-spec/` directory). RFC 0111 retired the snapshot; RFCs in this directory are the contract.
 
-Implementation tree mirrors the module split in section 75 under `crates/`.
+The workspace crates live under `crates/` as described in RFC 0101.
 
 ---
 
@@ -229,7 +235,7 @@ Implementation tree mirrors the module split in section 75 under `crates/`.
 
 Parse Prayfile and prayspec; local path packages; exact resolve; write lock; render `INSTRUCTIONS.md`; verify. No registry.
 
-```
+```sh
 pray init --targets tool_a
 pray add local/base --path ../agent-packages/base
 pray install
@@ -256,7 +262,7 @@ Quality program: rustfmt, clippy, cargo-deny, fuzz README, mutants.toml.
 
 ## Drawbacks
 
-Calling three language CLIs “reference” without a shared fixture matrix will fork behavior. RFC 0100 is the mitigation.
+Calling three language CLIs "reference" without a shared fixture matrix will fork behavior. RFC 0100 is the mitigation.
 
 ## Rationale and alternatives
 

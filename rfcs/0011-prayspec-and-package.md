@@ -28,9 +28,9 @@ This section is the product contract for this concern. Where it disagrees with I
 
 Recommended package layout:
 
-Packages are primarily text packages. A conforming package may consist only of minimal editable text files plus the required `*.prayspec`; richer assets are optional, not structural.
+Packages are primarily text packages. A conforming package may consist only of minimal editable text files plus the required `*.prayspec`; richer assets are optional.
 
-```
+```text
 sample-webapp/
   sample-webapp.prayspec
   README.md
@@ -146,7 +146,7 @@ Allowed value types: string, number, boolean, symbol, array, hash, nil
 
 Allowed methods:
 
-```
+```text
 name= version= summary= description= authors= maintainers= license=
 homepage= source_code_uri= changelog_uri= prayfile_version= files=
 exports= skills= templates= adapters= targets= metadata=
@@ -162,7 +162,7 @@ add_dependency add_optional_dependency upstream
 
 Forbidden:
 
-```
+```text
 Dir["**/*"]
 ENV["VERSION"]
 require "..."
@@ -225,7 +225,7 @@ Every `*.prayspec` compiles to a canonical package model:
 Supported export types:
 
 - fragment: Text fragment rendered into a `compose` / legacy output
-- file: Exact file bytes via `pray …, file: "path"` (preferred) or nested under a legacy folder root
+- file: Exact file bytes via `pray ..., file: "path"` (preferred) or nested under a legacy folder root
 - folder: Directory tree provisioned into a `tree` / legacy folder root
 
 `skill` is a deprecated alias for `folder` and will be removed in version 2. Types `template`, `command`, `rule`, `asset`, and `bundle` match no destination role (RFC 0034). Do not invent dest types for them.
@@ -238,11 +238,11 @@ Folder exports may declare `only: [...]` or `except: [...]` relative paths to pr
 
 A `folder` export is a directory tree copied deterministically into a `tree` destination (or a legacy target `folder` root).
 
-A `file` export with `pray …, file: "SECURITY.md"` writes the export to that path at the project root (or relative path given), after `((pray:…))` substitution for UTF-8 text. Legacy fan-out without `file:` still copies under `<folder-root>/<export-name>/`.
+A `file` export with `pray ..., file: "SECURITY.md"` writes the export to that path at the project root (or relative path given), after `((pray:...))` substitution for UTF-8 text. Legacy fan-out without `file:` still copies under `<folder-root>/<export-name>/`.
 
 Example:
 
-```ruby
+```manifest
 tree ".agents/skills" do
   pray "amkisko/engineering-audit", "~> 2.0"
 end
@@ -252,7 +252,7 @@ pray "amkisko/community-security", "~> 1.0", file: "SECURITY.md"
 
 Legacy equivalent:
 
-```ruby
+```manifest
 target :agents do
   output "AGENTS.md"
   folder ".agents/skills"
@@ -328,7 +328,7 @@ Rules:
 
 Pseudo-algorithm:
 
-```
+```text
 entries = sorted(package_files_by_relative_path_utf8_bytes)
 for each entry:
   append entry.kind

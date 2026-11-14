@@ -10,7 +10,7 @@ This note captures the core distribution idea in one place:
 
 ## What matters
 
-The important contract is not the transport shape. The important contract is that the same package bytes, metadata, and verification records can move across machines without changing trust semantics.
+Package bytes, metadata, and verification records must retain their trust semantics when transferred between machines.
 
 That means:
 
@@ -22,11 +22,6 @@ That means:
 
 ## How the current design fits
 
-The current implementation uses a simple HTTP-based distribution point and optional peer synchronization. That is enough to prove the end-to-end contract for:
+The current implementation uses a simple HTTP-based distribution point and optional peer synchronization. The HTTP publish, consume, sync, and verify E2E coverage is recorded in [RFC 0060 implementation notes](../rfcs/0060-distribution.md#implementation-notes).
 
-- publish
-- consume
-- sync
-- verify
-
-The beta E2E coverage now exercises that full path.
+[RFC 0104](../rfcs/0104-federation-transports.md) defines peer relationships and the experimental federation wire.

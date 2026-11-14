@@ -18,7 +18,7 @@ Independent implementations need one meaning for a Prayfile regardless of Ruby-l
 
 ## Guide-level explanation
 
-A project commits Prayfile and usually Prayfile.lock. `pray install` writes the lock and renders destinations. `pray format` rewrites the manifest toward `compose` / `tree` / `pray …, file:`.
+A project commits Prayfile and usually Prayfile.lock. `pray install` writes the lock and renders destinations. `pray format` rewrites the manifest toward `compose` / `tree` / `pray ..., file:`.
 
 Deprecated keywords `target`, `output`, `agent`, and `skills` still parse and warn. Changelog 1.6.0 schedules removal in CLI version 2. RFC 0102 tracks making destination DSL the documented default.
 
@@ -131,9 +131,7 @@ Example:
 }
 ```
 
-The canonical model, not textual formatting, defines meaning.
-
-Whitespace-only changes should not affect lockfile resolution.
+The canonical model defines meaning. Whitespace-only changes should not affect lockfile resolution.
 
 ---
 
@@ -218,7 +216,7 @@ render mode: :managed,
 
 Declares spec version.
 
-```
+```manifest
 prayfile "1"
 ```
 
@@ -228,7 +226,7 @@ Required.
 
 Declares package source.
 
-```
+```manifest
 source "default", "https://agents.example.com"
 source "sample", "git+ssh://git@example.com/agent-index.git"
 source "team", "pray+ssh://pray@prayers.internal"
@@ -241,9 +239,9 @@ Supported source kinds: `registry`, `static_index`, `git`, `path`, `tarball`, `o
 
 #### target
 
-Optional grouping for legacy Prayfiles and selective apply. Not required when using top-level `compose` / `tree` / `pray …, file:`.
+Optional grouping for legacy Prayfiles and selective apply. Not required when using top-level `compose` / `tree` / `pray ..., file:`.
 
-Deprecated in prayfile `"1"`: implementations should warn that `target`, nested `output`, and nested `skills` will be removed in version 2. Prefer `compose` / `tree` / `folder`. Top-level `output "path" do … end` (compose alias) is likewise deprecated in favor of `compose`. Top-level `skills "path" do … end` is likewise deprecated in favor of `tree`.
+Deprecated in prayfile `"1"`: implementations should warn that `target`, nested `output`, and nested `skills` will be removed in version 2. Prefer `compose` / `tree` / `folder`. Top-level `output "path" do ... end` (compose alias) is likewise deprecated in favor of `compose`. Top-level `skills "path" do ... end` is likewise deprecated in favor of `tree`.
 
 ```manifest
 target :tool_a do
@@ -254,7 +252,7 @@ end
 
 Common target fields:
 
-```
+```manifest
 output "INSTRUCTIONS.md"
 folder ".agents/skills"
 commands ".tool-b/commands"
@@ -281,7 +279,7 @@ Rules:
 - Package inputs use fragment exports (see default export resolution).
 - Local bare paths embed human-owned files (no pray markers). A local path starts with `.` or `/`, or ends with `.md`, `.txt`, or `.markdown`. Any other unqualified name is a package (RFC 0117).
 - Markers are HTML comments (`<!-- pray:id -->`) only. Compose fails closed unless the destination accepts HTML comments, as specified by RFC 0108.
-- Alias: `output "AGENTS.md" do … end` at top level.
+- Alias: `output "AGENTS.md" do ... end` at top level.
 
 #### tree
 
@@ -318,16 +316,16 @@ Aliases: `use`, `include`. Legacy `agent` / `package` remain valid in prayfile `
 
 Forms:
 
-- `pray "owner/name", "constraint", …`: Package
-- `pray "owner/name", …, file: "path"`: Package file export at path (after `((pray:…))` substitution)
+- `pray "owner/name", "constraint", ...`: Package
+- `pray "owner/name", ..., file: "path"`: Package file export at path (after `((pray:...))` substitution)
 - `pray "relative/or/./path"` bare, inside `compose`: Local file embed
-- `pray do … end`: Default symbol map for `((pray:…))` placeholders
+- `pray do ... end`: Default symbol map for `((pray:...))` placeholders
 
 `file:` rules:
 
 - Package form requires a `file`-typed package export (default export resolution applies).
 - Local path form MUST fail parse. RFC 0115 proposed allowing it and is not adopted.
-- Writes UTF-8 text after `((pray:…))` substitution (binary non-UTF-8 copies as bytes); no pray markers; no agent header.
+- Writes UTF-8 text after `((pray:...))` substitution (binary non-UTF-8 copies as bytes); no pray markers; no agent header.
 - Exclusive ownership of the path. Refuse-clobber, symlink dest reject, lock ledger, and hash-gated prune are RFC 0033.
 - Destination strings MUST be project-relative. A leading `~` is a manifest error, not home expansion.
 - Mutually exclusive with nesting inside `compose` / `tree`.
@@ -344,20 +342,20 @@ pray do
 end
 ```
 
-Alias: `template do … end`.
+Alias: `template do ... end`.
 
 Surface sugar (optional, normalizes to the canonical form above):
 
-- `{ … }` blocks instead of `do` / `end` when the statement is a keyword call (`pray{…}`, `compose("AGENTS.md"){…}`, `compose "AGENTS.md"{…}`); assignment map literals such as `spec.exports = { … }` are left alone
+- `{ ... }` blocks instead of `do` / `end` when the statement is a keyword call (`pray{...}`, `compose("AGENTS.md"){...}`, `compose "AGENTS.md"{...}`); assignment map literals such as `spec.exports = { ... }` are left alone
 - top-level `;` statement separators (including one-liners)
 - optional call parentheses after keywords (`compose("AGENTS.md") do`)
-- optional call parentheses on symbol assignments (`support_email("…")`)
+- optional call parentheses on symbol assignments (`support_email("...")`)
 
 Still forbidden: interpolation, constants, variables, method chaining, and other executable Ruby.
 
 Placeholder form (strict, no spaces):
 
-```
+```text
 ((pray:<path>))
 ```
 
@@ -370,9 +368,9 @@ Examples: `((pray:support_email))`, `((pray:user.email))`.
 
 Rules:
 
-- Unknown `((pray:…))` symbols fail render.
+- Unknown `((pray:...))` symbols fail render.
 - Spaced forms such as `(( pray:email ))` are not placeholders.
-- Only the `pray` resolver is implemented; other resolvers such as `((env:…))` are reserved for later.
+- Only the `pray` resolver is implemented; other resolvers such as `((env:...))` are reserved for later.
 - Verify compares provisioned UTF-8 files to the substituted expected content, not the raw package bytes.
 
 Default export resolution when `export:` / `exports:` omitted:
@@ -396,7 +394,7 @@ agent "sample/webapp", "~> 2.1",
 
 Supported options:
 
-```
+```text
 source: :sample
 export: "name"
 exports: [...]
@@ -439,7 +437,7 @@ Rules:
 
 Includes human-owned local project context.
 
-```
+```manifest
 local ".agents/project.md"
 local ".agents/security.md", position: :after
 local ".agents/security.md", at: :start
@@ -474,7 +472,7 @@ Supported fields: `mode`, `conflict`, `churn`, `header`. Parsers MUST reject `se
 
 Supported constraints:
 
-```
+```text
 = 1.2.3       exact
 1.2.3         exact shorthand
 ~> 1.2        pessimistic
@@ -490,13 +488,13 @@ The pessimistic operator follows Ruby version semantics. `~> X.Y` admits later m
 
 Pre-release versions require explicit opt-in:
 
-```
+```manifest
 agent "sample/base", "2.0.0-beta.1"
 ```
 
 or:
 
-```
+```manifest
 agent "sample/base", "~> 2.0.beta", prerelease: true
 ```
 
@@ -508,7 +506,7 @@ Default resolver should avoid pre-release versions.
 
 Package names use slash-separated identifiers:
 
-```
+```text
 namespace/name
 ```
 

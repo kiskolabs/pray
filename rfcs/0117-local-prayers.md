@@ -14,7 +14,7 @@ A consumer project keeps local prayers as packages under a path source directory
 
 ## Motivation
 
-Compose of `.agents/project.md` is a short local embed. It does not look like a package, so people do not polish that text into something they can share. Path packages already exist, but `pray prayer init` scaffolds a versioned package in the current directory, and examples use `packages/`. That is the published-gem shape. A project-local gem does not need `gem build`.
+Compose of `.agents/project.md` embeds one local file. A path package lets authors declare files and exports for reuse. Path packages already exist. The current `pray prayer init` scaffolds a versioned package in the current directory, and examples use `packages/`. Project-local authoring needs scaffolding that works before packaging or publishing.
 
 A per-package `path:` next to compose `pray "project"` names the same prayer twice. A path source names the folder once.
 
@@ -41,11 +41,11 @@ The directory name is the author's. `prayers/` is the default when `pray prayer 
 
 Three repository shapes share these folders.
 
-A consumer keeps local prayers under a path source. The default is `prayers/<name>/`. There is no catalog.
+A consumer keeps local prayers under that path source without a catalog.
 
 A publisher keeps those sources beside `prayers/v1/`. A catalog of many prayers uses the same tree: one named directory per prayer.
 
-`prayers/v1/packages/` is catalog metadata. Root `packages/`, `dist/`, and `shared/` are not pray source conventions. `pray prayer init` without a Prayfile still scaffolds a standalone package in the current directory.
+`prayers/v1/packages/` is catalog metadata. Root `packages/`, `dist/`, and `shared/` are not pray source conventions.
 
 `pray prayer init` in a directory with a Prayfile writes `<dir>/<name>/` with no `spec.version`. It adds `source "local", path: "<dir>"` when the project has no path source. It declares `pray "<source>/<name>"` once, such as `pray "local/project"`: inside the first `compose` block when one exists, otherwise at the top level, never with `path:`. `spec.name` is that same token. A starter fragment is included.
 
