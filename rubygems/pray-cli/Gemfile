@@ -9,7 +9,7 @@ group :development do
   gem "bundler-audit", "~> 0.9"
   gem "json", ">= 2.21.2"
   gem "libyear-bundler", "~> 0.9"
-  gem "polyrun", "~> 2.2"
+  gem "polyrun", "~> 3.1"
   gem "rbs", "~> 4.0"
   gem "standard", "~> 1.52"
   gem "standard-custom", "~> 1.0"

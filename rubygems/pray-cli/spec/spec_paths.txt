@@ -34,6 +34,7 @@ spec/pray/lockfile_performance_spec.rb
 spec/pray/lockfile_spec.rb
 spec/pray/login_spec.rb
 spec/pray/manifest_json_spec.rb
+spec/pray/optional_dependencies_spec.rb
 spec/pray/package_spec_render_spec.rb
 spec/pray/package_tree_hash_spec.rb
 spec/pray/parser_spec.rb
@@ -45,7 +46,6 @@ spec/pray/publish_spec.rb
 spec/pray/registry_search_spec.rb
 spec/pray/registry_spec.rb
 spec/pray/related_prayers_spec.rb
-spec/pray/optional_dependencies_spec.rb
 spec/pray/render_content_spec.rb
 spec/pray/render_patch_spec.rb
 spec/pray/render_reconciliation_spec.rb

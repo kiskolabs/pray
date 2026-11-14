@@ -21,12 +21,12 @@ require "pray-cli"
 
 Dir[File.expand_path("support/**/*.rb", __dir__)].each { |path| require path }
 
-require "polyrun/rspec"
-Polyrun::RSpec.install_sharded_formatter_compat!
-Polyrun::RSpec.install_failure_fragments!
-Polyrun::RSpec.install_worker_ping!
-Polyrun::RSpec.install_example_debug!
-Polyrun::RSpec.install_example_timeout!
+require "polyrun/rspec_support"
+Polyrun::RSpecSupport.install_sharded_formatter_compat!
+Polyrun::RSpecSupport.install_failure_fragments!
+Polyrun::RSpecSupport.install_worker_ping!
+Polyrun::RSpecSupport.install_example_debug!
+Polyrun::RSpecSupport.install_example_timeout!
 
 RSpec.configure do |config|
   config.expect_with :rspec do |expectations|
